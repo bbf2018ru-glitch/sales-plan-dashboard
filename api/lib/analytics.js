@@ -320,7 +320,9 @@ function normalizeDb(db) {
     products: Array.isArray(db.products) ? db.products : [],
     plans: Array.isArray(db.plans) ? db.plans : [],
     sales: Array.isArray(db.sales) ? db.sales : [],
-    marketing: Array.isArray(db.marketing) ? db.marketing : []
+    marketing: Array.isArray(db.marketing) ? db.marketing : [],
+    ingestRuns: Array.isArray(db.ingestRuns) ? db.ingestRuns : [],
+    rawUppPayloads: Array.isArray(db.rawUppPayloads) ? db.rawUppPayloads : []
   };
 }
 

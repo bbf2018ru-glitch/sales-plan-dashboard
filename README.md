@@ -15,6 +15,8 @@
 - формирует executive summary для руководителя;
 - показывает маркетинговые метрики по каналам;
 - по кнопке запускает маркетинговый анализ и выдает выводы и советы;
+- принимает unified package import из `1С:УПП`;
+- ведет журнал загрузок и отсекает дублирующиеся пакеты;
 - обновляется автоматически через SSE и периодический polling;
 - принимает данные из 1С по HTTP JSON.
 
@@ -24,6 +26,8 @@
 - `web/` — frontend дашборда
 - `data/sample-db.json` — демо-данные
 - `examples/1c-payloads.http` — примеры запросов из 1С
+- `examples/upp-exchange-spec.md` — спецификация обмена для `1С:УПП`
+- `examples/upp-http-export-template.bsl` — шаблон кода выгрузки из `1С`
 
 ## Запуск
 
@@ -168,6 +172,44 @@ X-API-Key: demo-secret
 - список рисков;
 - список рекомендаций.
 
+### Unified import для 1С:УПП
+
+`POST /api/ingest/upp`
+
+Назначение:
+
+- принять единый пакет обмена из `1С:УПП`
+- сохранить сырой payload
+- записать запуск в журнал `ingest_runs`
+- отбросить повторный пакет по `packageId` или `payloadHash`
+- нормализовать данные в `plans`, `sales`, `marketing_metrics`
+
+Минимальный пример:
+
+```json
+{
+  "sourceSystem": "1c-upp",
+  "sourceObject": "regulated_exchange",
+  "packageId": "upp-2026-04-22-001",
+  "period": "2026-04",
+  "stores": [{ "id": "irk-1", "name": "Иркутск Центр", "region": "Иркутск" }],
+  "products": [{ "id": "coffee", "name": "Кофе", "category": "Напитки" }],
+  "plans": [{ "storeId": "irk-1", "productId": "coffee", "amount": 120000 }],
+  "sales": [{ "storeId": "irk-1", "productId": "coffee", "amount": 12500, "cost": 7200, "quantity": 48, "soldAt": "2026-04-22T09:00:00+08:00" }],
+  "marketingMetrics": [{ "channelId": "yandex-direct", "channelName": "Яндекс Директ", "spend": 85000, "leads": 620, "orders": 164, "revenue": 402000, "impressions": 480000, "clicks": 11800, "sessions": 9700 }]
+}
+```
+
+### Журнал загрузок
+
+`GET /api/ingest/runs?limit=20`
+
+Отдает последние запуски импорта со статусами:
+
+- `success`
+- `duplicate`
+- `failed`
+
 ## Управленческий слой
 
 `GET /api/dashboard/summary?period=2026-04`
@@ -179,6 +221,14 @@ X-API-Key: demo-secret
 - `daily` — дневной накопительный план-факт
 - `trend` — многомесячный тренд по периодам
 - `executive` — короткая сводка для руководителя
+
+## Что уже готово под УПП
+
+- отдельный endpoint под единый пакет обмена
+- дедупликация повторных загрузок
+- хранение сырого UPP payload
+- журнал запусков импорта
+- нормализация UPP-данных в витрину дашборда
 
 ## Что дальше
 

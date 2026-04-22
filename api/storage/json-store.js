@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const {
   normalizeDb,
@@ -7,6 +8,7 @@ const {
   appendSales,
   replaceMarketing
 } = require('../lib/analytics');
+const { normalizeUppPayload, validateNormalizedUppPayload } = require('../lib/upp');
 
 class JsonStore {
   constructor(options) {
@@ -46,6 +48,9 @@ class JsonStore {
 
   async appendSales(body) {
     const db = await this.getDb();
+    if (body.replace) {
+      db.sales = db.sales.filter((item) => item.period !== body.period);
+    }
     const period = appendSales(db, body);
     await this.saveDb(db);
     return {
@@ -62,6 +67,107 @@ class JsonStore {
       period,
       count: db.marketing.filter((item) => item.period === period).length
     };
+  }
+
+  async ingestUppPayload(payload) {
+    const normalized = normalizeUppPayload(payload);
+    validateNormalizedUppPayload(normalized);
+    const db = await this.getDb();
+    const duplicated = db.ingestRuns.find(
+      (item) => item.packageId === normalized.packageId || item.payloadHash === normalized.payloadHash
+    );
+
+    const runId = crypto.randomUUID();
+
+    if (duplicated) {
+      const duplicateRun = {
+        id: runId,
+        packageId: normalized.packageId,
+        payloadHash: normalized.payloadHash,
+        sourceSystem: normalized.sourceSystem,
+        sourceObject: normalized.sourceObject,
+        period: normalized.period,
+        status: 'duplicate',
+        stats: normalized.stats,
+        createdAt: new Date().toISOString()
+      };
+      db.ingestRuns.unshift(duplicateRun);
+      await this.saveDb(db);
+      return duplicateRun;
+    }
+
+    replacePlans(db, {
+      period: normalized.period,
+      stores: normalized.stores,
+      products: normalized.products,
+      plans: normalized.plans
+    });
+
+    db.sales = db.sales.filter((item) => item.period !== normalized.period);
+    appendSales(db, {
+      period: normalized.period,
+      stores: normalized.stores,
+      products: normalized.products,
+      sales: normalized.sales,
+      replace: true
+    });
+
+    replaceMarketing(db, {
+      period: normalized.period,
+      metrics: normalized.metrics
+    });
+
+    db.rawUppPayloads.unshift({
+      id: runId,
+      packageId: normalized.packageId,
+      period: normalized.period,
+      sourceSystem: normalized.sourceSystem,
+      sourceObject: normalized.sourceObject,
+      payload: normalized.raw,
+      createdAt: new Date().toISOString()
+    });
+
+    const run = {
+      id: runId,
+      packageId: normalized.packageId,
+      payloadHash: normalized.payloadHash,
+      sourceSystem: normalized.sourceSystem,
+      sourceObject: normalized.sourceObject,
+      period: normalized.period,
+      status: 'success',
+      stats: normalized.stats,
+      createdAt: new Date().toISOString()
+    };
+
+    db.ingestRuns.unshift(run);
+    await this.saveDb(db);
+    return run;
+  }
+
+  async listIngestRuns(limit = 20) {
+    const db = await this.getDb();
+    return db.ingestRuns.slice(0, limit);
+  }
+
+  async recordIngestFailure(payload, error) {
+    const db = await this.getDb();
+    const normalized = normalizeUppPayload(payload || {});
+    const run = {
+      id: crypto.randomUUID(),
+      packageId: normalized.packageId,
+      payloadHash: normalized.payloadHash,
+      sourceSystem: normalized.sourceSystem,
+      sourceObject: normalized.sourceObject,
+      period: normalized.period,
+      status: 'failed',
+      stats: normalized.stats,
+      error: error.message || String(error),
+      createdAt: new Date().toISOString()
+    };
+
+    db.ingestRuns.unshift(run);
+    await this.saveDb(db);
+    return run;
   }
 }
 

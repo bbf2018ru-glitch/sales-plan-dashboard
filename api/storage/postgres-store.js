@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { normalizeDb, monthKey } = require('../lib/analytics');
+const { normalizeUppPayload, validateNormalizedUppPayload } = require('../lib/upp');
 
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'sql', 'init.sql');
 
@@ -220,6 +221,184 @@ class PostgresStore {
     } finally {
       client.release();
     }
+  }
+
+  async ingestUppPayload(payload) {
+    await this.init();
+    const normalized = normalizeUppPayload(payload);
+    validateNormalizedUppPayload(normalized);
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('begin');
+
+      const duplicateCheck = await client.query(
+        `select id, status from ingest_runs
+         where package_id = $1 or payload_hash = $2
+         order by created_at desc
+         limit 1`,
+        [normalized.packageId, normalized.payloadHash]
+      );
+
+      if (duplicateCheck.rows[0]) {
+        const duplicateRun = await client.query(
+          `insert into ingest_runs (
+             package_id, payload_hash, source_system, source_object, period, status, stats_json
+           ) values ($1, $2, $3, $4, $5, $6, $7)
+           returning id, package_id as "packageId", payload_hash as "payloadHash", source_system as "sourceSystem",
+                     source_object as "sourceObject", period, status, stats_json as stats, created_at as "createdAt"`,
+          [
+            normalized.packageId,
+            normalized.payloadHash,
+            normalized.sourceSystem,
+            normalized.sourceObject,
+            normalized.period,
+            'duplicate',
+            JSON.stringify(normalized.stats)
+          ]
+        );
+        await client.query('commit');
+        return duplicateRun.rows[0];
+      }
+
+      await client.query(
+        `insert into raw_upp_payloads (package_id, payload_hash, source_system, source_object, period, payload_json)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [
+          normalized.packageId,
+          normalized.payloadHash,
+          normalized.sourceSystem,
+          normalized.sourceObject,
+          normalized.period,
+          JSON.stringify(normalized.raw)
+        ]
+      );
+
+      for (const store of normalized.stores) {
+        await client.query(
+          `insert into stores (id, name, region)
+           values ($1, $2, $3)
+           on conflict (id) do update set
+             name = excluded.name,
+             region = excluded.region`,
+          [store.id, store.name, store.region || '']
+        );
+      }
+
+      for (const product of normalized.products) {
+        await client.query(
+          `insert into products (id, name, category)
+           values ($1, $2, $3)
+           on conflict (id) do update set
+             name = excluded.name,
+             category = excluded.category`,
+          [product.id, product.name, product.category || '']
+        );
+      }
+
+      await client.query('delete from plans where period = $1', [normalized.period]);
+      for (const item of normalized.plans) {
+        if (!item.storeId || !item.productId) continue;
+        await client.query(
+          `insert into plans (period, store_id, product_id, amount)
+           values ($1, $2, $3, $4)`,
+          [normalized.period, item.storeId, item.productId, item.amount]
+        );
+      }
+
+      await client.query('delete from sales where period = $1', [normalized.period]);
+      for (const item of normalized.sales) {
+        if (!item.storeId || !item.productId) continue;
+        await client.query(
+          `insert into sales (period, store_id, product_id, amount, cost, quantity, sold_at)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
+          [normalized.period, item.storeId, item.productId, item.amount, item.cost || 0, item.quantity || 0, item.soldAt]
+        );
+      }
+
+      await client.query('delete from marketing_metrics where period = $1', [normalized.period]);
+      for (const item of normalized.metrics) {
+        if (!item.channelId) continue;
+        await client.query(
+          `insert into marketing_metrics (
+             period, channel_id, channel_name, spend, leads, orders, revenue, impressions, clicks, sessions
+           ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            normalized.period,
+            item.channelId,
+            item.channelName,
+            item.spend || 0,
+            item.leads || 0,
+            item.orders || 0,
+            item.revenue || 0,
+            item.impressions || 0,
+            item.clicks || 0,
+            item.sessions || 0
+          ]
+        );
+      }
+
+      const run = await client.query(
+        `insert into ingest_runs (
+           package_id, payload_hash, source_system, source_object, period, status, stats_json
+         ) values ($1, $2, $3, $4, $5, $6, $7)
+         returning id, package_id as "packageId", payload_hash as "payloadHash", source_system as "sourceSystem",
+                   source_object as "sourceObject", period, status, stats_json as stats, created_at as "createdAt"`,
+        [
+          normalized.packageId,
+          normalized.payloadHash,
+          normalized.sourceSystem,
+          normalized.sourceObject,
+          normalized.period,
+          'success',
+          JSON.stringify(normalized.stats)
+        ]
+      );
+
+      await client.query('commit');
+      return run.rows[0];
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listIngestRuns(limit = 20) {
+    await this.init();
+    const result = await this.pool.query(
+      `select id, package_id as "packageId", payload_hash as "payloadHash", source_system as "sourceSystem",
+              source_object as "sourceObject", period, status, stats_json as stats, error_text as error, created_at as "createdAt"
+       from ingest_runs
+       order by created_at desc
+       limit $1`,
+      [limit]
+    );
+    return result.rows;
+  }
+
+  async recordIngestFailure(payload, error) {
+    await this.init();
+    const normalized = normalizeUppPayload(payload || {});
+    const result = await this.pool.query(
+      `insert into ingest_runs (
+         package_id, payload_hash, source_system, source_object, period, status, stats_json, error_text
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+       returning id, package_id as "packageId", payload_hash as "payloadHash", source_system as "sourceSystem",
+                 source_object as "sourceObject", period, status, stats_json as stats, error_text as error, created_at as "createdAt"`,
+      [
+        normalized.packageId,
+        normalized.payloadHash,
+        normalized.sourceSystem,
+        normalized.sourceObject,
+        normalized.period,
+        'failed',
+        JSON.stringify(normalized.stats),
+        error.message || String(error)
+      ]
+    );
+    return result.rows[0];
   }
 }
 

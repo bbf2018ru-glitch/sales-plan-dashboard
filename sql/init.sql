@@ -53,3 +53,36 @@ create table if not exists marketing_metrics (
 
 create index if not exists idx_marketing_period on marketing_metrics(period);
 create index if not exists idx_marketing_period_channel on marketing_metrics(period, channel_id);
+
+create table if not exists ingest_runs (
+  id bigserial primary key,
+  package_id text not null,
+  payload_hash text not null,
+  source_system text not null default '1c-upp',
+  source_object text not null default 'sales_exchange',
+  period text not null,
+  status text not null,
+  stats_json jsonb not null default '{}'::jsonb,
+  error_text text,
+  created_at timestamptz not null default now()
+);
+
+alter table ingest_runs add column if not exists error_text text;
+
+create index if not exists idx_ingest_runs_created_at on ingest_runs(created_at desc);
+create index if not exists idx_ingest_runs_package_id on ingest_runs(package_id);
+create index if not exists idx_ingest_runs_payload_hash on ingest_runs(payload_hash);
+
+create table if not exists raw_upp_payloads (
+  id bigserial primary key,
+  package_id text not null,
+  payload_hash text not null,
+  source_system text not null default '1c-upp',
+  source_object text not null default 'sales_exchange',
+  period text not null,
+  payload_json jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_raw_upp_payloads_created_at on raw_upp_payloads(created_at desc);
+create index if not exists idx_raw_upp_payloads_package_id on raw_upp_payloads(package_id);

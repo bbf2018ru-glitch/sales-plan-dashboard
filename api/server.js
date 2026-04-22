@@ -138,13 +138,15 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === '/api/health' && req.method === 'GET') {
       const db = await store.getDb();
+      const ingestRuns = await store.listIngestRuns(1);
       sendJson(res, 200, {
         status: 'ok',
         storage: DATABASE_URL ? 'postgres' : 'json',
         periods: listPeriods(db),
         stores: db.stores.length,
         products: db.products.length,
-        marketingRows: db.marketing.length
+        marketingRows: db.marketing.length,
+        lastIngestRun: ingestRuns[0] || null
       });
       return;
     }
@@ -206,6 +208,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/ingest/runs' && req.method === 'GET') {
+      const limit = Number(parsedUrl.searchParams.get('limit') || 20);
+      const runs = await store.listIngestRuns(Math.min(Math.max(limit, 1), 100));
+      sendJson(res, 200, { runs });
+      return;
+    }
+
     if (pathname === '/api/ingest/plans' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
       const body = await parseBody(req);
@@ -248,6 +257,31 @@ const server = http.createServer(async (req, res) => {
         period,
         metricsCount: count
       });
+      return;
+    }
+
+    if (pathname === '/api/ingest/upp' && req.method === 'POST') {
+      if (!requireApiKey(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        const run = await store.ingestUppPayload(body);
+        const db = await store.getDb();
+        const summary = aggregateDashboard(db, run.period);
+        const marketing = aggregateMarketing(db, run.period);
+        sendEvent('plans_updated', { period: run.period, totals: summary.totals });
+        sendEvent('sales_updated', { period: run.period, totals: summary.totals });
+        sendEvent('marketing_updated', { period: run.period, totals: marketing.totals });
+        sendJson(res, 200, {
+          ok: true,
+          run
+        });
+      } catch (error) {
+        const failedRun = await store.recordIngestFailure(body, error);
+        sendJson(res, 500, {
+          error: error.message || 'UPP import failed',
+          run: failedRun
+        });
+      }
       return;
     }
 

@@ -91,3 +91,50 @@ Content-Type: application/json
 {
   "period": "2026-04"
 }
+
+### UPP unified package import
+POST http://localhost:3000/api/ingest/upp
+X-API-Key: demo-secret
+Content-Type: application/json
+
+{
+  "sourceSystem": "1c-upp",
+  "sourceObject": "regulated_exchange",
+  "packageId": "upp-2026-04-22-001",
+  "period": "2026-04",
+  "stores": [
+    { "id": "irk-1", "name": "Иркутск Центр", "region": "Иркутск" }
+  ],
+  "products": [
+    { "id": "coffee", "name": "Кофе", "category": "Напитки" }
+  ],
+  "plans": [
+    { "storeId": "irk-1", "productId": "coffee", "amount": 120000 }
+  ],
+  "sales": [
+    {
+      "storeId": "irk-1",
+      "productId": "coffee",
+      "amount": 12500,
+      "cost": 7200,
+      "quantity": 48,
+      "soldAt": "2026-04-22T09:00:00+08:00"
+    }
+  ],
+  "marketingMetrics": [
+    {
+      "channelId": "yandex-direct",
+      "channelName": "Яндекс Директ",
+      "spend": 85000,
+      "leads": 620,
+      "orders": 164,
+      "revenue": 402000,
+      "impressions": 480000,
+      "clicks": 11800,
+      "sessions": 9700
+    }
+  ]
+}
+
+### Ingest runs
+GET http://localhost:3000/api/ingest/runs?limit=20
