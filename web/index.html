@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Дашборд продаж</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-kicker">Sales Monitor</div>
+          <h1>План продаж</h1>
+          <p>Онлайн-контроль продаж, плана и маркетинговой эффективности</p>
+        </div>
+
+        <div class="sidebar-card">
+          <label for="periodSelect">Период</label>
+          <select id="periodSelect"></select>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-card-title">Статус потока</div>
+          <div id="streamStatus" class="status-pill idle">ожидание данных</div>
+          <div id="lastUpdate" class="muted">последнее обновление: нет</div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-card-title">Интеграция с 1С</div>
+          <p class="muted">
+            1С отправляет планы, продажи и маркетинг в `/api/ingest/plans`,
+            `/api/ingest/sales` и `/api/ingest/marketing`.
+          </p>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-card-title">Маркетинговый анализ</div>
+          <p class="muted">
+            Запускается по кнопке, считает ROAS, CPL, CAC, находит риски и дает рекомендации.
+          </p>
+          <button id="runAnalysisButton" class="primary-button" type="button">
+            Запустить анализ
+          </button>
+          <div id="analysisStatus" class="muted sidebar-note">анализ еще не запускался</div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="hero">
+          <div>
+            <div class="eyebrow">Контроль в реальном времени</div>
+            <h2>Дашборд продаж и маркетинга</h2>
+            <p class="hero-copy">
+              Отслеживайте выполнение плана, динамику точек, результативность каналов и получайте
+              быстрые управленческие рекомендации.
+            </p>
+          </div>
+          <div class="hero-badge">
+            <span>Данные обновляются автоматически</span>
+          </div>
+        </section>
+
+        <section id="kpis" class="kpi-grid"></section>
+
+        <section id="forecastPanel" class="forecast-grid"></section>
+
+        <section class="panel-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Сводка руководителя</div>
+                <div class="panel-subtitle">Ключевые выводы, приоритеты и риски</div>
+              </div>
+            </div>
+            <div id="executivePanel" class="executive-panel"></div>
+          </article>
+
+          <article class="panel panel-large">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Тренд по месяцам</div>
+                <div class="panel-subtitle">Последние периоды по плану, факту и выполнению</div>
+              </div>
+            </div>
+            <div id="trendPanel" class="trend-panel"></div>
+          </article>
+        </section>
+
+        <section class="panel-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Сравнение с прошлым периодом</div>
+                <div class="panel-subtitle">Что изменилось относительно предыдущего месяца</div>
+              </div>
+            </div>
+            <div id="comparisonPanel" class="comparison-panel"></div>
+          </article>
+
+          <article class="panel panel-large">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Дневной план-факт</div>
+                <div class="panel-subtitle">Накопительный ритм продаж по дням месяца</div>
+              </div>
+            </div>
+            <div id="dailyPanel" class="daily-panel"></div>
+          </article>
+        </section>
+
+        <section class="panel-grid">
+          <article class="panel panel-large">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">По точкам</div>
+                <div class="panel-subtitle">План, факт и процент выполнения</div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Точка</th>
+                    <th>План</th>
+                    <th>Факт</th>
+                    <th>%</th>
+                    <th>Отклонение</th>
+                  </tr>
+                </thead>
+                <tbody id="storesTable"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Лидер / Риск</div>
+                <div class="panel-subtitle">Сравнение лучших и слабых точек</div>
+              </div>
+            </div>
+            <div id="spotlight" class="spotlight"></div>
+          </article>
+        </section>
+
+        <section class="panel-grid">
+          <article class="panel panel-large">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">По товарам</div>
+                <div class="panel-subtitle">Какие категории тянут выручку</div>
+              </div>
+            </div>
+            <div id="productsList" class="rank-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Детализация точки</div>
+                <div class="panel-subtitle">Выберите строку в таблице слева</div>
+              </div>
+            </div>
+            <div id="storeDetails" class="details-empty">Выберите точку, чтобы увидеть товары.</div>
+          </article>
+        </section>
+
+        <section class="panel-grid marketing-grid">
+          <article class="panel panel-large">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Маркетинговые каналы</div>
+                <div class="panel-subtitle">Расход, выручка, ROAS, CPL, CAC и конверсия</div>
+              </div>
+            </div>
+            <div id="marketingSummary" class="marketing-summary"></div>
+            <div id="marketingChannels" class="rank-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Выводы и советы</div>
+                <div class="panel-subtitle">Результат запуска маркетингового анализа</div>
+              </div>
+            </div>
+            <div id="analysisPanel" class="analysis-empty">
+              Нажмите «Запустить анализ», чтобы получить выводы и рекомендации.
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+  </html>

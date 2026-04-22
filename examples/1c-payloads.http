@@ -1,0 +1,93 @@
+### Health
+GET http://localhost:3000/api/health
+
+### Dashboard summary
+GET http://localhost:3000/api/dashboard/summary?period=2026-04
+
+### Replace plans for period (из 1С: планирование продаж)
+POST http://localhost:3000/api/ingest/plans
+X-API-Key: demo-secret
+Content-Type: application/json
+
+{
+  "period": "2026-04",
+  "stores": [
+    { "id": "irk-1", "name": "Иркутск Центр", "region": "Иркутск" }
+  ],
+  "products": [
+    { "id": "coffee", "name": "Кофе", "category": "Напитки" }
+  ],
+  "plans": [
+    { "storeId": "irk-1", "productId": "coffee", "amount": 120000 }
+  ]
+}
+
+### Replace sales for period (из 1С: replace=true — безопасно слать весь месяц повторно)
+POST http://localhost:3000/api/ingest/sales
+X-API-Key: demo-secret
+Content-Type: application/json
+
+{
+  "period": "2026-04",
+  "replace": true,
+  "stores": [
+    { "id": "irk-1", "name": "Иркутск Центр", "region": "Иркутск" }
+  ],
+  "products": [
+    { "id": "coffee", "name": "Кофе", "category": "Напитки" }
+  ],
+  "sales": [
+    {
+      "storeId": "irk-1",
+      "productId": "coffee",
+      "amount": 12500,
+      "cost": 7200,
+      "quantity": 48,
+      "soldAt": "2026-04-20T16:00:00+08:00"
+    }
+  ]
+}
+
+### Replace marketing metrics for period
+POST http://localhost:3000/api/ingest/marketing
+X-API-Key: demo-secret
+Content-Type: application/json
+
+{
+  "period": "2026-04",
+  "metrics": [
+    {
+      "channelId": "yandex-direct",
+      "channelName": "Яндекс Директ",
+      "spend": 85000,
+      "leads": 620,
+      "orders": 164,
+      "revenue": 402000,
+      "impressions": 480000,
+      "clicks": 11800,
+      "sessions": 9700
+    },
+    {
+      "channelId": "vk-ads",
+      "channelName": "VK Ads",
+      "spend": 54000,
+      "leads": 410,
+      "orders": 92,
+      "revenue": 176000,
+      "impressions": 390000,
+      "clicks": 8300,
+      "sessions": 7000
+    }
+  ]
+}
+
+### Marketing dashboard
+GET http://localhost:3000/api/dashboard/marketing?period=2026-04
+
+### Run marketing analysis
+POST http://localhost:3000/api/analysis/marketing
+Content-Type: application/json
+
+{
+  "period": "2026-04"
+}

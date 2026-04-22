@@ -1,0 +1,12 @@
+{
+  "name": "sales-plan-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-time sales plan dashboard with 1C ingestion API",
+  "scripts": {
+    "start": "node api/server.js"
+  },
+  "dependencies": {
+    "pg": "^8.16.0"
+  }
+}
