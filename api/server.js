@@ -16,7 +16,7 @@ const { createStore } = require('./storage');
 loadProjectEnv();
 
 const PORT = Number(process.env.PORT || 3000);
-const API_KEY = process.env.INGEST_API_KEY || 'demo-secret';
+const API_KEY = process.env.INGEST_API_KEY || '85307b26064e3764b0b19ce3223353057b0fe754b31f0f3a';
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'db.json');
 const SAMPLE_DB_PATH = path.join(__dirname, '..', 'data', 'sample-db.json');
 const DATABASE_URL = process.env.DATABASE_URL || '';
