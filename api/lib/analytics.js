@@ -329,8 +329,8 @@ function normalizeDb(db) {
 function aggregatePeriodCore(db, period) {
   const stores = new Map(db.stores.map((item) => [item.id, item]));
   const products = new Map(db.products.map((item) => [item.id, item]));
-  const plans = db.plans.filter((item) => item.period === period);
-  const sales = db.sales.filter((item) => item.period === period);
+  const plans = db.plans.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
+  const sales = db.sales.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
 
   const byStore = new Map();
   const byProduct = new Map();

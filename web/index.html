@@ -3,388 +3,213 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sales Monitor</title>
+    <title>Мария — Продажи</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="shell">
+
+      <!-- ═══ SIDEBAR ═══ -->
       <aside class="sidebar">
         <div class="brand">
           <div class="brand-kicker">Sales Monitor</div>
           <h1>Мария</h1>
-          <p>Управленческая аналитика</p>
         </div>
 
         <div class="sidebar-card">
-          <label for="periodSelect">Период</label>
+          <label class="field-label" for="periodSelect">Период</label>
           <select id="periodSelect"></select>
         </div>
 
         <nav class="tab-nav">
           <button class="tab-btn active" data-tab="sales">
-            <span class="tab-icon">📊</span>Продажи
-          </button>
-          <button class="tab-btn" data-tab="marketing">
-            <span class="tab-icon">📣</span>Маркетинг
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Продажи
           </button>
           <button class="tab-btn" data-tab="reports">
-            <span class="tab-icon">📋</span>Отчёты
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+            Отчёты
           </button>
         </nav>
 
-        <div class="sidebar-card">
-          <div class="sidebar-card-title">Статус потока</div>
-          <div id="streamStatus" class="status-pill idle">ожидание данных</div>
-          <div id="lastUpdate" class="muted">последнее обновление: нет</div>
+        <div class="sidebar-card status-card">
+          <div class="status-row">
+            <div id="streamStatus" class="status-pill idle">● нет связи</div>
+          </div>
+          <div id="lastUpdate" class="field-hint">обновление: —</div>
         </div>
 
-        <!-- Sales sidebar -->
         <div id="sidebarSales" class="sidebar-section">
-          <div class="sidebar-card">
-            <div class="sidebar-card-title">Действия</div>
-            <button id="exportSalesBtn" class="secondary-button" type="button">⬇ Экспорт CSV</button>
-          </div>
+          <button id="exportSalesBtn" class="side-action-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Экспорт CSV
+          </button>
         </div>
 
-        <!-- Marketing sidebar -->
-        <div id="sidebarMarketing" class="sidebar-section hidden">
-          <div class="sidebar-card">
-            <div class="sidebar-card-title">Бюджет маркетинга</div>
-            <label class="input-label" for="totalBudgetInput">Фактический бюджет (₽)</label>
-            <input type="number" id="totalBudgetInput" class="text-input" placeholder="0" />
-            <button id="saveBudgetBtn" class="primary-button" type="button">Сохранить</button>
-          </div>
-          <div class="sidebar-card">
-            <div class="sidebar-card-title">Источники данных</div>
-            <div class="integration-list">
-              <div class="integration-item"><span>Яндекс Метрика</span><span class="badge">не подкл.</span></div>
-              <div class="integration-item"><span>Яндекс Директ</span><span class="badge">не подкл.</span></div>
-              <div class="integration-item"><span>ВКонтакте Ads</span><span class="badge">не подкл.</span></div>
-              <div class="integration-item"><span>Google Analytics</span><span class="badge">не подкл.</span></div>
-              <div class="integration-item"><span>2ГИС</span><span class="badge">не подкл.</span></div>
-            </div>
-          </div>
-          <div class="sidebar-card">
-            <div class="sidebar-card-title">Маркетинговый анализ</div>
-            <button id="runAnalysisButton" class="primary-button" type="button">Запустить анализ</button>
-            <div id="analysisStatus" class="muted sidebar-note">анализ не запускался</div>
-          </div>
-        </div>
-
-        <!-- Reports sidebar -->
         <div id="sidebarReports" class="sidebar-section hidden">
-          <div class="sidebar-card">
-            <div class="sidebar-card-title">Экспорт отчётов</div>
-            <button id="exportAbcBtn" class="secondary-button" type="button">⬇ ABC-анализ CSV</button>
-            <button id="exportRoiBtn" class="secondary-button" type="button">⬇ ROI-отчёт CSV</button>
-            <button id="exportGrowthBtn" class="secondary-button" type="button">⬇ Рост продаж CSV</button>
-          </div>
+          <button id="exportAbcBtn" class="side-action-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            ABC-анализ CSV
+          </button>
+          <button id="exportGrowthBtn" class="side-action-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Рост продаж CSV
+          </button>
         </div>
       </aside>
 
+      <!-- ═══ MAIN ═══ -->
       <main class="content">
 
-        <!-- ═══ TAB: ПРОДАЖИ ═══ -->
+        <!-- ── TAB: ПРОДАЖИ ── -->
         <div id="tabSales" class="tab-content">
-          <section class="hero">
-            <div>
-              <div class="eyebrow">Продажи</div>
-              <h2>Детальный анализ продаж</h2>
-              <p class="hero-copy">Графики, маржа, сортировка, прогноз и тренды в одном экране.</p>
-            </div>
-            <div class="hero-badge"><span>Данные в реальном времени</span></div>
+
+          <!-- Блок 1: KPI -->
+          <section class="section">
+            <div class="section-label">Итоги периода</div>
+            <div id="kpis" class="kpi-grid"></div>
           </section>
 
-          <section id="kpis" class="kpi-grid"></section>
-          <section id="forecastPanel" class="forecast-grid"></section>
+          <!-- Блок 2: Прогноз -->
+          <section class="section">
+            <div class="section-label">Прогноз и ритм</div>
+            <div id="forecastPanel" class="forecast-grid"></div>
+          </section>
 
-          <section class="panel-grid">
-            <article class="panel panel-large">
+          <!-- Блок 3: Графики -->
+          <section class="section panel-grid">
+            <article class="panel">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">Тренд по месяцам</div>
-                  <div class="panel-subtitle">6 последних периодов — план и факт</div>
-                </div>
+                <div class="panel-title">Тренд по месяцам</div>
+                <div class="panel-subtitle">план и факт за 6 периодов</div>
               </div>
               <div id="trendChart" class="chart-wrap"></div>
             </article>
-            <article class="panel">
+            <article class="panel panel-narrow">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">vs. прошлый период</div>
-                  <div class="panel-subtitle">Что изменилось</div>
-                </div>
+                <div class="panel-title">Изменение</div>
+                <div class="panel-subtitle">vs прошлый период</div>
               </div>
               <div id="comparisonPanel"></div>
             </article>
           </section>
 
-          <section class="panel-grid">
-            <article class="panel panel-large">
+          <!-- Блок 4: Дневной ритм -->
+          <section class="section panel-grid">
+            <article class="panel">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">Дневной план-факт</div>
-                  <div class="panel-subtitle">Накопительный ритм продаж</div>
-                </div>
+                <div class="panel-title">Дневной план-факт</div>
+                <div class="panel-subtitle">накопительный ритм по дням</div>
               </div>
               <div id="dailyChart" class="chart-wrap"></div>
             </article>
-            <article class="panel">
+            <article class="panel panel-narrow">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">Лидер / Риск</div>
-                  <div class="panel-subtitle">Топ и аутсайдер по точкам</div>
-                </div>
+                <div class="panel-title">Лидер / Риск</div>
               </div>
               <div id="spotlight" class="spotlight"></div>
             </article>
           </section>
 
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">По точкам</div>
-                  <div class="panel-subtitle">Нажмите заголовок для сортировки</div>
-                </div>
-                <button id="exportSalesBtnHeader" class="secondary-button-sm">⬇ CSV</button>
+          <!-- Блок 5: Таблица точек -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">По точкам</div>
+                <div class="section-hint">Нажмите заголовок для сортировки · строку — для детализации</div>
               </div>
+              <button id="exportSalesBtnH" class="icon-btn" title="Экспорт CSV">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                CSV
+              </button>
+            </div>
+            <div class="panel">
               <div class="table-wrap">
                 <table id="storesTableEl">
                   <thead>
                     <tr>
+                      <th class="col-num">#</th>
                       <th data-sort="storeName" class="sortable">Точка</th>
-                      <th data-sort="plan" class="sortable">План</th>
-                      <th data-sort="fact" class="sortable">Факт</th>
-                      <th data-sort="percent" class="sortable">%</th>
-                      <th data-sort="margin" class="sortable">Маржа</th>
-                      <th data-sort="marginPct" class="sortable">Марж.%</th>
-                      <th data-sort="gap" class="sortable">Откл.</th>
-                      <th>Тренд</th>
+                      <th data-sort="fact" class="sortable num">Факт</th>
+                      <th data-sort="plan" class="sortable num">План</th>
+                      <th data-sort="percent" class="sortable num">%</th>
+                      <th data-sort="margin" class="sortable num">Маржа</th>
+                      <th data-sort="marginPct" class="sortable num">Марж.%</th>
+                      <th data-sort="avgCheck" class="sortable num">Ср. чек</th>
+                      <th data-sort="quantity" class="sortable num">Шт</th>
+                      <th class="num">Тренд</th>
                     </tr>
                   </thead>
                   <tbody id="storesTable"></tbody>
                 </table>
               </div>
-            </article>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Детализация точки</div>
-                  <div class="panel-subtitle">Выберите строку слева</div>
-                </div>
-              </div>
-              <div id="storeDetails" class="details-empty">Выберите точку в таблице.</div>
-            </article>
-          </section>
-
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div><div class="panel-title">По товарам</div></div>
-                <div class="sort-controls">
-                  <select id="productSort" class="sort-select">
-                    <option value="fact">По выручке</option>
-                    <option value="percent">По %</option>
-                    <option value="margin">По марже</option>
-                    <option value="quantity">По кол-ву</option>
-                  </select>
-                </div>
-              </div>
-              <div id="productsList" class="rank-list"></div>
-            </article>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Тренд рынка</div>
-                  <div class="panel-subtitle">Иркутск и Россия</div>
-                </div>
-              </div>
-              <div id="marketTrend" class="market-trend-panel"></div>
-            </article>
-          </section>
-        </div>
-
-        <!-- ═══ TAB: МАРКЕТИНГ ═══ -->
-        <div id="tabMarketing" class="tab-content hidden">
-          <section class="hero">
-            <div>
-              <div class="eyebrow">Маркетинг</div>
-              <h2>Эффективность каналов и ROI</h2>
-              <p class="hero-copy">Анализ затрат, возврата инвестиций, источники трафика и рекомендации.</p>
             </div>
           </section>
 
-          <section id="marketingKpis" class="kpi-grid"></section>
-
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Каналы продвижения</div>
-                  <div class="panel-subtitle">ROAS, ROI, CPL, CAC, конверсия по каждому каналу</div>
-                </div>
-              </div>
-              <div id="marketingChannels" class="rank-list"></div>
-            </article>
+          <!-- Блок 6: Детализация + Товары -->
+          <section class="section panel-grid">
             <article class="panel">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">Расчёт ROI</div>
-                  <div class="panel-subtitle">Введите фактический бюджет</div>
-                </div>
+                <div class="panel-title" id="storeDetailTitle">Детализация точки</div>
+                <div class="panel-subtitle">выберите строку в таблице</div>
               </div>
-              <div class="roi-calculator">
-                <div class="roi-field">
-                  <label class="input-label" for="roiBudget">Бюджет (₽)</label>
-                  <input type="number" id="roiBudget" class="text-input" placeholder="Введите бюджет..." />
-                </div>
-                <div id="roiResult"></div>
+              <div id="storeDetails" class="empty-state">Нажмите на строку таблицы, чтобы увидеть детализацию по товарам</div>
+            </article>
+            <article class="panel panel-narrow">
+              <div class="panel-header">
+                <div class="panel-title">По товарам</div>
+                <select id="productSort" class="sort-select">
+                  <option value="fact">По выручке</option>
+                  <option value="percent">По %</option>
+                  <option value="margin">По марже</option>
+                  <option value="quantity">По кол-ву</option>
+                </select>
               </div>
+              <div id="productsList" class="products-list"></div>
             </article>
           </section>
 
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Выводы и рекомендации</div>
-                  <div class="panel-subtitle">Что улучшилось, что ухудшилось, что делать</div>
-                </div>
-              </div>
-              <div id="analysisPanel" class="analysis-empty">Нажмите «Запустить анализ» в боковой панели.</div>
-            </article>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Динамика за месяц</div>
-                  <div class="panel-subtitle">Авто-сравнение с предыдущим периодом</div>
-                </div>
-              </div>
-              <div id="marketingDynamics" class="muted">Загрузка...</div>
-            </article>
-          </section>
-
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Анализ конкурентов</div>
-                  <div class="panel-subtitle">Еженедельный мониторинг — ручные заметки</div>
-                </div>
-              </div>
-              <div id="competitorPanel">
-                <p class="muted">Для автоматического мониторинга подключите источник новостей. Пока добавляйте заметки вручную.</p>
-                <textarea id="competitorNotes" class="competitor-textarea" placeholder="Заметки о конкурентах: акции, новые точки, цены..."></textarea>
-                <button id="saveNotesBtn" class="secondary-button" type="button">Сохранить заметки</button>
-                <div id="competitorNotesSaved"></div>
-              </div>
-            </article>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Подключить источники</div>
-                  <div class="panel-subtitle">Интеграция с рекламными платформами</div>
-                </div>
-              </div>
-              <div class="integration-setup">
-                <div class="integration-row">
-                  <div><div class="integration-name">Яндекс Метрика</div><div class="muted" style="font-size:13px">Трафик, источники, конверсии</div></div>
-                  <button class="badge-btn" data-source="Яндекс Метрика">Подключить</button>
-                </div>
-                <div class="integration-row">
-                  <div><div class="integration-name">Яндекс Директ</div><div class="muted" style="font-size:13px">Расходы, клики, кампании</div></div>
-                  <button class="badge-btn" data-source="Яндекс Директ">Подключить</button>
-                </div>
-                <div class="integration-row">
-                  <div><div class="integration-name">ВКонтакте Ads</div><div class="muted" style="font-size:13px">Охваты, клики, заказы</div></div>
-                  <button class="badge-btn" data-source="ВКонтакте Ads">Подключить</button>
-                </div>
-                <div class="integration-row">
-                  <div><div class="integration-name">Google Analytics 4</div><div class="muted" style="font-size:13px">Веб-аналитика, события</div></div>
-                  <button class="badge-btn" data-source="Google Analytics 4">Подключить</button>
-                </div>
-                <div class="integration-row">
-                  <div><div class="integration-name">2ГИС</div><div class="muted" style="font-size:13px">Рейтинг точек, отзывы</div></div>
-                  <button class="badge-btn" data-source="2ГИС">Подключить</button>
-                </div>
-              </div>
-            </article>
-          </section>
         </div>
 
-        <!-- ═══ TAB: ОТЧЁТЫ ═══ -->
+        <!-- ── TAB: ОТЧЁТЫ ── -->
         <div id="tabReports" class="tab-content hidden">
-          <section class="hero">
-            <div>
-              <div class="eyebrow">Отчёты</div>
-              <h2>Аналитические отчёты</h2>
-              <p class="hero-copy">ABC-анализ, ROI, рост продаж и сводка руководителя.</p>
-            </div>
-          </section>
 
-          <section class="panel-grid">
-            <article class="panel panel-large">
+          <!-- Блок 1: ABC -->
+          <section class="section panel-grid">
+            <article class="panel">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">ABC-анализ товаров</div>
-                  <div class="panel-subtitle">A — 80% выручки · B — 15% · C — 5%</div>
-                </div>
+                <div class="panel-title">ABC — товары</div>
+                <div class="panel-subtitle">A: 80% выручки · B: 15% · C: 5%</div>
               </div>
-              <div id="abcProducts" class="abc-panel"></div>
+              <div id="abcProducts" class="table-wrap"></div>
             </article>
             <article class="panel">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">ABC-анализ точек</div>
-                  <div class="panel-subtitle">По объёму выручки</div>
-                </div>
+                <div class="panel-title">ABC — точки</div>
+                <div class="panel-subtitle">по объёму выручки</div>
               </div>
-              <div id="abcStores" class="abc-panel"></div>
+              <div id="abcStores" class="table-wrap"></div>
             </article>
           </section>
 
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">ROI по каналам</div>
-                  <div class="panel-subtitle">Возврат инвестиций на маркетинг</div>
-                </div>
-              </div>
-              <div id="roiReport" class="table-wrap"></div>
-            </article>
+          <!-- Блок 2: Рост + Сводка -->
+          <section class="section panel-grid">
             <article class="panel">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">Сводка руководителя</div>
-                  <div class="panel-subtitle">Ключевые выводы, приоритеты, риски</div>
-                </div>
-              </div>
-              <div id="executivePanel" class="executive-panel"></div>
-            </article>
-          </section>
-
-          <section class="panel-grid">
-            <article class="panel panel-large">
-              <div class="panel-header">
-                <div>
-                  <div class="panel-title">Рост продаж</div>
-                  <div class="panel-subtitle">Динамика по 6 месяцам</div>
-                </div>
+                <div class="panel-title">Рост продаж</div>
+                <div class="panel-subtitle">динамика по месяцам</div>
               </div>
               <div id="growthReport" class="table-wrap"></div>
             </article>
-            <article class="panel">
+            <article class="panel panel-narrow">
               <div class="panel-header">
-                <div>
-                  <div class="panel-title">Сводный отчёт продаж</div>
-                  <div class="panel-subtitle">Все точки за период</div>
-                </div>
+                <div class="panel-title">Сводка</div>
+                <div class="panel-subtitle">ключевые выводы</div>
               </div>
-              <div id="salesReport" class="table-wrap"></div>
+              <div id="executivePanel"></div>
             </article>
           </section>
+
         </div>
 
       </main>
