@@ -26,18 +26,20 @@
           <div class="modal-title">Редактировать план</div>
           <button id="modalClose" class="modal-close">&times;</button>
         </div>
-        <div id="modalStoreName" class="modal-meta"></div>
-        <div class="table-wrap">
-          <table id="planEditTable">
-            <thead>
-              <tr>
-                <th>Товар</th>
-                <th class="num">Текущий план</th>
-                <th class="num">Новый план</th>
-              </tr>
-            </thead>
-            <tbody id="planEditBody"></tbody>
-          </table>
+        <div class="modal-body" style="padding-top:4px">
+          <div id="modalStoreName" class="modal-store-name"></div>
+          <div class="table-wrap">
+            <table id="planEditTable">
+              <thead>
+                <tr>
+                  <th>Товар</th>
+                  <th class="num">Текущий план</th>
+                  <th class="num">Новый план</th>
+                </tr>
+              </thead>
+              <tbody id="planEditBody"></tbody>
+            </table>
+          </div>
         </div>
         <div class="modal-footer">
           <button id="planSaveBtn" class="btn-primary">Сохранить изменения</button>
@@ -53,7 +55,9 @@
           <div class="modal-title">Интеграция с 1С УПП</div>
           <button id="uppGuideClose" class="modal-close">&times;</button>
         </div>
-        <div id="uppGuideContent" class="guide-content"></div>
+        <div class="modal-body">
+          <div id="uppGuideContent" class="guide-content"></div>
+        </div>
       </div>
     </div>
 

@@ -600,6 +600,14 @@ th.sortable:hover { color: var(--accent); }
 th.num, td.num { text-align: right; }
 th.col-num, td.col-num { width: 32px; color: var(--hint); text-align: center; }
 
+/* ── Modal store name ────────────────────────────────────────── */
+.modal-store-name {
+  padding: 0 24px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 /* ── Plan edit column ────────────────────────────────────────── */
 th.col-edit { width: 44px; text-align: center; }
 td.col-edit { text-align: center; }

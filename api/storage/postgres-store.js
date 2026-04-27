@@ -5,6 +5,7 @@ const { normalizeDb, monthKey } = require('../lib/analytics');
 const { normalizeUppPayload, validateNormalizedUppPayload } = require('../lib/upp');
 
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'sql', 'init.sql');
+const SAMPLE_PATH = path.join(__dirname, '..', '..', 'data', 'sample-db.json');
 
 class PostgresStore {
   constructor(options) {
@@ -30,6 +31,53 @@ class PostgresStore {
 
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
     await this.pool.query(schema);
+
+    // Seed sample data on first run (when no stores exist)
+    const existing = await this.pool.query('select count(*)::int as cnt from stores');
+    if (existing.rows[0].cnt === 0) {
+      try {
+        const sample = JSON.parse(fs.readFileSync(SAMPLE_PATH, 'utf8'));
+        await this._seedSample(sample);
+      } catch (_) { /* non-fatal: seed failure should not break startup */ }
+    }
+  }
+
+  async _seedSample(sample) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      for (const s of (sample.stores || [])) {
+        await client.query(
+          `insert into stores (id, name, region) values ($1, $2, $3) on conflict (id) do nothing`,
+          [s.id, s.name, s.region || '']
+        );
+      }
+      for (const p of (sample.products || [])) {
+        await client.query(
+          `insert into products (id, name, category) values ($1, $2, $3) on conflict (id) do nothing`,
+          [p.id, p.name, p.category || '']
+        );
+      }
+      for (const r of (sample.plans || [])) {
+        await client.query(
+          `insert into plans (period, store_id, product_id, amount) values ($1, $2, $3, $4) on conflict (period, store_id, product_id) do nothing`,
+          [r.period, r.storeId, r.productId, r.amount || 0]
+        );
+      }
+      for (const r of (sample.sales || [])) {
+        await client.query(
+          `insert into sales (period, store_id, product_id, amount, cost, quantity, sold_at)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
+          [r.period, r.storeId, r.productId, r.amount || 0, r.cost || 0, r.quantity || 0, r.soldAt || new Date().toISOString()]
+        );
+      }
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async getDb() {
@@ -376,6 +424,44 @@ class PostgresStore {
       [limit]
     );
     return result.rows;
+  }
+
+  async getComments(period) {
+    await this.init();
+    const q = period
+      ? `select id::text, period, text, author, created_at as "createdAt"
+         from comments where period = $1 order by created_at desc`
+      : `select id::text, period, text, author, created_at as "createdAt"
+         from comments order by created_at desc`;
+    const result = await this.pool.query(q, period ? [period] : []);
+    return result.rows;
+  }
+
+  async addComment(period, text, author) {
+    await this.init();
+    const result = await this.pool.query(
+      `insert into comments (period, text, author) values ($1, $2, $3)
+       returning id::text, period, text, author, created_at as "createdAt"`,
+      [String(period), String(text).slice(0, 2000), String(author || 'Менеджер').slice(0, 100)]
+    );
+    return result.rows[0];
+  }
+
+  async deleteComment(id) {
+    await this.init();
+    const result = await this.pool.query('delete from comments where id::text = $1', [id]);
+    return (result.rowCount || 0) > 0;
+  }
+
+  async editPlanItem(period, storeId, productId, amount) {
+    await this.init();
+    await this.pool.query(
+      `insert into plans (period, store_id, product_id, amount)
+       values ($1, $2, $3, $4)
+       on conflict (period, store_id, product_id) do update set amount = excluded.amount`,
+      [period, storeId, productId, Number(amount)]
+    );
+    return { period, storeId, productId, amount: Number(amount) };
   }
 
   async recordIngestFailure(payload, error) {

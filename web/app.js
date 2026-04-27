@@ -1234,9 +1234,8 @@ function renderIngestHistory(runs) {
     el.innerHTML = '<div class="empty-state">Нет истории загрузок.</div>'; return;
   }
   const statusBadge = s => {
-    const cls = s === 'success' ? 'good' : s === 'duplicate' ? 'warn' : 'bad';
     const txt = s === 'success' ? 'Успех' : s === 'duplicate' ? 'Дубликат' : 'Ошибка';
-    return `<span class="abc-badge abc-${s === 'success' ? 'A' : s === 'duplicate' ? 'B' : 'C'}">${txt}</span>`;
+    return `<span class="ingest-badge ${s}">${txt}</span>`;
   };
   el.innerHTML = `<table><thead><tr>
     <th>Дата</th>
@@ -1253,8 +1252,8 @@ function renderIngestHistory(runs) {
       <td>${r.period || '—'}</td>
       <td>${r.sourceSystem || '—'}</td>
       <td><small class="muted">${(r.sourceObject || '—').slice(0, 40)}</small></td>
-      <td class="num">${r.stats?.plansCount || 0}</td>
-      <td class="num">${r.stats?.salesCount || 0}</td>
+      <td class="num">${r.stats?.plans || 0}</td>
+      <td class="num">${r.stats?.sales || 0}</td>
       <td>${statusBadge(r.status)}</td>
       <td><small class="muted">${r.error ? r.error.slice(0, 60) : ''}</small></td>
     </tr>`).join('')}
@@ -1559,11 +1558,10 @@ async function loadMetadata() {
   $('periodSelect').value = state.period;
 
   const tgStatus = $('telegramStatus');
-  if (tgStatus) {
-    if (meta.hasTelegram) {
-      tgStatus.textContent = '🔔 Telegram алерты подключены';
-      tgStatus.classList.remove('hidden');
-    }
+  if (tgStatus && meta.hasTelegram) {
+    tgStatus.innerHTML = '<span class="tg-dot"></span>Telegram алерты активны';
+    tgStatus.classList.add('connected');
+    tgStatus.classList.remove('hidden');
   }
 
   return meta;

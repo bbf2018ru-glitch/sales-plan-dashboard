@@ -86,3 +86,18 @@ create table if not exists raw_upp_payloads (
 
 create index if not exists idx_raw_upp_payloads_created_at on raw_upp_payloads(created_at desc);
 create index if not exists idx_raw_upp_payloads_package_id on raw_upp_payloads(package_id);
+
+-- Unique constraint on plans for upsert support
+create unique index if not exists idx_plans_unique on plans(period, store_id, product_id);
+
+-- Comments per period
+create table if not exists comments (
+  id uuid primary key default gen_random_uuid(),
+  period text not null,
+  text text not null,
+  author text not null default 'Менеджер',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_comments_period on comments(period);
+create index if not exists idx_comments_created_at on comments(created_at desc);
