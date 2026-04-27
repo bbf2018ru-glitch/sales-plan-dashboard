@@ -149,6 +149,50 @@ class JsonStore {
     return db.ingestRuns.slice(0, limit);
   }
 
+  async getComments(period) {
+    const db = await this.getDb();
+    const all = db.comments || [];
+    return period ? all.filter(c => c.period === period) : all;
+  }
+
+  async addComment(period, text, author) {
+    const db = await this.getDb();
+    if (!Array.isArray(db.comments)) db.comments = [];
+    const comment = {
+      id: crypto.randomUUID(),
+      period: String(period),
+      text: String(text).slice(0, 2000),
+      author: String(author || 'Менеджер').slice(0, 100),
+      createdAt: new Date().toISOString()
+    };
+    db.comments.unshift(comment);
+    await this.saveDb(db);
+    return comment;
+  }
+
+  async deleteComment(id) {
+    const db = await this.getDb();
+    const before = (db.comments || []).length;
+    db.comments = (db.comments || []).filter(c => c.id !== id);
+    const deleted = before !== (db.comments || []).length;
+    if (deleted) await this.saveDb(db);
+    return deleted;
+  }
+
+  async editPlanItem(period, storeId, productId, amount) {
+    const db = await this.getDb();
+    const idx = db.plans.findIndex(
+      p => p.period === period && p.storeId === storeId && p.productId === productId
+    );
+    if (idx >= 0) {
+      db.plans[idx].amount = Number(amount);
+    } else {
+      db.plans.push({ period, storeId: String(storeId), productId: String(productId), amount: Number(amount) });
+    }
+    await this.saveDb(db);
+    return { period, storeId, productId, amount: Number(amount) };
+  }
+
   async recordIngestFailure(payload, error) {
     const db = await this.getDb();
     const normalized = normalizeUppPayload(payload || {});

@@ -322,7 +322,8 @@ function normalizeDb(db) {
     sales: Array.isArray(db.sales) ? db.sales : [],
     marketing: Array.isArray(db.marketing) ? db.marketing : [],
     ingestRuns: Array.isArray(db.ingestRuns) ? db.ingestRuns : [],
-    rawUppPayloads: Array.isArray(db.rawUppPayloads) ? db.rawUppPayloads : []
+    rawUppPayloads: Array.isArray(db.rawUppPayloads) ? db.rawUppPayloads : [],
+    comments: Array.isArray(db.comments) ? db.comments : []
   };
 }
 
@@ -806,6 +807,39 @@ function buildStoreProductMatrix(db, period) {
   };
 }
 
+function buildProductForecast(db, period) {
+  const summary = aggregatePeriodCore(db, period);
+  const { elapsedDays, remainingDays, totalDays } = summary.forecast;
+  return {
+    period,
+    elapsedDays,
+    remainingDays,
+    totalDays,
+    products: summary.products.map(p => {
+      const avgPerDay = elapsedDays > 0 ? p.fact / elapsedDays : 0;
+      const projected = Math.round(avgPerDay * totalDays);
+      const projPct = p.plan > 0 ? Math.round(projected / p.plan * 100) : 0;
+      const reqPerDay = remainingDays > 0 ? Math.max(p.plan - p.fact, 0) / remainingDays : 0;
+      return {
+        productId: p.productId,
+        productName: p.productName,
+        category: p.category,
+        fact: p.fact,
+        plan: p.plan,
+        percent: p.percent,
+        margin: p.margin,
+        marginPct: p.marginPct,
+        quantity: p.quantity,
+        projected,
+        projPct,
+        reqPerDay: Math.round(reqPerDay),
+        gap: projected - p.plan,
+        status: projPct >= 100 ? 'good' : projPct >= 90 ? 'warn' : 'bad'
+      };
+    })
+  };
+}
+
 function listPeriods(db) {
   const values = new Set();
   for (const row of db.plans) values.add(row.period);
@@ -904,6 +938,7 @@ module.exports = {
   aggregateDashboard,
   aggregateMarketing,
   buildMarketingAnalysis,
+  buildProductForecast,
   buildStoreProductMatrix,
   listPeriods,
   monthKey,

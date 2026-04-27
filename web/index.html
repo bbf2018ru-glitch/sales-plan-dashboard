@@ -1,19 +1,81 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Мария — Продажи</title>
-    <link rel="stylesheet" href="/styles.css?v=4" />
+    <link rel="stylesheet" href="/styles.css?v=5" />
   </head>
   <body>
+
+    <!-- ═══ PIN OVERLAY ═══ -->
+    <div id="pinOverlay" class="pin-overlay hidden">
+      <div class="pin-box">
+        <div class="pin-logo">Мария</div>
+        <div class="pin-title">Введите PIN для доступа</div>
+        <input id="pinInput" class="pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off" />
+        <div id="pinError" class="pin-error"></div>
+        <button id="pinSubmit" class="pin-btn">Войти</button>
+      </div>
+    </div>
+
+    <!-- ═══ PLAN EDIT MODAL ═══ -->
+    <div id="planEditModal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div class="modal-title">Редактировать план</div>
+          <button id="modalClose" class="modal-close">&times;</button>
+        </div>
+        <div id="modalStoreName" class="modal-meta"></div>
+        <div class="table-wrap">
+          <table id="planEditTable">
+            <thead>
+              <tr>
+                <th>Товар</th>
+                <th class="num">Текущий план</th>
+                <th class="num">Новый план</th>
+              </tr>
+            </thead>
+            <tbody id="planEditBody"></tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button id="planSaveBtn" class="btn-primary">Сохранить изменения</button>
+          <button id="planCancelBtn" class="btn-secondary">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 1С GUIDE MODAL ═══ -->
+    <div id="uppGuideModal" class="modal-overlay hidden">
+      <div class="modal-box modal-wide">
+        <div class="modal-header">
+          <div class="modal-title">Интеграция с 1С УПП</div>
+          <button id="uppGuideClose" class="modal-close">&times;</button>
+        </div>
+        <div id="uppGuideContent" class="guide-content"></div>
+      </div>
+    </div>
+
     <div class="shell">
 
       <!-- ═══ SIDEBAR ═══ -->
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebar">
         <div class="brand">
           <div class="brand-kicker">Sales Monitor</div>
           <h1>Мария</h1>
+          <div class="brand-actions">
+            <button id="themeToggle" class="tool-btn" title="Тёмная тема"></button>
+            <button id="printBtn" class="tool-btn" title="Печать / PDF">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            </button>
+            <button id="pinSettingsBtn" class="tool-btn" title="PIN-защита">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </button>
+            <button id="uppGuideBtn" class="tool-btn" title="Интеграция с 1С УПП">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </button>
+          </div>
         </div>
 
         <div class="sidebar-card">
@@ -71,6 +133,10 @@
             Каналы CSV
           </button>
         </div>
+
+        <div class="sidebar-footer">
+          <div id="telegramStatus" class="tg-status hidden"></div>
+        </div>
       </aside>
 
       <!-- ═══ MAIN ═══ -->
@@ -79,24 +145,23 @@
         <!-- ── TAB: ПРОДАЖИ ── -->
         <div id="tabSales" class="tab-content">
 
-          <!-- Блок 1: KPI -->
           <section class="section">
             <div class="section-label">Итоги периода</div>
             <div id="kpis" class="kpi-grid"></div>
           </section>
 
-          <!-- Блок 2: Прогноз -->
           <section class="section">
             <div class="section-label">Прогноз и ритм</div>
             <div id="forecastPanel" class="forecast-grid"></div>
           </section>
 
-          <!-- Блок 3: Графики -->
           <section class="section panel-grid">
             <article class="panel">
               <div class="panel-header">
-                <div class="panel-title">Тренд по месяцам</div>
-                <div class="panel-subtitle">план и факт за 6 периодов</div>
+                <div>
+                  <div class="panel-title">Тренд по месяцам</div>
+                  <div class="panel-subtitle">план и факт за 6 периодов</div>
+                </div>
               </div>
               <div id="trendChart" class="chart-wrap"></div>
             </article>
@@ -109,7 +174,6 @@
             </article>
           </section>
 
-          <!-- Блок 4: Дневной ритм -->
           <section class="section panel-grid">
             <article class="panel">
               <div class="panel-header">
@@ -126,7 +190,6 @@
             </article>
           </section>
 
-          <!-- Блок 4b: Рекомендации + Новинки рынка -->
           <section class="section panel-grid">
             <article class="panel">
               <div class="panel-header">
@@ -147,12 +210,11 @@
             </article>
           </section>
 
-          <!-- Блок 5: Таблица точек -->
           <section class="section">
             <div class="section-header">
               <div>
                 <div class="section-label">По точкам</div>
-                <div class="section-hint">Нажмите заголовок для сортировки · строку — для детализации</div>
+                <div class="section-hint">Нажмите заголовок для сортировки · строку — для детализации · ✎ — редактировать план</div>
               </div>
               <button id="exportSalesBtnH" class="icon-btn" title="Экспорт CSV">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -174,6 +236,7 @@
                       <th data-sort="avgCheck" class="sortable num">Ср. чек</th>
                       <th data-sort="quantity" class="sortable num">Шт</th>
                       <th class="num">Тренд</th>
+                      <th class="col-edit no-print"></th>
                     </tr>
                   </thead>
                   <tbody id="storesTable"></tbody>
@@ -182,7 +245,6 @@
             </div>
           </section>
 
-          <!-- Блок 6: Детализация + Товары -->
           <section class="section panel-grid">
             <article class="panel">
               <div class="panel-header">
@@ -205,12 +267,34 @@
             </article>
           </section>
 
+          <!-- Комментарии к периоду -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Заметки к периоду</div>
+                <div class="section-hint">Комментарии менеджера по текущему периоду</div>
+              </div>
+              <button id="addCommentBtn" class="icon-btn no-print">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Добавить
+              </button>
+            </div>
+            <div id="commentsList" class="comments-list"></div>
+            <div id="commentForm" class="comment-form hidden">
+              <textarea id="commentText" class="comment-textarea" placeholder="Введите заметку к периоду..." rows="3"></textarea>
+              <div class="comment-form-row">
+                <input id="commentAuthor" class="comment-author-input" type="text" placeholder="Ваше имя (необязательно)" />
+                <button id="commentSaveBtn" class="btn-primary">Сохранить</button>
+                <button id="commentCancelBtn" class="btn-secondary">Отмена</button>
+              </div>
+            </div>
+          </section>
+
         </div>
 
         <!-- ── TAB: ОТЧЁТЫ ── -->
         <div id="tabReports" class="tab-content hidden">
 
-          <!-- Блок 1: ABC -->
           <section class="section">
             <div class="section-label">ABC-анализ</div>
             <div class="report-2col">
@@ -237,7 +321,6 @@
             </div>
           </section>
 
-          <!-- Блок 2: Динамика -->
           <section class="section">
             <div class="section-label">Динамика</div>
             <article class="panel">
@@ -249,13 +332,33 @@
             </article>
           </section>
 
-          <!-- Блок 3: Сводка -->
           <section class="section">
             <div class="section-label">Сводка</div>
             <div id="executivePanel" class="exec-grid"></div>
           </section>
 
-          <!-- Блок 4: Прогноз по точкам -->
+          <section class="section">
+            <div class="section-label">Недельная динамика</div>
+            <article class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Продажи по неделям</div>
+                <div class="panel-subtitle">план и факт по неделям текущего периода</div>
+              </div>
+              <div id="weeklyChart" class="chart-wrap"></div>
+            </article>
+          </section>
+
+          <section class="section">
+            <div class="section-label">BCG-квадрант</div>
+            <article class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Выручка vs Маржинальность по точкам</div>
+                <div class="panel-subtitle">Чемпионы · Потенциал · Донор оборота · Аутсайдеры</div>
+              </div>
+              <div id="bcgChart" class="chart-wrap"></div>
+            </article>
+          </section>
+
           <section class="section">
             <div class="section-label">Прогноз по точкам</div>
             <div class="panel">
@@ -270,7 +373,7 @@
                       <th class="num">Прогноз</th>
                       <th class="num">Ожид.%</th>
                       <th class="num">Нужно/день</th>
-                      <th class="num">Разрыв прогноза</th>
+                      <th class="num">Разрыв</th>
                       <th>Статус</th>
                     </tr>
                   </thead>
@@ -280,7 +383,31 @@
             </div>
           </section>
 
-          <!-- Блок 5: Распределение точек -->
+          <section class="section">
+            <div class="section-label">Прогноз по товарам</div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="productForecastTable">
+                  <thead>
+                    <tr>
+                      <th class="col-num">#</th>
+                      <th>Товар / Категория</th>
+                      <th class="num">Факт</th>
+                      <th class="num">%</th>
+                      <th class="num">Прогноз</th>
+                      <th class="num">Ожид.%</th>
+                      <th class="num">Нужно/день</th>
+                      <th class="num">Разрыв</th>
+                      <th class="num">Маржа%</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody id="productForecastBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section class="section">
             <div class="section-label">Распределение точек по выполнению</div>
             <div class="report-2col">
@@ -301,7 +428,6 @@
             </div>
           </section>
 
-          <!-- Блок 6: Маржинальность -->
           <section class="section">
             <div class="section-label">Маржинальность по точкам</div>
             <article class="panel">
@@ -313,7 +439,6 @@
             </article>
           </section>
 
-          <!-- Блок 7: Средний чек -->
           <section class="section">
             <div class="section-label">Средний чек</div>
             <article class="panel">
@@ -325,7 +450,6 @@
             </article>
           </section>
 
-          <!-- Блок 8: Рейтинг точек -->
           <section class="section">
             <div class="section-label">Рейтинг точек</div>
             <article class="panel">
@@ -337,7 +461,6 @@
             </article>
           </section>
 
-          <!-- Блок 9: По категориям -->
           <section class="section">
             <div class="section-label">По категориям товаров</div>
             <article class="panel">
@@ -349,14 +472,13 @@
             </article>
           </section>
 
-          <!-- Блок 10: Матрица точка × товар -->
           <section class="section">
             <div class="section-header">
               <div>
                 <div class="section-label">Матрица точка × товар</div>
                 <div class="section-hint">Факт продаж по каждой точке и товару · цвет = выполнение плана</div>
               </div>
-              <button id="exportMatrixBtnH" class="icon-btn" title="Экспорт CSV">
+              <button id="exportMatrixBtnH" class="icon-btn no-print" title="Экспорт CSV">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 CSV
               </button>
@@ -366,25 +488,30 @@
             </div>
           </section>
 
+          <section class="section">
+            <div class="section-label">История загрузок</div>
+            <div class="panel">
+              <div id="ingestHistory" class="table-wrap"></div>
+            </div>
+          </section>
+
         </div>
 
         <!-- ── TAB: МАРКЕТИНГ ── -->
         <div id="tabMarketing" class="tab-content hidden">
 
-          <!-- Блок 1: KPI -->
           <section class="section">
             <div class="section-label">Маркетинговые метрики</div>
             <div id="mkKpis" class="kpi-grid"></div>
           </section>
 
-          <!-- Блок 2: Каналы -->
           <section class="section">
             <div class="section-header">
               <div>
                 <div class="section-label">Каналы</div>
                 <div class="section-hint">ROAS = выручка / расходы · CAC = расходы / заказы · CTR = клики / показы · CVR = заказы / клики</div>
               </div>
-              <button id="exportMktgBtnH" class="icon-btn" title="Экспорт CSV">
+              <button id="exportMktgBtnH" class="icon-btn no-print" title="Экспорт CSV">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 CSV
               </button>
@@ -413,7 +540,6 @@
             </div>
           </section>
 
-          <!-- Блок 3: Инсайты -->
           <section class="section">
             <div class="section-label">Анализ</div>
             <div id="mkInsights" class="exec-grid"></div>
@@ -423,6 +549,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=4"></script>
+    <script src="/app.js?v=5"></script>
   </body>
 </html>

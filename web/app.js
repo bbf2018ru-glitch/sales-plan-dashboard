@@ -6,8 +6,15 @@ const state = {
   summary: null,
   matrix: null,
   marketing: null,
+  productForecast: null,
+  ingestRuns: [],
+  comments: [],
   storeSort: { key: 'percent', dir: -1 },
-  productSort: 'fact'
+  productSort: 'fact',
+  sessionToken: sessionStorage.getItem('maria_session') || '',
+  pinRequired: false,
+  editStoreId: '',
+  editPlanData: []
 };
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -23,6 +30,11 @@ function formatDate(v) {
   const d = new Date(v);
   return isNaN(d.getTime()) ? v : d.toLocaleString('ru-RU');
 }
+function formatDateShort(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? v : d.toLocaleDateString('ru-RU');
+}
 function pctTone(v) { return v >= 100 ? 'good' : v >= 80 ? 'warn' : 'bad'; }
 function signed(v, fmt) { return `${v > 0 ? '+' : ''}${fmt(v)}`; }
 function fmtAxis(v) {
@@ -32,13 +44,134 @@ function fmtAxis(v) {
 }
 
 // ── HTTP ───────────────────────────────────────────────────────────────────
-async function fetchJson(path, opts) {
+async function fetchJson(path, opts = {}) {
+  if (state.sessionToken) {
+    opts.headers = { ...(opts.headers || {}), 'X-Session-Token': state.sessionToken };
+  }
   const res = await fetch(path, opts);
   if (!res.ok) {
     const b = await res.json().catch(() => ({ error: 'Ошибка запроса' }));
     throw new Error(b.error || 'Ошибка запроса');
   }
   return res.json();
+}
+
+// ── PIN Auth ───────────────────────────────────────────────────────────────
+const PIN_STORED_KEY = 'maria_pin_hash';
+
+function pinHash(pin) {
+  let h = 5381;
+  for (let i = 0; i < pin.length; i++) h = ((h << 5) + h) ^ pin.charCodeAt(i);
+  return (h >>> 0).toString(36);
+}
+
+function initPin(pinRequired) {
+  state.pinRequired = pinRequired;
+
+  // Server-side PIN
+  if (pinRequired && !state.sessionToken) {
+    showPinOverlay();
+  }
+
+  // Client-side PIN (local override)
+  const storedHash = localStorage.getItem(PIN_STORED_KEY);
+  if (storedHash && !sessionStorage.getItem('maria_local_ok')) {
+    showPinOverlay(true);
+  }
+
+  $('pinSubmit').addEventListener('click', handlePinSubmit);
+  $('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinSubmit').click(); });
+
+  $('pinSettingsBtn').addEventListener('click', () => {
+    const newPin = prompt('Введите новый PIN (4-8 цифр) для клиентской защиты.\nОставьте пустым — отключить:');
+    if (newPin === null) return;
+    if (newPin.trim() === '') {
+      localStorage.removeItem(PIN_STORED_KEY);
+      sessionStorage.setItem('maria_local_ok', '1');
+      alert('Клиентская PIN-защита отключена.');
+    } else if (/^\d{4,8}$/.test(newPin)) {
+      localStorage.setItem(PIN_STORED_KEY, pinHash(newPin));
+      sessionStorage.setItem('maria_local_ok', '1');
+      alert('PIN установлен. Он будет запрашиваться при каждом новом сеансе.');
+    } else {
+      alert('PIN должен содержать 4–8 цифр.');
+    }
+  });
+}
+
+function showPinOverlay(localMode) {
+  $('pinOverlay').classList.remove('hidden');
+  $('pinOverlay').dataset.localMode = localMode ? '1' : '0';
+  setTimeout(() => $('pinInput').focus(), 100);
+}
+
+function hidePinOverlay() {
+  $('pinOverlay').classList.add('hidden');
+}
+
+async function handlePinSubmit() {
+  const pin = $('pinInput').value.trim();
+  if (!pin) return;
+  $('pinError').textContent = '';
+
+  const localMode = $('pinOverlay').dataset.localMode === '1';
+
+  if (localMode) {
+    const stored = localStorage.getItem(PIN_STORED_KEY);
+    if (pinHash(pin) === stored) {
+      sessionStorage.setItem('maria_local_ok', '1');
+      hidePinOverlay();
+    } else {
+      $('pinError').textContent = 'Неверный PIN';
+      $('pinInput').value = '';
+      $('pinInput').focus();
+    }
+    return;
+  }
+
+  // Server PIN
+  try {
+    const data = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    }).then(r => r.json());
+    if (data.ok) {
+      if (data.token) {
+        state.sessionToken = data.token;
+        sessionStorage.setItem('maria_session', data.token);
+      }
+      hidePinOverlay();
+    } else {
+      $('pinError').textContent = data.error || 'Неверный PIN';
+      $('pinInput').value = '';
+      $('pinInput').focus();
+    }
+  } catch {
+    $('pinError').textContent = 'Ошибка соединения';
+  }
+}
+
+// ── Dark theme ─────────────────────────────────────────────────────────────
+function initDarkTheme() {
+  const saved = localStorage.getItem('maria_theme') || 'light';
+  setTheme(saved);
+
+  $('themeToggle').addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('maria_theme', theme);
+  const btn = $('themeToggle');
+  if (!btn) return;
+  btn.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  btn.innerHTML = theme === 'dark'
+    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
+    : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 }
 
 // ── Tab switching ──────────────────────────────────────────────────────────
@@ -71,8 +204,8 @@ function renderTrendChart(summary) {
 
   const grids = Array.from({ length: 5 }, (_, i) => {
     const v = maxVal / 4 * i, y = yp(v);
-    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="#ece4d8" stroke-width="1"/>
-    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#9ca3af" font-size="11">${fmtAxis(v)}</text>`;
+    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="11">${fmtAxis(v)}</text>`;
   }).join('');
 
   const planD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(p.plan).toFixed(1)}`).join(' ');
@@ -83,11 +216,11 @@ function renderTrendChart(summary) {
     const clr = p.completion >= 100 ? '#16a34a' : p.completion >= 80 ? '#f59e0b' : '#ef4444';
     return `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.fact).toFixed(1)}" r="5" fill="${clr}" stroke="white" stroke-width="2"/>
     <circle cx="${xp(i).toFixed(1)}" cy="${yp(p.plan).toFixed(1)}" r="3" fill="white" stroke="#9ca3af" stroke-width="1.5"/>
-    <text x="${xp(i).toFixed(1)}" y="${(yp(p.fact) - 10).toFixed(1)}" text-anchor="middle" fill="#6b7280" font-size="10">${p.completion}%</text>`;
+    <text x="${xp(i).toFixed(1)}" y="${(yp(p.fact) - 10).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${p.completion}%</text>`;
   }).join('');
 
   const xlabels = pts.map((p, i) =>
-    `<text x="${xp(i).toFixed(1)}" y="${(pad.t + ph + 18).toFixed(1)}" text-anchor="middle" fill="#9ca3af" font-size="11">${p.period}</text>`
+    `<text x="${xp(i).toFixed(1)}" y="${(pad.t + ph + 18).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="11">${p.period}</text>`
   ).join('');
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
@@ -99,11 +232,11 @@ function renderTrendChart(summary) {
     </defs>
     ${grids}
     <path d="${areaD}" fill="url(#tg)"/>
-    <path d="${planD}" fill="none" stroke="#d1d5db" stroke-width="2" stroke-dasharray="6,4"/>
-    <path d="${factD}" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="2" stroke-dasharray="6,4"/>
+    <path d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${dots}${xlabels}
-    <text x="${pad.l}" y="${H - 4}" fill="#9ca3af" font-size="10">─ ─ план</text>
-    <text x="${pad.l + 54}" y="${H - 4}" fill="#0f766e" font-size="10">─── факт</text>
+    <text x="${pad.l}" y="${H - 4}" fill="var(--hint)" font-size="10">─ ─ план</text>
+    <text x="${pad.l + 54}" y="${H - 4}" fill="var(--accent)" font-size="10">─── факт</text>
   </svg>`;
 }
 
@@ -124,40 +257,183 @@ function renderDailyChart(summary) {
 
   const grids = Array.from({ length: 4 }, (_, i) => {
     const v = maxVal / 3 * i, y = yp(v);
-    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="#ece4d8" stroke-width="1"/>
-    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#9ca3af" font-size="11">${fmtAxis(v)}</text>`;
+    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="11">${fmtAxis(v)}</text>`;
   }).join('');
 
   const bars = vis.map((row, i) => {
     const cx = pad.l + i * slot + slot / 2;
     const clr = row.percent >= 100 ? '#16a34a' : row.percent >= 80 ? '#f59e0b' : '#ef4444';
     const showLabel = i === 0 || (i + 1) % 5 === 0 || i === n - 1;
-    return `<rect x="${(cx - barW / 2 - 1).toFixed(1)}" y="${yp(row.plan).toFixed(1)}" width="${(barW + 2).toFixed(1)}" height="${bh(row.plan).toFixed(1)}" rx="2" fill="#ddd6cc"/>
+    return `<rect x="${(cx - barW / 2 - 1).toFixed(1)}" y="${yp(row.plan).toFixed(1)}" width="${(barW + 2).toFixed(1)}" height="${bh(row.plan).toFixed(1)}" rx="2" fill="var(--line)"/>
     <rect x="${(cx - barW / 2).toFixed(1)}" y="${yp(row.fact).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh(row.fact).toFixed(1)}" rx="2" fill="${clr}" opacity="0.88"/>
-    ${showLabel ? `<text x="${cx.toFixed(1)}" y="${(pad.t + ph + 14).toFixed(1)}" text-anchor="middle" fill="#9ca3af" font-size="10">${row.day}</text>` : ''}`;
+    ${showLabel ? `<text x="${cx.toFixed(1)}" y="${(pad.t + ph + 14).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${row.day}</text>` : ''}`;
   }).join('');
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
     ${grids}${bars}
-    <text x="${pad.l}" y="${H - 2}" fill="#9ca3af" font-size="10">▭ план   ▮ факт</text>
+    <text x="${pad.l}" y="${H - 2}" fill="var(--hint)" font-size="10">▭ план   ▮ факт</text>
+  </svg>`;
+}
+
+// ── SVG: weekly bar chart ──────────────────────────────────────────────────
+function renderWeeklyChart(summary) {
+  const el = $('weeklyChart');
+  if (!el) return;
+  const daily = summary.daily || [];
+  const elapsed = summary.forecast.elapsedDays || 0;
+  const visible = daily.slice(0, Math.max(elapsed, 1));
+
+  if (!visible.length) { el.innerHTML = '<div class="empty-state">Нет дневных данных для расчёта недель.</div>'; return; }
+
+  const weeks = [];
+  for (let i = 0; i < visible.length; i += 7) {
+    const chunk = visible.slice(i, Math.min(i + 7, visible.length));
+    const weekNum = Math.floor(i / 7) + 1;
+    const days = chunk.length;
+    weeks.push({
+      label: `Нед. ${weekNum} (${days} дн.)`,
+      plan: chunk.reduce((s, d) => s + d.plan, 0),
+      fact: chunk.reduce((s, d) => s + d.fact, 0)
+    });
+  }
+
+  const W = 560, H = 240, pad = { t: 24, r: 20, b: 50, l: 80 };
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const n = weeks.length;
+  const maxVal = Math.max(...weeks.flatMap(w => [w.plan, w.fact]), 1);
+  const slot = pw / n;
+  const barW = Math.min(slot * 0.35, 40);
+  const yp = v => pad.t + ph - (v / maxVal) * ph;
+  const bh = v => Math.max((v / maxVal) * ph, 0);
+
+  const grids = Array.from({ length: 5 }, (_, i) => {
+    const v = maxVal / 4 * i, y = yp(v);
+    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="11">${fmtAxis(v)}</text>`;
+  }).join('');
+
+  const bars = weeks.map((w, i) => {
+    const cx = pad.l + i * slot + slot / 2;
+    const pct = w.plan > 0 ? w.fact / w.plan * 100 : 0;
+    const clr = pct >= 100 ? '#16a34a' : pct >= 80 ? '#f59e0b' : '#ef4444';
+    const px = cx - barW - 3, fx = cx + 3;
+    return `
+    <rect x="${px.toFixed(1)}" y="${yp(w.plan).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh(w.plan).toFixed(1)}" rx="3" fill="var(--line)"/>
+    <rect x="${fx.toFixed(1)}" y="${yp(w.fact).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh(w.fact).toFixed(1)}" rx="3" fill="${clr}" opacity="0.88"/>
+    <text x="${cx.toFixed(1)}" y="${(pad.t + ph + 16).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10.5">${w.label}</text>
+    <text x="${cx.toFixed(1)}" y="${(pad.t + ph + 28).toFixed(1)}" text-anchor="middle" fill="${clr}" font-size="10" font-weight="600">${Math.round(pct)}%</text>`;
+  }).join('');
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    ${grids}${bars}
+    <rect x="${pad.l}" y="${H - 8}" width="10" height="7" rx="1" fill="var(--line)"/>
+    <text x="${pad.l + 14}" y="${H - 2}" fill="var(--hint)" font-size="10">план</text>
+    <rect x="${pad.l + 52}" y="${H - 8}" width="10" height="7" rx="1" fill="var(--accent)" opacity="0.88"/>
+    <text x="${pad.l + 66}" y="${H - 2}" fill="var(--hint)" font-size="10">факт</text>
+  </svg>`;
+}
+
+// ── SVG: BCG quadrant ──────────────────────────────────────────────────────
+function renderBcgChart(summary) {
+  const el = $('bcgChart');
+  if (!el) return;
+  const stores = summary.stores.filter(s => s.fact > 0);
+  if (stores.length < 2) { el.innerHTML = '<div class="empty-state">Недостаточно данных для BCG-квадранта.</div>'; return; }
+
+  const W = 620, H = 380, pad = { t: 40, r: 40, b: 60, l: 80 };
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+
+  const maxFact = Math.max(...stores.map(s => s.fact), 1);
+  const maxMargin = Math.max(...stores.map(s => Math.abs(s.marginPct)), 30);
+  const midX = maxFact / 2;
+  const midY = 20; // 20% маржи как порог
+
+  const xp = fact => pad.l + (fact / maxFact) * pw;
+  const yp = marginPct => pad.t + ph - ((marginPct + maxMargin) / (maxMargin * 2)) * ph;
+  const midXpx = xp(midX);
+  const midYpx = yp(midY);
+
+  const quadLabels = [
+    { x: pad.l + pw * 0.75, y: pad.t + 14, text: 'Чемпионы', color: '#16a34a' },
+    { x: pad.l + pw * 0.25, y: pad.t + 14, text: 'Потенциал', color: '#0f766e' },
+    { x: pad.l + pw * 0.25, y: pad.t + ph - 10, text: 'Аутсайдеры', color: '#dc2626' },
+    { x: pad.l + pw * 0.75, y: pad.t + ph - 10, text: 'Донор оборота', color: '#b45309' },
+  ];
+
+  const quadBgs = [
+    { x: midXpx, y: pad.t, w: pad.l + pw - midXpx, h: midYpx - pad.t, fill: 'rgba(22,163,74,0.05)' },
+    { x: pad.l, y: pad.t, w: midXpx - pad.l, h: midYpx - pad.t, fill: 'rgba(15,118,110,0.04)' },
+    { x: pad.l, y: midYpx, w: midXpx - pad.l, h: pad.t + ph - midYpx, fill: 'rgba(220,38,38,0.05)' },
+    { x: midXpx, y: midYpx, w: pad.l + pw - midXpx, h: pad.t + ph - midYpx, fill: 'rgba(180,83,9,0.05)' },
+  ];
+
+  const dots = stores.map(s => {
+    const cx = xp(s.fact);
+    const cy = yp(s.marginPct);
+    const r = 7;
+    let fill = '#6b7280';
+    if (s.fact >= midX && s.marginPct >= midY) fill = '#16a34a';
+    else if (s.fact < midX && s.marginPct >= midY) fill = '#0f766e';
+    else if (s.fact < midX && s.marginPct < midY) fill = '#dc2626';
+    else fill = '#b45309';
+
+    const name = s.storeName.length > 12 ? s.storeName.slice(0, 11) + '…' : s.storeName;
+    const titleText = `${s.storeName}: факт ${fmtAxis(s.fact)} / маржа ${s.marginPct}%`;
+    const labelX = cx + r + 4;
+    const labelAnchor = labelX + 80 > W ? 'end' : 'start';
+    const lx = labelAnchor === 'end' ? cx - r - 4 : labelX;
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="${fill}" opacity="0.85" stroke="white" stroke-width="1.5">
+      <title>${titleText}</title>
+    </circle>
+    <text x="${lx.toFixed(1)}" y="${(cy + 4).toFixed(1)}" text-anchor="${labelAnchor}" fill="var(--ink)" font-size="10">${name}</text>`;
+  }).join('');
+
+  const xAxis = Array.from({ length: 5 }, (_, i) => {
+    const v = (maxFact / 4) * i;
+    const x = xp(v);
+    return `<line x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${pad.t + ph}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${x.toFixed(1)}" y="${pad.t + ph + 16}" text-anchor="middle" fill="var(--hint)" font-size="10">${fmtAxis(v)}</text>`;
+  }).join('');
+
+  const yAxis = [-20, -10, 0, 10, 20, 30].map(v => {
+    if (v > maxMargin || v < -maxMargin) return '';
+    const y = yp(v);
+    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="10">${v}%</text>`;
+  }).join('');
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    ${quadBgs.map(q => `<rect x="${q.x.toFixed(1)}" y="${q.y.toFixed(1)}" width="${q.w.toFixed(1)}" height="${q.h.toFixed(1)}" fill="${q.fill}"/>`).join('')}
+    ${xAxis}${yAxis}
+    <line x1="${midXpx.toFixed(1)}" y1="${pad.t}" x2="${midXpx.toFixed(1)}" y2="${pad.t + ph}" stroke="var(--hint)" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <line x1="${pad.l}" y1="${midYpx.toFixed(1)}" x2="${pad.l + pw}" y2="${midYpx.toFixed(1)}" stroke="var(--hint)" stroke-width="1.5" stroke-dasharray="5,3"/>
+    ${quadLabels.map(q => `<text x="${q.x.toFixed(1)}" y="${q.y.toFixed(1)}" text-anchor="middle" fill="${q.color}" font-size="11" font-weight="700" opacity="0.7">${q.text}</text>`).join('')}
+    ${dots}
+    <text x="${pad.l + pw / 2}" y="${H - 6}" text-anchor="middle" fill="var(--hint)" font-size="11">Выручка →</text>
+    <text x="14" y="${pad.t + ph / 2}" text-anchor="middle" fill="var(--hint)" font-size="11" transform="rotate(-90, 14, ${pad.t + ph / 2})">Маржа % →</text>
   </svg>`;
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
 function renderKpis(summary) {
   const f = summary.forecast;
+  const c = summary.comparison;
+  const deltaArrow = c?.hasData && c.factDelta > 0 ? '↑' : c?.hasData && c.factDelta < 0 ? '↓' : '';
+  const deltaTxt = c?.hasData ? ` ${deltaArrow}${c.factDeltaPercent > 0 ? '+' : ''}${c.factDeltaPercent}%` : '';
   const cards = [
-    { label: 'План сети',  value: formatMoney(summary.totals.plan),   tone: 'neutral' },
-    { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   tone: 'neutral' },
-    { label: 'Выполнение', value: `${summary.totals.completion}%`,    tone: pctTone(summary.totals.completion) },
-    { label: 'Маржа',      value: formatMoney(summary.totals.margin), tone: summary.totals.margin >= 0 ? 'good' : 'bad' },
-    { label: 'Маржа %',    value: `${summary.totals.marginPct}%`,    tone: summary.totals.marginPct >= 20 ? 'good' : summary.totals.marginPct >= 10 ? 'warn' : 'bad' },
-    { label: 'Прогноз',    value: formatMoney(f.projectedFact),       tone: f.tone }
+    { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: '', tone: 'neutral' },
+    { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt, tone: c?.factDelta >= 0 ? 'neutral' : 'neutral' },
+    { label: 'Выполнение', value: `${summary.totals.completion}%`,    sub: '', tone: pctTone(summary.totals.completion) },
+    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: `${summary.totals.marginPct}% от выр.`, tone: summary.totals.margin >= 0 ? 'good' : 'bad' },
+    { label: 'Прогноз',    value: formatMoney(f.projectedFact),       sub: `${f.projectedCompletion}% к плану`, tone: f.tone },
+    { label: 'Нужно/день', value: formatMoney(f.requiredPerDayToPlan), sub: `осталось ${f.remainingDays} дн.`, tone: f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral' }
   ];
   $('kpis').innerHTML = cards.map(c => `
     <article class="kpi ${c.tone}">
       <div class="kpi-label">${c.label}</div>
       <div class="kpi-value">${c.value}</div>
+      ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
     </article>`).join('');
 }
 
@@ -281,11 +557,15 @@ function renderStores(summary) {
       <td class="num">${avgCheck > 0 ? formatMoney(avgCheck) : '—'}</td>
       <td class="num">${formatNum(s.quantity)}</td>
       <td class="num"><span class="spark"><span class="spark-fill ${tone}" style="width:${Math.min(s.percent, 100)}%"></span></span></td>
+      <td class="col-edit no-print">
+        <button class="edit-plan-btn" data-store-id="${s.storeId}" title="Редактировать план">✎</button>
+      </td>
     </tr>`;
   }).join('');
 
   document.querySelectorAll('#storesTable tr').forEach(row => {
-    row.addEventListener('click', () => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('.edit-plan-btn')) return;
       state.selectedStoreId = row.dataset.storeId;
       const store = sorted.find(s => s.storeId === row.dataset.storeId);
       if (store) $('storeDetailTitle').textContent = store.storeName;
@@ -293,6 +573,80 @@ function renderStores(summary) {
       loadStoreDetails();
     });
   });
+
+  document.querySelectorAll('.edit-plan-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openPlanEdit(btn.dataset.storeId, sorted);
+    });
+  });
+}
+
+// ── Plan edit modal ────────────────────────────────────────────────────────
+function openPlanEdit(storeId, stores) {
+  const store = stores.find(s => s.storeId === storeId);
+  if (!store) return;
+  state.editStoreId = storeId;
+
+  $('modalStoreName').textContent = store.storeName + (store.region ? ` · ${store.region}` : '');
+
+  fetchJson(`/api/dashboard/store?period=${encodeURIComponent(state.period)}&storeId=${encodeURIComponent(storeId)}`).then(d => {
+    const items = d.items || [];
+    state.editPlanData = items.map(item => ({ ...item, newPlan: item.plan }));
+    $('planEditBody').innerHTML = state.editPlanData.map((item, i) => `
+      <tr>
+        <td>${item.productName}<br><small class="muted">${item.category || ''}</small></td>
+        <td class="num">${formatMoney(item.plan)}</td>
+        <td class="num">
+          <input class="plan-edit-input" data-idx="${i}" type="number" value="${item.plan}" min="0" step="1000" />
+        </td>
+      </tr>`).join('');
+
+    document.querySelectorAll('.plan-edit-input').forEach(input => {
+      input.addEventListener('change', e => {
+        const idx = Number(e.target.dataset.idx);
+        state.editPlanData[idx].newPlan = Number(e.target.value) || 0;
+      });
+    });
+
+    $('planEditModal').classList.remove('hidden');
+  }).catch(() => alert('Ошибка загрузки данных точки'));
+}
+
+async function savePlanEdit() {
+  const changed = state.editPlanData.filter(item => item.newPlan !== item.plan);
+  if (!changed.length) { closePlanEdit(); return; }
+
+  $('planSaveBtn').disabled = true;
+  $('planSaveBtn').textContent = 'Сохранение...';
+
+  try {
+    for (const item of changed) {
+      await fetchJson('/api/plans/item', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period: state.period,
+          storeId: state.editStoreId,
+          productId: item.productId,
+          amount: item.newPlan
+        })
+      });
+    }
+    closePlanEdit();
+    await loadSummary();
+  } catch (err) {
+    alert('Ошибка сохранения: ' + err.message);
+  } finally {
+    $('planSaveBtn').disabled = false;
+    $('planSaveBtn').textContent = 'Сохранить изменения';
+  }
+}
+
+function closePlanEdit() {
+  $('planEditModal').classList.add('hidden');
+  state.editStoreId = '';
+  state.editPlanData = [];
 }
 
 // ── Products list ──────────────────────────────────────────────────────────
@@ -349,6 +703,72 @@ async function loadStoreDetails() {
       </div>`;
     }).join('')}
   </div>`;
+}
+
+// ── Comments ───────────────────────────────────────────────────────────────
+async function loadComments() {
+  try {
+    const data = await fetchJson(`/api/comments?period=${encodeURIComponent(state.period)}`);
+    state.comments = data.comments || [];
+    renderComments();
+  } catch { state.comments = []; renderComments(); }
+}
+
+function renderComments() {
+  const el = $('commentsList');
+  if (!el) return;
+  if (!state.comments.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:12px 0">Нет заметок за этот период.</div>';
+    return;
+  }
+  el.innerHTML = state.comments.map(c => `
+    <div class="comment-card">
+      <div class="comment-header">
+        <span class="comment-author">${c.author || 'Менеджер'}</span>
+        <span class="comment-date">${formatDate(c.createdAt)}</span>
+        <button class="comment-del-btn no-print" data-id="${c.id}" title="Удалить">×</button>
+      </div>
+      <div class="comment-text">${escapeHtml(c.text)}</div>
+    </div>`).join('');
+
+  el.querySelectorAll('.comment-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Удалить заметку?')) return;
+      try {
+        await fetchJson(`/api/comments/${btn.dataset.id}`, { method: 'DELETE' });
+        await loadComments();
+      } catch (err) { alert('Ошибка: ' + err.message); }
+    });
+  });
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function initComments() {
+  $('addCommentBtn').addEventListener('click', () => {
+    $('commentForm').classList.toggle('hidden');
+  });
+  $('commentCancelBtn').addEventListener('click', () => {
+    $('commentForm').classList.add('hidden');
+    $('commentText').value = '';
+  });
+  $('commentSaveBtn').addEventListener('click', async () => {
+    const text = $('commentText').value.trim();
+    if (!text) return;
+    const author = $('commentAuthor').value.trim() || 'Менеджер';
+    try {
+      await fetchJson('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period: state.period, text, author })
+      });
+      $('commentText').value = '';
+      $('commentForm').classList.add('hidden');
+      await loadComments();
+    } catch (err) { alert('Ошибка: ' + err.message); }
+  });
 }
 
 // ── ABC analysis ───────────────────────────────────────────────────────────
@@ -471,127 +891,6 @@ function renderExecutive(summary) {
     `<div class="exec-footer">Сформировано: ${formatDate(e.generatedAt)}</div>`;
 }
 
-// ── Reports accordion ─────────────────────────────────────────────────────
-function initReportsAccordion() {
-  document.querySelectorAll('#tabReports .section').forEach((section, idx) => {
-    const children = Array.from(section.children);
-    const triggerEl = children.find(el =>
-      el.classList.contains('section-label') || el.classList.contains('section-header')
-    );
-    if (!triggerEl) return;
-
-    const contentEls = children.filter(el => el !== triggerEl);
-    if (!contentEls.length) return;
-
-    const body = document.createElement('div');
-    body.className = 'acc-body';
-    contentEls.forEach(el => body.appendChild(el));
-    section.appendChild(body);
-
-    const labelEl = triggerEl.classList.contains('section-label')
-      ? triggerEl
-      : (triggerEl.querySelector('.section-label') || triggerEl);
-
-    const arrow = document.createElement('span');
-    arrow.className = 'acc-arrow';
-    arrow.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
-    labelEl.appendChild(arrow);
-
-    if (idx > 0) {
-      section.classList.add('acc-closed');
-      body.style.maxHeight = '0';
-      body.style.overflow = 'hidden';
-    } else {
-      body.style.maxHeight = 'none';
-    }
-
-    const toggle = () => {
-      const isClosed = section.classList.contains('acc-closed');
-      if (isClosed) {
-        section.classList.remove('acc-closed');
-        body.style.overflow = 'hidden';
-        body.style.maxHeight = body.scrollHeight + 'px';
-        body.addEventListener('transitionend', () => {
-          if (!section.classList.contains('acc-closed')) {
-            body.style.maxHeight = 'none';
-            body.style.overflow = '';
-          }
-        }, { once: true });
-      } else {
-        body.style.maxHeight = body.scrollHeight + 'px';
-        body.style.overflow = 'hidden';
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          section.classList.add('acc-closed');
-          body.style.maxHeight = '0';
-        }));
-      }
-    };
-
-    triggerEl.style.cursor = 'pointer';
-    triggerEl.addEventListener('click', e => {
-      if (e.target.closest('.icon-btn')) return;
-      toggle();
-    });
-  });
-}
-
-// ── Market news content ────────────────────────────────────────────────────
-const MARKET_NEWS = [
-  {
-    tag: 'Тренд', tone: 'accent',
-    date: 'Апрель 2025',
-    title: 'Бенто-торты: рост +25% г/г',
-    text: 'Мини-торты в коробках остаются в топе. Покупатели выбирают их как подарок на 1–2 человека. Фокус на упаковке и персонализации.'
-  },
-  {
-    tag: 'Рынок', tone: 'good',
-    date: 'Q1 2025',
-    title: 'Кофе с собой обгоняет торты',
-    text: 'Кофейный сегмент в кондитерских Сибири +18% год к году. Главный драйвер — офисная аудитория. Рассмотрите расширение линейки.'
-  },
-  {
-    tag: 'Сезон', tone: 'warn',
-    date: 'Май–Июнь 2025',
-    title: 'Выпускные: ожидаемый рост +35%',
-    text: 'Сезон выпускных вечеров запускается в мае. Рост заказных тортов +35% в мае-июне — готовьте производственные мощности заранее.'
-  },
-  {
-    tag: 'Новинка', tone: 'accent',
-    date: 'Весна 2025',
-    title: 'Корейский стиль: buttercream flowers',
-    text: 'Торты с цветами из крема в корейском стиле — один из топ-запросов в соцсетях. Высокий средний чек и виральность в Instagram.'
-  },
-  {
-    tag: 'Рынок', tone: 'good',
-    date: 'Q1 2025',
-    title: 'Средний чек вырос на 12%',
-    text: 'В кондитерских Сибири средний чек +12% г/г. Покупатели готовы к премиуму — важно обеспечить соответствующий сервис.'
-  },
-  {
-    tag: 'Совет', tone: 'neutral',
-    date: 'Апрель 2025',
-    title: 'Программы лояльности удерживают 30%+',
-    text: 'Кондитерские с программой лояльности демонстрируют возврат клиентов на 30% выше. Персонализированные предложения к дням рождения особенно эффективны.'
-  }
-];
-
-const TONE_TAG = { accent: '#0f766e', good: '#16a34a', warn: '#b45309', neutral: '#6b7280', bad: '#dc2626' };
-const TONE_BG  = { accent: '#d5f2ee', good: '#dcfce7', warn: '#fef3c7', neutral: '#f3f4f6', bad: '#fee2e2' };
-
-function renderMarketNews() {
-  const el = $('marketNews');
-  if (!el) return;
-  el.innerHTML = MARKET_NEWS.map(n => `
-    <div class="news-card">
-      <div class="news-meta">
-        <span class="news-tag" style="background:${TONE_BG[n.tone]};color:${TONE_TAG[n.tone]}">${n.tag}</span>
-        <span class="news-date">${n.date}</span>
-      </div>
-      <div class="news-title">${n.title}</div>
-      <div class="news-text">${n.text}</div>
-    </div>`).join('');
-}
-
 // ── Recommendations panel ──────────────────────────────────────────────────
 function renderRecommendations(summary) {
   const el = $('recommendPanel');
@@ -642,13 +941,44 @@ function renderRecommendations(summary) {
   el.innerHTML = headline + priorities + alerts + headlines;
 }
 
+// ── Market news ────────────────────────────────────────────────────────────
+const MARKET_NEWS = [
+  { tag: 'Тренд', tone: 'accent', date: 'Апрель 2025', title: 'Бенто-торты: рост +25% г/г',
+    text: 'Мини-торты в коробках остаются в топе. Покупатели выбирают их как подарок на 1–2 человека. Фокус на упаковке и персонализации.' },
+  { tag: 'Рынок', tone: 'good', date: 'Q1 2025', title: 'Кофе с собой обгоняет торты',
+    text: 'Кофейный сегмент в кондитерских Сибири +18% год к году. Главный драйвер — офисная аудитория. Рассмотрите расширение линейки.' },
+  { tag: 'Сезон', tone: 'warn', date: 'Май–Июнь 2025', title: 'Выпускные: ожидаемый рост +35%',
+    text: 'Сезон выпускных запускается в мае. Рост заказных тортов +35% в мае-июне — готовьте производственные мощности заранее.' },
+  { tag: 'Новинка', tone: 'accent', date: 'Весна 2025', title: 'Корейский стиль: buttercream flowers',
+    text: 'Торты с цветами из крема в корейском стиле — один из топ-запросов в соцсетях. Высокий средний чек и виральность в Instagram.' },
+  { tag: 'Рынок', tone: 'good', date: 'Q1 2025', title: 'Средний чек вырос на 12%',
+    text: 'В кондитерских Сибири средний чек +12% г/г. Покупатели готовы к премиуму — важно обеспечить соответствующий сервис.' },
+  { tag: 'Совет', tone: 'neutral', date: 'Апрель 2025', title: 'Программы лояльности удерживают 30%+',
+    text: 'Кондитерские с программой лояльности демонстрируют возврат клиентов на 30% выше. Персонализированные предложения к дням рождения особенно эффективны.' }
+];
+const TONE_TAG = { accent: '#0f766e', good: '#16a34a', warn: '#b45309', neutral: '#6b7280', bad: '#dc2626' };
+const TONE_BG  = { accent: '#d5f2ee', good: '#dcfce7', warn: '#fef3c7', neutral: '#f3f4f6', bad: '#fee2e2' };
+
+function renderMarketNews() {
+  const el = $('marketNews');
+  if (!el) return;
+  el.innerHTML = MARKET_NEWS.map(n => `
+    <div class="news-card">
+      <div class="news-meta">
+        <span class="news-tag" style="background:${TONE_BG[n.tone]};color:${TONE_TAG[n.tone]}">${n.tag}</span>
+        <span class="news-date">${n.date}</span>
+      </div>
+      <div class="news-title">${n.title}</div>
+      <div class="news-text">${n.text}</div>
+    </div>`).join('');
+}
+
 // ── Store forecast report ──────────────────────────────────────────────────
 function renderStoreForecastReport(summary) {
   const el = $('storeForecastBody');
   if (!el) return;
   const f = summary.forecast;
   const { elapsedDays, remainingDays, totalDays } = f;
-
   const stores = [...summary.stores].sort((a, b) => a.percent - b.percent);
 
   el.innerHTML = stores.map((s, idx) => {
@@ -674,35 +1004,51 @@ function renderStoreForecastReport(summary) {
   }).join('');
 }
 
+// ── Product forecast report ────────────────────────────────────────────────
+function renderProductForecastReport(data) {
+  const el = $('productForecastBody');
+  if (!el || !data) return;
+  const { products } = data;
+  if (!products?.length) { el.innerHTML = '<tr><td colspan="10" class="empty-state">Нет данных.</td></tr>'; return; }
+
+  el.innerHTML = products.map((p, idx) => {
+    const ptone = pctTone(p.projPct);
+    const statusIcon = p.status === 'good' ? '✓' : p.status === 'warn' ? '~' : '✗';
+    return `<tr>
+      <td class="col-num">${idx + 1}</td>
+      <td>${p.productName}<br><small class="muted">${p.category || ''}</small></td>
+      <td class="num">${formatMoney(p.fact)}</td>
+      <td class="num"><span class="${pctTone(p.percent)}">${p.percent}%</span></td>
+      <td class="num">${formatMoney(p.projected)}</td>
+      <td class="num"><span class="${ptone}">${p.projPct}%</span></td>
+      <td class="num">${p.reqPerDay > 0 ? formatMoney(p.reqPerDay) : '<span class="good">—</span>'}</td>
+      <td class="num"><span class="${p.gap >= 0 ? 'positive' : 'negative'}">${p.gap >= 0 ? '+' : ''}${formatMoney(p.gap)}</span></td>
+      <td class="num ${p.marginPct >= 20 ? 'good' : p.marginPct >= 10 ? 'warn' : 'bad'}">${p.marginPct}%</td>
+      <td><span class="forecast-status ${p.status}">${statusIcon}</span></td>
+    </tr>`;
+  }).join('');
+}
+
 // ── Distribution chart ─────────────────────────────────────────────────────
 function renderDistribution(summary) {
   const el = $('distributionChart');
   if (!el) return;
   const brackets = [
-    { label: 'Сверх плана (≥110%)', min: 110, max: Infinity,   cls: 'good',    icon: '★' },
-    { label: 'Выполнение (100–109%)', min: 100, max: 110,       cls: 'good',    icon: '✓' },
-    { label: 'Близко (90–99%)',       min: 90,  max: 100,       cls: 'warn',    icon: '~' },
-    { label: 'Отставание (80–89%)',   min: 80,  max: 90,        cls: 'warn',    icon: '!' },
-    { label: 'В риске (<80%)',        min: 0,   max: 80,        cls: 'bad',     icon: '✗' },
+    { label: 'Сверх плана (≥110%)', min: 110, max: Infinity, cls: 'good',    icon: '★' },
+    { label: 'Выполнение (100–109%)', min: 100, max: 110,    cls: 'good',    icon: '✓' },
+    { label: 'Близко (90–99%)',       min: 90,  max: 100,    cls: 'warn',    icon: '~' },
+    { label: 'Отставание (80–89%)',   min: 80,  max: 90,     cls: 'warn',    icon: '!' },
+    { label: 'В риске (<80%)',        min: 0,   max: 80,     cls: 'bad',     icon: '✗' },
   ];
   const total = summary.stores.length;
   el.innerHTML = brackets.map(b => {
     const stores = summary.stores.filter(s => s.percent >= b.min && s.percent < b.max);
     const pct = total > 0 ? Math.round(stores.length / total * 100) : 0;
-    const barW = pct;
     const names = stores.map(s => s.storeName).join(', ') || '—';
     return `<div class="dist-row" title="${names}">
-      <div class="dist-label">
-        <span class="${b.cls}">${b.icon}</span>
-        ${b.label}
-      </div>
-      <div class="dist-track">
-        <div class="dist-bar ${b.cls}" style="width:${barW}%"></div>
-      </div>
-      <div class="dist-count">
-        <strong>${stores.length}</strong>
-        <span class="muted">/${total}</span>
-      </div>
+      <div class="dist-label"><span class="${b.cls}">${b.icon}</span>${b.label}</div>
+      <div class="dist-track"><div class="dist-bar ${b.cls}" style="width:${pct}%"></div></div>
+      <div class="dist-count"><strong>${stores.length}</strong><span class="muted">/${total}</span></div>
     </div>`;
   }).join('');
 }
@@ -712,13 +1058,8 @@ function renderGapReport(summary) {
   const el = $('gapTable');
   if (!el) return;
   const { remainingDays } = summary.forecast;
-  const lagging = [...summary.stores]
-    .filter(s => s.gap < 0)
-    .sort((a, b) => a.gap - b.gap);
-  if (!lagging.length) {
-    el.innerHTML = '<div class="empty-state">Все точки выполняют план.</div>';
-    return;
-  }
+  const lagging = [...summary.stores].filter(s => s.gap < 0).sort((a, b) => a.gap - b.gap);
+  if (!lagging.length) { el.innerHTML = '<div class="empty-state">Все точки выполняют план.</div>'; return; }
   el.innerHTML = `<table><thead><tr>
     <th>Точка</th>
     <th class="num">Разрыв</th>
@@ -742,18 +1083,14 @@ function renderGapReport(summary) {
 function renderMarginChart(summary) {
   const el = $('marginChart');
   if (!el) return;
-  const stores = [...summary.stores]
-    .filter(s => s.fact > 0)
-    .sort((a, b) => b.marginPct - a.marginPct);
+  const stores = [...summary.stores].filter(s => s.fact > 0).sort((a, b) => b.marginPct - a.marginPct);
   const maxFact = Math.max(...stores.map(s => s.fact), 1);
   el.innerHTML = stores.map(s => {
     const barW = (s.fact / maxFact * 100).toFixed(1);
     const mTone = s.marginPct >= 25 ? 'good' : s.marginPct >= 15 ? 'warn' : 'bad';
     return `<div class="rank-row">
       <div class="rank-label" title="${s.storeName}">${s.storeName}</div>
-      <div class="rank-track">
-        <div class="rank-fact-bar ${mTone}" style="width:${barW}%"></div>
-      </div>
+      <div class="rank-track"><div class="rank-fact-bar ${mTone}" style="width:${barW}%"></div></div>
       <div class="rank-vals">
         <span class="${mTone} rank-pct">${s.marginPct}%</span>
         <span class="muted rank-money">${formatMoney(s.margin)}</span>
@@ -766,19 +1103,15 @@ function renderMarginChart(summary) {
 function renderAvgCheckChart(summary) {
   const el = $('avgCheckChart');
   if (!el) return;
-  const stores = [...summary.stores]
-    .filter(s => s.quantity > 0)
-    .map(s => ({ ...s, avgCheck: s.fact / s.quantity }))
-    .sort((a, b) => b.avgCheck - a.avgCheck);
+  const stores = [...summary.stores].filter(s => s.quantity > 0)
+    .map(s => ({ ...s, avgCheck: s.fact / s.quantity })).sort((a, b) => b.avgCheck - a.avgCheck);
   const maxCheck = Math.max(...stores.map(s => s.avgCheck), 1);
   el.innerHTML = stores.map(s => {
     const barW = (s.avgCheck / maxCheck * 100).toFixed(1);
     const rank = s.avgCheck > maxCheck * 0.75 ? 'good' : s.avgCheck > maxCheck * 0.4 ? 'warn' : 'neutral';
     return `<div class="rank-row">
       <div class="rank-label" title="${s.storeName}">${s.storeName}</div>
-      <div class="rank-track">
-        <div class="rank-fact-bar ${rank}" style="width:${barW}%"></div>
-      </div>
+      <div class="rank-track"><div class="rank-fact-bar ${rank}" style="width:${barW}%"></div></div>
       <div class="rank-vals">
         <span class="rank-pct" style="color:var(--ink)">${formatMoney(s.avgCheck)}</span>
         <span class="muted rank-money">${formatNum(s.quantity)} шт</span>
@@ -796,8 +1129,7 @@ function renderStoreRankChart(summary) {
     const factW = (s.fact / maxVal * 100).toFixed(1);
     const planW = (s.plan / maxVal * 100).toFixed(1);
     const tone = pctTone(s.percent);
-    return `
-    <div class="rank-row">
+    return `<div class="rank-row">
       <div class="rank-label" title="${s.storeName}">${s.storeName}</div>
       <div class="rank-track">
         <div class="rank-fact-bar ${tone}" style="width:${factW}%"></div>
@@ -819,10 +1151,7 @@ function renderCategoryChart(summary) {
     const cat = p.category || 'Другое';
     if (!catMap.has(cat)) catMap.set(cat, { name: cat, fact: 0, plan: 0, cost: 0, quantity: 0 });
     const c = catMap.get(cat);
-    c.fact += p.fact;
-    c.plan += p.plan;
-    c.cost += (p.cost || 0);
-    c.quantity += (p.quantity || 0);
+    c.fact += p.fact; c.plan += p.plan; c.cost += (p.cost || 0); c.quantity += (p.quantity || 0);
   }
   const cats = [...catMap.values()].sort((a, b) => b.fact - a.fact);
   const maxVal = Math.max(...cats.map(c => Math.max(c.fact, c.plan)), 1);
@@ -834,8 +1163,7 @@ function renderCategoryChart(summary) {
     const pctVal = c.plan > 0 ? Math.round(c.fact / c.plan * 100) : 0;
     const tone = c.plan > 0 ? pctTone(pctVal) : 'neutral';
     const share = totalFact > 0 ? (c.fact / totalFact * 100).toFixed(1) : 0;
-    return `
-    <div class="rank-row">
+    return `<div class="rank-row">
       <div class="rank-label">${c.name}</div>
       <div class="rank-track">
         <div class="rank-fact-bar ${tone}" style="width:${factW}%"></div>
@@ -849,12 +1177,11 @@ function renderCategoryChart(summary) {
   }).join('');
 }
 
-// ── Store × product matrix ─────────────────────────────────────────────────
+// ── Matrix ─────────────────────────────────────────────────────────────────
 function renderMatrix(matrix) {
   const el = $('storeMatrix');
   if (!matrix || !matrix.stores.length || !matrix.products.length) {
-    el.innerHTML = '<div class="empty-state">Нет данных.</div>';
-    return;
+    el.innerHTML = '<div class="empty-state">Нет данных.</div>'; return;
   }
   const { stores, products, cells, storeTotals, productTotals } = matrix;
 
@@ -867,7 +1194,6 @@ function renderMatrix(matrix) {
       ${c.percent !== null ? `<div class="mx-pct">${c.percent}%</div>` : ''}
     </td>`;
   };
-
   const totHtml = (t) => {
     if (!t || (t.fact === 0 && t.plan === 0)) return `<td class="mx-cell mx-empty">—</td>`;
     const tone = t.percent >= 100 ? 'mx-good' : t.percent >= 80 ? 'mx-warn' : 'mx-bad';
@@ -900,27 +1226,54 @@ function renderMatrix(matrix) {
   </table>`;
 }
 
-// ── Load matrix data ───────────────────────────────────────────────────────
-async function loadMatrix() {
-  if (!state.period) return;
-  const matrix = await fetchJson(`/api/dashboard/matrix?period=${encodeURIComponent(state.period)}`);
-  state.matrix = matrix;
-  renderMatrix(matrix);
+// ── Ingest history ─────────────────────────────────────────────────────────
+function renderIngestHistory(runs) {
+  const el = $('ingestHistory');
+  if (!el) return;
+  if (!runs.length) {
+    el.innerHTML = '<div class="empty-state">Нет истории загрузок.</div>'; return;
+  }
+  const statusBadge = s => {
+    const cls = s === 'success' ? 'good' : s === 'duplicate' ? 'warn' : 'bad';
+    const txt = s === 'success' ? 'Успех' : s === 'duplicate' ? 'Дубликат' : 'Ошибка';
+    return `<span class="abc-badge abc-${s === 'success' ? 'A' : s === 'duplicate' ? 'B' : 'C'}">${txt}</span>`;
+  };
+  el.innerHTML = `<table><thead><tr>
+    <th>Дата</th>
+    <th>Период</th>
+    <th>Источник</th>
+    <th>Объект</th>
+    <th class="num">Планов</th>
+    <th class="num">Продаж</th>
+    <th>Статус</th>
+    <th>Примечание</th>
+  </tr></thead><tbody>
+    ${runs.map(r => `<tr>
+      <td>${formatDateShort(r.createdAt)}</td>
+      <td>${r.period || '—'}</td>
+      <td>${r.sourceSystem || '—'}</td>
+      <td><small class="muted">${(r.sourceObject || '—').slice(0, 40)}</small></td>
+      <td class="num">${r.stats?.plansCount || 0}</td>
+      <td class="num">${r.stats?.salesCount || 0}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td><small class="muted">${r.error ? r.error.slice(0, 60) : ''}</small></td>
+    </tr>`).join('')}
+  </tbody></table>`;
 }
 
-// ── Marketing tab ──────────────────────────────────────────────────────────
+// ── Marketing ──────────────────────────────────────────────────────────────
 function renderMarketingKpis(mkt) {
   const el = $('mkKpis');
   if (!mkt || !mkt.totals) { el.innerHTML = ''; return; }
   const t = mkt.totals;
   const roasTone = t.roas >= 4 ? 'good' : t.roas >= 2 ? 'warn' : 'bad';
   const cards = [
-    { label: 'Расходы',          value: formatMoney(t.spend),                  tone: 'neutral' },
-    { label: 'Выручка (маркет.)',value: formatMoney(t.revenue),                 tone: 'neutral' },
-    { label: 'ROAS',             value: t.roas.toFixed(2),                     tone: roasTone  },
-    { label: 'CPL',              value: formatMoney(t.cpl),                     tone: 'neutral' },
-    { label: 'CAC',              value: formatMoney(t.cac),                     tone: 'neutral' },
-    { label: 'Доля от продаж',   value: `${mkt.salesShare}%`,                  tone: 'neutral' },
+    { label: 'Расходы',           value: formatMoney(t.spend),   tone: 'neutral' },
+    { label: 'Выручка (маркет.)', value: formatMoney(t.revenue),  tone: 'neutral' },
+    { label: 'ROAS',              value: t.roas.toFixed(2),       tone: roasTone  },
+    { label: 'CPL',               value: formatMoney(t.cpl),      tone: 'neutral' },
+    { label: 'CAC',               value: formatMoney(t.cac),      tone: 'neutral' },
+    { label: 'Доля от продаж',    value: `${mkt.salesShare}%`,    tone: 'neutral' },
   ];
   el.innerHTML = cards.map(c => `
     <article class="kpi ${c.tone}">
@@ -961,16 +1314,13 @@ function renderMarketingInsights(analysis, mkt) {
     el.innerHTML = `<div class="exec-block key" style="grid-column:1/-1">
       <div class="exec-label">Нет данных</div>
       <ul class="exec-list">
-        <li>Загрузите маркетинговые данные через <code>POST /api/ingest/marketing</code></li>
-        <li>Формат: <code>{ "period": "2026-04", "metrics": [{ "channelId": "vk", "channelName": "ВКонтакте", "spend": 50000, "leads": 120, "orders": 40, "revenue": 280000 }] }</code></li>
+        <li>Загрузите данные через <code>POST /api/ingest/marketing</code></li>
+        <li>Формат: <code>{ "period": "2026-04", "metrics": [{ "channelId": "vk", ... }] }</code></li>
       </ul>
     </div>`;
     return;
   }
-  if (!analysis) {
-    el.innerHTML = '<div class="empty-state">Загрузка анализа...</div>';
-    return;
-  }
+  if (!analysis) { el.innerHTML = '<div class="empty-state">Загрузка анализа...</div>'; return; }
   const block = (cls, label, items) => `
     <div class="exec-block ${cls}">
       <div class="exec-label">${label}</div>
@@ -1005,12 +1355,176 @@ async function loadMarketing() {
   }
 }
 
+// ── Reports accordion ──────────────────────────────────────────────────────
+function initReportsAccordion() {
+  document.querySelectorAll('#tabReports .section').forEach((section, idx) => {
+    const children = Array.from(section.children);
+    const triggerEl = children.find(el =>
+      el.classList.contains('section-label') || el.classList.contains('section-header')
+    );
+    if (!triggerEl) return;
+
+    const contentEls = children.filter(el => el !== triggerEl);
+    if (!contentEls.length) return;
+
+    const body = document.createElement('div');
+    body.className = 'acc-body';
+    contentEls.forEach(el => body.appendChild(el));
+    section.appendChild(body);
+
+    const labelEl = triggerEl.classList.contains('section-label')
+      ? triggerEl
+      : (triggerEl.querySelector('.section-label') || triggerEl);
+
+    const arrow = document.createElement('span');
+    arrow.className = 'acc-arrow';
+    arrow.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    labelEl.appendChild(arrow);
+
+    if (idx > 0) {
+      section.classList.add('acc-closed');
+      body.style.maxHeight = '0';
+      body.style.overflow = 'hidden';
+    } else {
+      body.style.maxHeight = 'none';
+    }
+
+    const toggle = () => {
+      const isClosed = section.classList.contains('acc-closed');
+      if (isClosed) {
+        section.classList.remove('acc-closed');
+        body.style.overflow = 'hidden';
+        body.style.maxHeight = body.scrollHeight + 'px';
+        body.addEventListener('transitionend', () => {
+          if (!section.classList.contains('acc-closed')) {
+            body.style.maxHeight = 'none';
+            body.style.overflow = '';
+          }
+        }, { once: true });
+      } else {
+        body.style.maxHeight = body.scrollHeight + 'px';
+        body.style.overflow = 'hidden';
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          section.classList.add('acc-closed');
+          body.style.maxHeight = '0';
+        }));
+      }
+    };
+
+    triggerEl.style.cursor = 'pointer';
+    triggerEl.addEventListener('click', e => {
+      if (e.target.closest('.icon-btn')) return;
+      toggle();
+    });
+  });
+}
+
+// ── 1С UPP Guide modal ─────────────────────────────────────────────────────
+function initUppGuide() {
+  $('uppGuideBtn').addEventListener('click', () => {
+    $('uppGuideContent').innerHTML = getUppGuideHtml();
+    $('uppGuideModal').classList.remove('hidden');
+  });
+  $('uppGuideClose').addEventListener('click', () => $('uppGuideModal').classList.add('hidden'));
+  $('uppGuideModal').addEventListener('click', e => { if (e.target === $('uppGuideModal')) $('uppGuideModal').classList.add('hidden'); });
+}
+
+function getUppGuideHtml() {
+  return `
+  <div class="guide-section">
+    <div class="guide-title">Автоматическая выгрузка из 1С УПП</div>
+    <p class="guide-text">Дашборд принимает данные через REST API. Настройте регламентное задание в 1С для отправки данных раз в час.</p>
+  </div>
+
+  <div class="guide-section">
+    <div class="guide-subtitle">Эндпоинт для выгрузки (универсальный формат УПП)</div>
+    <code class="guide-code">POST ${window.location.origin}/api/ingest/upp
+X-API-Key: &lt;ваш ключ&gt;
+Content-Type: application/json</code>
+  </div>
+
+  <div class="guide-section">
+    <div class="guide-subtitle">Формат тела запроса</div>
+    <code class="guide-code">{
+  "packageId": "2026-04-001",
+  "sourceSystem": "1С:УПП",
+  "sourceObject": "Отчёт_ПланФакт",
+  "period": "2026-04",
+  "stores": [{ "id": "store1", "name": "Мария Центр", "region": "Иркутск" }],
+  "products": [{ "id": "cake", "name": "Торты", "category": "Торты" }],
+  "plans": [{ "storeId": "store1", "productId": "cake", "amount": 500000 }],
+  "sales": [{ "storeId": "store1", "productId": "cake", "amount": 480000,
+              "cost": 280000, "quantity": 48, "soldAt": "2026-04-15T10:00:00Z" }]
+}</code>
+  </div>
+
+  <div class="guide-section">
+    <div class="guide-subtitle">Настройка обработчика в 1С (псевдокод)</div>
+    <code class="guide-code">// Создать ВнешнююОбработку или РегламентноеЗадание
+Процедура ОтправитьДашборд()
+  HTTP = Новый HTTPСоединение("${window.location.hostname}", ${window.location.port || 443});
+  Запрос = Новый HTTPЗапрос("/api/ingest/upp");
+  Запрос.Заголовки["X-API-Key"] = "ваш-ключ";
+  Запрос.Заголовки["Content-Type"] = "application/json";
+  Запрос.УстановитьТелоИзСтроки(СформироватьJSON());
+  Ответ = HTTP.ОтправитьДляОбработки(Запрос);
+КонецПроцедуры</code>
+  </div>
+
+  <div class="guide-section">
+    <div class="guide-subtitle">Telegram-уведомления</div>
+    <p class="guide-text">Для получения алертов в Telegram, установите переменные окружения на сервере:</p>
+    <code class="guide-code">TELEGRAM_BOT_TOKEN=ваш_токен_бота
+TELEGRAM_CHAT_ID=ваш_chat_id</code>
+    <p class="guide-text">Алерт отправляется автоматически при загрузке данных, если любая точка ниже 80% плана.</p>
+  </div>
+
+  <div class="guide-section">
+    <div class="guide-subtitle">PIN-защита дашборда</div>
+    <p class="guide-text">Серверный PIN: установите переменную окружения <code>DASHBOARD_PIN=1234</code>.<br>
+    Клиентский PIN: нажмите кнопку 🔒 в шапке дашборда.</p>
+  </div>
+
+  <div class="guide-section">
+    <div class="guide-subtitle">Отдельные эндпоинты</div>
+    <code class="guide-code">POST /api/ingest/plans   — только планы
+POST /api/ingest/sales   — только продажи
+POST /api/ingest/marketing — маркетинговые каналы</code>
+  </div>`;
+}
+
 // ── Reports tab ────────────────────────────────────────────────────────────
+async function loadProductForecast() {
+  if (!state.period) return;
+  try {
+    const data = await fetchJson(`/api/dashboard/product-forecast?period=${encodeURIComponent(state.period)}`);
+    state.productForecast = data;
+    renderProductForecastReport(data);
+  } catch { renderProductForecastReport(null); }
+}
+
+async function loadMatrix() {
+  if (!state.period) return;
+  const matrix = await fetchJson(`/api/dashboard/matrix?period=${encodeURIComponent(state.period)}`);
+  state.matrix = matrix;
+  renderMatrix(matrix);
+}
+
+async function loadIngestRuns() {
+  try {
+    const data = await fetchJson('/api/ingest/runs?limit=20');
+    state.ingestRuns = data.runs || [];
+    renderIngestHistory(state.ingestRuns);
+  } catch { renderIngestHistory([]); }
+}
+
 function renderReports(summary) {
   renderAbcTable('abcProducts', computeAbc(summary.products, 'fact', 'productName'));
   renderAbcTable('abcStores', computeAbc(summary.stores, 'fact', 'storeName'));
   renderGrowthReport(summary);
   renderExecutive(summary);
+  renderWeeklyChart(summary);
+  renderBcgChart(summary);
   renderStoreForecastReport(summary);
   renderDistribution(summary);
   renderGapReport(summary);
@@ -1018,7 +1532,9 @@ function renderReports(summary) {
   renderAvgCheckChart(summary);
   renderStoreRankChart(summary);
   renderCategoryChart(summary);
+  loadProductForecast();
   loadMatrix();
+  loadIngestRuns();
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
@@ -1041,6 +1557,16 @@ async function loadMetadata() {
   $('periodSelect').innerHTML = meta.periods.map(p => `<option value="${p}">${p}</option>`).join('');
   state.period = meta.periods[0] || '';
   $('periodSelect').value = state.period;
+
+  const tgStatus = $('telegramStatus');
+  if (tgStatus) {
+    if (meta.hasTelegram) {
+      tgStatus.textContent = '🔔 Telegram алерты подключены';
+      tgStatus.classList.remove('hidden');
+    }
+  }
+
+  return meta;
 }
 
 async function loadSummary() {
@@ -1063,6 +1589,7 @@ async function loadSummary() {
   renderStores(summary);
   renderProducts(summary);
   await loadStoreDetails();
+  await loadComments();
 
   if (state.activeTab === 'reports') renderReports(summary);
 
@@ -1084,6 +1611,7 @@ function connectEvents() {
     $('streamStatus').className = 'status-pill live';
   };
   ['sales_updated', 'plans_updated'].forEach(e => es.addEventListener(e, reload));
+  es.addEventListener('comment_added', () => loadComments());
   es.onerror = () => {
     $('streamStatus').textContent = '● нет связи';
     $('streamStatus').className = 'status-pill idle';
@@ -1092,6 +1620,9 @@ function connectEvents() {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
+  // Dark theme (before anything else to avoid flash)
+  initDarkTheme();
+
   // Tab switching
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -1110,23 +1641,42 @@ async function init() {
     });
   });
 
-  // Product sort select
+  // Product sort
   $('productSort').addEventListener('change', e => {
     state.productSort = e.target.value;
     if (state.summary) renderProducts(state.summary);
   });
 
-  // Export: sales CSV (sidebar + header button)
+  // Print button
+  $('printBtn').addEventListener('click', () => {
+    // Open all accordion sections before printing
+    document.querySelectorAll('#tabReports .section.acc-closed').forEach(section => {
+      const body = section.querySelector('.acc-body');
+      if (body) { body.style.maxHeight = 'none'; body.style.overflow = ''; }
+      section.classList.remove('acc-closed');
+    });
+    window.print();
+  });
+
+  // Plan edit modal
+  $('planSaveBtn').addEventListener('click', savePlanEdit);
+  $('planCancelBtn').addEventListener('click', closePlanEdit);
+  $('modalClose').addEventListener('click', closePlanEdit);
+  $('planEditModal').addEventListener('click', e => { if (e.target === $('planEditModal')) closePlanEdit(); });
+
+  // Comments
+  initComments();
+
+  // 1С Guide
+  initUppGuide();
+
+  // Exports
   const exportSales = () => {
     if (!state.summary) return;
     exportCsv(state.summary.stores.map(s => ({
-      'Точка': s.storeName,
-      'Регион': s.region || '',
-      'Факт': s.fact,
-      'План': s.plan,
-      'Выполнение%': s.percent,
-      'Маржа': s.margin,
-      'Маржа%': s.marginPct,
+      'Точка': s.storeName, 'Регион': s.region || '',
+      'Факт': s.fact, 'План': s.plan, 'Выполнение%': s.percent,
+      'Маржа': s.margin, 'Маржа%': s.marginPct,
       'Ср.чек': s.quantity > 0 ? Math.round(s.fact / s.quantity) : 0,
       'Количество': s.quantity
     })), `sales-${state.period}.csv`);
@@ -1134,20 +1684,28 @@ async function init() {
   $('exportSalesBtn')?.addEventListener('click', exportSales);
   $('exportSalesBtnH')?.addEventListener('click', exportSales);
 
-  // Export: ABC CSV
   $('exportAbcBtn')?.addEventListener('click', () => {
     if (!state.summary) return;
     exportCsv(computeAbc(state.summary.products, 'fact', 'productName').map(i => ({
-      '№': i.rank,
-      'Наименование': i.name,
-      'Выручка': i.value,
-      'Доля%': i.share.toFixed(1),
-      'Накоп%': i.cumPct.toFixed(1),
-      'Группа': i.abc
+      '№': i.rank, 'Наименование': i.name, 'Выручка': i.value,
+      'Доля%': i.share.toFixed(1), 'Накоп%': i.cumPct.toFixed(1), 'Группа': i.abc
     })), `abc-${state.period}.csv`);
   });
 
-  // Export: matrix CSV
+  $('exportGrowthBtn')?.addEventListener('click', () => {
+    if (!state.summary) return;
+    const active = (state.summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
+    exportCsv(active.map((p, i) => {
+      const prev = active[i - 1];
+      return {
+        'Период': p.period, 'Факт': p.fact,
+        'Рост': prev ? (p.fact - prev.fact).toFixed(0) : '',
+        'Рост%': prev && prev.fact > 0 ? ((p.fact - prev.fact) / prev.fact * 100).toFixed(1) : '',
+        'Выполнение%': p.completion, 'Маржа': p.margin
+      };
+    }), `growth-${state.period}.csv`);
+  });
+
   const exportMatrix = () => {
     if (!state.matrix) return;
     const { stores, products, cells, storeTotals } = state.matrix;
@@ -1167,47 +1725,21 @@ async function init() {
   $('exportMatrixBtn')?.addEventListener('click', exportMatrix);
   $('exportMatrixBtnH')?.addEventListener('click', exportMatrix);
 
-  // Export: marketing CSV
   const exportMktg = () => {
     if (!state.marketing?.channels.length) return;
     exportCsv(state.marketing.channels.map(ch => ({
-      'Канал': ch.channelName,
-      'Расходы': ch.spend,
-      'Выручка': ch.revenue,
-      'ROAS': ch.roas,
-      'Лиды': ch.leads,
-      'CPL': ch.cpl,
-      'Заказы': ch.orders,
-      'CAC': ch.cac,
-      'Показы': ch.impressions,
-      'Клики': ch.clicks,
-      'CTR%': ch.ctr,
-      'CVR%': ch.cvr
+      'Канал': ch.channelName, 'Расходы': ch.spend, 'Выручка': ch.revenue,
+      'ROAS': ch.roas, 'Лиды': ch.leads, 'CPL': ch.cpl, 'Заказы': ch.orders,
+      'CAC': ch.cac, 'Показы': ch.impressions, 'Клики': ch.clicks, 'CTR%': ch.ctr, 'CVR%': ch.cvr
     })), `marketing-${state.period}.csv`);
   };
   $('exportMktgBtn')?.addEventListener('click', exportMktg);
   $('exportMktgBtnH')?.addEventListener('click', exportMktg);
 
-  // Export: growth CSV
-  $('exportGrowthBtn')?.addEventListener('click', () => {
-    if (!state.summary) return;
-    const active = (state.summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
-    exportCsv(active.map((p, i) => {
-      const prev = active[i - 1];
-      return {
-        'Период': p.period,
-        'Факт': p.fact,
-        'Рост': prev ? (p.fact - prev.fact).toFixed(0) : '',
-        'Рост%': prev && prev.fact > 0 ? ((p.fact - prev.fact) / prev.fact * 100).toFixed(1) : '',
-        'Выполнение%': p.completion,
-        'Маржа': p.margin
-      };
-    }), `growth-${state.period}.csv`);
-  });
-
-  // Load data and start auto-refresh
+  // Load data
   try {
-    await loadMetadata();
+    const meta = await loadMetadata();
+    initPin(meta.pinRequired);
     await loadSummary();
     connectEvents();
     $('periodSelect').addEventListener('change', async e => {
