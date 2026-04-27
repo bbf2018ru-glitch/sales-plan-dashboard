@@ -471,6 +471,70 @@ function renderExecutive(summary) {
     `<div class="exec-footer">Сформировано: ${formatDate(e.generatedAt)}</div>`;
 }
 
+// ── Reports accordion ─────────────────────────────────────────────────────
+function initReportsAccordion() {
+  document.querySelectorAll('#tabReports .section').forEach((section, idx) => {
+    const children = Array.from(section.children);
+    const triggerEl = children.find(el =>
+      el.classList.contains('section-label') || el.classList.contains('section-header')
+    );
+    if (!triggerEl) return;
+
+    const contentEls = children.filter(el => el !== triggerEl);
+    if (!contentEls.length) return;
+
+    const body = document.createElement('div');
+    body.className = 'acc-body';
+    contentEls.forEach(el => body.appendChild(el));
+    section.appendChild(body);
+
+    const labelEl = triggerEl.classList.contains('section-label')
+      ? triggerEl
+      : (triggerEl.querySelector('.section-label') || triggerEl);
+
+    const arrow = document.createElement('span');
+    arrow.className = 'acc-arrow';
+    arrow.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    labelEl.appendChild(arrow);
+
+    if (idx > 0) {
+      section.classList.add('acc-closed');
+      body.style.maxHeight = '0';
+      body.style.overflow = 'hidden';
+    } else {
+      body.style.maxHeight = 'none';
+    }
+
+    const toggle = () => {
+      const isClosed = section.classList.contains('acc-closed');
+      if (isClosed) {
+        section.classList.remove('acc-closed');
+        body.style.overflow = 'hidden';
+        body.style.maxHeight = body.scrollHeight + 'px';
+        body.addEventListener('transitionend', () => {
+          if (!section.classList.contains('acc-closed')) {
+            body.style.maxHeight = 'none';
+            body.style.overflow = '';
+          }
+        }, { once: true });
+      } else {
+        body.style.maxHeight = body.scrollHeight + 'px';
+        body.style.overflow = 'hidden';
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          section.classList.add('acc-closed');
+          body.style.maxHeight = '0';
+        }));
+      }
+    };
+
+    triggerEl.style.cursor = 'pointer';
+    triggerEl.addEventListener('click', e => {
+      if (e.target.closest('.icon-btn')) return;
+      toggle();
+    });
+  });
+}
+
 // ── Market news content ────────────────────────────────────────────────────
 const MARKET_NEWS = [
   {
@@ -1032,6 +1096,8 @@ async function init() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
+
+  initReportsAccordion();
 
   // Sortable table headers
   document.querySelectorAll('#storesTableEl th.sortable').forEach(th => {

@@ -683,6 +683,43 @@ th.col-num, td.col-num { width: 32px; color: var(--hint); text-align: center; }
   font-weight: 600;
 }
 
+/* ── Reports accordion ───────────────────────────────────────── */
+.acc-body {
+  transition: max-height 0.32s cubic-bezier(.4, 0, .2, 1);
+}
+
+.acc-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--hint);
+  transition: transform 0.28s ease;
+  vertical-align: middle;
+}
+
+.acc-closed .acc-arrow { transform: rotate(-90deg); }
+
+#tabReports .section-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: color .15s;
+  user-select: none;
+}
+
+#tabReports .section-label:hover { color: var(--accent); }
+#tabReports .section-label:hover .acc-arrow { color: var(--accent); }
+
+#tabReports .section-header { cursor: pointer; user-select: none; }
+#tabReports .section-header:hover .section-label { color: var(--accent); }
+#tabReports .section-header:hover .acc-arrow { color: var(--accent); }
+
+.acc-closed > .section-label  { margin-bottom: 0; }
+.acc-closed > .section-header { margin-bottom: 0; }
+
 /* ── Recommendations panel ───────────────────────────────────── */
 .rec-badge {
   display: inline-block;
