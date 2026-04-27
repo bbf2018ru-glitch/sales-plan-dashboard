@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Мария — Продажи</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=3" />
   </head>
   <body>
     <div class="shell">
@@ -30,6 +30,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
             Отчёты
           </button>
+          <button class="tab-btn" data-tab="marketing">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 9l-5 5-4-4-4 4"/></svg>
+            Маркетинг
+          </button>
         </nav>
 
         <div class="sidebar-card status-card">
@@ -54,6 +58,17 @@
           <button id="exportGrowthBtn" class="side-action-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Рост продаж CSV
+          </button>
+          <button id="exportMatrixBtn" class="side-action-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Матрица CSV
+          </button>
+        </div>
+
+        <div id="sidebarMarketing" class="sidebar-section hidden">
+          <button id="exportMktgBtn" class="side-action-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Каналы CSV
           </button>
         </div>
       </aside>
@@ -108,6 +123,27 @@
                 <div class="panel-title">Лидер / Риск</div>
               </div>
               <div id="spotlight" class="spotlight"></div>
+            </article>
+          </section>
+
+          <!-- Блок 4b: Рекомендации + Новинки рынка -->
+          <section class="section panel-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <div class="panel-title">Рекомендации</div>
+                  <div class="panel-subtitle">на основе данных текущего периода</div>
+                </div>
+                <div id="recommendBadge" class="rec-badge"></div>
+              </div>
+              <div id="recommendPanel"></div>
+            </article>
+            <article class="panel panel-narrow">
+              <div class="panel-header">
+                <div class="panel-title">Новинки рынка</div>
+                <div class="panel-subtitle">тренды кондитерского рынка 2025</div>
+              </div>
+              <div id="marketNews" class="news-feed"></div>
             </article>
           </section>
 
@@ -219,10 +255,174 @@
             <div id="executivePanel" class="exec-grid"></div>
           </section>
 
+          <!-- Блок 4: Прогноз по точкам -->
+          <section class="section">
+            <div class="section-label">Прогноз по точкам</div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="storeForecastTable">
+                  <thead>
+                    <tr>
+                      <th class="col-num">#</th>
+                      <th>Точка</th>
+                      <th class="num">Факт</th>
+                      <th class="num">%</th>
+                      <th class="num">Прогноз</th>
+                      <th class="num">Ожид.%</th>
+                      <th class="num">Нужно/день</th>
+                      <th class="num">Разрыв прогноза</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody id="storeForecastBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Блок 5: Распределение точек -->
+          <section class="section">
+            <div class="section-label">Распределение точек по выполнению</div>
+            <div class="report-2col">
+              <article class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">Сколько точек в каждом диапазоне</div>
+                  <div class="panel-subtitle">выполнение плана на текущую дату</div>
+                </div>
+                <div id="distributionChart"></div>
+              </article>
+              <article class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">Gap-анализ</div>
+                  <div class="panel-subtitle">отстающие точки — сколько нужно в день</div>
+                </div>
+                <div id="gapTable" class="table-wrap"></div>
+              </article>
+            </div>
+          </section>
+
+          <!-- Блок 6: Маржинальность -->
+          <section class="section">
+            <div class="section-label">Маржинальность по точкам</div>
+            <article class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Маржа % по каждой точке</div>
+                <div class="panel-subtitle">отсортировано по марже · размер полосы = объём выручки</div>
+              </div>
+              <div id="marginChart" class="rank-chart"></div>
+            </article>
+          </section>
+
+          <!-- Блок 7: Средний чек -->
+          <section class="section">
+            <div class="section-label">Средний чек</div>
+            <article class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Рейтинг точек по среднему чеку</div>
+                <div class="panel-subtitle">выручка / количество единиц</div>
+              </div>
+              <div id="avgCheckChart" class="rank-chart"></div>
+            </article>
+          </section>
+
+          <!-- Блок 8: Рейтинг точек -->
+          <section class="section">
+            <div class="section-label">Рейтинг точек</div>
+            <article class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Все точки — план vs факт</div>
+                <div class="panel-subtitle">отсортировано по выручке · вертикальная черта = 100% плана</div>
+              </div>
+              <div id="storeRankChart" class="rank-chart"></div>
+            </article>
+          </section>
+
+          <!-- Блок 9: По категориям -->
+          <section class="section">
+            <div class="section-label">По категориям товаров</div>
+            <article class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Выручка по категориям</div>
+                <div class="panel-subtitle">план и факт · доля в общей выручке</div>
+              </div>
+              <div id="categoryChart" class="rank-chart"></div>
+            </article>
+          </section>
+
+          <!-- Блок 10: Матрица точка × товар -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Матрица точка × товар</div>
+                <div class="section-hint">Факт продаж по каждой точке и товару · цвет = выполнение плана</div>
+              </div>
+              <button id="exportMatrixBtnH" class="icon-btn" title="Экспорт CSV">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                CSV
+              </button>
+            </div>
+            <div class="panel">
+              <div id="storeMatrix" class="table-wrap"></div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- ── TAB: МАРКЕТИНГ ── -->
+        <div id="tabMarketing" class="tab-content hidden">
+
+          <!-- Блок 1: KPI -->
+          <section class="section">
+            <div class="section-label">Маркетинговые метрики</div>
+            <div id="mkKpis" class="kpi-grid"></div>
+          </section>
+
+          <!-- Блок 2: Каналы -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Каналы</div>
+                <div class="section-hint">ROAS = выручка / расходы · CAC = расходы / заказы · CTR = клики / показы · CVR = заказы / клики</div>
+              </div>
+              <button id="exportMktgBtnH" class="icon-btn" title="Экспорт CSV">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                CSV
+              </button>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Канал</th>
+                      <th class="num">Расходы</th>
+                      <th class="num">Выручка</th>
+                      <th class="num">ROAS</th>
+                      <th class="num">Лиды</th>
+                      <th class="num">CPL</th>
+                      <th class="num">Заказы</th>
+                      <th class="num">CAC</th>
+                      <th class="num">Показы</th>
+                      <th class="num">CTR</th>
+                      <th class="num">CVR</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mkChannels"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Блок 3: Инсайты -->
+          <section class="section">
+            <div class="section-label">Анализ</div>
+            <div id="mkInsights" class="exec-grid"></div>
+          </section>
+
         </div>
 
       </main>
     </div>
-    <script src="/app.js"></script>
+    <script src="/app.js?v=3"></script>
   </body>
 </html>

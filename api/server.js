@@ -7,6 +7,7 @@ const {
   aggregateDashboard,
   aggregateMarketing,
   buildMarketingAnalysis,
+  buildStoreProductMatrix,
   listPeriods,
   monthKey,
   storeDetails
@@ -180,6 +181,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, storeDetails(db, period, storeId));
+      return;
+    }
+
+    if (pathname === '/api/dashboard/matrix' && req.method === 'GET') {
+      const db = await store.getDb();
+      const period = monthKey(parsedUrl.searchParams.get('period'));
+      sendJson(res, 200, buildStoreProductMatrix(db, period));
       return;
     }
 

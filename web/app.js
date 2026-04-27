@@ -4,6 +4,8 @@ const state = {
   selectedStoreId: '',
   activeTab: 'sales',
   summary: null,
+  matrix: null,
+  marketing: null,
   storeSort: { key: 'percent', dir: -1 },
   productSort: 'fact'
 };
@@ -52,6 +54,7 @@ function switchTab(tab) {
     el.classList.toggle('hidden', el.id !== `sidebar${tab[0].toUpperCase()}${tab.slice(1)}`);
   });
   if (tab === 'reports' && state.summary) renderReports(state.summary);
+  if (tab === 'marketing') loadMarketing();
 }
 
 // ── SVG: trend line chart ──────────────────────────────────────────────────
@@ -339,7 +342,9 @@ async function loadStoreDetails() {
         </div>
         <div class="detail-right">
           <div class="detail-fact">${formatMoney(item.fact)}</div>
+          <div class="detail-sub">план: ${formatMoney(item.plan)}</div>
           <div class="detail-pct ${tone}">${item.percent}%</div>
+          ${item.margin ? `<div class="detail-sub ${item.margin >= 0 ? 'positive' : 'negative'}">маржа: ${formatMoney(item.margin)}</div>` : ''}
         </div>
       </div>`;
     }).join('')}
@@ -466,12 +471,490 @@ function renderExecutive(summary) {
     `<div class="exec-footer">Сформировано: ${formatDate(e.generatedAt)}</div>`;
 }
 
+// ── Market news content ────────────────────────────────────────────────────
+const MARKET_NEWS = [
+  {
+    tag: 'Тренд', tone: 'accent',
+    date: 'Апрель 2025',
+    title: 'Бенто-торты: рост +25% г/г',
+    text: 'Мини-торты в коробках остаются в топе. Покупатели выбирают их как подарок на 1–2 человека. Фокус на упаковке и персонализации.'
+  },
+  {
+    tag: 'Рынок', tone: 'good',
+    date: 'Q1 2025',
+    title: 'Кофе с собой обгоняет торты',
+    text: 'Кофейный сегмент в кондитерских Сибири +18% год к году. Главный драйвер — офисная аудитория. Рассмотрите расширение линейки.'
+  },
+  {
+    tag: 'Сезон', tone: 'warn',
+    date: 'Май–Июнь 2025',
+    title: 'Выпускные: ожидаемый рост +35%',
+    text: 'Сезон выпускных вечеров запускается в мае. Рост заказных тортов +35% в мае-июне — готовьте производственные мощности заранее.'
+  },
+  {
+    tag: 'Новинка', tone: 'accent',
+    date: 'Весна 2025',
+    title: 'Корейский стиль: buttercream flowers',
+    text: 'Торты с цветами из крема в корейском стиле — один из топ-запросов в соцсетях. Высокий средний чек и виральность в Instagram.'
+  },
+  {
+    tag: 'Рынок', tone: 'good',
+    date: 'Q1 2025',
+    title: 'Средний чек вырос на 12%',
+    text: 'В кондитерских Сибири средний чек +12% г/г. Покупатели готовы к премиуму — важно обеспечить соответствующий сервис.'
+  },
+  {
+    tag: 'Совет', tone: 'neutral',
+    date: 'Апрель 2025',
+    title: 'Программы лояльности удерживают 30%+',
+    text: 'Кондитерские с программой лояльности демонстрируют возврат клиентов на 30% выше. Персонализированные предложения к дням рождения особенно эффективны.'
+  }
+];
+
+const TONE_TAG = { accent: '#0f766e', good: '#16a34a', warn: '#b45309', neutral: '#6b7280', bad: '#dc2626' };
+const TONE_BG  = { accent: '#d5f2ee', good: '#dcfce7', warn: '#fef3c7', neutral: '#f3f4f6', bad: '#fee2e2' };
+
+function renderMarketNews() {
+  const el = $('marketNews');
+  if (!el) return;
+  el.innerHTML = MARKET_NEWS.map(n => `
+    <div class="news-card">
+      <div class="news-meta">
+        <span class="news-tag" style="background:${TONE_BG[n.tone]};color:${TONE_TAG[n.tone]}">${n.tag}</span>
+        <span class="news-date">${n.date}</span>
+      </div>
+      <div class="news-title">${n.title}</div>
+      <div class="news-text">${n.text}</div>
+    </div>`).join('');
+}
+
+// ── Recommendations panel ──────────────────────────────────────────────────
+function renderRecommendations(summary) {
+  const el = $('recommendPanel');
+  const badge = $('recommendBadge');
+  if (!el) return;
+  const e = summary.executive;
+  const f = summary.forecast;
+  const tone = f.projectedCompletion >= 100 ? 'good' : f.projectedCompletion >= 90 ? 'warn' : 'bad';
+
+  if (badge) {
+    badge.textContent = f.projectedCompletion >= 100 ? 'В плане' : f.projectedCompletion >= 90 ? 'Риск' : 'Не в плане';
+    badge.className = `rec-badge rec-${tone}`;
+  }
+
+  const headline = `<div class="rec-headline">
+    <div class="rec-kpi ${tone}">
+      <span class="rec-kpi-val">${f.projectedCompletion}%</span>
+      <span class="rec-kpi-label">прогноз выполнения</span>
+    </div>
+    <div class="rec-kpi neutral">
+      <span class="rec-kpi-val">${formatMoney(f.projectedFact)}</span>
+      <span class="rec-kpi-label">ожидается к концу месяца</span>
+    </div>
+    <div class="rec-kpi ${tone}">
+      <span class="rec-kpi-val">${formatMoney(f.requiredPerDayToPlan)}</span>
+      <span class="rec-kpi-label">нужно в день для плана</span>
+    </div>
+  </div>`;
+
+  const priorities = e.priorities.length
+    ? `<div class="rec-section">
+        <div class="rec-section-label rec-prior">▲ Приоритеты</div>
+        <ul class="rec-list">${e.priorities.map(p => `<li>${p}</li>`).join('')}</ul>
+      </div>` : '';
+
+  const alerts = e.alerts.length
+    ? `<div class="rec-section">
+        <div class="rec-section-label rec-risk">! Риски</div>
+        <ul class="rec-list rec-alerts">${e.alerts.map(a => `<li>${a}</li>`).join('')}</ul>
+      </div>` : '';
+
+  const headlines = e.headlines.length
+    ? `<div class="rec-section">
+        <div class="rec-section-label">● Ключевые факты</div>
+        <ul class="rec-list rec-facts">${e.headlines.map(h => `<li>${h}</li>`).join('')}</ul>
+      </div>` : '';
+
+  el.innerHTML = headline + priorities + alerts + headlines;
+}
+
+// ── Store forecast report ──────────────────────────────────────────────────
+function renderStoreForecastReport(summary) {
+  const el = $('storeForecastBody');
+  if (!el) return;
+  const f = summary.forecast;
+  const { elapsedDays, remainingDays, totalDays } = f;
+
+  const stores = [...summary.stores].sort((a, b) => a.percent - b.percent);
+
+  el.innerHTML = stores.map((s, idx) => {
+    const avgPerDay = elapsedDays > 0 ? s.fact / elapsedDays : 0;
+    const projected = Math.round(avgPerDay * totalDays);
+    const projPct = s.plan > 0 ? Math.round(projected / s.plan * 100) : 0;
+    const reqPerDay = remainingDays > 0 ? Math.max(s.plan - s.fact, 0) / remainingDays : 0;
+    const gap = projected - s.plan;
+    const ptone = pctTone(projPct);
+    const statusIcon = projPct >= 100 ? '✓' : projPct >= 90 ? '~' : '✗';
+    const statusCls  = projPct >= 100 ? 'good' : projPct >= 90 ? 'warn' : 'bad';
+    return `<tr>
+      <td class="col-num">${idx + 1}</td>
+      <td>${s.storeName}<br><small class="muted">${s.region || ''}</small></td>
+      <td class="num">${formatMoney(s.fact)}</td>
+      <td class="num"><span class="${pctTone(s.percent)}">${s.percent}%</span></td>
+      <td class="num">${formatMoney(projected)}</td>
+      <td class="num"><span class="${ptone}">${projPct}%</span></td>
+      <td class="num">${reqPerDay > 0 ? formatMoney(reqPerDay) : '<span class="good">—</span>'}</td>
+      <td class="num"><span class="${gap >= 0 ? 'positive' : 'negative'}">${gap >= 0 ? '+' : ''}${formatMoney(gap)}</span></td>
+      <td><span class="forecast-status ${statusCls}">${statusIcon}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Distribution chart ─────────────────────────────────────────────────────
+function renderDistribution(summary) {
+  const el = $('distributionChart');
+  if (!el) return;
+  const brackets = [
+    { label: 'Сверх плана (≥110%)', min: 110, max: Infinity,   cls: 'good',    icon: '★' },
+    { label: 'Выполнение (100–109%)', min: 100, max: 110,       cls: 'good',    icon: '✓' },
+    { label: 'Близко (90–99%)',       min: 90,  max: 100,       cls: 'warn',    icon: '~' },
+    { label: 'Отставание (80–89%)',   min: 80,  max: 90,        cls: 'warn',    icon: '!' },
+    { label: 'В риске (<80%)',        min: 0,   max: 80,        cls: 'bad',     icon: '✗' },
+  ];
+  const total = summary.stores.length;
+  el.innerHTML = brackets.map(b => {
+    const stores = summary.stores.filter(s => s.percent >= b.min && s.percent < b.max);
+    const pct = total > 0 ? Math.round(stores.length / total * 100) : 0;
+    const barW = pct;
+    const names = stores.map(s => s.storeName).join(', ') || '—';
+    return `<div class="dist-row" title="${names}">
+      <div class="dist-label">
+        <span class="${b.cls}">${b.icon}</span>
+        ${b.label}
+      </div>
+      <div class="dist-track">
+        <div class="dist-bar ${b.cls}" style="width:${barW}%"></div>
+      </div>
+      <div class="dist-count">
+        <strong>${stores.length}</strong>
+        <span class="muted">/${total}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Gap analysis ───────────────────────────────────────────────────────────
+function renderGapReport(summary) {
+  const el = $('gapTable');
+  if (!el) return;
+  const { remainingDays } = summary.forecast;
+  const lagging = [...summary.stores]
+    .filter(s => s.gap < 0)
+    .sort((a, b) => a.gap - b.gap);
+  if (!lagging.length) {
+    el.innerHTML = '<div class="empty-state">Все точки выполняют план.</div>';
+    return;
+  }
+  el.innerHTML = `<table><thead><tr>
+    <th>Точка</th>
+    <th class="num">Разрыв</th>
+    <th class="num">Нужно/день</th>
+    <th class="num">%</th>
+  </tr></thead><tbody>
+    ${lagging.map(s => {
+      const reqPerDay = remainingDays > 0 ? Math.abs(s.gap) / remainingDays : 0;
+      const urgency = reqPerDay > summary.forecast.averagePerDay * 0.3 ? 'bad' : 'warn';
+      return `<tr>
+        <td>${s.storeName}</td>
+        <td class="num negative">${formatMoney(s.gap)}</td>
+        <td class="num"><span class="${urgency}">${formatMoney(reqPerDay)}</span></td>
+        <td class="num"><span class="${pctTone(s.percent)}">${s.percent}%</span></td>
+      </tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+// ── Margin chart ───────────────────────────────────────────────────────────
+function renderMarginChart(summary) {
+  const el = $('marginChart');
+  if (!el) return;
+  const stores = [...summary.stores]
+    .filter(s => s.fact > 0)
+    .sort((a, b) => b.marginPct - a.marginPct);
+  const maxFact = Math.max(...stores.map(s => s.fact), 1);
+  el.innerHTML = stores.map(s => {
+    const barW = (s.fact / maxFact * 100).toFixed(1);
+    const mTone = s.marginPct >= 25 ? 'good' : s.marginPct >= 15 ? 'warn' : 'bad';
+    return `<div class="rank-row">
+      <div class="rank-label" title="${s.storeName}">${s.storeName}</div>
+      <div class="rank-track">
+        <div class="rank-fact-bar ${mTone}" style="width:${barW}%"></div>
+      </div>
+      <div class="rank-vals">
+        <span class="${mTone} rank-pct">${s.marginPct}%</span>
+        <span class="muted rank-money">${formatMoney(s.margin)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Avg check chart ────────────────────────────────────────────────────────
+function renderAvgCheckChart(summary) {
+  const el = $('avgCheckChart');
+  if (!el) return;
+  const stores = [...summary.stores]
+    .filter(s => s.quantity > 0)
+    .map(s => ({ ...s, avgCheck: s.fact / s.quantity }))
+    .sort((a, b) => b.avgCheck - a.avgCheck);
+  const maxCheck = Math.max(...stores.map(s => s.avgCheck), 1);
+  el.innerHTML = stores.map(s => {
+    const barW = (s.avgCheck / maxCheck * 100).toFixed(1);
+    const rank = s.avgCheck > maxCheck * 0.75 ? 'good' : s.avgCheck > maxCheck * 0.4 ? 'warn' : 'neutral';
+    return `<div class="rank-row">
+      <div class="rank-label" title="${s.storeName}">${s.storeName}</div>
+      <div class="rank-track">
+        <div class="rank-fact-bar ${rank}" style="width:${barW}%"></div>
+      </div>
+      <div class="rank-vals">
+        <span class="rank-pct" style="color:var(--ink)">${formatMoney(s.avgCheck)}</span>
+        <span class="muted rank-money">${formatNum(s.quantity)} шт</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Store rank chart ───────────────────────────────────────────────────────
+function renderStoreRankChart(summary) {
+  const el = $('storeRankChart');
+  const stores = [...summary.stores].sort((a, b) => b.fact - a.fact);
+  const maxVal = Math.max(...stores.map(s => Math.max(s.fact, s.plan)), 1);
+  el.innerHTML = stores.map(s => {
+    const factW = (s.fact / maxVal * 100).toFixed(1);
+    const planW = (s.plan / maxVal * 100).toFixed(1);
+    const tone = pctTone(s.percent);
+    return `
+    <div class="rank-row">
+      <div class="rank-label" title="${s.storeName}">${s.storeName}</div>
+      <div class="rank-track">
+        <div class="rank-fact-bar ${tone}" style="width:${factW}%"></div>
+        <div class="rank-plan-line" style="left:${planW}%" title="План: ${formatMoney(s.plan)}"></div>
+      </div>
+      <div class="rank-vals">
+        <span class="${tone} rank-pct">${s.percent}%</span>
+        <span class="muted rank-money">${fmtAxis(s.fact)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Category chart ─────────────────────────────────────────────────────────
+function renderCategoryChart(summary) {
+  const el = $('categoryChart');
+  const catMap = new Map();
+  for (const p of summary.products) {
+    const cat = p.category || 'Другое';
+    if (!catMap.has(cat)) catMap.set(cat, { name: cat, fact: 0, plan: 0, cost: 0, quantity: 0 });
+    const c = catMap.get(cat);
+    c.fact += p.fact;
+    c.plan += p.plan;
+    c.cost += (p.cost || 0);
+    c.quantity += (p.quantity || 0);
+  }
+  const cats = [...catMap.values()].sort((a, b) => b.fact - a.fact);
+  const maxVal = Math.max(...cats.map(c => Math.max(c.fact, c.plan)), 1);
+  const totalFact = cats.reduce((s, c) => s + c.fact, 0);
+  if (!cats.length) { el.innerHTML = '<div class="empty-state">Нет данных.</div>'; return; }
+  el.innerHTML = cats.map(c => {
+    const factW = (c.fact / maxVal * 100).toFixed(1);
+    const planW = (c.plan / maxVal * 100).toFixed(1);
+    const pctVal = c.plan > 0 ? Math.round(c.fact / c.plan * 100) : 0;
+    const tone = c.plan > 0 ? pctTone(pctVal) : 'neutral';
+    const share = totalFact > 0 ? (c.fact / totalFact * 100).toFixed(1) : 0;
+    return `
+    <div class="rank-row">
+      <div class="rank-label">${c.name}</div>
+      <div class="rank-track">
+        <div class="rank-fact-bar ${tone}" style="width:${factW}%"></div>
+        ${c.plan > 0 ? `<div class="rank-plan-line" style="left:${planW}%" title="План: ${formatMoney(c.plan)}"></div>` : ''}
+      </div>
+      <div class="rank-vals">
+        ${c.plan > 0 ? `<span class="${tone} rank-pct">${pctVal}%</span>` : '<span class="muted rank-pct">—</span>'}
+        <span class="muted rank-money">${share}% выр.</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Store × product matrix ─────────────────────────────────────────────────
+function renderMatrix(matrix) {
+  const el = $('storeMatrix');
+  if (!matrix || !matrix.stores.length || !matrix.products.length) {
+    el.innerHTML = '<div class="empty-state">Нет данных.</div>';
+    return;
+  }
+  const { stores, products, cells, storeTotals, productTotals } = matrix;
+
+  const cellHtml = (c) => {
+    if (!c || (c.fact === 0 && c.plan === 0)) return `<td class="mx-cell mx-empty">—</td>`;
+    const tone = c.percent !== null ? (c.percent >= 100 ? 'mx-good' : c.percent >= 80 ? 'mx-warn' : 'mx-bad') : 'mx-noplan';
+    const title = `Факт: ${formatMoney(c.fact)}\nПлан: ${formatMoney(c.plan)}\n${c.percent !== null ? 'Вып.: ' + c.percent + '%' : 'Без плана'}`;
+    return `<td class="mx-cell ${tone}" title="${title}">
+      <div class="mx-fact">${fmtAxis(c.fact)}</div>
+      ${c.percent !== null ? `<div class="mx-pct">${c.percent}%</div>` : ''}
+    </td>`;
+  };
+
+  const totHtml = (t) => {
+    if (!t || (t.fact === 0 && t.plan === 0)) return `<td class="mx-cell mx-empty">—</td>`;
+    const tone = t.percent >= 100 ? 'mx-good' : t.percent >= 80 ? 'mx-warn' : 'mx-bad';
+    return `<td class="mx-cell mx-total ${tone}"><div class="mx-fact">${fmtAxis(t.fact)}</div><div class="mx-pct">${t.percent}%</div></td>`;
+  };
+
+  el.innerHTML = `<table class="matrix-table">
+    <thead><tr>
+      <th class="mx-th-store">Точка</th>
+      ${products.map(p => `<th class="num mx-th">${p.name}</th>`).join('')}
+      <th class="num mx-th mx-th-total">Итого</th>
+    </tr></thead>
+    <tbody>
+      ${stores.map(s => {
+        const st = storeTotals[s.id] || { fact: 0, plan: 0, percent: 0 };
+        return `<tr>
+          <td class="mx-store">${s.name}</td>
+          ${products.map(p => cellHtml(cells[s.id]?.[p.id])).join('')}
+          ${totHtml(st)}
+        </tr>`;
+      }).join('')}
+    </tbody>
+    <tfoot><tr>
+      <td class="mx-store mx-total">Итого</td>
+      ${products.map(p => totHtml(productTotals[p.id])).join('')}
+      <td class="mx-cell mx-total mx-grand">
+        <div class="mx-fact">${fmtAxis(Object.values(productTotals).reduce((s, t) => s + t.fact, 0))}</div>
+      </td>
+    </tr></tfoot>
+  </table>`;
+}
+
+// ── Load matrix data ───────────────────────────────────────────────────────
+async function loadMatrix() {
+  if (!state.period) return;
+  const matrix = await fetchJson(`/api/dashboard/matrix?period=${encodeURIComponent(state.period)}`);
+  state.matrix = matrix;
+  renderMatrix(matrix);
+}
+
+// ── Marketing tab ──────────────────────────────────────────────────────────
+function renderMarketingKpis(mkt) {
+  const el = $('mkKpis');
+  if (!mkt || !mkt.totals) { el.innerHTML = ''; return; }
+  const t = mkt.totals;
+  const roasTone = t.roas >= 4 ? 'good' : t.roas >= 2 ? 'warn' : 'bad';
+  const cards = [
+    { label: 'Расходы',          value: formatMoney(t.spend),                  tone: 'neutral' },
+    { label: 'Выручка (маркет.)',value: formatMoney(t.revenue),                 tone: 'neutral' },
+    { label: 'ROAS',             value: t.roas.toFixed(2),                     tone: roasTone  },
+    { label: 'CPL',              value: formatMoney(t.cpl),                     tone: 'neutral' },
+    { label: 'CAC',              value: formatMoney(t.cac),                     tone: 'neutral' },
+    { label: 'Доля от продаж',   value: `${mkt.salesShare}%`,                  tone: 'neutral' },
+  ];
+  el.innerHTML = cards.map(c => `
+    <article class="kpi ${c.tone}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+    </article>`).join('');
+}
+
+function renderMarketingChannels(mkt) {
+  const el = $('mkChannels');
+  if (!mkt || !mkt.channels.length) {
+    el.innerHTML = `<tr><td colspan="11" class="empty-state" style="padding:32px;text-align:center">
+      Нет данных по каналам за период.<br>
+      <small class="muted">Загрузите через POST /api/ingest/marketing с ключом X-API-Key</small>
+    </td></tr>`;
+    return;
+  }
+  const roasTone = r => r >= 4 ? 'good' : r >= 2 ? 'warn' : 'bad';
+  el.innerHTML = mkt.channels.map(ch => `
+    <tr>
+      <td><strong>${ch.channelName}</strong></td>
+      <td class="num">${formatMoney(ch.spend)}</td>
+      <td class="num">${formatMoney(ch.revenue)}</td>
+      <td class="num"><span class="${roasTone(ch.roas)}">${ch.roas.toFixed(2)}</span></td>
+      <td class="num">${formatNum(ch.leads)}</td>
+      <td class="num">${ch.leads > 0 ? formatMoney(ch.cpl) : '—'}</td>
+      <td class="num">${formatNum(ch.orders)}</td>
+      <td class="num">${ch.orders > 0 ? formatMoney(ch.cac) : '—'}</td>
+      <td class="num">${formatNum(ch.impressions)}</td>
+      <td class="num">${ch.ctr}%</td>
+      <td class="num">${ch.cvr}%</td>
+    </tr>`).join('');
+}
+
+function renderMarketingInsights(analysis, mkt) {
+  const el = $('mkInsights');
+  if (!mkt || !mkt.channels.length) {
+    el.innerHTML = `<div class="exec-block key" style="grid-column:1/-1">
+      <div class="exec-label">Нет данных</div>
+      <ul class="exec-list">
+        <li>Загрузите маркетинговые данные через <code>POST /api/ingest/marketing</code></li>
+        <li>Формат: <code>{ "period": "2026-04", "metrics": [{ "channelId": "vk", "channelName": "ВКонтакте", "spend": 50000, "leads": 120, "orders": 40, "revenue": 280000 }] }</code></li>
+      </ul>
+    </div>`;
+    return;
+  }
+  if (!analysis) {
+    el.innerHTML = '<div class="empty-state">Загрузка анализа...</div>';
+    return;
+  }
+  const block = (cls, label, items) => `
+    <div class="exec-block ${cls}">
+      <div class="exec-label">${label}</div>
+      <ul class="exec-list">${items.length
+        ? items.map(i => `<li>${i}</li>`).join('')
+        : '<li class="muted">Нет данных</li>'}</ul>
+    </div>`;
+  el.innerHTML =
+    block('key',   '● Инсайты',        analysis.insights)     +
+    block('prior', '▲ Рекомендации',   analysis.recommendations) +
+    block('risk',  '! Предупреждения', analysis.warnings)     +
+    `<div class="exec-footer" style="grid-column:1/-1">Анализ сформирован: ${formatDate(analysis.generatedAt)}</div>`;
+}
+
+async function loadMarketing() {
+  if (!state.period) return;
+  try {
+    const [mkt, analysis] = await Promise.all([
+      fetchJson(`/api/dashboard/marketing?period=${encodeURIComponent(state.period)}`),
+      fetchJson('/api/analysis/marketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period: state.period })
+      }).catch(() => null)
+    ]);
+    state.marketing = mkt;
+    renderMarketingKpis(mkt);
+    renderMarketingChannels(mkt);
+    renderMarketingInsights(analysis, mkt);
+  } catch (err) {
+    $('mkInsights').innerHTML = `<div class="empty-state" style="grid-column:1/-1">Ошибка загрузки: ${err.message}</div>`;
+  }
+}
+
 // ── Reports tab ────────────────────────────────────────────────────────────
 function renderReports(summary) {
   renderAbcTable('abcProducts', computeAbc(summary.products, 'fact', 'productName'));
   renderAbcTable('abcStores', computeAbc(summary.stores, 'fact', 'storeName'));
   renderGrowthReport(summary);
   renderExecutive(summary);
+  renderStoreForecastReport(summary);
+  renderDistribution(summary);
+  renderGapReport(summary);
+  renderMarginChart(summary);
+  renderAvgCheckChart(summary);
+  renderStoreRankChart(summary);
+  renderCategoryChart(summary);
+  loadMatrix();
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
@@ -510,9 +993,11 @@ async function loadSummary() {
   renderTrendChart(summary);
   renderDailyChart(summary);
   renderComparison(summary);
+  renderSpotlight(summary);
+  renderRecommendations(summary);
+  renderMarketNews();
   renderStores(summary);
   renderProducts(summary);
-  renderSpotlight(summary);
   await loadStoreDetails();
 
   if (state.activeTab === 'reports') renderReports(summary);
@@ -595,6 +1080,47 @@ async function init() {
       'Группа': i.abc
     })), `abc-${state.period}.csv`);
   });
+
+  // Export: matrix CSV
+  const exportMatrix = () => {
+    if (!state.matrix) return;
+    const { stores, products, cells, storeTotals } = state.matrix;
+    exportCsv(stores.map(s => {
+      const row = { 'Точка': s.name, 'Регион': s.region };
+      for (const p of products) {
+        const c = cells[s.id]?.[p.id];
+        row[p.name] = c ? c.fact : 0;
+      }
+      const t = storeTotals[s.id] || {};
+      row['Итого факт'] = t.fact || 0;
+      row['Итого план'] = t.plan || 0;
+      row['Выполнение%'] = t.percent || 0;
+      return row;
+    }), `matrix-${state.period}.csv`);
+  };
+  $('exportMatrixBtn')?.addEventListener('click', exportMatrix);
+  $('exportMatrixBtnH')?.addEventListener('click', exportMatrix);
+
+  // Export: marketing CSV
+  const exportMktg = () => {
+    if (!state.marketing?.channels.length) return;
+    exportCsv(state.marketing.channels.map(ch => ({
+      'Канал': ch.channelName,
+      'Расходы': ch.spend,
+      'Выручка': ch.revenue,
+      'ROAS': ch.roas,
+      'Лиды': ch.leads,
+      'CPL': ch.cpl,
+      'Заказы': ch.orders,
+      'CAC': ch.cac,
+      'Показы': ch.impressions,
+      'Клики': ch.clicks,
+      'CTR%': ch.ctr,
+      'CVR%': ch.cvr
+    })), `marketing-${state.period}.csv`);
+  };
+  $('exportMktgBtn')?.addEventListener('click', exportMktg);
+  $('exportMktgBtnH')?.addEventListener('click', exportMktg);
 
   // Export: growth CSV
   $('exportGrowthBtn')?.addEventListener('click', () => {

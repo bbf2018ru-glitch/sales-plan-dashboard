@@ -726,6 +726,86 @@ function buildMarketingAnalysis(db, period) {
   };
 }
 
+function buildStoreProductMatrix(db, period) {
+  const stores = db.stores;
+  const products = db.products;
+  const plans = db.plans.filter(r => r.period === period);
+  const sales = db.sales.filter(r => r.period === period);
+
+  const cells = {};
+  for (const s of stores) {
+    cells[s.id] = {};
+    for (const p of products) {
+      cells[s.id][p.id] = { plan: 0, fact: 0, cost: 0, quantity: 0 };
+    }
+  }
+
+  for (const row of plans) {
+    if (!cells[row.storeId]) cells[row.storeId] = {};
+    if (!cells[row.storeId][row.productId]) {
+      cells[row.storeId][row.productId] = { plan: 0, fact: 0, cost: 0, quantity: 0 };
+    }
+    cells[row.storeId][row.productId].plan += toNumber(row.amount);
+  }
+
+  for (const row of sales) {
+    if (!cells[row.storeId]) cells[row.storeId] = {};
+    if (!cells[row.storeId][row.productId]) {
+      cells[row.storeId][row.productId] = { plan: 0, fact: 0, cost: 0, quantity: 0 };
+    }
+    cells[row.storeId][row.productId].fact += toNumber(row.amount);
+    cells[row.storeId][row.productId].cost += toNumber(row.cost);
+    cells[row.storeId][row.productId].quantity += toNumber(row.quantity);
+  }
+
+  for (const sid of Object.keys(cells)) {
+    for (const pid of Object.keys(cells[sid])) {
+      const c = cells[sid][pid];
+      c.percent = c.plan > 0 ? percent(c.fact / c.plan) : null;
+      c.margin = roundMetric(c.fact - c.cost);
+    }
+  }
+
+  const storeTotals = {};
+  for (const s of stores) {
+    const sc = cells[s.id] || {};
+    const tf = Object.values(sc).reduce((a, c) => a + c.fact, 0);
+    const tp = Object.values(sc).reduce((a, c) => a + c.plan, 0);
+    storeTotals[s.id] = {
+      fact: roundMetric(tf),
+      plan: roundMetric(tp),
+      percent: tp > 0 ? percent(tf / tp) : 0
+    };
+  }
+
+  const productTotals = {};
+  for (const p of products) {
+    let tf = 0, tp = 0;
+    for (const sid of Object.keys(cells)) {
+      const c = cells[sid][p.id];
+      if (c) { tf += c.fact; tp += c.plan; }
+    }
+    productTotals[p.id] = {
+      fact: roundMetric(tf),
+      plan: roundMetric(tp),
+      percent: tp > 0 ? percent(tf / tp) : 0
+    };
+  }
+
+  const storesSorted = [...stores].sort(
+    (a, b) => (storeTotals[b.id]?.fact || 0) - (storeTotals[a.id]?.fact || 0)
+  );
+
+  return {
+    period,
+    stores: storesSorted.map(s => ({ id: s.id, name: s.name, region: s.region || '' })),
+    products: products.map(p => ({ id: p.id, name: p.name, category: p.category || '' })),
+    cells,
+    storeTotals,
+    productTotals
+  };
+}
+
 function listPeriods(db) {
   const values = new Set();
   for (const row of db.plans) values.add(row.period);
@@ -824,6 +904,7 @@ module.exports = {
   aggregateDashboard,
   aggregateMarketing,
   buildMarketingAnalysis,
+  buildStoreProductMatrix,
   listPeriods,
   monthKey,
   normalizeDb,
