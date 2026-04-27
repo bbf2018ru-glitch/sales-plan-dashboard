@@ -175,39 +175,48 @@
         <div id="tabReports" class="tab-content hidden">
 
           <!-- Блок 1: ABC -->
-          <section class="section panel-grid">
-            <article class="panel">
-              <div class="panel-header">
-                <div class="panel-title">ABC — товары</div>
-                <div class="panel-subtitle">A: 80% выручки · B: 15% · C: 5%</div>
-              </div>
-              <div id="abcProducts" class="table-wrap"></div>
-            </article>
-            <article class="panel">
-              <div class="panel-header">
-                <div class="panel-title">ABC — точки</div>
-                <div class="panel-subtitle">по объёму выручки</div>
-              </div>
-              <div id="abcStores" class="table-wrap"></div>
-            </article>
+          <section class="section">
+            <div class="section-label">ABC-анализ</div>
+            <div class="report-2col">
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <div class="panel-title">Товары</div>
+                    <div class="panel-subtitle">A — топ 80% выручки · B — следующие 15% · C — хвост</div>
+                  </div>
+                </div>
+                <div id="abcProductsBar" class="abc-bar"></div>
+                <div id="abcProducts" class="table-wrap"></div>
+              </article>
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <div class="panel-title">Точки продаж</div>
+                    <div class="panel-subtitle">ранжирование по выручке за период</div>
+                  </div>
+                </div>
+                <div id="abcStoresBar" class="abc-bar"></div>
+                <div id="abcStores" class="table-wrap"></div>
+              </article>
+            </div>
           </section>
 
-          <!-- Блок 2: Рост + Сводка -->
-          <section class="section panel-grid">
+          <!-- Блок 2: Динамика -->
+          <section class="section">
+            <div class="section-label">Динамика</div>
             <article class="panel">
               <div class="panel-header">
-                <div class="panel-title">Рост продаж</div>
-                <div class="panel-subtitle">динамика по месяцам</div>
+                <div class="panel-title">Рост продаж по месяцам</div>
+                <div class="panel-subtitle">месяц к месяцу · текущий период выделен</div>
               </div>
               <div id="growthReport" class="table-wrap"></div>
             </article>
-            <article class="panel panel-narrow">
-              <div class="panel-header">
-                <div class="panel-title">Сводка</div>
-                <div class="panel-subtitle">ключевые выводы</div>
-              </div>
-              <div id="executivePanel"></div>
-            </article>
+          </section>
+
+          <!-- Блок 3: Сводка -->
+          <section class="section">
+            <div class="section-label">Сводка</div>
+            <div id="executivePanel" class="exec-grid"></div>
           </section>
 
         </div>

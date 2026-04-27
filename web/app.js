@@ -365,11 +365,32 @@ function computeAbc(items, valueKey, nameKey) {
   });
 }
 
+function renderAbcBar(barElId, items) {
+  const el = $(barElId);
+  if (!el || !items.length) return;
+  const groups = { A: [], B: [], C: [] };
+  items.forEach(i => groups[i.abc].push(i));
+  const total = items.reduce((s, i) => s + i.value, 0);
+  const revPct = g => total > 0 ? (groups[g].reduce((s, i) => s + i.value, 0) / total * 100).toFixed(0) : 0;
+  el.innerHTML = ['A', 'B', 'C'].map(g => `
+    <div class="abc-stat ${g.toLowerCase()}">
+      <div class="abc-stat-group">${g}</div>
+      <div class="abc-stat-pct">${revPct(g)}%</div>
+      <div class="abc-stat-count">${groups[g].length} поз.</div>
+    </div>`).join('');
+}
+
 function renderAbcTable(elId, items) {
+  renderAbcBar(elId + 'Bar', items);
   const el = $(elId);
   if (!items.length) { el.innerHTML = '<div class="empty-state">Нет данных.</div>'; return; }
   el.innerHTML = `<table><thead><tr>
-    <th class="col-num">№</th><th>Наименование</th><th class="num">Выручка</th><th class="num">Доля</th><th class="num">Накоп.</th><th>Группа</th>
+    <th class="col-num">№</th>
+    <th>Наименование</th>
+    <th class="num">Выручка</th>
+    <th class="num">Доля</th>
+    <th class="num">Накоп.</th>
+    <th>Гр.</th>
   </tr></thead><tbody>
     ${items.map(i => `<tr>
       <td class="col-num">${i.rank}</td>
@@ -386,21 +407,43 @@ function renderAbcTable(elId, items) {
 function renderGrowthReport(summary) {
   const el = $('growthReport');
   const active = (summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
-  if (active.length < 2) { el.innerHTML = '<div class="empty-state">Недостаточно данных.</div>'; return; }
+  if (active.length < 2) { el.innerHTML = '<div class="empty-state">Недостаточно данных для анализа динамики.</div>'; return; }
+  const maxFact = Math.max(...active.map(p => p.fact), 1);
   el.innerHTML = `<table><thead><tr>
-    <th>Период</th><th class="num">Факт</th><th class="num">Рост</th><th class="num">Рост %</th><th class="num">Вып. %</th><th class="num">Маржа</th>
+    <th>Период</th>
+    <th class="num">Факт</th>
+    <th class="num">Изм. к пред.</th>
+    <th class="num">Изм. %</th>
+    <th class="num">Вып. %</th>
+    <th class="num">Маржа</th>
+    <th class="num">График</th>
   </tr></thead><tbody>
     ${active.map((p, i) => {
+      const isCur = p.period === summary.period;
       const prev = active[i - 1];
       const delta = prev ? p.fact - prev.fact : null;
       const deltaPct = prev && prev.fact > 0 ? delta / prev.fact * 100 : null;
-      return `<tr class="${p.period === summary.period ? 'active' : ''}">
-        <td>${p.period}</td>
+      const barW = Math.round(p.fact / maxFact * 100);
+      const barClr = p.completion >= 100 ? 'var(--good)' : p.completion >= 80 ? '#f59e0b' : 'var(--bad)';
+      const arrow = delta === null ? '' : delta > 0
+        ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>`
+        : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
+      return `<tr class="${isCur ? 'growth-cur' : ''}">
+        <td>${isCur ? `<strong>${p.period}</strong>` : p.period}</td>
         <td class="num">${formatMoney(p.fact)}</td>
-        <td class="num">${delta !== null ? `<span class="${delta >= 0 ? 'positive' : 'negative'}">${signed(delta, formatMoney)}</span>` : '—'}</td>
-        <td class="num">${deltaPct !== null ? `<span class="${deltaPct >= 0 ? 'positive' : 'negative'}">${signed(deltaPct, v => v.toFixed(1) + '%')}</span>` : '—'}</td>
+        <td class="num">${delta !== null
+          ? `<span class="growth-arrow ${delta >= 0 ? 'positive' : 'negative'}">${arrow}${formatMoney(Math.abs(delta))}</span>`
+          : '<span class="muted">—</span>'}</td>
+        <td class="num">${deltaPct !== null
+          ? `<span class="${deltaPct >= 0 ? 'positive' : 'negative'}">${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%</span>`
+          : '<span class="muted">—</span>'}</td>
         <td class="num"><span class="${pctTone(p.completion)}">${p.completion}%</span></td>
         <td class="num">${formatMoney(p.margin)}</td>
+        <td class="num" style="width:80px;min-width:80px">
+          <div style="height:6px;background:var(--line);border-radius:999px;overflow:hidden">
+            <div style="height:100%;width:${barW}%;background:${barClr};border-radius:inherit"></div>
+          </div>
+        </td>
       </tr>`;
     }).join('')}
   </tbody></table>`;
@@ -409,20 +452,18 @@ function renderGrowthReport(summary) {
 // ── Executive summary ──────────────────────────────────────────────────────
 function renderExecutive(summary) {
   const e = summary.executive;
-  $('executivePanel').innerHTML = `
-    <div class="exec-block">
-      <div class="exec-label">Ключевое</div>
-      <ul class="exec-list">${e.headlines.map(i => `<li>${i}</li>`).join('')}</ul>
-    </div>
-    <div class="exec-block">
-      <div class="exec-label">Приоритеты</div>
-      <ul class="exec-list">${e.priorities.map(i => `<li>${i}</li>`).join('')}</ul>
-    </div>
-    <div class="exec-block">
-      <div class="exec-label">Риски</div>
-      <ul class="exec-list">${e.alerts.map(i => `<li>${i}</li>`).join('')}</ul>
-    </div>
-    <div class="exec-footer">Сформировано: ${formatDate(e.generatedAt)}</div>`;
+  const block = (cls, label, icon, items) => `
+    <div class="exec-block ${cls}">
+      <div class="exec-label">${icon} ${label}</div>
+      <ul class="exec-list">${items.length
+        ? items.map(i => `<li>${i}</li>`).join('')
+        : '<li class="muted">Нет данных</li>'}</ul>
+    </div>`;
+  $('executivePanel').innerHTML =
+    block('key',   'Ключевые выводы', '●', e.headlines)  +
+    block('prior', 'Приоритеты',      '▲', e.priorities) +
+    block('risk',  'Риски',           '!', e.alerts)     +
+    `<div class="exec-footer">Сформировано: ${formatDate(e.generatedAt)}</div>`;
 }
 
 // ── Reports tab ────────────────────────────────────────────────────────────
