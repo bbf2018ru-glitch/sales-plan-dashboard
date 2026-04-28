@@ -87,6 +87,37 @@ function normalizeUppPayload(payload) {
     sessions: Number(item.sessions || 0)
   }));
 
+  // Защита от FK: если sales/plans ссылаются на storeId/productId, которого нет
+  // в списке stores/products — добавляем заглушку. Это спасает от
+  // sales_store_id_fkey, когда 1С шлёт неполный stores в payload (из-за
+  // несовпадения СкладКод между разными запросами или whitespace-различий).
+  const storeMap = new Map(stores.map((s) => [s.id, s]));
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  const referencedStoreIds = new Set();
+  const referencedProductIds = new Set();
+  for (const row of [...plans, ...sales]) {
+    if (row.storeId) referencedStoreIds.add(row.storeId);
+    if (row.productId) referencedProductIds.add(row.productId);
+  }
+  const autoStores = [];
+  for (const storeId of referencedStoreIds) {
+    if (!storeMap.has(storeId)) {
+      const stub = { id: storeId, name: storeId, region: '' };
+      stores.push(stub);
+      storeMap.set(storeId, stub);
+      autoStores.push(storeId);
+    }
+  }
+  const autoProducts = [];
+  for (const productId of referencedProductIds) {
+    if (!productMap.has(productId)) {
+      const stub = { id: productId, name: productId, category: '' };
+      products.push(stub);
+      productMap.set(productId, stub);
+      autoProducts.push(productId);
+    }
+  }
+
   return {
     packageId,
     payloadHash: buildPayloadHash(payload),
@@ -104,8 +135,11 @@ function normalizeUppPayload(payload) {
       products: products.length,
       plans: plans.length,
       sales: sales.length,
-      marketing: metrics.length
-    }
+      marketing: metrics.length,
+      autoStores: autoStores.length,
+      autoProducts: autoProducts.length
+    },
+    autoCreated: { stores: autoStores, products: autoProducts }
   };
 }
 
