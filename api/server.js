@@ -351,18 +351,31 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/users' && req.method === 'POST') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') {
-        sendJson(res, 403, { error: 'Доступ только для администратора' });
-        return;
+      // Bootstrap: если в БД нет пользователей, разрешаем создать первого admin
+      // через X-API-Key (тот же ingest-ключ из BSL). После создания этот путь
+      // больше не работает — дальше нужен X-User-Token админа.
+      const existingUsers = await store.listUsers();
+      const isBootstrap = existingUsers.length === 0
+        && req.headers['x-api-key'] === API_KEY;
+
+      if (!isBootstrap) {
+        const actor = await resolveUser(req);
+        if (!actor || actor.role !== 'admin') {
+          sendJson(res, 403, { error: 'Доступ только для администратора' });
+          return;
+        }
       }
+
       const body = await parseBody(req);
       if (!body.id || !body.name) {
         sendJson(res, 400, { error: 'id и name обязательны' });
         return;
       }
+      // При bootstrap первый пользователь всегда admin
+      if (isBootstrap) body.role = 'admin';
+
       const saved = await store.upsertUser(body);
-      sendJson(res, 200, { ok: true, user: saved });
+      sendJson(res, 200, { ok: true, user: saved, bootstrap: isBootstrap });
       return;
     }
 
