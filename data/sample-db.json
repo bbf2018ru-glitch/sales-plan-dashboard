@@ -1,139 +1,3427 @@
 {
   "stores": [
-    { "id": "angarsk-18",      "name": "Ангарск 18 м-он",        "region": "Ангарск" },
-    { "id": "dekabr",          "name": "Декабрьских Событий",     "region": "Иркутск" },
-    { "id": "deputatskaya",    "name": "Депутатская",             "region": "Иркутск" },
-    { "id": "konditerskaya",   "name": "Кондитерская Мария",      "region": "Иркутск" },
-    { "id": "lermontova",      "name": "Лермонтова 81/5",         "region": "Иркутск" },
-    { "id": "nizhnyaya",       "name": "Нижняя Лисиха",           "region": "Иркутск" },
-    { "id": "premier",         "name": "Премьер БЦ",              "region": "Иркутск" },
-    { "id": "pushkina",        "name": "Пушкина",                 "region": "Иркутск" },
-    { "id": "rzhanova",        "name": "Ржанова",                 "region": "Иркутск" },
-    { "id": "sezon",           "name": "Сезон",                   "region": "Иркутск" },
-    { "id": "solnechny",       "name": "Солнечный 11/4",          "region": "Иркутск" },
-    { "id": "solnce-dc",       "name": "Солнце ДЦ",               "region": "Иркутск" },
-    { "id": "soyuz",           "name": "Союз",                    "region": "Иркутск" },
-    { "id": "cimlyanskaya",    "name": "Цимлянская",              "region": "Иркутск" },
-    { "id": "energetikov",     "name": "Энергетиков",             "region": "Иркутск" },
-    { "id": "yubileynyy",      "name": "Юбилейный",               "region": "Иркутск" },
-    { "id": "yadrintseva",     "name": "Ядринцева",               "region": "Иркутск" }
+    {
+      "id": "angarsk-18",
+      "name": "Ангарск 18 м-он",
+      "region": "Ангарск"
+    },
+    {
+      "id": "dekabr",
+      "name": "Декабрьских Событий",
+      "region": "Иркутск"
+    },
+    {
+      "id": "deputatskaya",
+      "name": "Депутатская",
+      "region": "Иркутск"
+    },
+    {
+      "id": "konditerskaya",
+      "name": "Кондитерская Мария",
+      "region": "Иркутск"
+    },
+    {
+      "id": "lermontova",
+      "name": "Лермонтова 81/5",
+      "region": "Иркутск"
+    },
+    {
+      "id": "nizhnyaya",
+      "name": "Нижняя Лисиха",
+      "region": "Иркутск"
+    },
+    {
+      "id": "premier",
+      "name": "Премьер БЦ",
+      "region": "Иркутск"
+    },
+    {
+      "id": "pushkina",
+      "name": "Пушкина",
+      "region": "Иркутск"
+    },
+    {
+      "id": "rzhanova",
+      "name": "Ржанова",
+      "region": "Иркутск"
+    },
+    {
+      "id": "sezon",
+      "name": "Сезон",
+      "region": "Иркутск"
+    },
+    {
+      "id": "solnechny",
+      "name": "Солнечный 11/4",
+      "region": "Иркутск"
+    },
+    {
+      "id": "solnce-dc",
+      "name": "Солнце ДЦ",
+      "region": "Иркутск"
+    },
+    {
+      "id": "soyuz",
+      "name": "Союз",
+      "region": "Иркутск"
+    },
+    {
+      "id": "cimlyanskaya",
+      "name": "Цимлянская",
+      "region": "Иркутск"
+    },
+    {
+      "id": "energetikov",
+      "name": "Энергетиков",
+      "region": "Иркутск"
+    },
+    {
+      "id": "yubileynyy",
+      "name": "Юбилейный",
+      "region": "Иркутск"
+    },
+    {
+      "id": "yadrintseva",
+      "name": "Ядринцева",
+      "region": "Иркутск"
+    }
   ],
   "products": [
-    { "id": "coffee",      "name": "Кофе",                    "category": "Кофе" },
-    { "id": "bento",       "name": "Бенто-торты",             "category": "Бенто торты" },
-    { "id": "torty",       "name": "Торты на заказ",          "category": "Торты" },
-    { "id": "pirozhnie",   "name": "Пирожные",                "category": "Пирожные" },
-    { "id": "napitki",     "name": "Напитки производства",    "category": "Напитки производства" },
-    { "id": "dobavki",     "name": "Добавки",                 "category": "Добавки" }
+    {
+      "id": "coffee",
+      "name": "Кофе",
+      "category": "Кофе"
+    },
+    {
+      "id": "bento",
+      "name": "Бенто-торты",
+      "category": "Бенто торты"
+    },
+    {
+      "id": "torty",
+      "name": "Торты на заказ",
+      "category": "Торты"
+    },
+    {
+      "id": "pirozhnie",
+      "name": "Пирожные",
+      "category": "Пирожные"
+    },
+    {
+      "id": "napitki",
+      "name": "Напитки производства",
+      "category": "Напитки производства"
+    },
+    {
+      "id": "dobavki",
+      "name": "Добавки",
+      "category": "Добавки"
+    }
   ],
   "plans": [
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "coffee",    "amount": 207000 },
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "bento",     "amount": 200000 },
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "torty",     "amount": 200000 },
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "pirozhnie", "amount": 221302 },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "coffee",    "amount": 380000 },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "bento",     "amount": 350000 },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "torty",     "amount": 400000 },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "pirozhnie", "amount": 388886 },
-    { "period": "2026-04", "storeId": "deputatskaya",  "productId": "coffee",    "amount": 250000 },
-    { "period": "2026-04", "storeId": "deputatskaya",  "productId": "torty",     "amount": 300000 },
-    { "period": "2026-04", "storeId": "deputatskaya",  "productId": "pirozhnie", "amount": 419791 },
-    { "period": "2026-04", "storeId": "konditerskaya", "productId": "coffee",    "amount": 300000 },
-    { "period": "2026-04", "storeId": "konditerskaya", "productId": "torty",     "amount": 500000 },
-    { "period": "2026-04", "storeId": "konditerskaya", "productId": "pirozhnie", "amount": 453171 },
-    { "period": "2026-04", "storeId": "lermontova",    "productId": "coffee",    "amount": 260000 },
-    { "period": "2026-04", "storeId": "lermontova",    "productId": "torty",     "amount": 350000 },
-    { "period": "2026-04", "storeId": "lermontova",    "productId": "pirozhnie", "amount": 425429 },
-    { "period": "2026-04", "storeId": "nizhnyaya",     "productId": "coffee",    "amount": 265000 },
-    { "period": "2026-04", "storeId": "nizhnyaya",     "productId": "torty",     "amount": 350000 },
-    { "period": "2026-04", "storeId": "nizhnyaya",     "productId": "pirozhnie", "amount": 440033 },
-    { "period": "2026-04", "storeId": "premier",       "productId": "coffee",    "amount": 150000 },
-    { "period": "2026-04", "storeId": "premier",       "productId": "torty",     "amount": 150000 },
-    { "period": "2026-04", "storeId": "pushkina",      "productId": "coffee",    "amount": 260000 },
-    { "period": "2026-04", "storeId": "pushkina",      "productId": "torty",     "amount": 350000 },
-    { "period": "2026-04", "storeId": "pushkina",      "productId": "pirozhnie", "amount": 416972 },
-    { "period": "2026-04", "storeId": "rzhanova",      "productId": "coffee",    "amount": 185000 },
-    { "period": "2026-04", "storeId": "rzhanova",      "productId": "torty",     "amount": 250000 },
-    { "period": "2026-04", "storeId": "rzhanova",      "productId": "pirozhnie", "amount": 298562 },
-    { "period": "2026-04", "storeId": "sezon",         "productId": "coffee",    "amount": 14000 },
-    { "period": "2026-04", "storeId": "sezon",         "productId": "torty",     "amount": 14000 },
-    { "period": "2026-04", "storeId": "solnechny",     "productId": "coffee",    "amount": 190000 },
-    { "period": "2026-04", "storeId": "solnechny",     "productId": "torty",     "amount": 250000 },
-    { "period": "2026-04", "storeId": "solnechny",     "productId": "pirozhnie", "amount": 309562 },
-    { "period": "2026-04", "storeId": "solnce-dc",     "productId": "coffee",    "amount": 85000 },
-    { "period": "2026-04", "storeId": "solnce-dc",     "productId": "torty",     "amount": 120000 },
-    { "period": "2026-04", "storeId": "solnce-dc",     "productId": "pirozhnie", "amount": 134000 },
-    { "period": "2026-04", "storeId": "soyuz",         "productId": "coffee",    "amount": 180000 },
-    { "period": "2026-04", "storeId": "soyuz",         "productId": "torty",     "amount": 250000 },
-    { "period": "2026-04", "storeId": "soyuz",         "productId": "pirozhnie", "amount": 284874 },
-    { "period": "2026-04", "storeId": "cimlyanskaya",  "productId": "coffee",    "amount": 210000 },
-    { "period": "2026-04", "storeId": "cimlyanskaya",  "productId": "torty",     "amount": 280000 },
-    { "period": "2026-04", "storeId": "cimlyanskaya",  "productId": "pirozhnie", "amount": 333771 },
-    { "period": "2026-04", "storeId": "energetikov",   "productId": "coffee",    "amount": 165000 },
-    { "period": "2026-04", "storeId": "energetikov",   "productId": "torty",     "amount": 220000 },
-    { "period": "2026-04", "storeId": "energetikov",   "productId": "pirozhnie", "amount": 264373 },
-    { "period": "2026-04", "storeId": "yubileynyy",    "productId": "coffee",    "amount": 235000 },
-    { "period": "2026-04", "storeId": "yubileynyy",    "productId": "torty",     "amount": 310000 },
-    { "period": "2026-04", "storeId": "yubileynyy",    "productId": "pirozhnie", "amount": 383394 },
-    { "period": "2026-04", "storeId": "yadrintseva",   "productId": "coffee",    "amount": 540000 },
-    { "period": "2026-04", "storeId": "yadrintseva",   "productId": "torty",     "amount": 750000 },
-    { "period": "2026-04", "storeId": "yadrintseva",   "productId": "pirozhnie", "amount": 836300 }
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 207000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 200000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 200000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 221302
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 380000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 350000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 400000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 388886
+    },
+    {
+      "period": "2026-04",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 250000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 300000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 419791
+    },
+    {
+      "period": "2026-04",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 300000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 500000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 453171
+    },
+    {
+      "period": "2026-04",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 260000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 350000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 425429
+    },
+    {
+      "period": "2026-04",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 265000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 350000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 440033
+    },
+    {
+      "period": "2026-04",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 150000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 150000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 260000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 350000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 416972
+    },
+    {
+      "period": "2026-04",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 185000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 250000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 298562
+    },
+    {
+      "period": "2026-04",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 14000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 14000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 190000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 250000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 309562
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 85000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 120000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 134000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 180000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 250000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 284874
+    },
+    {
+      "period": "2026-04",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 210000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 280000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 333771
+    },
+    {
+      "period": "2026-04",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 165000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 220000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 264373
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 235000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 310000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 383394
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 540000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 750000
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 836300
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 182160
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 176000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 176000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 194746
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 334400
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 308000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 352000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 342220
+    },
+    {
+      "period": "2026-01",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 220000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 264000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 369416
+    },
+    {
+      "period": "2026-01",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 264000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 440000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 398790
+    },
+    {
+      "period": "2026-01",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 228800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 308000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 374378
+    },
+    {
+      "period": "2026-01",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 233200
+    },
+    {
+      "period": "2026-01",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 308000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 387229
+    },
+    {
+      "period": "2026-01",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 132000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 132000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 228800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 308000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 366935
+    },
+    {
+      "period": "2026-01",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 162800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 220000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 262735
+    },
+    {
+      "period": "2026-01",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 12320
+    },
+    {
+      "period": "2026-01",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 12320
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 167200
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 220000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 272415
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 74800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 105600
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 117920
+    },
+    {
+      "period": "2026-01",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 158400
+    },
+    {
+      "period": "2026-01",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 220000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 250689
+    },
+    {
+      "period": "2026-01",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 184800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 246400
+    },
+    {
+      "period": "2026-01",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 293718
+    },
+    {
+      "period": "2026-01",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 145200
+    },
+    {
+      "period": "2026-01",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 193600
+    },
+    {
+      "period": "2026-01",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 232648
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 206800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 272800
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 337387
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 475200
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 660000
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 735944
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 192510
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 186000
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 186000
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 205811
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 353400
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 325500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 372000
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 361664
+    },
+    {
+      "period": "2026-02",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 232500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 279000
+    },
+    {
+      "period": "2026-02",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 390405
+    },
+    {
+      "period": "2026-02",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 279000
+    },
+    {
+      "period": "2026-02",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 465000
+    },
+    {
+      "period": "2026-02",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 421449
+    },
+    {
+      "period": "2026-02",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 241800
+    },
+    {
+      "period": "2026-02",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 325500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 395649
+    },
+    {
+      "period": "2026-02",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 246450
+    },
+    {
+      "period": "2026-02",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 325500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 409231
+    },
+    {
+      "period": "2026-02",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 139500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 139500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 241800
+    },
+    {
+      "period": "2026-02",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 325500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 387784
+    },
+    {
+      "period": "2026-02",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 172050
+    },
+    {
+      "period": "2026-02",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 232500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 277663
+    },
+    {
+      "period": "2026-02",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 13020
+    },
+    {
+      "period": "2026-02",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 13020
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 176700
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 232500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 287893
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 79050
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 111600
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 124620
+    },
+    {
+      "period": "2026-02",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 167400
+    },
+    {
+      "period": "2026-02",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 232500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 264933
+    },
+    {
+      "period": "2026-02",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 195300
+    },
+    {
+      "period": "2026-02",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 260400
+    },
+    {
+      "period": "2026-02",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 310407
+    },
+    {
+      "period": "2026-02",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 153450
+    },
+    {
+      "period": "2026-02",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 204600
+    },
+    {
+      "period": "2026-02",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 245867
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 218550
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 288300
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 356556
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 502200
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 697500
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 777759
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 211140
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 204000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 204000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 225728
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 387600
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 357000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 408000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 396664
+    },
+    {
+      "period": "2026-03",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 255000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 306000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 428187
+    },
+    {
+      "period": "2026-03",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 306000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 510000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 462234
+    },
+    {
+      "period": "2026-03",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 265200
+    },
+    {
+      "period": "2026-03",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 357000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 433938
+    },
+    {
+      "period": "2026-03",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 270300
+    },
+    {
+      "period": "2026-03",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 357000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 448834
+    },
+    {
+      "period": "2026-03",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 153000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 153000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 265200
+    },
+    {
+      "period": "2026-03",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 357000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 425311
+    },
+    {
+      "period": "2026-03",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 188700
+    },
+    {
+      "period": "2026-03",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 255000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 304533
+    },
+    {
+      "period": "2026-03",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 14280
+    },
+    {
+      "period": "2026-03",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 14280
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 193800
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 255000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 315753
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 86700
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 122400
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 136680
+    },
+    {
+      "period": "2026-03",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 183600
+    },
+    {
+      "period": "2026-03",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 255000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 290571
+    },
+    {
+      "period": "2026-03",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 214200
+    },
+    {
+      "period": "2026-03",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 285600
+    },
+    {
+      "period": "2026-03",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 340446
+    },
+    {
+      "period": "2026-03",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 168300
+    },
+    {
+      "period": "2026-03",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 224400
+    },
+    {
+      "period": "2026-03",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 269660
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 239700
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 316200
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 391062
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 550800
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 765000
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 853026
+    }
   ],
   "sales": [
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "coffee",    "amount": 191581, "cost": 57474, "quantity": 648,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "bento",     "amount": 185000, "cost": 92500, "quantity": 185,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "torty",     "amount": 178000, "cost": 89000, "quantity": 52,   "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "angarsk-18",    "productId": "pirozhnie", "amount": 200752, "cost": 60225, "quantity": 1240, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "coffee",    "amount": 440108, "cost": 132032, "quantity": 1490, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "bento",     "amount": 320000, "cost": 160000, "quantity": 320, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "torty",     "amount": 398000, "cost": 199000, "quantity": 116, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "dekabr",        "productId": "pirozhnie", "amount": 370884, "cost": 111265, "quantity": 2290, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "deputatskaya",  "productId": "coffee",    "amount": 253812, "cost": 76143, "quantity": 858,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "deputatskaya",  "productId": "torty",     "amount": 310000, "cost": 155000, "quantity": 90,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "deputatskaya",  "productId": "pirozhnie", "amount": 423033, "cost": 126909, "quantity": 2612, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "konditerskaya", "productId": "coffee",    "amount": 341680, "cost": 102504, "quantity": 1155, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "konditerskaya", "productId": "torty",     "amount": 520000, "cost": 260000, "quantity": 152, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "konditerskaya", "productId": "pirozhnie", "amount": 423082, "cost": 126924, "quantity": 2611, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "lermontova",    "productId": "coffee",    "amount": 281065, "cost": 84319, "quantity": 950,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "lermontova",    "productId": "torty",     "amount": 365000, "cost": 182500, "quantity": 107, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "lermontova",    "productId": "pirozhnie", "amount": 440547, "cost": 132164, "quantity": 2720, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "nizhnyaya",     "productId": "coffee",    "amount": 287567, "cost": 86270, "quantity": 972,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "nizhnyaya",     "productId": "torty",     "amount": 360000, "cost": 180000, "quantity": 105, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "nizhnyaya",     "productId": "pirozhnie", "amount": 428446, "cost": 128533, "quantity": 2645, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "premier",       "productId": "coffee",    "amount": 67897,  "cost": 20369, "quantity": 229,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "premier",       "productId": "torty",     "amount": 138000, "cost": 69000, "quantity": 40,   "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "premier",       "productId": "pirozhnie", "amount": 112646, "cost": 33793, "quantity": 695,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "pushkina",      "productId": "coffee",    "amount": 263583, "cost": 79074, "quantity": 891,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "pushkina",      "productId": "torty",     "amount": 330000, "cost": 165000, "quantity": 96,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "pushkina",      "productId": "pirozhnie", "amount": 376831, "cost": 113049, "quantity": 2326, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "rzhanova",      "productId": "coffee",    "amount": 161190, "cost": 48357, "quantity": 545,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "rzhanova",      "productId": "torty",     "amount": 248000, "cost": 124000, "quantity": 72,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "rzhanova",      "productId": "pirozhnie", "amount": 254201, "cost": 76260, "quantity": 1569, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "sezon",         "productId": "coffee",    "amount": 18700,  "cost": 5610,  "quantity": 63,   "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "sezon",         "productId": "torty",     "amount": 18699,  "cost": 9349,  "quantity": 22,   "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "solnechny",     "productId": "coffee",    "amount": 214792, "cost": 64437, "quantity": 726,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "solnechny",     "productId": "torty",     "amount": 265000, "cost": 132500, "quantity": 77,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "solnechny",     "productId": "pirozhnie", "amount": 283439, "cost": 85031, "quantity": 1750, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "solnce-dc",     "productId": "coffee",    "amount": 84230,  "cost": 25269, "quantity": 285,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "solnce-dc",     "productId": "torty",     "amount": 126000, "cost": 63000, "quantity": 37,   "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "solnce-dc",     "productId": "pirozhnie", "amount": 123768, "cost": 37130, "quantity": 764,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "soyuz",         "productId": "coffee",    "amount": 205589, "cost": 61676, "quantity": 695,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "soyuz",         "productId": "torty",     "amount": 350000, "cost": 175000, "quantity": 102, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "soyuz",         "productId": "pirozhnie", "amount": 275543, "cost": 82662, "quantity": 1700, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "cimlyanskaya",  "productId": "coffee",    "amount": 238454, "cost": 71536, "quantity": 806,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "cimlyanskaya",  "productId": "torty",     "amount": 365000, "cost": 182500, "quantity": 106, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "cimlyanskaya",  "productId": "pirozhnie", "amount": 318337, "cost": 95501, "quantity": 1965, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "energetikov",   "productId": "coffee",    "amount": 157538, "cost": 47261, "quantity": 532,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "energetikov",   "productId": "torty",     "amount": 228000, "cost": 114000, "quantity": 66,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "energetikov",   "productId": "pirozhnie", "amount": 226991, "cost": 68097, "quantity": 1401, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "yubileynyy",    "productId": "coffee",    "amount": 217281, "cost": 65184, "quantity": 734,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "yubileynyy",    "productId": "torty",     "amount": 320000, "cost": 160000, "quantity": 93,  "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "yubileynyy",    "productId": "pirozhnie", "amount": 319350, "cost": 95805, "quantity": 1971, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "yadrintseva",   "productId": "coffee",    "amount": 616147, "cost": 184844, "quantity": 2082, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "yadrintseva",   "productId": "torty",     "amount": 750000, "cost": 375000, "quantity": 219, "soldAt": "2026-04-16T18:00:00+08:00" },
-    { "period": "2026-04", "storeId": "yadrintseva",   "productId": "pirozhnie", "amount": 616947, "cost": 185084, "quantity": 3807, "soldAt": "2026-04-16T18:00:00+08:00" }
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 191581,
+      "cost": 57474,
+      "quantity": 648,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 185000,
+      "cost": 92500,
+      "quantity": 185,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 178000,
+      "cost": 89000,
+      "quantity": 52,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 200752,
+      "cost": 60225,
+      "quantity": 1240,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 440108,
+      "cost": 132032,
+      "quantity": 1490,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 320000,
+      "cost": 160000,
+      "quantity": 320,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 398000,
+      "cost": 199000,
+      "quantity": 116,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 370884,
+      "cost": 111265,
+      "quantity": 2290,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 253812,
+      "cost": 76143,
+      "quantity": 858,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 310000,
+      "cost": 155000,
+      "quantity": 90,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 423033,
+      "cost": 126909,
+      "quantity": 2612,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 341680,
+      "cost": 102504,
+      "quantity": 1155,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 520000,
+      "cost": 260000,
+      "quantity": 152,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 423082,
+      "cost": 126924,
+      "quantity": 2611,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 281065,
+      "cost": 84319,
+      "quantity": 950,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 365000,
+      "cost": 182500,
+      "quantity": 107,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 440547,
+      "cost": 132164,
+      "quantity": 2720,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 287567,
+      "cost": 86270,
+      "quantity": 972,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 360000,
+      "cost": 180000,
+      "quantity": 105,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 428446,
+      "cost": 128533,
+      "quantity": 2645,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 67897,
+      "cost": 20369,
+      "quantity": 229,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 138000,
+      "cost": 69000,
+      "quantity": 40,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "premier",
+      "productId": "pirozhnie",
+      "amount": 112646,
+      "cost": 33793,
+      "quantity": 695,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 263583,
+      "cost": 79074,
+      "quantity": 891,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 330000,
+      "cost": 165000,
+      "quantity": 96,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 376831,
+      "cost": 113049,
+      "quantity": 2326,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 161190,
+      "cost": 48357,
+      "quantity": 545,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 248000,
+      "cost": 124000,
+      "quantity": 72,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 254201,
+      "cost": 76260,
+      "quantity": 1569,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 18700,
+      "cost": 5610,
+      "quantity": 63,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 18699,
+      "cost": 9349,
+      "quantity": 22,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 214792,
+      "cost": 64437,
+      "quantity": 726,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 265000,
+      "cost": 132500,
+      "quantity": 77,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 283439,
+      "cost": 85031,
+      "quantity": 1750,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 84230,
+      "cost": 25269,
+      "quantity": 285,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 126000,
+      "cost": 63000,
+      "quantity": 37,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 123768,
+      "cost": 37130,
+      "quantity": 764,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 205589,
+      "cost": 61676,
+      "quantity": 695,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 350000,
+      "cost": 175000,
+      "quantity": 102,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 275543,
+      "cost": 82662,
+      "quantity": 1700,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 238454,
+      "cost": 71536,
+      "quantity": 806,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 365000,
+      "cost": 182500,
+      "quantity": 106,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 318337,
+      "cost": 95501,
+      "quantity": 1965,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 157538,
+      "cost": 47261,
+      "quantity": 532,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 228000,
+      "cost": 114000,
+      "quantity": 66,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 226991,
+      "cost": 68097,
+      "quantity": 1401,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 217281,
+      "cost": 65184,
+      "quantity": 734,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 320000,
+      "cost": 160000,
+      "quantity": 93,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 319350,
+      "cost": 95805,
+      "quantity": 1971,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 616147,
+      "cost": 184844,
+      "quantity": 2082,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 750000,
+      "cost": 375000,
+      "quantity": 219,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-04",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 616947,
+      "cost": 185084,
+      "quantity": 3807,
+      "soldAt": "2026-04-16T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 156118,
+      "cost": 50105,
+      "quantity": 529,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 146647,
+      "cost": 77299,
+      "quantity": 147,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 150608,
+      "cost": 73524,
+      "quantity": 44,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 159209,
+      "cost": 43948,
+      "quantity": 983,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 274092,
+      "cost": 74742,
+      "quantity": 929,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 240650,
+      "cost": 124571,
+      "quantity": 241,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 305522,
+      "cost": 158431,
+      "quantity": 89,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 262155,
+      "cost": 77996,
+      "quantity": 1618,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 203938,
+      "cost": 56537,
+      "quantity": 691,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 214059,
+      "cost": 101079,
+      "quantity": 62,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 338998,
+      "cost": 95594,
+      "quantity": 2093,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 243010,
+      "cost": 68203,
+      "quantity": 824,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 414870,
+      "cost": 213856,
+      "quantity": 120,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 365828,
+      "cost": 119327,
+      "quantity": 2258,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 179019,
+      "cost": 54858,
+      "quantity": 607,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 267435,
+      "cost": 139690,
+      "quantity": 78,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 320056,
+      "cost": 93561,
+      "quantity": 1976,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 179925,
+      "cost": 53013,
+      "quantity": 610,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 245839,
+      "cost": 124669,
+      "quantity": 71,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 331494,
+      "cost": 93988,
+      "quantity": 2046,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 92862,
+      "cost": 25543,
+      "quantity": 315,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 89294,
+      "cost": 46827,
+      "quantity": 26,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 183323,
+      "cost": 55091,
+      "quantity": 621,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 256746,
+      "cost": 120754,
+      "quantity": 74,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 318073,
+      "cost": 99731,
+      "quantity": 1963,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 123160,
+      "cost": 33495,
+      "quantity": 417,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 167606,
+      "cost": 87772,
+      "quantity": 49,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 198347,
+      "cost": 53646,
+      "quantity": 1224,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 12135,
+      "cost": 3487,
+      "quantity": 41,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 12246,
+      "cost": 6029,
+      "quantity": 4,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 136704,
+      "cost": 43733,
+      "quantity": 463,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 191310,
+      "cost": 95843,
+      "quantity": 55,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 237402,
+      "cost": 77038,
+      "quantity": 1465,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 55035,
+      "cost": 15902,
+      "quantity": 187,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 88827,
+      "cost": 44076,
+      "quantity": 26,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 97528,
+      "cost": 27331,
+      "quantity": 602,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 140445,
+      "cost": 39895,
+      "quantity": 476,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 187127,
+      "cost": 97698,
+      "quantity": 54,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 241458,
+      "cost": 65792,
+      "quantity": 1490,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 169117,
+      "cost": 54108,
+      "quantity": 573,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 218259,
+      "cost": 102762,
+      "quantity": 63,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 232621,
+      "cost": 63172,
+      "quantity": 1436,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 125262,
+      "cost": 40513,
+      "quantity": 425,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 148224,
+      "cost": 72767,
+      "quantity": 43,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 189006,
+      "cost": 52274,
+      "quantity": 1167,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 189884,
+      "cost": 61910,
+      "quantity": 644,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 250176,
+      "cost": 126377,
+      "quantity": 73,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 290557,
+      "cost": 89221,
+      "quantity": 1794,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 433780,
+      "cost": 136804,
+      "quantity": 1470,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 630652,
+      "cost": 311653,
+      "quantity": 183,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-01",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 692351,
+      "cost": 193380,
+      "quantity": 4274,
+      "soldAt": "2026-01-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 169917,
+      "cost": 52726,
+      "quantity": 576,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 177523,
+      "cost": 93880,
+      "quantity": 178,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 164210,
+      "cost": 82937,
+      "quantity": 48,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 198052,
+      "cost": 61762,
+      "quantity": 1223,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 297067,
+      "cost": 90888,
+      "quantity": 1007,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 275918,
+      "cost": 142221,
+      "quantity": 276,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 332971,
+      "cost": 167400,
+      "quantity": 97,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 325977,
+      "cost": 102657,
+      "quantity": 2012,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 205290,
+      "cost": 63744,
+      "quantity": 696,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 262874,
+      "cost": 138413,
+      "quantity": 76,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 344077,
+      "cost": 109886,
+      "quantity": 2124,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 287444,
+      "cost": 89199,
+      "quantity": 974,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 476478,
+      "cost": 231105,
+      "quantity": 138,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 433434,
+      "cost": 122334,
+      "quantity": 2676,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 204498,
+      "cost": 56378,
+      "quantity": 693,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 308770,
+      "cost": 152171,
+      "quantity": 89,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 353427,
+      "cost": 104249,
+      "quantity": 2182,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 218832,
+      "cost": 71477,
+      "quantity": 742,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 277073,
+      "cost": 142948,
+      "quantity": 80,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 355671,
+      "cost": 117162,
+      "quantity": 2196,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 92197,
+      "cost": 26933,
+      "quantity": 313,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 97157,
+      "cost": 47260,
+      "quantity": 28,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 239888,
+      "cost": 75721,
+      "quantity": 813,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 291076,
+      "cost": 139982,
+      "quantity": 84,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 333907,
+      "cost": 109186,
+      "quantity": 2061,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 146623,
+      "cost": 41088,
+      "quantity": 497,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 203109,
+      "cost": 107258,
+      "quantity": 59,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 227392,
+      "cost": 72495,
+      "quantity": 1404,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 14285,
+      "cost": 4175,
+      "quantity": 48,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 13927,
+      "cost": 6867,
+      "quantity": 4,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 178165,
+      "cost": 49297,
+      "quantity": 604,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 208761,
+      "cost": 106205,
+      "quantity": 61,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 263348,
+      "cost": 73043,
+      "quantity": 1626,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 62800,
+      "cost": 18876,
+      "quantity": 213,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 95716,
+      "cost": 49625,
+      "quantity": 28,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 101395,
+      "cost": 28103,
+      "quantity": 626,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 163396,
+      "cost": 53720,
+      "quantity": 554,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 225696,
+      "cost": 108005,
+      "quantity": 65,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 251938,
+      "cost": 71189,
+      "quantity": 1555,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 186556,
+      "cost": 51461,
+      "quantity": 632,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 229788,
+      "cost": 109556,
+      "quantity": 67,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 295420,
+      "cost": 91062,
+      "quantity": 1824,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 134443,
+      "cost": 42317,
+      "quantity": 456,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 192430,
+      "cost": 95642,
+      "quantity": 56,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 230972,
+      "cost": 62492,
+      "quantity": 1426,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 198093,
+      "cost": 63591,
+      "quantity": 672,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 273239,
+      "cost": 134140,
+      "quantity": 79,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 352128,
+      "cost": 109086,
+      "quantity": 2174,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 531229,
+      "cost": 144260,
+      "quantity": 1801,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 674786,
+      "cost": 356274,
+      "quantity": 196,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-02",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 762373,
+      "cost": 219595,
+      "quantity": 4706,
+      "soldAt": "2026-02-28T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "coffee",
+      "amount": 210627,
+      "cost": 65712,
+      "quantity": 714,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "bento",
+      "amount": 220726,
+      "cost": 115533,
+      "quantity": 221,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "torty",
+      "amount": 211062,
+      "cost": 102585,
+      "quantity": 61,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "angarsk-18",
+      "productId": "pirozhnie",
+      "amount": 220533,
+      "cost": 64403,
+      "quantity": 1361,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "coffee",
+      "amount": 407280,
+      "cost": 133664,
+      "quantity": 1381,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "bento",
+      "amount": 354610,
+      "cost": 167980,
+      "quantity": 355,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "torty",
+      "amount": 410619,
+      "cost": 202318,
+      "quantity": 119,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "dekabr",
+      "productId": "pirozhnie",
+      "amount": 374488,
+      "cost": 104002,
+      "quantity": 2312,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "deputatskaya",
+      "productId": "coffee",
+      "amount": 254257,
+      "cost": 71275,
+      "quantity": 862,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "deputatskaya",
+      "productId": "torty",
+      "amount": 308221,
+      "cost": 155334,
+      "quantity": 89,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "deputatskaya",
+      "productId": "pirozhnie",
+      "amount": 435391,
+      "cost": 142010,
+      "quantity": 2688,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "konditerskaya",
+      "productId": "coffee",
+      "amount": 318213,
+      "cost": 89355,
+      "quantity": 1079,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "konditerskaya",
+      "productId": "torty",
+      "amount": 546882,
+      "cost": 278742,
+      "quantity": 159,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "konditerskaya",
+      "productId": "pirozhnie",
+      "amount": 483972,
+      "cost": 139041,
+      "quantity": 2987,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "lermontova",
+      "productId": "coffee",
+      "amount": 268314,
+      "cost": 84089,
+      "quantity": 910,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "lermontova",
+      "productId": "torty",
+      "amount": 342712,
+      "cost": 177179,
+      "quantity": 99,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "lermontova",
+      "productId": "pirozhnie",
+      "amount": 455828,
+      "cost": 147528,
+      "quantity": 2814,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "nizhnyaya",
+      "productId": "coffee",
+      "amount": 242851,
+      "cost": 72374,
+      "quantity": 823,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "nizhnyaya",
+      "productId": "torty",
+      "amount": 341020,
+      "cost": 175193,
+      "quantity": 99,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "nizhnyaya",
+      "productId": "pirozhnie",
+      "amount": 453393,
+      "cost": 128840,
+      "quantity": 2799,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "premier",
+      "productId": "coffee",
+      "amount": 119846,
+      "cost": 32433,
+      "quantity": 406,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "premier",
+      "productId": "torty",
+      "amount": 114239,
+      "cost": 58007,
+      "quantity": 33,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "pushkina",
+      "productId": "coffee",
+      "amount": 289505,
+      "cost": 88413,
+      "quantity": 981,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "pushkina",
+      "productId": "torty",
+      "amount": 392534,
+      "cost": 206654,
+      "quantity": 114,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "pushkina",
+      "productId": "pirozhnie",
+      "amount": 413644,
+      "cost": 125793,
+      "quantity": 2553,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "rzhanova",
+      "productId": "coffee",
+      "amount": 175698,
+      "cost": 48294,
+      "quantity": 596,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "rzhanova",
+      "productId": "torty",
+      "amount": 251923,
+      "cost": 121078,
+      "quantity": 73,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "rzhanova",
+      "productId": "pirozhnie",
+      "amount": 289201,
+      "cost": 94902,
+      "quantity": 1785,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "sezon",
+      "productId": "coffee",
+      "amount": 16669,
+      "cost": 4772,
+      "quantity": 57,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "sezon",
+      "productId": "torty",
+      "amount": 17108,
+      "cost": 8123,
+      "quantity": 5,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnechny",
+      "productId": "coffee",
+      "amount": 206957,
+      "cost": 61374,
+      "quantity": 702,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnechny",
+      "productId": "torty",
+      "amount": 287551,
+      "cost": 148989,
+      "quantity": 83,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnechny",
+      "productId": "pirozhnie",
+      "amount": 317644,
+      "cost": 104102,
+      "quantity": 1961,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnce-dc",
+      "productId": "coffee",
+      "amount": 83480,
+      "cost": 25218,
+      "quantity": 283,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnce-dc",
+      "productId": "torty",
+      "amount": 107678,
+      "cost": 53177,
+      "quantity": 31,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "solnce-dc",
+      "productId": "pirozhnie",
+      "amount": 123382,
+      "cost": 39536,
+      "quantity": 762,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "soyuz",
+      "productId": "coffee",
+      "amount": 201368,
+      "cost": 64526,
+      "quantity": 683,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "soyuz",
+      "productId": "torty",
+      "amount": 289050,
+      "cost": 148961,
+      "quantity": 84,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "soyuz",
+      "productId": "pirozhnie",
+      "amount": 332413,
+      "cost": 90797,
+      "quantity": 2052,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "cimlyanskaya",
+      "productId": "coffee",
+      "amount": 228167,
+      "cost": 67685,
+      "quantity": 773,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "cimlyanskaya",
+      "productId": "torty",
+      "amount": 283143,
+      "cost": 133730,
+      "quantity": 82,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "cimlyanskaya",
+      "productId": "pirozhnie",
+      "amount": 340363,
+      "cost": 96155,
+      "quantity": 2101,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "energetikov",
+      "productId": "coffee",
+      "amount": 158249,
+      "cost": 45114,
+      "quantity": 536,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "energetikov",
+      "productId": "torty",
+      "amount": 212414,
+      "cost": 101811,
+      "quantity": 62,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "energetikov",
+      "productId": "pirozhnie",
+      "amount": 276142,
+      "cost": 82367,
+      "quantity": 1705,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yubileynyy",
+      "productId": "coffee",
+      "amount": 263036,
+      "cost": 77454,
+      "quantity": 892,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yubileynyy",
+      "productId": "torty",
+      "amount": 321845,
+      "cost": 165854,
+      "quantity": 93,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yubileynyy",
+      "productId": "pirozhnie",
+      "amount": 393924,
+      "cost": 119825,
+      "quantity": 2432,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yadrintseva",
+      "productId": "coffee",
+      "amount": 600232,
+      "cost": 195790,
+      "quantity": 2035,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yadrintseva",
+      "productId": "torty",
+      "amount": 835186,
+      "cost": 392559,
+      "quantity": 242,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "period": "2026-03",
+      "storeId": "yadrintseva",
+      "productId": "pirozhnie",
+      "amount": 978458,
+      "cost": 299527,
+      "quantity": 6040,
+      "soldAt": "2026-03-31T18:00:00+08:00"
+    }
   ],
-  "marketing": [],
+  "marketing": [
+    {
+      "period": "2026-01",
+      "channelId": "yandex-direct",
+      "channelName": "Яндекс Директ",
+      "spend": 55492,
+      "leads": 558,
+      "orders": 138,
+      "revenue": 303845,
+      "impressions": 308289,
+      "clicks": 6752,
+      "sessions": 5297
+    },
+    {
+      "period": "2026-01",
+      "channelId": "vk-ads",
+      "channelName": "VK Реклама",
+      "spend": 36068,
+      "leads": 353,
+      "orders": 107,
+      "revenue": 237200,
+      "impressions": 379663,
+      "clicks": 6792,
+      "sessions": 5700
+    },
+    {
+      "period": "2026-01",
+      "channelId": "telegram-ads",
+      "channelName": "Telegram Ads",
+      "spend": 22478,
+      "leads": 204,
+      "orders": 54,
+      "revenue": 108170,
+      "impressions": 102173,
+      "clicks": 2875,
+      "sessions": 2218
+    },
+    {
+      "period": "2026-01",
+      "channelId": "2gis-promo",
+      "channelName": "2ГИС Промо",
+      "spend": 14560,
+      "leads": 433,
+      "orders": 124,
+      "revenue": 177592,
+      "impressions": 242667,
+      "clicks": 3104,
+      "sessions": 2455
+    },
+    {
+      "period": "2026-02",
+      "channelId": "yandex-direct",
+      "channelName": "Яндекс Директ",
+      "spend": 62746,
+      "leads": 670,
+      "orders": 196,
+      "revenue": 406519,
+      "impressions": 348589,
+      "clicks": 8726,
+      "sessions": 6973
+    },
+    {
+      "period": "2026-02",
+      "channelId": "vk-ads",
+      "channelName": "VK Реклама",
+      "spend": 39639,
+      "leads": 454,
+      "orders": 139,
+      "revenue": 287637,
+      "impressions": 417253,
+      "clicks": 8008,
+      "sessions": 6196
+    },
+    {
+      "period": "2026-02",
+      "channelId": "telegram-ads",
+      "channelName": "Telegram Ads",
+      "spend": 21946,
+      "leads": 221,
+      "orders": 51,
+      "revenue": 95470,
+      "impressions": 99755,
+      "clicks": 3172,
+      "sessions": 2572
+    },
+    {
+      "period": "2026-02",
+      "channelId": "2gis-promo",
+      "channelName": "2ГИС Промо",
+      "spend": 15400,
+      "leads": 425,
+      "orders": 90,
+      "revenue": 117954,
+      "impressions": 256667,
+      "clicks": 3238,
+      "sessions": 2515
+    },
+    {
+      "period": "2026-03",
+      "channelId": "yandex-direct",
+      "channelName": "Яндекс Директ",
+      "spend": 74461,
+      "leads": 800,
+      "orders": 222,
+      "revenue": 494027,
+      "impressions": 413672,
+      "clicks": 9379,
+      "sessions": 7615
+    },
+    {
+      "period": "2026-03",
+      "channelId": "vk-ads",
+      "channelName": "VK Реклама",
+      "spend": 41913,
+      "leads": 392,
+      "orders": 113,
+      "revenue": 273153,
+      "impressions": 441189,
+      "clicks": 7485,
+      "sessions": 6389
+    },
+    {
+      "period": "2026-03",
+      "channelId": "telegram-ads",
+      "channelName": "Telegram Ads",
+      "spend": 26799,
+      "leads": 309,
+      "orders": 85,
+      "revenue": 171125,
+      "impressions": 121814,
+      "clicks": 4019,
+      "sessions": 3165
+    },
+    {
+      "period": "2026-03",
+      "channelId": "2gis-promo",
+      "channelName": "2ГИС Промо",
+      "spend": 17860,
+      "leads": 538,
+      "orders": 119,
+      "revenue": 186735,
+      "impressions": 297667,
+      "clicks": 3289,
+      "sessions": 2840
+    },
+    {
+      "period": "2026-04",
+      "channelId": "yandex-direct",
+      "channelName": "Яндекс Директ",
+      "spend": 83008,
+      "leads": 1083,
+      "orders": 330,
+      "revenue": 777690,
+      "impressions": 461156,
+      "clicks": 11330,
+      "sessions": 9228
+    },
+    {
+      "period": "2026-04",
+      "channelId": "vk-ads",
+      "channelName": "VK Реклама",
+      "spend": 43534,
+      "leads": 539,
+      "orders": 114,
+      "revenue": 226132,
+      "impressions": 458253,
+      "clicks": 8926,
+      "sessions": 7381
+    },
+    {
+      "period": "2026-04",
+      "channelId": "telegram-ads",
+      "channelName": "Telegram Ads",
+      "spend": 28995,
+      "leads": 317,
+      "orders": 75,
+      "revenue": 133853,
+      "impressions": 131795,
+      "clicks": 3932,
+      "sessions": 3313
+    },
+    {
+      "period": "2026-04",
+      "channelId": "2gis-promo",
+      "channelName": "2ГИС Промо",
+      "spend": 17556,
+      "leads": 456,
+      "orders": 111,
+      "revenue": 148302,
+      "impressions": 292600,
+      "clicks": 3278,
+      "sessions": 2666
+    }
+  ],
   "ingestRuns": [],
-  "rawUppPayloads": []
+  "rawUppPayloads": [],
+  "users": [
+    {
+      "id": "admin",
+      "name": "Админ",
+      "role": "admin",
+      "token": "admin-demo-token",
+      "stores": []
+    },
+    {
+      "id": "mgr-yadrintseva",
+      "name": "Менеджер Ядринцева",
+      "role": "manager",
+      "token": "mgr-yadr-token",
+      "stores": [
+        "yadrintseva"
+      ]
+    },
+    {
+      "id": "mgr-konditerskaya",
+      "name": "Менеджер Кондитерская",
+      "role": "manager",
+      "token": "mgr-kond-token",
+      "stores": [
+        "konditerskaya",
+        "dekabr"
+      ]
+    },
+    {
+      "id": "mgr-angarsk",
+      "name": "Менеджер Ангарск",
+      "role": "manager",
+      "token": "mgr-angarsk-token",
+      "stores": [
+        "angarsk-18"
+      ]
+    }
+  ]
 }

@@ -179,6 +179,43 @@ class JsonStore {
     return deleted;
   }
 
+  async listUsers() {
+    const db = await this.getDb();
+    return db.users || [];
+  }
+
+  async getUserByToken(token) {
+    if (!token) return null;
+    const db = await this.getDb();
+    return (db.users || []).find((u) => u.token === token) || null;
+  }
+
+  async upsertUser(user) {
+    const db = await this.getDb();
+    if (!Array.isArray(db.users)) db.users = [];
+    const idx = db.users.findIndex((u) => u.id === user.id);
+    const record = {
+      id: String(user.id),
+      name: String(user.name || user.id),
+      role: user.role === 'admin' ? 'admin' : 'manager',
+      token: String(user.token || crypto.randomUUID()),
+      stores: Array.isArray(user.stores) ? user.stores.map(String) : []
+    };
+    if (idx >= 0) db.users[idx] = record;
+    else db.users.push(record);
+    await this.saveDb(db);
+    return record;
+  }
+
+  async deleteUser(id) {
+    const db = await this.getDb();
+    const before = (db.users || []).length;
+    db.users = (db.users || []).filter((u) => u.id !== id);
+    const deleted = before !== (db.users || []).length;
+    if (deleted) await this.saveDb(db);
+    return deleted;
+  }
+
   async editPlanItem(period, storeId, productId, amount) {
     const db = await this.getDb();
     const idx = db.plans.findIndex(

@@ -323,7 +323,26 @@ function normalizeDb(db) {
     marketing: Array.isArray(db.marketing) ? db.marketing : [],
     ingestRuns: Array.isArray(db.ingestRuns) ? db.ingestRuns : [],
     rawUppPayloads: Array.isArray(db.rawUppPayloads) ? db.rawUppPayloads : [],
-    comments: Array.isArray(db.comments) ? db.comments : []
+    comments: Array.isArray(db.comments) ? db.comments : [],
+    users: Array.isArray(db.users) ? db.users : []
+  };
+}
+
+/**
+ * Возвращает view БД, отфильтрованный под пользователя.
+ * admin (или null) — без изменений. manager — только привязанные точки.
+ */
+function scopeDbForUser(db, user) {
+  if (!user || user.role === 'admin') return db;
+  const allowed = new Set(user.stores || []);
+  if (allowed.size === 0) {
+    return { ...db, stores: [], plans: [], sales: [] };
+  }
+  return {
+    ...db,
+    stores: db.stores.filter((s) => allowed.has(s.id)),
+    plans: db.plans.filter((p) => allowed.has(p.storeId)),
+    sales: db.sales.filter((s) => allowed.has(s.storeId))
   };
 }
 
@@ -636,25 +655,10 @@ function aggregateMarketing(db, period) {
   };
 }
 
-function buildMarketingAnalysis(db, period) {
-  const marketing = aggregateMarketing(db, period);
-  const sales = aggregateDashboard(db, period);
+function buildRulesAnalysis({ period, marketing, sales }) {
   const insights = [];
   const recommendations = [];
   const warnings = [];
-
-  if (!marketing.channels.length) {
-    return {
-      period,
-      generatedAt: new Date().toISOString(),
-      summary: 'Нет маркетинговых данных за выбранный период.',
-      insights: ['Загрузите данные по рекламным каналам через `/api/ingest/marketing`, чтобы получить анализ.'],
-      recommendations: ['Начните с выгрузки spend, leads, orders, revenue, impressions и clicks по каналам.'],
-      warnings: [],
-      metrics: marketing,
-      sales
-    };
-  }
 
   insights.push(`Маркетинг принес ${marketing.totals.revenue.toFixed(0)} ₽ выручки при расходах ${marketing.totals.spend.toFixed(0)} ₽. ROAS = ${marketing.totals.roas}.`);
   insights.push(`Доля маркетингово-атрибутированной выручки от общего факта продаж за ${period}: ${marketing.salesShare}%.`);
@@ -715,13 +719,65 @@ function buildMarketingAnalysis(db, period) {
     recommendations.push(`Кандидаты на масштабирование: ${highPotentialChannels.map((item) => item.channelName).join(', ')}.`);
   }
 
+  return { insights, recommendations, warnings };
+}
+
+async function buildMarketingAnalysis(db, period, options = {}) {
+  const marketing = aggregateMarketing(db, period);
+  const sales = aggregateDashboard(db, period);
+
+  if (!marketing.channels.length) {
+    return {
+      period,
+      generatedAt: new Date().toISOString(),
+      engine: 'rules',
+      summary: 'Нет маркетинговых данных за выбранный период.',
+      insights: ['Загрузите данные по рекламным каналам через `/api/ingest/marketing`, чтобы получить анализ.'],
+      recommendations: ['Начните с выгрузки spend, leads, orders, revenue, impressions и clicks по каналам.'],
+      warnings: [],
+      metrics: marketing,
+      sales
+    };
+  }
+
+  const llmCfg = options.llm || {};
+  if (llmCfg.enabled && llmCfg.apiKey) {
+    try {
+      const { analyzeWithLLM } = require('./llm-analyst');
+      const llmResult = await analyzeWithLLM({
+        period,
+        marketing,
+        sales,
+        apiKey: llmCfg.apiKey,
+        model: llmCfg.model,
+        timeoutMs: llmCfg.timeoutMs
+      });
+      return {
+        period,
+        generatedAt: new Date().toISOString(),
+        engine: 'llm',
+        model: llmCfg.model || 'llama-3.3-70b-versatile',
+        summary: llmResult.summary,
+        insights: llmResult.insights,
+        recommendations: llmResult.recommendations,
+        warnings: llmResult.warnings,
+        metrics: marketing,
+        sales
+      };
+    } catch (error) {
+      console.warn(`[marketing-analysis] LLM failed, fallback to rules: ${error.message}`);
+    }
+  }
+
+  const rules = buildRulesAnalysis({ period, marketing, sales });
   return {
     period,
     generatedAt: new Date().toISOString(),
+    engine: 'rules',
     summary: `Маркетинговый анализ за ${period}: ROAS ${marketing.totals.roas}, CPL ${marketing.totals.cpl.toFixed(0)} ₽, CAC ${marketing.totals.cac.toFixed(0)} ₽, выполнение плана продаж ${sales.totals.completion}%.`,
-    insights,
-    recommendations,
-    warnings,
+    insights: rules.insights,
+    recommendations: rules.recommendations,
+    warnings: rules.warnings,
     metrics: marketing,
     sales
   };
@@ -945,5 +1001,6 @@ module.exports = {
   normalizeDb,
   replaceMarketing,
   replacePlans,
+  scopeDbForUser,
   storeDetails
 };

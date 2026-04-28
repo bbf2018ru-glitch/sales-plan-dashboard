@@ -59,6 +59,13 @@ docker compose up --build
 - `INGEST_API_KEY` — ключ для загрузки данных из 1С, по умолчанию `demo-secret`
 - `DB_PATH` — путь к json-файлу хранилища, по умолчанию `./data/db.json`
 - `DATABASE_URL` — строка подключения PostgreSQL. Если задана, сервис работает с PostgreSQL вместо JSON.
+- `DASHBOARD_PIN` — PIN для входа в дашборд (по умолчанию выключен)
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — алерты по точкам ниже 80% плана
+- `GROQ_API_KEY` — ключ Groq для LLM-маркетинг-анализа (если не задан, используется встроенный rules engine)
+- `GROQ_MODEL` — модель для анализа, по умолчанию `llama-3.3-70b-versatile`
+- `UPP_PULL_URL` — URL HTTP-сервиса 1С УПП для pull-режима (см. ниже)
+- `UPP_PULL_USER`, `UPP_PULL_PASSWORD` — Basic Auth для HTTP-сервиса
+- `UPP_PULL_INTERVAL_MIN` — авто-pull в минутах (`0` = только по запросу)
 
 ## Режимы хранения
 
@@ -229,6 +236,56 @@ X-API-Key: demo-secret
 - хранение сырого UPP payload
 - журнал запусков импорта
 - нормализация UPP-данных в витрину дашборда
+
+## Два режима интеграции с 1С
+
+### Push (1С → дашборд)
+
+Регламентное задание в 1С шлёт пакет на `POST /api/ingest/upp`.
+
+- BSL-шаблон: [examples/upp-http-export-template.bsl](/C:/Users/user/sales-plan-dashboard/examples/upp-http-export-template.bsl)
+- Простой запуск: достаточно сетевого доступа из 1С наружу.
+- Минусы: нужно править регламентное задание для смены частоты, нет «по требованию».
+
+### Pull (дашборд → 1С)
+
+Дашборд периодически (или по кнопке) дёргает HTTP-сервис в 1С.
+
+- BSL-шаблон HTTP-сервиса: [examples/upp-http-service-template.bsl](/C:/Users/user/sales-plan-dashboard/examples/upp-http-service-template.bsl)
+- Конфиг через env: `UPP_PULL_URL`, `UPP_PULL_USER`, `UPP_PULL_PASSWORD`, `UPP_PULL_INTERVAL_MIN`
+- Ручной триггер: `POST /api/upp/pull` (требует admin-токен), опционально `?period=YYYY-MM`
+- Ответ HTTP-сервиса должен совпадать с форматом `/api/ingest/upp` (см. выше)
+- Плюсы: можно дёргать по кнопке, частоту меняем в env, не нужно ничего трогать в 1С после публикации.
+
+Можно использовать оба режима одновременно — дедупликация по `packageId` отсечёт повторы.
+
+## Роли и доступ
+
+Дашборд поддерживает два типа пользователей:
+
+- `admin` — видит все точки, может управлять пользователями через `/api/users`
+- `manager` — видит только привязанные к нему точки
+
+Доступ передаётся через `X-User-Token: <token>` или одноразовую ссылку вида `/?userToken=<token>` (токен сохраняется в localStorage и подставляется в дальнейшие запросы).
+
+### API управления пользователями (только admin)
+
+```text
+GET  /api/users
+POST /api/users        { "id": "mgr-pushkina", "name": "Менеджер Пушкина", "role": "manager", "stores": ["pushkina"], "token": "..." }
+DELETE /api/users/:id
+```
+
+Если `token` не передан в POST — генерируется автоматически.
+
+В `data/sample-db.json` уже заведены демо-пользователи:
+
+- `admin-demo-token` — админ
+- `mgr-yadr-token` — менеджер точки «Ядринцева»
+- `mgr-kond-token` — менеджер точек «Кондитерская» и «Декабрьских Событий»
+- `mgr-angarsk-token` — менеджер точки «Ангарск»
+
+Для production обязательно поменяйте токены через `/api/users`.
 
 ## Что дальше
 

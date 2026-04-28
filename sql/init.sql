@@ -101,3 +101,19 @@ create table if not exists comments (
 
 create index if not exists idx_comments_period on comments(period);
 create index if not exists idx_comments_created_at on comments(created_at desc);
+
+-- Roles and per-store access for managers
+create table if not exists users (
+  id text primary key,
+  name text not null,
+  role text not null default 'manager',
+  token text not null unique
+);
+
+create table if not exists user_stores (
+  user_id text not null references users(id) on delete cascade,
+  store_id text not null references stores(id) on delete cascade,
+  primary key (user_id, store_id)
+);
+
+create index if not exists idx_users_token on users(token);

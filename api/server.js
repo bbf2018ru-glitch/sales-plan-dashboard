@@ -13,6 +13,7 @@ const {
   buildStoreProductMatrix,
   listPeriods,
   monthKey,
+  scopeDbForUser,
   storeDetails
 } = require('./lib/analytics');
 const { createStore } = require('./storage');
@@ -28,6 +29,26 @@ const WEB_DIR = path.join(__dirname, '..', 'web');
 const DASHBOARD_PIN = process.env.DASHBOARD_PIN || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const LLM_ANALYSIS_ENABLED = !!GROQ_API_KEY;
+
+const llmConfig = {
+  enabled: LLM_ANALYSIS_ENABLED,
+  apiKey: GROQ_API_KEY,
+  model: GROQ_MODEL
+};
+
+const UPP_PULL_URL = process.env.UPP_PULL_URL || '';
+const UPP_PULL_USER = process.env.UPP_PULL_USER || '';
+const UPP_PULL_PASSWORD = process.env.UPP_PULL_PASSWORD || '';
+const UPP_PULL_INTERVAL_MIN = Number(process.env.UPP_PULL_INTERVAL_MIN || 0);
+const uppPullConfig = {
+  url: UPP_PULL_URL,
+  username: UPP_PULL_USER,
+  password: UPP_PULL_PASSWORD,
+  currentPeriod: () => monthKey()
+};
 
 const store = createStore({
   databaseUrl: DATABASE_URL,
@@ -57,6 +78,23 @@ function checkSession(req) {
   const token = req.headers['x-session-token'] || '';
   const expiry = sessions.get(token);
   return !!(expiry && Date.now() <= expiry);
+}
+
+async function resolveUser(req) {
+  const url = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
+  const token = req.headers['x-user-token'] || url.searchParams.get('userToken') || '';
+  if (!token) return null;
+  try {
+    return await store.getUserByToken(String(token));
+  } catch (_) {
+    return null;
+  }
+}
+
+async function getScopedDb(req) {
+  const db = await store.getDb();
+  const user = await resolveUser(req);
+  return { db: scopeDbForUser(db, user), user };
 }
 
 // ── Telegram alerts ───────────────────────────────────────────────────────────
@@ -232,23 +270,27 @@ const server = http.createServer(async (req, res) => {
 
     // ── Dashboard summary ─────────────────────────────────────────────────────
     if (pathname === '/api/dashboard/summary' && req.method === 'GET') {
-      const db = await store.getDb();
+      const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       sendJson(res, 200, aggregateDashboard(db, period));
       return;
     }
 
     if (pathname === '/api/dashboard/store' && req.method === 'GET') {
-      const db = await store.getDb();
+      const { db, user } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       const storeId = String(parsedUrl.searchParams.get('storeId') || '');
       if (!storeId) { sendJson(res, 400, { error: 'storeId is required' }); return; }
+      if (user && user.role === 'manager' && !(user.stores || []).includes(storeId)) {
+        sendJson(res, 403, { error: 'Нет доступа к этой точке' });
+        return;
+      }
       sendJson(res, 200, storeDetails(db, period, storeId));
       return;
     }
 
     if (pathname === '/api/dashboard/matrix' && req.method === 'GET') {
-      const db = await store.getDb();
+      const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       sendJson(res, 200, buildStoreProductMatrix(db, period));
       return;
@@ -262,7 +304,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/dashboard/product-forecast' && req.method === 'GET') {
-      const db = await store.getDb();
+      const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       sendJson(res, 200, buildProductForecast(db, period));
       return;
@@ -271,22 +313,98 @@ const server = http.createServer(async (req, res) => {
     // ── Analysis ──────────────────────────────────────────────────────────────
     if (pathname === '/api/analysis/marketing' && req.method === 'POST') {
       const body = await parseBody(req);
-      const db = await store.getDb();
+      const { db } = await getScopedDb(req);
       const period = monthKey(body.period || parsedUrl.searchParams.get('period'));
-      sendJson(res, 200, buildMarketingAnalysis(db, period));
+      const useLlm = body.engine ? body.engine === 'llm' : LLM_ANALYSIS_ENABLED;
+      const result = await buildMarketingAnalysis(db, period, {
+        llm: { ...llmConfig, enabled: useLlm }
+      });
+      sendJson(res, 200, result);
       return;
     }
 
     // ── Metadata ──────────────────────────────────────────────────────────────
     if (pathname === '/api/metadata' && req.method === 'GET') {
-      const db = await store.getDb();
+      const { db, user } = await getScopedDb(req);
       sendJson(res, 200, {
         periods: listPeriods(db),
         stores: db.stores,
         products: db.products,
         pinRequired: !!DASHBOARD_PIN,
-        hasTelegram: !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)
+        hasTelegram: !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
+        llmEnabled: LLM_ANALYSIS_ENABLED,
+        llmModel: LLM_ANALYSIS_ENABLED ? GROQ_MODEL : null,
+        currentUser: user ? { id: user.id, name: user.name, role: user.role, stores: user.stores } : null
       });
+      return;
+    }
+
+    // ── User management (admin-only) ──────────────────────────────────────────
+    if (pathname === '/api/users' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 403, { error: 'Доступ только для администратора' });
+        return;
+      }
+      sendJson(res, 200, { users: await store.listUsers() });
+      return;
+    }
+
+    if (pathname === '/api/users' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 403, { error: 'Доступ только для администратора' });
+        return;
+      }
+      const body = await parseBody(req);
+      if (!body.id || !body.name) {
+        sendJson(res, 400, { error: 'id и name обязательны' });
+        return;
+      }
+      const saved = await store.upsertUser(body);
+      sendJson(res, 200, { ok: true, user: saved });
+      return;
+    }
+
+    // ── UPP pull (admin) ──────────────────────────────────────────────────────
+    if (pathname === '/api/upp/pull' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 403, { error: 'Доступ только для администратора' });
+        return;
+      }
+      if (!UPP_PULL_URL) {
+        sendJson(res, 400, { error: 'UPP_PULL_URL не настроен' });
+        return;
+      }
+      const body = await parseBody(req);
+      const period = monthKey(body.period || parsedUrl.searchParams.get('period'));
+      try {
+        const { fetchUppPackage } = require('./lib/upp-pull');
+        const payload = await fetchUppPackage({ ...uppPullConfig, period });
+        const run = await store.ingestUppPayload(payload);
+        const db = await store.getDb();
+        const summary = aggregateDashboard(db, run.period);
+        const marketing = aggregateMarketing(db, run.period);
+        sendEvent('plans_updated', { period: run.period, totals: summary.totals });
+        sendEvent('sales_updated', { period: run.period, totals: summary.totals });
+        sendEvent('marketing_updated', { period: run.period, totals: marketing.totals });
+        sendJson(res, 200, { ok: true, run });
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || 'UPP pull failed' });
+      }
+      return;
+    }
+
+    const userIdMatch = pathname.match(/^\/api\/users\/([^/]+)$/);
+    if (userIdMatch && req.method === 'DELETE') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 403, { error: 'Доступ только для администратора' });
+        return;
+      }
+      const ok = await store.deleteUser(userIdMatch[1]);
+      sendJson(res, 200, { ok });
       return;
     }
 
@@ -414,4 +532,32 @@ server.listen(PORT, async () => {
   console.log(`Storage: ${DATABASE_URL ? 'PostgreSQL' : 'JSON file'}`);
   console.log(`PIN protection: ${DASHBOARD_PIN ? 'enabled' : 'disabled'}`);
   console.log(`Telegram alerts: ${TELEGRAM_BOT_TOKEN ? 'enabled' : 'disabled'}`);
+  console.log(`LLM marketing analysis: ${LLM_ANALYSIS_ENABLED ? `enabled (${GROQ_MODEL})` : 'disabled (rules engine)'}`);
+  console.log(`UPP pull: ${UPP_PULL_URL ? `${UPP_PULL_URL} (${UPP_PULL_INTERVAL_MIN > 0 ? `every ${UPP_PULL_INTERVAL_MIN} min` : 'manual'})` : 'disabled'}`);
+
+  if (UPP_PULL_URL && UPP_PULL_INTERVAL_MIN > 0) {
+    const { startPullScheduler } = require('./lib/upp-pull');
+    startPullScheduler({
+      config: uppPullConfig,
+      store,
+      intervalMs: UPP_PULL_INTERVAL_MIN * 60 * 1000,
+      onResult: (run) => {
+        console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
+        if (run.status === 'success') {
+          (async () => {
+            const db = await store.getDb();
+            const summary = aggregateDashboard(db, run.period);
+            const marketing = aggregateMarketing(db, run.period);
+            sendEvent('plans_updated', { period: run.period, totals: summary.totals });
+            sendEvent('sales_updated', { period: run.period, totals: summary.totals });
+            sendEvent('marketing_updated', { period: run.period, totals: marketing.totals });
+          })().catch(() => {});
+        }
+      },
+      onError: (error) => {
+        console.error(`[upp-pull] ${error.message}`);
+        store.recordIngestFailure({ sourceSystem: '1c-upp', sourceObject: 'pull' }, error).catch(() => {});
+      }
+    });
+  }
 });

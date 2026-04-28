@@ -814,6 +814,36 @@ td.col-edit { text-align: center; }
 .exec-list li + li { margin-top: 5px; }
 
 .exec-footer { font-size: 11px; color: var(--hint); margin-top: 10px; }
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg-3, rgba(120,120,140,0.10));
+  font-size: 12px;
+}
+.user-badge.hidden { display: none; }
+.user-badge .user-role { color: var(--hint, #888); }
+.user-badge .user-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--good, #2bb673);
+}
+.user-badge .user-dot.bad { background: var(--bad, #e44); }
+.user-badge .link-btn {
+  background: none; border: none; color: var(--accent, #4a7afe);
+  cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline;
+}
+
+.exec-summary {
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg-3, rgba(120,120,140,0.08));
+  border-left: 3px solid var(--accent, #4a7afe);
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
 
 /* ── Reports layout ──────────────────────────────────────────── */
 .report-2col {

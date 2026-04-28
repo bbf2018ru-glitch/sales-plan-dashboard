@@ -1,4 +1,16 @@
 // ── State ──────────────────────────────────────────────────────────────────
+function readUserToken() {
+  const url = new URL(window.location.href);
+  const fromUrl = url.searchParams.get('userToken');
+  if (fromUrl) {
+    localStorage.setItem('maria_user_token', fromUrl);
+    url.searchParams.delete('userToken');
+    window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash);
+    return fromUrl;
+  }
+  return localStorage.getItem('maria_user_token') || '';
+}
+
 const state = {
   period: '',
   selectedStoreId: '',
@@ -12,6 +24,8 @@ const state = {
   storeSort: { key: 'percent', dir: -1 },
   productSort: 'fact',
   sessionToken: sessionStorage.getItem('maria_session') || '',
+  userToken: readUserToken(),
+  currentUser: null,
   pinRequired: false,
   editStoreId: '',
   editPlanData: []
@@ -45,9 +59,10 @@ function fmtAxis(v) {
 
 // ── HTTP ───────────────────────────────────────────────────────────────────
 async function fetchJson(path, opts = {}) {
-  if (state.sessionToken) {
-    opts.headers = { ...(opts.headers || {}), 'X-Session-Token': state.sessionToken };
-  }
+  const headers = { ...(opts.headers || {}) };
+  if (state.sessionToken) headers['X-Session-Token'] = state.sessionToken;
+  if (state.userToken) headers['X-User-Token'] = state.userToken;
+  opts.headers = headers;
   const res = await fetch(path, opts);
   if (!res.ok) {
     const b = await res.json().catch(() => ({ error: 'Ошибка запроса' }));
@@ -1327,11 +1342,18 @@ function renderMarketingInsights(analysis, mkt) {
         ? items.map(i => `<li>${i}</li>`).join('')
         : '<li class="muted">Нет данных</li>'}</ul>
     </div>`;
+  const engineLabel = analysis.engine === 'llm'
+    ? `LLM (${analysis.model || 'groq'})`
+    : 'Правила';
+  const summaryHtml = analysis.summary
+    ? `<div class="exec-summary" style="grid-column:1/-1">${analysis.summary}</div>`
+    : '';
   el.innerHTML =
+    summaryHtml +
     block('key',   '● Инсайты',        analysis.insights)     +
     block('prior', '▲ Рекомендации',   analysis.recommendations) +
     block('risk',  '! Предупреждения', analysis.warnings)     +
-    `<div class="exec-footer" style="grid-column:1/-1">Анализ сформирован: ${formatDate(analysis.generatedAt)}</div>`;
+    `<div class="exec-footer" style="grid-column:1/-1">Источник: ${engineLabel} · Сформирован ${formatDate(analysis.generatedAt)}</div>`;
 }
 
 async function loadMarketing() {
@@ -1564,7 +1586,36 @@ async function loadMetadata() {
     tgStatus.classList.remove('hidden');
   }
 
+  state.currentUser = meta.currentUser || null;
+  renderUserBadge();
   return meta;
+}
+
+function renderUserBadge() {
+  const badge = $('userBadge');
+  if (!badge) return;
+  const u = state.currentUser;
+  if (!u) {
+    if (state.userToken) {
+      badge.innerHTML = `<span class="user-dot bad"></span>Токен не распознан <button class="link-btn" id="userLogoutBtn">сбросить</button>`;
+      badge.classList.remove('hidden');
+      $('userLogoutBtn')?.addEventListener('click', userLogout);
+    } else {
+      badge.classList.add('hidden');
+    }
+    return;
+  }
+  const roleLabel = u.role === 'admin' ? 'админ' : `менеджер · ${u.stores?.length || 0} ${u.stores?.length === 1 ? 'точка' : 'точек'}`;
+  badge.innerHTML = `<span class="user-dot good"></span><b>${u.name}</b> <span class="user-role">${roleLabel}</span> <button class="link-btn" id="userLogoutBtn">выйти</button>`;
+  badge.classList.remove('hidden');
+  $('userLogoutBtn')?.addEventListener('click', userLogout);
+}
+
+function userLogout() {
+  localStorage.removeItem('maria_user_token');
+  state.userToken = '';
+  state.currentUser = null;
+  window.location.reload();
 }
 
 async function loadSummary() {

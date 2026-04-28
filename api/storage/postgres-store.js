@@ -83,21 +83,83 @@ class PostgresStore {
   async getDb() {
     await this.init();
 
-    const [stores, products, plans, sales, marketing] = await Promise.all([
+    const [stores, products, plans, sales, marketing, users, userStores] = await Promise.all([
       this.pool.query('select id, name, region from stores order by name'),
       this.pool.query('select id, name, category from products order by name'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount from plans'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount, cost, quantity, sold_at as "soldAt" from sales'),
-      this.pool.query('select period, channel_id as "channelId", channel_name as "channelName", spend, leads, orders, revenue, impressions, clicks, sessions from marketing_metrics')
+      this.pool.query('select period, channel_id as "channelId", channel_name as "channelName", spend, leads, orders, revenue, impressions, clicks, sessions from marketing_metrics'),
+      this.pool.query('select id, name, role, token from users').catch(() => ({ rows: [] })),
+      this.pool.query('select user_id as "userId", store_id as "storeId" from user_stores').catch(() => ({ rows: [] }))
     ]);
+
+    const userStoreMap = new Map();
+    for (const row of userStores.rows) {
+      if (!userStoreMap.has(row.userId)) userStoreMap.set(row.userId, []);
+      userStoreMap.get(row.userId).push(row.storeId);
+    }
 
     return normalizeDb({
       stores: stores.rows,
       products: products.rows,
       plans: plans.rows,
       sales: sales.rows,
-      marketing: marketing.rows
+      marketing: marketing.rows,
+      users: users.rows.map((u) => ({ ...u, stores: userStoreMap.get(u.id) || [] }))
     });
+  }
+
+  async listUsers() {
+    const db = await this.getDb();
+    return db.users || [];
+  }
+
+  async getUserByToken(token) {
+    if (!token) return null;
+    await this.init();
+    const result = await this.pool.query('select id, name, role, token from users where token = $1', [token]);
+    if (!result.rows.length) return null;
+    const user = result.rows[0];
+    const stores = await this.pool.query('select store_id from user_stores where user_id = $1', [user.id]);
+    return { ...user, stores: stores.rows.map((r) => r.store_id) };
+  }
+
+  async upsertUser(user) {
+    await this.init();
+    const crypto = require('crypto');
+    const record = {
+      id: String(user.id),
+      name: String(user.name || user.id),
+      role: user.role === 'admin' ? 'admin' : 'manager',
+      token: String(user.token || crypto.randomUUID()),
+      stores: Array.isArray(user.stores) ? user.stores.map(String) : []
+    };
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      await client.query(
+        `insert into users (id, name, role, token) values ($1, $2, $3, $4)
+         on conflict (id) do update set name = excluded.name, role = excluded.role, token = excluded.token`,
+        [record.id, record.name, record.role, record.token]
+      );
+      await client.query('delete from user_stores where user_id = $1', [record.id]);
+      for (const sid of record.stores) {
+        await client.query('insert into user_stores (user_id, store_id) values ($1, $2)', [record.id, sid]);
+      }
+      await client.query('commit');
+    } catch (err) {
+      await client.query('rollback');
+      throw err;
+    } finally {
+      client.release();
+    }
+    return record;
+  }
+
+  async deleteUser(id) {
+    await this.init();
+    const result = await this.pool.query('delete from users where id = $1', [id]);
+    return result.rowCount > 0;
   }
 
   async replacePlans(body) {
