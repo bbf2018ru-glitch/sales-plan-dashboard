@@ -6,8 +6,8 @@
   --muted:       #6b7280;
   --hint:        #9ca3af;
   --line:        #e8e2d8;
-  --accent:      #0f766e;
-  --accent-soft: #d5f2ee;
+  --accent:      #b5294a;
+  --accent-soft: #fce8ee;
   --good:        #16a34a;
   --good-soft:   #dcfce7;
   --warn:        #b45309;
@@ -28,8 +28,8 @@
   --muted:       #9ca3af;
   --hint:        #6b7280;
   --line:        #2a3045;
-  --accent:      #14b8a6;
-  --accent-soft: #0f3532;
+  --accent:      #e8647e;
+  --accent-soft: #3a0f1c;
   --good:        #22c55e;
   --good-soft:   #0d2e1a;
   --warn:        #f59e0b;
@@ -111,19 +111,39 @@ body {
   margin-bottom: 4px;
 }
 
-.brand-kicker {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 4px;
+.brand-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 8px;
 }
 
-.brand h1 {
-  font-size: 24px;
+.brand-badge {
+  flex-shrink: 0;
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.brand-text {
+  min-width: 0;
+}
+
+.brand-name {
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -.02em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.brand-tagline {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--hint);
+  margin-top: 1px;
+  white-space: nowrap;
 }
 
 /* ── Brand actions (tool buttons row) ────────────────────────── */
@@ -591,9 +611,9 @@ td {
 
 tr:last-child td { border-bottom: 0; }
 
-tr.active td { background: rgba(15, 118, 110, .05); }
+tr.active td { background: rgba(181, 41, 74, .05); }
 tr:hover td { background: var(--bg); cursor: pointer; }
-tr.active:hover td { background: rgba(15, 118, 110, .08); }
+tr.active:hover td { background: rgba(181, 41, 74, .08); }
 
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--accent); }
@@ -831,7 +851,7 @@ td.col-edit { text-align: center; }
 }
 .user-badge .user-dot.bad { background: var(--bad, #e44); }
 .user-badge .link-btn {
-  background: none; border: none; color: var(--accent, #4a7afe);
+  background: none; border: none; color: var(--accent);
   cursor: pointer; padding: 0; font-size: 12px; text-decoration: underline;
 }
 
@@ -839,7 +859,7 @@ td.col-edit { text-align: center; }
   font-size: 13px;
   line-height: 1.5;
   background: var(--bg-3, rgba(120,120,140,0.08));
-  border-left: 3px solid var(--accent, #4a7afe);
+  border-left: 3px solid var(--accent);
   padding: 10px 14px;
   border-radius: 6px;
   margin-bottom: 4px;
@@ -959,7 +979,7 @@ td.col-edit { text-align: center; }
 }
 
 .growth-cur td {
-  background: rgba(15, 118, 110, .06) !important;
+  background: rgba(181, 41, 74, .06) !important;
   font-weight: 600;
 }
 
@@ -1453,6 +1473,17 @@ tfoot td { border-top: 2px solid var(--line); }
   flex-direction: column;
   align-items: center;
   gap: 16px;
+}
+
+.pin-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.pin-logo svg {
+  filter: drop-shadow(0 4px 12px rgba(181, 41, 74, .28));
 }
 
 .pin-icon {

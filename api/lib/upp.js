@@ -70,7 +70,23 @@ function normalizeUppPayload(payload) {
   const sales = (payload.sales || payload.salesRows || payload.realizationRows || []).map((item) => ({
     storeId: asId(item.storeId, item.store, item.storeCode),
     productId: asId(item.productId, item.product, item.productCode, item.sku),
-    amount: Number(item.amount || item.saleAmount || item.revenue || item.sum || 0),
+    amount: Number(
+      item['СуммаПродажПоЧеку'] ||
+      item.summaProdazhPoChequ   ||
+      item.summaProdazhPoCheque  ||
+      item.amount                ||
+      item.saleAmount            ||
+      item.revenue               ||
+      item.sum                   ||
+      0
+    ),
+    grossProfit: Number(
+      item['ВаловаяПрибыль'] ||
+      item.valovayaPribyl     ||
+      item.grossProfit        ||
+      item.profit             ||
+      0
+    ),
     cost: Number(item.cost || item.costAmount || item.purchaseCost || 0),
     quantity: Number(item.quantity || item.qty || 0),
     soldAt: item.soldAt || item.date || item.datetime || new Date().toISOString()

@@ -28,9 +28,12 @@ create table if not exists sales (
   product_id text not null references products(id),
   amount numeric(14, 2) not null default 0,
   cost numeric(14, 2) not null default 0,
+  gross_profit numeric(14, 2) not null default 0,
   quantity numeric(14, 2) not null default 0,
   sold_at timestamptz not null default now()
 );
+
+alter table sales add column if not exists gross_profit numeric(14,2) not null default 0;
 
 create index if not exists idx_sales_period on sales(period);
 create index if not exists idx_sales_period_store on sales(period, store_id);

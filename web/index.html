@@ -4,15 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Мария — Продажи</title>
-    <link rel="stylesheet" href="/styles.css?v=6" />
+    <link rel="stylesheet" href="/styles.css?v=7" />
   </head>
   <body>
 
     <!-- ═══ PIN OVERLAY ═══ -->
     <div id="pinOverlay" class="pin-overlay hidden">
       <div class="pin-box">
-        <div class="pin-logo">Мария</div>
-        <div class="pin-title">Введите PIN для доступа</div>
+        <div class="pin-logo">
+          <svg viewBox="0 0 56 56" width="56" height="56" aria-hidden="true">
+            <defs>
+              <linearGradient id="pinBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#d4536a"/>
+                <stop offset="100%" stop-color="#9c1f3a"/>
+              </linearGradient>
+            </defs>
+            <rect width="56" height="56" rx="15" fill="url(#pinBrandGrad)"/>
+            <text x="28" y="40" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="33" font-weight="700" fill="white">М</text>
+          </svg>
+        </div>
+        <div class="pin-title">Мария · Аналитика</div>
+        <div class="pin-subtitle">Введите PIN для доступа</div>
         <input id="pinInput" class="pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off" />
         <div id="pinError" class="pin-error"></div>
         <button id="pinSubmit" class="pin-btn">Войти</button>
@@ -66,8 +78,22 @@
       <!-- ═══ SIDEBAR ═══ -->
       <aside class="sidebar" id="sidebar">
         <div class="brand">
-          <div class="brand-kicker">Sales Monitor</div>
-          <h1>Мария</h1>
+          <div class="brand-logo-row">
+            <svg class="brand-badge" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+              <defs>
+                <linearGradient id="mariaBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#d4536a"/>
+                  <stop offset="100%" stop-color="#9c1f3a"/>
+                </linearGradient>
+              </defs>
+              <rect width="40" height="40" rx="11" fill="url(#mariaBrandGrad)"/>
+              <text x="20" y="29" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="24" font-weight="700" fill="white">М</text>
+            </svg>
+            <div class="brand-text">
+              <div class="brand-name">Мария</div>
+              <div class="brand-tagline">Кондитерская · аналитика</div>
+            </div>
+          </div>
           <div class="brand-actions">
             <button id="themeToggle" class="tool-btn" title="Тёмная тема"></button>
             <button id="printBtn" class="tool-btn" title="Печать / PDF">
@@ -560,6 +586,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=6"></script>
+    <script src="/app.js?v=7"></script>
   </body>
 </html>

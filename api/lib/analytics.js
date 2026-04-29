@@ -363,6 +363,7 @@ function aggregatePeriodCore(db, period) {
       plan: 0,
       fact: 0,
       cost: 0,
+      grossProfit: 0,
       quantity: 0
     });
   }
@@ -375,6 +376,7 @@ function aggregatePeriodCore(db, period) {
       plan: 0,
       fact: 0,
       cost: 0,
+      grossProfit: 0,
       quantity: 0
     });
   }
@@ -387,6 +389,8 @@ function aggregatePeriodCore(db, period) {
         region: '',
         plan: 0,
         fact: 0,
+        cost: 0,
+        grossProfit: 0,
         quantity: 0
       });
     }
@@ -397,6 +401,8 @@ function aggregatePeriodCore(db, period) {
         category: '',
         plan: 0,
         fact: 0,
+        cost: 0,
+        grossProfit: 0,
         quantity: 0
       });
     }
@@ -413,6 +419,7 @@ function aggregatePeriodCore(db, period) {
         plan: 0,
         fact: 0,
         cost: 0,
+        grossProfit: 0,
         quantity: 0
       });
     }
@@ -424,21 +431,24 @@ function aggregatePeriodCore(db, period) {
         plan: 0,
         fact: 0,
         cost: 0,
+        grossProfit: 0,
         quantity: 0
       });
     }
     byStore.get(row.storeId).fact += toNumber(row.amount);
     byStore.get(row.storeId).cost += toNumber(row.cost);
+    byStore.get(row.storeId).grossProfit += toNumber(row.grossProfit);
     byStore.get(row.storeId).quantity += toNumber(row.quantity);
     byProduct.get(row.productId).fact += toNumber(row.amount);
     byProduct.get(row.productId).cost += toNumber(row.cost);
+    byProduct.get(row.productId).grossProfit += toNumber(row.grossProfit);
     byProduct.get(row.productId).quantity += toNumber(row.quantity);
   }
 
   const storesList = Array.from(byStore.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
     .map((item) => {
-      const margin = item.fact - item.cost;
+      const margin = item.grossProfit > 0 ? item.grossProfit : (item.fact - item.cost);
       return {
         ...item,
         margin: roundMetric(margin),
@@ -452,7 +462,7 @@ function aggregatePeriodCore(db, period) {
   const productsList = Array.from(byProduct.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
     .map((item) => {
-      const margin = item.fact - item.cost;
+      const margin = item.grossProfit > 0 ? item.grossProfit : (item.fact - item.cost);
       return {
         ...item,
         margin: roundMetric(margin),
@@ -955,6 +965,7 @@ function appendSales(db, body) {
       productId: String(item.productId),
       amount: toNumber(item.amount),
       cost: toNumber(item.cost),
+      grossProfit: toNumber(item.grossProfit),
       quantity: toNumber(item.quantity),
       soldAt: item.soldAt || new Date().toISOString()
     });

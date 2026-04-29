@@ -66,9 +66,9 @@ class PostgresStore {
       }
       for (const r of (sample.sales || [])) {
         await client.query(
-          `insert into sales (period, store_id, product_id, amount, cost, quantity, sold_at)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
-          [r.period, r.storeId, r.productId, r.amount || 0, r.cost || 0, r.quantity || 0, r.soldAt || new Date().toISOString()]
+          `insert into sales (period, store_id, product_id, amount, cost, gross_profit, quantity, sold_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [r.period, r.storeId, r.productId, r.amount || 0, r.cost || 0, r.grossProfit || 0, r.quantity || 0, r.soldAt || new Date().toISOString()]
         );
       }
       await client.query('commit');
@@ -87,7 +87,7 @@ class PostgresStore {
       this.pool.query('select id, name, region from stores order by name'),
       this.pool.query('select id, name, category from products order by name'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount from plans'),
-      this.pool.query('select period, store_id as "storeId", product_id as "productId", amount, cost, quantity, sold_at as "soldAt" from sales'),
+      this.pool.query('select period, store_id as "storeId", product_id as "productId", amount, cost, gross_profit as "grossProfit", quantity, sold_at as "soldAt" from sales'),
       this.pool.query('select period, channel_id as "channelId", channel_name as "channelName", spend, leads, orders, revenue, impressions, clicks, sessions from marketing_metrics'),
       this.pool.query('select id, name, role, token from users').catch(() => ({ rows: [] })),
       this.pool.query('select user_id as "userId", store_id as "storeId" from user_stores').catch(() => ({ rows: [] }))
@@ -258,14 +258,15 @@ class PostgresStore {
           throw new Error('Each sales row must include storeId and productId');
         }
         await client.query(
-          `insert into sales (period, store_id, product_id, amount, cost, quantity, sold_at)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
+          `insert into sales (period, store_id, product_id, amount, cost, gross_profit, quantity, sold_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             period,
             String(item.storeId),
             String(item.productId),
             Number(item.amount || 0),
             Number(item.cost || 0),
+            Number(item.grossProfit || 0),
             Number(item.quantity || 0),
             item.soldAt || new Date().toISOString()
           ]
@@ -420,9 +421,9 @@ class PostgresStore {
       for (const item of normalized.sales) {
         if (!item.storeId || !item.productId) continue;
         await client.query(
-          `insert into sales (period, store_id, product_id, amount, cost, quantity, sold_at)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
-          [normalized.period, item.storeId, item.productId, item.amount, item.cost || 0, item.quantity || 0, item.soldAt]
+          `insert into sales (period, store_id, product_id, amount, cost, gross_profit, quantity, sold_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [normalized.period, item.storeId, item.productId, item.amount, item.cost || 0, item.grossProfit || 0, item.quantity || 0, item.soldAt]
         );
       }
 
