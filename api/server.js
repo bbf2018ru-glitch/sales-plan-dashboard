@@ -138,7 +138,7 @@ function sendJson(res, statusCode, payload) {
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token'
+    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token, X-User-Token'
   });
   res.end(JSON.stringify(payload));
 }
@@ -215,7 +215,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token'
+      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token, X-User-Token'
     });
     res.end();
     return;

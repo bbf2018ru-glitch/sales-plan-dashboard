@@ -218,7 +218,8 @@ function fmtPeriodLabel(period, prevPeriod) {
 
 function renderTrendChart(summary) {
   const el = $('trendChart');
-  const pts = (summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
+  const allPts = (summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
+  const pts = allPts.slice(-state.trendWindow);
   if (pts.length < 2) { el.innerHTML = '<div class="empty-state">Недостаточно данных для графика.</div>'; return; }
 
   const subtitle = $('trendSubtitle');
@@ -687,16 +688,23 @@ function closePlanEdit() {
   state.editPlanData = [];
 }
 
+function productDisplayName(p) {
+  if (p.productId === '_total' || p.productName === '_total') return 'ИТОГО по магазину';
+  return p.productName || p.productId;
+}
+
 // ── Products list ──────────────────────────────────────────────────────────
 function renderProducts(summary) {
-  const sorted = [...summary.products].sort((a, b) => b[state.productSort] - a[state.productSort]);
+  const sorted = [...summary.products]
+    .filter(p => p.productId !== '_total')
+    .sort((a, b) => b[state.productSort] - a[state.productSort]);
   $('productsList').innerHTML = sorted.map(p => {
     const tone = pctTone(p.percent);
     return `
     <div class="prod-item">
       <div class="prod-head">
         <div>
-          <div class="prod-name">${p.productName}</div>
+          <div class="prod-name">${productDisplayName(p)}</div>
           <div class="prod-cat">${p.category || 'Без категории'}</div>
         </div>
         <div class="prod-pct ${tone}">${p.percent}%</div>
@@ -719,12 +727,13 @@ async function loadStoreDetails() {
     return;
   }
   const d = await fetchJson(`/api/dashboard/store?period=${encodeURIComponent(state.period)}&storeId=${encodeURIComponent(state.selectedStoreId)}`);
-  if (!d.items?.length) {
+  const items = (d.items || []).filter(item => item.productId !== '_total');
+  if (!items.length) {
     el.innerHTML = '<div class="empty-state">Нет данных за период.</div>';
     return;
   }
   el.innerHTML = `<div class="detail-rows">
-    ${d.items.map(item => {
+    ${items.map(item => {
       const tone = pctTone(item.percent);
       return `
       <div class="detail-row">
@@ -981,17 +990,17 @@ function renderRecommendations(summary) {
 
 // ── Market news ────────────────────────────────────────────────────────────
 const MARKET_NEWS = [
-  { tag: 'Тренд', tone: 'accent', date: 'Апрель 2025', title: 'Бенто-торты: рост +25% г/г',
+  { tag: 'Тренд', tone: 'accent', date: 'Апрель 2026', title: 'Бенто-торты: рост +25% г/г',
     text: 'Мини-торты в коробках остаются в топе. Покупатели выбирают их как подарок на 1–2 человека. Фокус на упаковке и персонализации.' },
-  { tag: 'Рынок', tone: 'good', date: 'Q1 2025', title: 'Кофе с собой обгоняет торты',
+  { tag: 'Рынок', tone: 'good', date: 'Q1 2026', title: 'Кофе с собой обгоняет торты',
     text: 'Кофейный сегмент в кондитерских Сибири +18% год к году. Главный драйвер — офисная аудитория. Рассмотрите расширение линейки.' },
-  { tag: 'Сезон', tone: 'warn', date: 'Май–Июнь 2025', title: 'Выпускные: ожидаемый рост +35%',
+  { tag: 'Сезон', tone: 'warn', date: 'Май–Июнь 2026', title: 'Выпускные: ожидаемый рост +35%',
     text: 'Сезон выпускных запускается в мае. Рост заказных тортов +35% в мае-июне — готовьте производственные мощности заранее.' },
-  { tag: 'Новинка', tone: 'accent', date: 'Весна 2025', title: 'Корейский стиль: buttercream flowers',
+  { tag: 'Новинка', tone: 'accent', date: 'Весна 2026', title: 'Корейский стиль: buttercream flowers',
     text: 'Торты с цветами из крема в корейском стиле — один из топ-запросов в соцсетях. Высокий средний чек и виральность в Instagram.' },
-  { tag: 'Рынок', tone: 'good', date: 'Q1 2025', title: 'Средний чек вырос на 12%',
+  { tag: 'Рынок', tone: 'good', date: 'Q1 2026', title: 'Средний чек вырос на 12%',
     text: 'В кондитерских Сибири средний чек +12% г/г. Покупатели готовы к премиуму — важно обеспечить соответствующий сервис.' },
-  { tag: 'Совет', tone: 'neutral', date: 'Апрель 2025', title: 'Программы лояльности удерживают 30%+',
+  { tag: 'Совет', tone: 'neutral', date: 'Апрель 2026', title: 'Программы лояльности удерживают 30%+',
     text: 'Кондитерские с программой лояльности демонстрируют возврат клиентов на 30% выше. Персонализированные предложения к дням рождения особенно эффективны.' }
 ];
 const TONE_TAG = { accent: '#0f766e', good: '#16a34a', warn: '#b45309', neutral: '#6b7280', bad: '#dc2626' };
@@ -1046,8 +1055,8 @@ function renderStoreForecastReport(summary) {
 function renderProductForecastReport(data) {
   const el = $('productForecastBody');
   if (!el || !data) return;
-  const { products } = data;
-  if (!products?.length) { el.innerHTML = '<tr><td colspan="10" class="empty-state">Нет данных.</td></tr>'; return; }
+  const products = (data.products || []).filter(p => p.productId !== '_total');
+  if (!products.length) { el.innerHTML = '<tr><td colspan="10" class="empty-state">Нет данных.</td></tr>'; return; }
 
   el.innerHTML = products.map((p, idx) => {
     const ptone = pctTone(p.projPct);
@@ -1563,7 +1572,7 @@ async function loadIngestRuns() {
 }
 
 function renderReports(summary) {
-  renderAbcTable('abcProducts', computeAbc(summary.products, 'fact', 'productName'));
+  renderAbcTable('abcProducts', computeAbc(summary.products.filter(p => p.productId !== '_total'), 'fact', 'productName'));
   renderAbcTable('abcStores', computeAbc(summary.stores, 'fact', 'storeName'));
   renderGrowthReport(summary);
   renderExecutive(summary);
@@ -1643,7 +1652,9 @@ function userLogout() {
 
 async function loadSummary() {
   if (!state.period) return;
-  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}&trend_window=${state.trendWindow}`);
+  // Always fetch 24 months so reports/growth table always show full history.
+  // The trend chart slices to state.trendWindow on the client.
+  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}&trend_window=24`);
   state.summary = summary;
   if (!state.selectedStoreId && summary.stores[0]) {
     state.selectedStoreId = summary.stores[0].storeId;
@@ -1683,6 +1694,7 @@ function connectEvents() {
     $('streamStatus').className = 'status-pill live';
   };
   ['sales_updated', 'plans_updated'].forEach(e => es.addEventListener(e, reload));
+  es.addEventListener('marketing_updated', () => { if (state.activeTab === 'marketing') loadMarketing(); });
   es.addEventListener('comment_added', () => loadComments());
   es.onerror = () => {
     $('streamStatus').textContent = '● нет связи';
@@ -1821,12 +1833,12 @@ async function init() {
       await loadSummary();
     });
 
-    $('trendWindowBtns')?.addEventListener('click', async e => {
+    $('trendWindowBtns')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-tw]');
       if (!btn) return;
       state.trendWindow = Number(btn.dataset.tw);
       $('trendWindowBtns').querySelectorAll('[data-tw]').forEach(b => b.classList.toggle('btn-xs-active', b === btn));
-      await loadSummary();
+      if (state.summary) renderTrendChart(state.summary);
     });
 
     setInterval(loadSummary, 30000);
