@@ -436,6 +436,7 @@ function aggregatePeriodCore(db, period) {
   }
 
   const storesList = Array.from(byStore.values())
+    .filter((item) => item.plan > 0 || item.fact > 0)
     .map((item) => {
       const margin = item.fact - item.cost;
       return {
@@ -449,6 +450,7 @@ function aggregatePeriodCore(db, period) {
     .sort((a, b) => b.percent - a.percent);
 
   const productsList = Array.from(byProduct.values())
+    .filter((item) => item.plan > 0 || item.fact > 0)
     .map((item) => {
       const margin = item.fact - item.cost;
       return {
