@@ -28,7 +28,8 @@ const state = {
   currentUser: null,
   pinRequired: false,
   editStoreId: '',
-  editPlanData: []
+  editPlanData: [],
+  trendWindow: 12
 };
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -206,12 +207,25 @@ function switchTab(tab) {
 }
 
 // ── SVG: trend line chart ──────────────────────────────────────────────────
+const MONTH_SHORT_RU = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+function fmtPeriodLabel(period, prevPeriod) {
+  const [y, m] = period.split('-').map(Number);
+  const label = MONTH_SHORT_RU[m - 1];
+  // show year if first point or year changed
+  if (!prevPeriod || prevPeriod.split('-')[0] !== String(y)) return `${label}'${String(y).slice(2)}`;
+  return label;
+}
+
 function renderTrendChart(summary) {
   const el = $('trendChart');
   const pts = (summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
   if (pts.length < 2) { el.innerHTML = '<div class="empty-state">Недостаточно данных для графика.</div>'; return; }
 
-  const W = 560, H = 240, pad = { t: 24, r: 20, b: 46, l: 68 };
+  const subtitle = $('trendSubtitle');
+  if (subtitle) subtitle.textContent = `план и факт за ${pts.length} мес.`;
+
+  const dense = pts.length > 8;
+  const W = 560, H = 240, pad = { t: 24, r: 20, b: dense ? 54 : 46, l: 68 };
   const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b, n = pts.length;
   const maxVal = Math.max(...pts.flatMap(p => [p.plan, p.fact]), 1);
   const xp = i => pad.l + (n > 1 ? (i / (n - 1)) * pw : pw / 2);
@@ -227,16 +241,25 @@ function renderTrendChart(summary) {
   const factD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(p.fact).toFixed(1)}`).join(' ');
   const areaD = `${factD} L${xp(n - 1).toFixed(1)},${(pad.t + ph).toFixed(1)} L${xp(0).toFixed(1)},${(pad.t + ph).toFixed(1)} Z`;
 
+  // для плотных графиков — только точки без % меток, точки меньше
+  const dotR = dense ? 3.5 : 5;
   const dots = pts.map((p, i) => {
     const clr = p.completion >= 100 ? '#16a34a' : p.completion >= 80 ? '#f59e0b' : '#ef4444';
-    return `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.fact).toFixed(1)}" r="5" fill="${clr}" stroke="white" stroke-width="2"/>
-    <circle cx="${xp(i).toFixed(1)}" cy="${yp(p.plan).toFixed(1)}" r="3" fill="white" stroke="#9ca3af" stroke-width="1.5"/>
-    <text x="${xp(i).toFixed(1)}" y="${(yp(p.fact) - 10).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${p.completion}%</text>`;
+    const pctLabel = dense ? '' : `<text x="${xp(i).toFixed(1)}" y="${(yp(p.fact) - 9).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${p.completion}%</text>`;
+    return `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.fact).toFixed(1)}" r="${dotR}" fill="${clr}" stroke="white" stroke-width="2"/>
+    <circle cx="${xp(i).toFixed(1)}" cy="${yp(p.plan).toFixed(1)}" r="2.5" fill="white" stroke="#9ca3af" stroke-width="1.5"/>${pctLabel}`;
   }).join('');
 
-  const xlabels = pts.map((p, i) =>
-    `<text x="${xp(i).toFixed(1)}" y="${(pad.t + ph + 18).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="11">${p.period}</text>`
-  ).join('');
+  // для плотных — показываем подписи под углом 45°
+  const xlabels = pts.map((p, i) => {
+    const x = xp(i).toFixed(1);
+    const y = (pad.t + ph + 14).toFixed(1);
+    const lbl = fmtPeriodLabel(p.period, pts[i - 1]?.period);
+    if (dense) {
+      return `<text x="${x}" y="${y}" text-anchor="end" fill="var(--hint)" font-size="10" transform="rotate(-40,${x},${y})">${lbl}</text>`;
+    }
+    return `<text x="${x}" y="${(pad.t + ph + 18).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="11">${lbl}</text>`;
+  }).join('');
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
     <defs>
@@ -1620,7 +1643,7 @@ function userLogout() {
 
 async function loadSummary() {
   if (!state.period) return;
-  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}`);
+  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}&trend_window=${state.trendWindow}`);
   state.summary = summary;
   if (!state.selectedStoreId && summary.stores[0]) {
     state.selectedStoreId = summary.stores[0].storeId;
@@ -1797,6 +1820,15 @@ async function init() {
       $('storeDetailTitle').textContent = 'Детализация точки';
       await loadSummary();
     });
+
+    $('trendWindowBtns')?.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-tw]');
+      if (!btn) return;
+      state.trendWindow = Number(btn.dataset.tw);
+      $('trendWindowBtns').querySelectorAll('[data-tw]').forEach(b => b.classList.toggle('btn-xs-active', b === btn));
+      await loadSummary();
+    });
+
     setInterval(loadSummary, 30000);
   } catch (err) {
     document.body.innerHTML = `<main style="padding:48px;text-align:center;color:#dc2626">Ошибка загрузки: ${err.message}</main>`;

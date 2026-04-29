@@ -845,6 +845,37 @@ td.col-edit { text-align: center; }
   margin-bottom: 4px;
 }
 
+/* ── Trend window buttons ────────────────────────────────────── */
+.btn-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.btn-xs {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--hint);
+  cursor: pointer;
+  line-height: 1.4;
+  transition: all .15s;
+}
+
+.btn-xs:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-xs-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff !important;
+}
+
 /* ── Reports layout ──────────────────────────────────────────── */
 .report-2col {
   display: grid;

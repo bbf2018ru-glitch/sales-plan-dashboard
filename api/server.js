@@ -272,7 +272,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/dashboard/summary' && req.method === 'GET') {
       const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
-      sendJson(res, 200, aggregateDashboard(db, period));
+      const trendWindow = Number(parsedUrl.searchParams.get('trend_window')) || 12;
+      sendJson(res, 200, aggregateDashboard(db, period, { trendWindow }));
       return;
     }
 

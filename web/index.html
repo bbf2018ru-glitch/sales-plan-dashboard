@@ -165,7 +165,13 @@
               <div class="panel-header">
                 <div>
                   <div class="panel-title">Тренд по месяцам</div>
-                  <div class="panel-subtitle">план и факт за 6 периодов</div>
+                  <div class="panel-subtitle" id="trendSubtitle">план и факт</div>
+                </div>
+                <div class="btn-group" id="trendWindowBtns">
+                  <button class="btn-xs" data-tw="3">3М</button>
+                  <button class="btn-xs" data-tw="6">6М</button>
+                  <button class="btn-xs btn-xs-active" data-tw="12">12М</button>
+                  <button class="btn-xs" data-tw="24">Всё</button>
                 </div>
               </div>
               <div id="trendChart" class="chart-wrap"></div>

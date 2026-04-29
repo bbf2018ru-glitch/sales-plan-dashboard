@@ -222,7 +222,7 @@ function buildPeriodComparison(db, period, currentTotals) {
   };
 }
 
-function buildTrend(db, period, windowSize = 6) {
+function buildTrend(db, period, windowSize = 12) {
   const periods = [];
 
   for (let index = windowSize - 1; index >= 0; index -= 1) {
@@ -495,13 +495,14 @@ function aggregatePeriodCore(db, period) {
   };
 }
 
-function aggregateDashboard(db, period) {
+function aggregateDashboard(db, period, opts = {}) {
   const summary = aggregatePeriodCore(db, period);
   const marketing = aggregateMarketing(db, period);
+  const trendWindow = opts.trendWindow || 12;
   return {
     ...summary,
     comparison: buildPeriodComparison(db, period, summary.totals),
-    trend: buildTrend(db, period),
+    trend: buildTrend(db, period, trendWindow),
     executive: buildExecutiveSummary(summary, marketing)
   };
 }
