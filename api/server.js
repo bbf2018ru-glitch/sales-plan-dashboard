@@ -12,6 +12,8 @@ const {
   scopeDbForUser,
   storeDetails
 } = require('./lib/analytics');
+const { buildInsights } = require('./lib/insights');
+const { startMorningReport, buildReportText } = require('./lib/morning-report');
 const { createStore } = require('./storage');
 
 loadProjectEnv();
@@ -25,6 +27,9 @@ const WEB_DIR = path.join(__dirname, '..', 'web');
 const DASHBOARD_PIN = process.env.DASHBOARD_PIN || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+const GROQ_KEY = process.env.GROQ_KEY || process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const groqConfig = GROQ_KEY ? { apiKey: GROQ_KEY, model: GROQ_MODEL } : null;
 
 const UPP_PULL_URL = process.env.UPP_PULL_URL || '';
 const UPP_PULL_USER = process.env.UPP_PULL_USER || '';
@@ -276,6 +281,41 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Утренний отчёт — ручной запуск (для проверки) ────────────────────────
+    if (pathname === '/api/morning-report/preview' && req.method === 'GET') {
+      const text = await buildReportText(store);
+      sendJson(res, 200, { text });
+      return;
+    }
+
+    if (pathname === '/api/morning-report/send' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 403, { error: 'Доступ только для администратора' });
+        return;
+      }
+      if (!morningReportHandle?.sendNow) {
+        sendJson(res, 400, { error: 'Утренний отчёт не активирован — выставьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID' });
+        return;
+      }
+      const ok = await morningReportHandle.sendNow();
+      sendJson(res, 200, { ok });
+      return;
+    }
+
+    // ── Insights ──────────────────────────────────────────────────────────────
+    if (pathname === '/api/insights' && req.method === 'GET') {
+      const { db } = await getScopedDb(req);
+      const period = monthKey(parsedUrl.searchParams.get('period'));
+      const summary = aggregateDashboard(db, period);
+      const useLlm = parsedUrl.searchParams.get('llm') !== '0';
+      const result = await buildInsights(summary, db, period, {
+        groq: useLlm ? groqConfig : null,
+      });
+      sendJson(res, 200, result);
+      return;
+    }
+
     // ── Metadata ──────────────────────────────────────────────────────────────
     if (pathname === '/api/metadata' && req.method === 'GET') {
       const { db, user } = await getScopedDb(req);
@@ -475,13 +515,22 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+let morningReportHandle = null;
+
 server.listen(PORT, async () => {
   await store.init();
   console.log(`Sales Plan Dashboard running at http://localhost:${PORT}`);
   console.log(`Storage: ${DATABASE_URL ? 'PostgreSQL' : 'JSON file'}`);
   console.log(`PIN protection: ${DASHBOARD_PIN ? 'enabled' : 'disabled'}`);
   console.log(`Telegram alerts: ${TELEGRAM_BOT_TOKEN ? 'enabled' : 'disabled'}`);
+  console.log(`Groq AI insights: ${groqConfig ? `enabled (${GROQ_MODEL})` : 'disabled (rule-based only)'}`);
   console.log(`UPP pull: ${UPP_PULL_URL ? `${UPP_PULL_URL} (${UPP_PULL_INTERVAL_MIN > 0 ? `every ${UPP_PULL_INTERVAL_MIN} min` : 'manual'})` : 'disabled'}`);
+
+  morningReportHandle = startMorningReport({
+    store,
+    botToken: TELEGRAM_BOT_TOKEN,
+    chatId: TELEGRAM_CHAT_ID,
+  });
 
   if (UPP_PULL_URL && UPP_PULL_INTERVAL_MIN > 0) {
     const { startPullScheduler } = require('./lib/upp-pull');

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Мария — Продажи</title>
-    <link rel="stylesheet" href="/styles.css?v=8" />
+    <link rel="stylesheet" href="/styles.css?v=9" />
   </head>
   <body>
 
@@ -137,6 +137,17 @@
       <main class="content">
 
         <section class="section">
+          <div class="section-header">
+            <div>
+              <div class="section-label">AI · что посмотреть в первую очередь</div>
+              <div class="section-hint">алгоритмическое выделение аномалий + советы с учётом сибирского календаря</div>
+            </div>
+            <div id="insightsEngine" class="muted" style="font-size:11px"></div>
+          </div>
+          <div id="insightsPanel" class="insights-panel"></div>
+        </section>
+
+        <section class="section">
           <div class="section-label">Итоги периода</div>
           <div id="kpis" class="kpi-grid"></div>
         </section>
@@ -164,8 +175,8 @@
           </article>
           <article class="panel panel-narrow">
             <div class="panel-header">
-              <div class="panel-title">Изменение</div>
-              <div class="panel-subtitle">vs прошлый период</div>
+              <div class="panel-title">Сравнения</div>
+              <div class="panel-subtitle">прошлый месяц и год назад</div>
             </div>
             <div id="comparisonPanel"></div>
           </article>
@@ -269,6 +280,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=8"></script>
+    <script src="/app.js?v=9"></script>
   </body>
 </html>

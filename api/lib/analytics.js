@@ -247,6 +247,35 @@ function buildPeriodComparison(db, period, currentTotals) {
   };
 }
 
+function buildYoYComparison(db, period, currentTotals) {
+  const yoyPeriod = shiftPeriod(period, -12);
+  if (!yoyPeriod) return null;
+
+  const previous = aggregatePeriodCore(db, yoyPeriod);
+  const hasPreviousData = previous.totals.plan > 0 || previous.totals.fact > 0;
+  if (!hasPreviousData) {
+    return { previousPeriod: yoyPeriod, hasData: false };
+  }
+
+  const factDelta = roundMetric(currentTotals.fact - previous.totals.fact);
+  const completionDelta = roundMetric(currentTotals.completion - previous.totals.completion);
+  const quantityDelta = roundMetric(currentTotals.quantity - previous.totals.quantity);
+  const haveBothMargins = currentTotals.margin !== null && previous.totals.margin !== null;
+  const marginDelta = haveBothMargins ? roundMetric(currentTotals.margin - previous.totals.margin) : null;
+
+  return {
+    previousPeriod: yoyPeriod,
+    hasData: true,
+    factDelta,
+    factDeltaPercent: previous.totals.fact > 0 ? percent(factDelta / previous.totals.fact) : 0,
+    completionDelta,
+    quantityDelta,
+    marginDelta,
+    previousTotals: previous.totals,
+    tone: factDelta >= 0 ? 'good' : 'bad'
+  };
+}
+
 function buildTrend(db, period, windowSize = 12) {
   const periods = [];
 
@@ -482,6 +511,7 @@ function aggregateDashboard(db, period, opts = {}) {
   return {
     ...summary,
     comparison: buildPeriodComparison(db, period, summary.totals),
+    yoy: buildYoYComparison(db, period, summary.totals),
     trend: buildTrend(db, period, trendWindow)
   };
 }

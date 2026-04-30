@@ -336,24 +336,30 @@ function renderForecast(summary) {
 }
 
 // ── Comparison ─────────────────────────────────────────────────────────────
-function renderComparison(summary) {
-  const c = summary.comparison;
+function renderCmpCard(label, c) {
   if (!c?.hasData) {
-    $('comparisonPanel').innerHTML = '<div class="empty-state">Нет данных за предыдущий период.</div>';
-    return;
+    return `<div class="cmp-card neutral">
+      <div class="cmp-period">${label}</div>
+      <div class="empty-state" style="padding:8px 0">Нет данных.</div>
+    </div>`;
   }
   const tone = c.factDelta >= 0 ? 'good' : 'bad';
-  $('comparisonPanel').innerHTML = `
-    <div class="cmp-card ${tone}">
-      <div class="cmp-period">vs. ${c.previousPeriod}</div>
-      <div class="cmp-rows">
-        <div class="cmp-row"><span>Факт</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDelta, formatMoney)}</strong></div>
-        <div class="cmp-row"><span>Изм. %</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDeltaPercent, v => v.toFixed(1) + '%')}</strong></div>
-        <div class="cmp-row"><span>Выполнение</span><strong class="${c.completionDelta >= 0 ? 'positive' : 'negative'}">${signed(c.completionDelta, v => v.toFixed(1) + ' п.п.')}</strong></div>
-        <div class="cmp-row"><span>Маржа</span><strong class="${!isNum(c.marginDelta) ? '' : c.marginDelta >= 0 ? 'positive' : 'negative'}">${isNum(c.marginDelta) ? signed(c.marginDelta, formatMoney) : '—'}</strong></div>
-        <div class="cmp-row"><span>Количество</span><strong class="${c.quantityDelta >= 0 ? 'positive' : 'negative'}">${signed(c.quantityDelta, formatNum)}</strong></div>
-      </div>
-    </div>`;
+  return `<div class="cmp-card ${tone}">
+    <div class="cmp-period">${label} (${c.previousPeriod})</div>
+    <div class="cmp-rows">
+      <div class="cmp-row"><span>Факт</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDelta, formatMoney)}</strong></div>
+      <div class="cmp-row"><span>Изм. %</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDeltaPercent, v => v.toFixed(1) + '%')}</strong></div>
+      <div class="cmp-row"><span>Выполнение</span><strong class="${c.completionDelta >= 0 ? 'positive' : 'negative'}">${signed(c.completionDelta, v => v.toFixed(1) + ' п.п.')}</strong></div>
+      <div class="cmp-row"><span>Маржа</span><strong class="${!isNum(c.marginDelta) ? '' : c.marginDelta >= 0 ? 'positive' : 'negative'}">${isNum(c.marginDelta) ? signed(c.marginDelta, formatMoney) : '—'}</strong></div>
+      <div class="cmp-row"><span>Количество</span><strong class="${c.quantityDelta >= 0 ? 'positive' : 'negative'}">${signed(c.quantityDelta, formatNum)}</strong></div>
+    </div>
+  </div>`;
+}
+
+function renderComparison(summary) {
+  $('comparisonPanel').innerHTML =
+    renderCmpCard('vs. прошлый месяц', summary.comparison) +
+    renderCmpCard('vs. тот же месяц год назад', summary.yoy);
 }
 
 // ── Spotlight ──────────────────────────────────────────────────────────────
@@ -795,8 +801,65 @@ async function loadSummary() {
   renderProducts(summary);
   await loadStoreDetails();
   await loadComments();
+  loadInsights();
 
   $('lastUpdate').textContent = `обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
+}
+
+async function loadInsights() {
+  const el = $('insightsPanel');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:16px">Анализирую…</div>';
+  try {
+    const data = await fetchJson(`/api/insights?period=${encodeURIComponent(state.period)}`);
+    renderInsights(data);
+  } catch (err) {
+    el.innerHTML = `<div class="empty-state" style="padding:16px;color:var(--bad)">Не удалось загрузить: ${err.message}</div>`;
+  }
+}
+
+function renderInsights(data) {
+  const el = $('insightsPanel');
+  const engineEl = $('insightsEngine');
+  if (engineEl) engineEl.textContent = data.engine === 'llm+rules' ? 'LLM + правила' : 'правила';
+
+  const sevColor = (s) => s === 'high' ? 'bad' : s === 'medium' ? 'warn' : 'neutral';
+  const sevIcon = (s) => s === 'high' ? '⚠' : s === 'medium' ? '!' : '·';
+
+  const findingsHtml = (data.findings || []).map((f) => `
+    <div class="ins-card ${sevColor(f.severity)}">
+      <div class="ins-head">
+        <span class="ins-sev">${sevIcon(f.severity)}</span>
+        <span class="ins-headline">${escapeHtml(f.headline)}</span>
+      </div>
+      <div class="ins-detail">${escapeHtml(f.detail)}</div>
+    </div>`).join('');
+
+  const eventsHtml = (data.upcomingEvents || []).slice(0, 4).map((e) => {
+    const tone = e.impact === 'major' ? 'bad' : e.impact === 'medium' ? 'warn' : 'neutral';
+    return `<div class="ins-event ${tone}">
+      <div class="ins-event-date">${e.date} · через ${e.daysFromNow} дн.</div>
+      <div class="ins-event-name">${escapeHtml(e.name)}</div>
+      ${e.note ? `<div class="ins-event-note">${escapeHtml(e.note)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const llmHtml = data.llmSummary
+    ? `<div class="ins-llm"><div class="ins-llm-label">Резюме AI:</div><div class="ins-llm-text">${escapeHtml(data.llmSummary).replace(/\n/g, '<br>')}</div></div>`
+    : '';
+
+  el.innerHTML = `
+    ${llmHtml}
+    <div class="ins-grid">
+      <div class="ins-col">
+        <div class="ins-col-label">Что посмотреть</div>
+        ${findingsHtml || '<div class="empty-state" style="padding:12px">Аномалий не найдено — сеть в норме.</div>'}
+      </div>
+      <div class="ins-col">
+        <div class="ins-col-label">Календарь — ближайшие 45 дн.</div>
+        ${eventsHtml || '<div class="empty-state" style="padding:12px">Праздников впереди нет.</div>'}
+      </div>
+    </div>`;
 }
 
 // ── SSE ────────────────────────────────────────────────────────────────────
