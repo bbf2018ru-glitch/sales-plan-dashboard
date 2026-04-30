@@ -83,12 +83,11 @@ class PostgresStore {
   async getDb() {
     await this.init();
 
-    const [stores, products, plans, sales, marketing, users, userStores] = await Promise.all([
+    const [stores, products, plans, sales, users, userStores] = await Promise.all([
       this.pool.query('select id, name, region from stores order by name'),
       this.pool.query('select id, name, category from products order by name'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount from plans'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount, cost, gross_profit as "grossProfit", quantity, sold_at as "soldAt" from sales'),
-      this.pool.query('select period, channel_id as "channelId", channel_name as "channelName", spend, leads, orders, revenue, impressions, clicks, sessions from marketing_metrics'),
       this.pool.query('select id, name, role, token from users').catch(() => ({ rows: [] })),
       this.pool.query('select user_id as "userId", store_id as "storeId" from user_stores').catch(() => ({ rows: [] }))
     ]);
@@ -104,7 +103,6 @@ class PostgresStore {
       products: products.rows,
       plans: plans.rows,
       sales: sales.rows,
-      marketing: marketing.rows,
       users: users.rows.map((u) => ({ ...u, stores: userStoreMap.get(u.id) || [] }))
     });
   }
@@ -288,52 +286,6 @@ class PostgresStore {
     }
   }
 
-  async replaceMarketing(body) {
-    await this.init();
-    const period = monthKey(body.period);
-    const client = await this.pool.connect();
-
-    try {
-      await client.query('begin');
-      await client.query('delete from marketing_metrics where period = $1', [period]);
-
-      for (const item of body.metrics || []) {
-        if (!item.channelId) {
-          throw new Error('Each marketing row must include channelId');
-        }
-        await client.query(
-          `insert into marketing_metrics (
-             period, channel_id, channel_name, spend, leads, orders, revenue, impressions, clicks, sessions
-           ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            period,
-            String(item.channelId),
-            item.channelName || String(item.channelId),
-            Number(item.spend || 0),
-            Number(item.leads || 0),
-            Number(item.orders || 0),
-            Number(item.revenue || 0),
-            Number(item.impressions || 0),
-            Number(item.clicks || 0),
-            Number(item.sessions || 0)
-          ]
-        );
-      }
-
-      await client.query('commit');
-
-      return {
-        period,
-        count: Array.isArray(body.metrics) ? body.metrics.length : 0
-      };
-    } catch (error) {
-      await client.query('rollback');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
   async ingestUppPayload(payload) {
     await this.init();
     const normalized = normalizeUppPayload(payload);
@@ -424,28 +376,6 @@ class PostgresStore {
           `insert into sales (period, store_id, product_id, amount, cost, gross_profit, quantity, sold_at)
            values ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [normalized.period, item.storeId, item.productId, item.amount, item.cost || 0, item.grossProfit || 0, item.quantity || 0, item.soldAt]
-        );
-      }
-
-      await client.query('delete from marketing_metrics where period = $1', [normalized.period]);
-      for (const item of normalized.metrics) {
-        if (!item.channelId) continue;
-        await client.query(
-          `insert into marketing_metrics (
-             period, channel_id, channel_name, spend, leads, orders, revenue, impressions, clicks, sessions
-           ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            normalized.period,
-            item.channelId,
-            item.channelName,
-            item.spend || 0,
-            item.leads || 0,
-            item.orders || 0,
-            item.revenue || 0,
-            item.impressions || 0,
-            item.clicks || 0,
-            item.sessions || 0
-          ]
         );
       }
 

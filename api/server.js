@@ -7,10 +7,6 @@ const crypto = require('crypto');
 const { loadProjectEnv } = require('./lib/load-env');
 const {
   aggregateDashboard,
-  aggregateMarketing,
-  buildMarketingAnalysis,
-  buildProductForecast,
-  buildStoreProductMatrix,
   listPeriods,
   monthKey,
   scopeDbForUser,
@@ -29,15 +25,6 @@ const WEB_DIR = path.join(__dirname, '..', 'web');
 const DASHBOARD_PIN = process.env.DASHBOARD_PIN || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-const LLM_ANALYSIS_ENABLED = !!GROQ_API_KEY;
-
-const llmConfig = {
-  enabled: LLM_ANALYSIS_ENABLED,
-  apiKey: GROQ_API_KEY,
-  model: GROQ_MODEL
-};
 
 const UPP_PULL_URL = process.env.UPP_PULL_URL || '';
 const UPP_PULL_USER = process.env.UPP_PULL_USER || '';
@@ -248,7 +235,6 @@ const server = http.createServer(async (req, res) => {
         periods: listPeriods(db),
         stores: db.stores.length,
         products: db.products.length,
-        marketingRows: db.marketing.length,
         lastIngestRun: ingestRuns[0] || null
       });
       return;
@@ -290,40 +276,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (pathname === '/api/dashboard/matrix' && req.method === 'GET') {
-      const { db } = await getScopedDb(req);
-      const period = monthKey(parsedUrl.searchParams.get('period'));
-      sendJson(res, 200, buildStoreProductMatrix(db, period));
-      return;
-    }
-
-    if (pathname === '/api/dashboard/marketing' && req.method === 'GET') {
-      const db = await store.getDb();
-      const period = monthKey(parsedUrl.searchParams.get('period'));
-      sendJson(res, 200, aggregateMarketing(db, period));
-      return;
-    }
-
-    if (pathname === '/api/dashboard/product-forecast' && req.method === 'GET') {
-      const { db } = await getScopedDb(req);
-      const period = monthKey(parsedUrl.searchParams.get('period'));
-      sendJson(res, 200, buildProductForecast(db, period));
-      return;
-    }
-
-    // ── Analysis ──────────────────────────────────────────────────────────────
-    if (pathname === '/api/analysis/marketing' && req.method === 'POST') {
-      const body = await parseBody(req);
-      const { db } = await getScopedDb(req);
-      const period = monthKey(body.period || parsedUrl.searchParams.get('period'));
-      const useLlm = body.engine ? body.engine === 'llm' : LLM_ANALYSIS_ENABLED;
-      const result = await buildMarketingAnalysis(db, period, {
-        llm: { ...llmConfig, enabled: useLlm }
-      });
-      sendJson(res, 200, result);
-      return;
-    }
-
     // ── Metadata ──────────────────────────────────────────────────────────────
     if (pathname === '/api/metadata' && req.method === 'GET') {
       const { db, user } = await getScopedDb(req);
@@ -333,8 +285,6 @@ const server = http.createServer(async (req, res) => {
         products: db.products,
         pinRequired: !!DASHBOARD_PIN,
         hasTelegram: !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
-        llmEnabled: LLM_ANALYSIS_ENABLED,
-        llmModel: LLM_ANALYSIS_ENABLED ? GROQ_MODEL : null,
         currentUser: user ? { id: user.id, name: user.name, role: user.role, stores: user.stores } : null
       });
       return;
@@ -399,10 +349,8 @@ const server = http.createServer(async (req, res) => {
         const run = await store.ingestUppPayload(payload);
         const db = await store.getDb();
         const summary = aggregateDashboard(db, run.period);
-        const marketing = aggregateMarketing(db, run.period);
         sendEvent('plans_updated', { period: run.period, totals: summary.totals });
         sendEvent('sales_updated', { period: run.period, totals: summary.totals });
-        sendEvent('marketing_updated', { period: run.period, totals: marketing.totals });
         sendJson(res, 200, { ok: true, run });
       } catch (error) {
         sendJson(res, 500, { error: error.message || 'UPP pull failed' });
@@ -501,17 +449,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (pathname === '/api/ingest/marketing' && req.method === 'POST') {
-      if (!requireApiKey(req, res)) return;
-      const body = await parseBody(req);
-      const { period, count } = await store.replaceMarketing(body);
-      const db = await store.getDb();
-      const marketing = aggregateMarketing(db, period);
-      sendEvent('marketing_updated', { period, totals: marketing.totals });
-      sendJson(res, 200, { ok: true, period, metricsCount: count });
-      return;
-    }
-
     if (pathname === '/api/ingest/upp' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
       const body = await parseBody(req);
@@ -519,10 +456,8 @@ const server = http.createServer(async (req, res) => {
         const run = await store.ingestUppPayload(body);
         const db = await store.getDb();
         const summary = aggregateDashboard(db, run.period);
-        const marketing = aggregateMarketing(db, run.period);
         sendEvent('plans_updated', { period: run.period, totals: summary.totals });
         sendEvent('sales_updated', { period: run.period, totals: summary.totals });
-        sendEvent('marketing_updated', { period: run.period, totals: marketing.totals });
         sendJson(res, 200, { ok: true, run });
         checkAndAlertStores(db, run.period);
       } catch (error) {
@@ -546,7 +481,6 @@ server.listen(PORT, async () => {
   console.log(`Storage: ${DATABASE_URL ? 'PostgreSQL' : 'JSON file'}`);
   console.log(`PIN protection: ${DASHBOARD_PIN ? 'enabled' : 'disabled'}`);
   console.log(`Telegram alerts: ${TELEGRAM_BOT_TOKEN ? 'enabled' : 'disabled'}`);
-  console.log(`LLM marketing analysis: ${LLM_ANALYSIS_ENABLED ? `enabled (${GROQ_MODEL})` : 'disabled (rules engine)'}`);
   console.log(`UPP pull: ${UPP_PULL_URL ? `${UPP_PULL_URL} (${UPP_PULL_INTERVAL_MIN > 0 ? `every ${UPP_PULL_INTERVAL_MIN} min` : 'manual'})` : 'disabled'}`);
 
   if (UPP_PULL_URL && UPP_PULL_INTERVAL_MIN > 0) {
@@ -561,10 +495,8 @@ server.listen(PORT, async () => {
           (async () => {
             const db = await store.getDb();
             const summary = aggregateDashboard(db, run.period);
-            const marketing = aggregateMarketing(db, run.period);
             sendEvent('plans_updated', { period: run.period, totals: summary.totals });
             sendEvent('sales_updated', { period: run.period, totals: summary.totals });
-            sendEvent('marketing_updated', { period: run.period, totals: marketing.totals });
           })().catch(() => {});
         }
       },

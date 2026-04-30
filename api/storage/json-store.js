@@ -5,8 +5,7 @@ const crypto = require('crypto');
 const {
   normalizeDb,
   replacePlans,
-  appendSales,
-  replaceMarketing
+  appendSales
 } = require('../lib/analytics');
 const { normalizeUppPayload, validateNormalizedUppPayload } = require('../lib/upp');
 
@@ -59,16 +58,6 @@ class JsonStore {
     };
   }
 
-  async replaceMarketing(body) {
-    const db = await this.getDb();
-    const period = replaceMarketing(db, body);
-    await this.saveDb(db);
-    return {
-      period,
-      count: db.marketing.filter((item) => item.period === period).length
-    };
-  }
-
   async ingestUppPayload(payload) {
     const normalized = normalizeUppPayload(payload);
     validateNormalizedUppPayload(normalized);
@@ -110,11 +99,6 @@ class JsonStore {
       products: normalized.products,
       sales: normalized.sales,
       replace: true
-    });
-
-    replaceMarketing(db, {
-      period: normalized.period,
-      metrics: normalized.metrics
     });
 
     db.rawUppPayloads.unshift({

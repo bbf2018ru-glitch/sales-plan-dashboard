@@ -12,10 +12,6 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-function safeDivide(a, b) {
-  return b > 0 ? a / b : 0;
-}
-
 function percent(value) {
   return Number((value * 100).toFixed(1));
 }
@@ -286,55 +282,6 @@ function buildTrend(db, period, windowSize = 12) {
   };
 }
 
-function buildExecutiveSummary(summary, marketing) {
-  const headlines = [];
-  const priorities = [];
-  const alerts = [];
-
-  headlines.push(`Факт ${summary.totals.fact.toFixed(0)} ₽ при плане ${summary.totals.plan.toFixed(0)} ₽. Выполнение ${summary.totals.completion}%.`);
-  headlines.push(`Прогноз на конец месяца ${summary.forecast.projectedFact.toFixed(0)} ₽, это ${summary.forecast.projectedCompletion}% от плана.`);
-  if (summary.totals.margin > 0) {
-    headlines.push(`Маржа: ${summary.totals.margin.toFixed(0)} ₽ (${summary.totals.marginPct}% от выручки).`);
-  }
-
-  if (summary.comparison?.hasData) {
-    headlines.push(`К прошлому периоду факт изменился на ${summary.comparison.factDelta >= 0 ? '+' : ''}${summary.comparison.factDelta.toFixed(0)} ₽.`);
-  }
-
-  if (summary.forecast.projectedCompletion < 100) {
-    alerts.push(`Если темп не изменится, план месяца не будет выполнен. Нужно ${summary.forecast.requiredPerDayToPlan.toFixed(0)} ₽ в день.`);
-    priorities.push('Усилить продажи в точках с минимальным процентом выполнения и вывести отдельный план действий по каждой точке.');
-  } else {
-    priorities.push('Зафиксировать рабочий темп и удерживать текущий объем продаж до конца периода.');
-  }
-
-  if (summary.lagger) {
-    alerts.push(`Наибольший риск у точки ${summary.lagger.storeName}: выполнение ${summary.lagger.percent}% и разрыв ${summary.lagger.gap.toFixed(0)} ₽.`);
-  }
-
-  if (marketing?.bestChannel) {
-    headlines.push(`Лучший маркетинговый канал: ${marketing.bestChannel.channelName}, ROAS ${marketing.bestChannel.roas}.`);
-    priorities.push(`Масштабировать ${marketing.bestChannel.channelName}, пока канал держит ROAS выше среднего.`);
-  }
-
-  if (marketing?.worstChannel) {
-    alerts.push(`Проблемный маркетинговый канал: ${marketing.worstChannel.channelName}, CAC ${marketing.worstChannel.cac.toFixed(0)} ₽.`);
-    priorities.push(`Пересобрать оффер или сократить бюджет в ${marketing.worstChannel.channelName}.`);
-  }
-
-  const topProduct = summary.products[0] || null;
-  if (topProduct) {
-    headlines.push(`Главный драйвер выручки: ${topProduct.productName}, факт ${topProduct.fact.toFixed(0)} ₽.`);
-  }
-
-  return {
-    generatedAt: new Date().toISOString(),
-    headlines,
-    priorities,
-    alerts
-  };
-}
-
 function upsertEntities(list, incoming) {
   const map = new Map(list.map((item) => [item.id, item]));
   for (const item of incoming) {
@@ -531,13 +478,11 @@ function aggregatePeriodCore(db, period) {
 
 function aggregateDashboard(db, period, opts = {}) {
   const summary = aggregatePeriodCore(db, period);
-  const marketing = aggregateMarketing(db, period);
   const trendWindow = opts.trendWindow || 12;
   return {
     ...summary,
     comparison: buildPeriodComparison(db, period, summary.totals),
-    trend: buildTrend(db, period, trendWindow),
-    executive: buildExecutiveSummary(summary, marketing)
+    trend: buildTrend(db, period, trendWindow)
   };
 }
 
@@ -603,340 +548,10 @@ function storeDetails(db, period, storeId) {
   };
 }
 
-function aggregateMarketing(db, period) {
-  const rows = db.marketing.filter((item) => item.period === period);
-  const channelMap = new Map();
-
-  for (const row of rows) {
-    const channelId = String(row.channelId || 'unknown');
-    if (!channelMap.has(channelId)) {
-      channelMap.set(channelId, {
-        channelId,
-        channelName: row.channelName || channelId,
-        spend: 0,
-        leads: 0,
-        orders: 0,
-        revenue: 0,
-        impressions: 0,
-        clicks: 0,
-        sessions: 0
-      });
-    }
-
-    const item = channelMap.get(channelId);
-    item.spend += toNumber(row.spend);
-    item.leads += toNumber(row.leads);
-    item.orders += toNumber(row.orders);
-    item.revenue += toNumber(row.revenue);
-    item.impressions += toNumber(row.impressions);
-    item.clicks += toNumber(row.clicks);
-    item.sessions += toNumber(row.sessions);
-  }
-
-  const channels = Array.from(channelMap.values())
-    .map((item) => ({
-      ...item,
-      roas: roundMetric(safeDivide(item.revenue, item.spend)),
-      ctr: percent(safeDivide(item.clicks, item.impressions)),
-      cvr: percent(safeDivide(item.orders, item.clicks)),
-      cpl: roundMetric(safeDivide(item.spend, item.leads)),
-      cac: roundMetric(safeDivide(item.spend, item.orders)),
-      aov: roundMetric(safeDivide(item.revenue, item.orders))
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
-
-  const totals = channels.reduce(
-    (acc, item) => {
-      acc.spend += item.spend;
-      acc.leads += item.leads;
-      acc.orders += item.orders;
-      acc.revenue += item.revenue;
-      acc.impressions += item.impressions;
-      acc.clicks += item.clicks;
-      acc.sessions += item.sessions;
-      return acc;
-    },
-    {
-      spend: 0,
-      leads: 0,
-      orders: 0,
-      revenue: 0,
-      impressions: 0,
-      clicks: 0,
-      sessions: 0
-    }
-  );
-
-  totals.roas = roundMetric(safeDivide(totals.revenue, totals.spend));
-  totals.ctr = percent(safeDivide(totals.clicks, totals.impressions));
-  totals.cvr = percent(safeDivide(totals.orders, totals.clicks));
-  totals.cpl = roundMetric(safeDivide(totals.spend, totals.leads));
-  totals.cac = roundMetric(safeDivide(totals.spend, totals.orders));
-  totals.aov = roundMetric(safeDivide(totals.revenue, totals.orders));
-
-  const salesSummary = aggregatePeriodCore(db, period);
-  const bestChannel = [...channels].sort((a, b) => b.roas - a.roas || b.revenue - a.revenue)[0] || null;
-  const worstChannel = [...channels].sort((a, b) => a.roas - b.roas || b.spend - a.spend)[0] || null;
-
-  return {
-    period,
-    totals,
-    channels,
-    bestChannel,
-    worstChannel,
-    salesShare: salesSummary.totals.fact > 0 ? percent(totals.revenue / salesSummary.totals.fact) : 0,
-    generatedAt: new Date().toISOString()
-  };
-}
-
-function buildRulesAnalysis({ period, marketing, sales }) {
-  const insights = [];
-  const recommendations = [];
-  const warnings = [];
-
-  insights.push(`Маркетинг принес ${marketing.totals.revenue.toFixed(0)} ₽ выручки при расходах ${marketing.totals.spend.toFixed(0)} ₽. ROAS = ${marketing.totals.roas}.`);
-  insights.push(`Доля маркетингово-атрибутированной выручки от общего факта продаж за ${period}: ${marketing.salesShare}%.`);
-
-  if (marketing.bestChannel) {
-    insights.push(`Лучший канал сейчас: ${marketing.bestChannel.channelName}. ROAS ${marketing.bestChannel.roas}, выручка ${marketing.bestChannel.revenue.toFixed(0)} ₽.`);
-  }
-
-  if (marketing.worstChannel) {
-    warnings.push(`Слабое звено: ${marketing.worstChannel.channelName}. ROAS ${marketing.worstChannel.roas}, CAC ${marketing.worstChannel.cac.toFixed(0)} ₽.`);
-  }
-
-  if (sales.totals.completion < 85) {
-    warnings.push(`План продаж выполнен только на ${sales.totals.completion}%. Нужно усиливать каналы, которые дают быстрые заказы.`);
-  } else if (sales.totals.completion >= 100) {
-    insights.push(`План продаж перевыполнен: ${sales.totals.completion}% от плана.`);
-  }
-
-  insights.push(`Прогноз на конец месяца: ${sales.forecast.projectedFact.toFixed(0)} ₽, это ${sales.forecast.projectedCompletion}% от плана.`);
-
-  if (sales.forecast.remainingDays > 0) {
-    warnings.push(`До конца периода осталось ${sales.forecast.remainingDays} дн. Для выхода в план нужно в среднем ${sales.forecast.requiredPerDayToPlan.toFixed(0)} ₽ в день.`);
-  }
-
-  if (sales.forecast.projectedCompletion < 100) {
-    recommendations.push(`Нарастите среднедневную выручку минимум до ${sales.forecast.requiredPerDayToPlan.toFixed(0)} ₽, сейчас средний темп ${sales.forecast.averagePerDay.toFixed(0)} ₽ в день.`);
-  }
-
-  if (sales.comparison?.hasData) {
-    insights.push(`К прошлому периоду ${sales.comparison.previousPeriod} факт продаж изменился на ${sales.comparison.factDelta >= 0 ? '+' : ''}${sales.comparison.factDelta.toFixed(0)} ₽.`);
-  }
-
-  if (marketing.totals.roas < 3) {
-    recommendations.push('Сократите бюджет в каналах с низким ROAS и перераспределите его в каналы с уже доказанной окупаемостью.');
-  } else {
-    recommendations.push('Сохраняйте текущий уровень инвестиций в эффективные каналы и масштабируйте их постепенно на 10-15% в неделю.');
-  }
-
-  if (marketing.totals.ctr < 1.5) {
-    recommendations.push('CTR низкий. Проверьте креативы, офферы и первые экраны объявлений: вероятно, проблема в сообщении или сегментации.');
-  } else {
-    insights.push(`CTR ${marketing.totals.ctr}% находится в рабочем диапазоне для базового performance-контроля.`);
-  }
-
-  if (marketing.totals.cvr < 2) {
-    recommendations.push('Конверсия в заказ низкая. Проверьте посадочные страницы, скорость ответа менеджеров и наличие дефицита товара.');
-  } else {
-    insights.push(`Конверсия из клика в заказ составляет ${marketing.totals.cvr}%.`);
-  }
-
-  const overpricedChannels = marketing.channels.filter((item) => item.roas > 0 && item.roas < 2);
-  if (overpricedChannels.length) {
-    recommendations.push(`Отдельно пересмотрите ${overpricedChannels.map((item) => item.channelName).join(', ')}: там есть расход без достаточной окупаемости.`);
-  }
-
-  const highPotentialChannels = marketing.channels.filter((item) => item.roas >= marketing.totals.roas && item.orders >= 10);
-  if (highPotentialChannels.length) {
-    recommendations.push(`Кандидаты на масштабирование: ${highPotentialChannels.map((item) => item.channelName).join(', ')}.`);
-  }
-
-  return { insights, recommendations, warnings };
-}
-
-async function buildMarketingAnalysis(db, period, options = {}) {
-  const marketing = aggregateMarketing(db, period);
-  const sales = aggregateDashboard(db, period);
-
-  if (!marketing.channels.length) {
-    return {
-      period,
-      generatedAt: new Date().toISOString(),
-      engine: 'rules',
-      summary: 'Нет маркетинговых данных за выбранный период.',
-      insights: ['Загрузите данные по рекламным каналам через `/api/ingest/marketing`, чтобы получить анализ.'],
-      recommendations: ['Начните с выгрузки spend, leads, orders, revenue, impressions и clicks по каналам.'],
-      warnings: [],
-      metrics: marketing,
-      sales
-    };
-  }
-
-  const llmCfg = options.llm || {};
-  if (llmCfg.enabled && llmCfg.apiKey) {
-    try {
-      const { analyzeWithLLM } = require('./llm-analyst');
-      const llmResult = await analyzeWithLLM({
-        period,
-        marketing,
-        sales,
-        apiKey: llmCfg.apiKey,
-        model: llmCfg.model,
-        timeoutMs: llmCfg.timeoutMs
-      });
-      return {
-        period,
-        generatedAt: new Date().toISOString(),
-        engine: 'llm',
-        model: llmCfg.model || 'llama-3.3-70b-versatile',
-        summary: llmResult.summary,
-        insights: llmResult.insights,
-        recommendations: llmResult.recommendations,
-        warnings: llmResult.warnings,
-        metrics: marketing,
-        sales
-      };
-    } catch (error) {
-      console.warn(`[marketing-analysis] LLM failed, fallback to rules: ${error.message}`);
-    }
-  }
-
-  const rules = buildRulesAnalysis({ period, marketing, sales });
-  return {
-    period,
-    generatedAt: new Date().toISOString(),
-    engine: 'rules',
-    summary: `Маркетинговый анализ за ${period}: ROAS ${marketing.totals.roas}, CPL ${marketing.totals.cpl.toFixed(0)} ₽, CAC ${marketing.totals.cac.toFixed(0)} ₽, выполнение плана продаж ${sales.totals.completion}%.`,
-    insights: rules.insights,
-    recommendations: rules.recommendations,
-    warnings: rules.warnings,
-    metrics: marketing,
-    sales
-  };
-}
-
-function buildStoreProductMatrix(db, period) {
-  const stores = db.stores;
-  const products = db.products;
-  const plans = db.plans.filter(r => r.period === period);
-  const sales = db.sales.filter(r => r.period === period);
-
-  const cells = {};
-  for (const s of stores) {
-    cells[s.id] = {};
-    for (const p of products) {
-      cells[s.id][p.id] = { plan: 0, fact: 0, cost: 0, quantity: 0 };
-    }
-  }
-
-  for (const row of plans) {
-    if (!cells[row.storeId]) cells[row.storeId] = {};
-    if (!cells[row.storeId][row.productId]) {
-      cells[row.storeId][row.productId] = { plan: 0, fact: 0, cost: 0, quantity: 0 };
-    }
-    cells[row.storeId][row.productId].plan += toNumber(row.amount);
-  }
-
-  for (const row of sales) {
-    if (!cells[row.storeId]) cells[row.storeId] = {};
-    if (!cells[row.storeId][row.productId]) {
-      cells[row.storeId][row.productId] = { plan: 0, fact: 0, cost: 0, grossProfit: 0, quantity: 0 };
-    }
-    cells[row.storeId][row.productId].fact += toNumber(row.amount);
-    cells[row.storeId][row.productId].cost += toNumber(row.cost);
-    cells[row.storeId][row.productId].grossProfit += toNumber(row.grossProfit);
-    cells[row.storeId][row.productId].quantity += toNumber(row.quantity);
-  }
-
-  for (const sid of Object.keys(cells)) {
-    for (const pid of Object.keys(cells[sid])) {
-      const c = cells[sid][pid];
-      c.percent = c.plan > 0 ? percent(c.fact / c.plan) : null;
-      const m = computeMargin(c);
-      c.margin = m === null ? null : roundMetric(m);
-    }
-  }
-
-  const storeTotals = {};
-  for (const s of stores) {
-    const sc = cells[s.id] || {};
-    const tf = Object.values(sc).reduce((a, c) => a + c.fact, 0);
-    const tp = Object.values(sc).reduce((a, c) => a + c.plan, 0);
-    storeTotals[s.id] = {
-      fact: roundMetric(tf),
-      plan: roundMetric(tp),
-      percent: tp > 0 ? percent(tf / tp) : 0
-    };
-  }
-
-  const productTotals = {};
-  for (const p of products) {
-    let tf = 0, tp = 0;
-    for (const sid of Object.keys(cells)) {
-      const c = cells[sid][p.id];
-      if (c) { tf += c.fact; tp += c.plan; }
-    }
-    productTotals[p.id] = {
-      fact: roundMetric(tf),
-      plan: roundMetric(tp),
-      percent: tp > 0 ? percent(tf / tp) : 0
-    };
-  }
-
-  const storesSorted = [...stores].sort(
-    (a, b) => (storeTotals[b.id]?.fact || 0) - (storeTotals[a.id]?.fact || 0)
-  );
-
-  return {
-    period,
-    stores: storesSorted.map(s => ({ id: s.id, name: s.name, region: s.region || '' })),
-    products: products.map(p => ({ id: p.id, name: p.name, category: p.category || '' })),
-    cells,
-    storeTotals,
-    productTotals
-  };
-}
-
-function buildProductForecast(db, period) {
-  const summary = aggregatePeriodCore(db, period);
-  const { elapsedDays, remainingDays, totalDays } = summary.forecast;
-  return {
-    period,
-    elapsedDays,
-    remainingDays,
-    totalDays,
-    products: summary.products.map(p => {
-      const avgPerDay = elapsedDays > 0 ? p.fact / elapsedDays : 0;
-      const projected = Math.round(avgPerDay * totalDays);
-      const projPct = p.plan > 0 ? Math.round(projected / p.plan * 100) : 0;
-      const reqPerDay = remainingDays > 0 ? Math.max(p.plan - p.fact, 0) / remainingDays : 0;
-      return {
-        productId: p.productId,
-        productName: p.productName,
-        category: p.category,
-        fact: p.fact,
-        plan: p.plan,
-        percent: p.percent,
-        margin: p.margin,
-        marginPct: p.marginPct,
-        quantity: p.quantity,
-        projected,
-        projPct,
-        reqPerDay: Math.round(reqPerDay),
-        gap: projected - p.plan,
-        status: projPct >= 100 ? 'good' : projPct >= 90 ? 'warn' : 'bad'
-      };
-    })
-  };
-}
-
 function listPeriods(db) {
   const values = new Set();
   for (const row of db.plans) values.add(row.period);
   for (const row of db.sales) values.add(row.period);
-  for (const row of db.marketing) values.add(row.period);
   return Array.from(values).sort().reverse();
 }
 
@@ -997,46 +612,12 @@ function appendSales(db, body) {
   return period;
 }
 
-function replaceMarketing(db, body) {
-  const period = monthKey(body.period);
-  if (!Array.isArray(body.metrics)) {
-    throw new Error('metrics must be an array');
-  }
-
-  db.marketing = db.marketing.filter((item) => item.period !== period);
-
-  for (const item of body.metrics) {
-    if (!item.channelId) {
-      throw new Error('Each marketing row must include channelId');
-    }
-    db.marketing.push({
-      period,
-      channelId: String(item.channelId),
-      channelName: item.channelName || String(item.channelId),
-      spend: toNumber(item.spend),
-      leads: toNumber(item.leads),
-      orders: toNumber(item.orders),
-      revenue: toNumber(item.revenue),
-      impressions: toNumber(item.impressions),
-      clicks: toNumber(item.clicks),
-      sessions: toNumber(item.sessions)
-    });
-  }
-
-  return period;
-}
-
 module.exports = {
   appendSales,
   aggregateDashboard,
-  aggregateMarketing,
-  buildMarketingAnalysis,
-  buildProductForecast,
-  buildStoreProductMatrix,
   listPeriods,
   monthKey,
   normalizeDb,
-  replaceMarketing,
   replacePlans,
   scopeDbForUser,
   storeDetails
