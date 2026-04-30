@@ -525,11 +525,17 @@ function productDisplayName(p) {
 }
 
 // ── Products list ──────────────────────────────────────────────────────────
+const PRODUCTS_PAGE_SIZE = 5;
 function renderProducts(summary) {
   const sorted = [...summary.products]
     .filter(p => p.productId !== '_total')
     .sort((a, b) => b[state.productSort] - a[state.productSort]);
-  $('productsList').innerHTML = sorted.map(p => {
+
+  const expanded = state.productsExpanded === true;
+  const visible = expanded ? sorted : sorted.slice(0, PRODUCTS_PAGE_SIZE);
+  const hidden = sorted.length - visible.length;
+
+  const items = visible.map(p => {
     const tone = pctTone(p.percent);
     return `
     <div class="prod-item">
@@ -548,6 +554,23 @@ function renderProducts(summary) {
       </div>
     </div>`;
   }).join('');
+
+  let toggle = '';
+  if (sorted.length > PRODUCTS_PAGE_SIZE) {
+    toggle = expanded
+      ? `<button id="productsToggleBtn" class="products-toggle no-print">Свернуть</button>`
+      : `<button id="productsToggleBtn" class="products-toggle no-print">Показать ещё (${hidden})</button>`;
+  }
+
+  $('productsList').innerHTML = items + toggle;
+
+  const btn = $('productsToggleBtn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      state.productsExpanded = !expanded;
+      renderProducts(summary);
+    });
+  }
 }
 
 // ── Store details ──────────────────────────────────────────────────────────
@@ -902,6 +925,7 @@ async function init() {
 
   $('productSort').addEventListener('change', e => {
     state.productSort = e.target.value;
+    state.productsExpanded = false;
     if (state.summary) renderProducts(state.summary);
   });
 

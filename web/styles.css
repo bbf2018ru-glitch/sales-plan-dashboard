@@ -1036,6 +1036,21 @@ td.col-edit { text-align: center; }
 /* ── Products list ────────────────────────────────────────────────── */
 .products-list { display: flex; flex-direction: column; gap: 10px; }
 
+.products-toggle {
+  align-self: center;
+  margin-top: 4px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.products-toggle:hover { background: var(--glass-strong); border-color: var(--accent); }
+
 .prod-item {
   padding: 13px 15px;
   border-radius: 12px;
