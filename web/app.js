@@ -19,7 +19,6 @@ const state = {
   matrix: null,
   marketing: null,
   productForecast: null,
-  ingestRuns: [],
   comments: [],
   storeSort: { key: 'percent', dir: -1 },
   productSort: 'fact',
@@ -37,9 +36,12 @@ const $ = (id) => document.getElementById(id);
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 function formatMoney(v) {
+  if (v === null || v === undefined) return '—';
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(v || 0);
 }
 function formatNum(v) { return new Intl.NumberFormat('ru-RU').format(v || 0); }
+function formatPct(v) { return v === null || v === undefined ? '—' : `${v}%`; }
+function isNum(v) { return v !== null && v !== undefined && !Number.isNaN(v); }
 function formatDate(v) {
   if (!v) return 'нет';
   const d = new Date(v);
@@ -377,8 +379,8 @@ function renderWeeklyChart(summary) {
 function renderBcgChart(summary) {
   const el = $('bcgChart');
   if (!el) return;
-  const stores = summary.stores.filter(s => s.fact > 0);
-  if (stores.length < 2) { el.innerHTML = '<div class="empty-state">Недостаточно данных для BCG-квадранта.</div>'; return; }
+  const stores = summary.stores.filter(s => s.fact > 0 && isNum(s.marginPct));
+  if (stores.length < 2) { el.innerHTML = '<div class="empty-state">Маржа за период не пришла из 1С — BCG-квадрант построить нельзя.</div>'; return; }
 
   const W = 620, H = 380, pad = { t: 40, r: 40, b: 60, l: 80 };
   const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
@@ -464,7 +466,7 @@ function renderKpis(summary) {
     { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: '', tone: 'neutral' },
     { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt, tone: c?.factDelta >= 0 ? 'neutral' : 'neutral' },
     { label: 'Выполнение', value: `${summary.totals.completion}%`,    sub: '', tone: pctTone(summary.totals.completion) },
-    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: `${summary.totals.marginPct}% от выр.`, tone: summary.totals.margin >= 0 ? 'good' : 'bad' },
+    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С', tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad' },
     { label: 'Прогноз',    value: formatMoney(f.projectedFact),       sub: `${f.projectedCompletion}% к плану`, tone: f.tone },
     { label: 'Нужно/день', value: formatMoney(f.requiredPerDayToPlan), sub: `осталось ${f.remainingDays} дн.`, tone: f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral' }
   ];
@@ -525,7 +527,7 @@ function renderComparison(summary) {
         <div class="cmp-row"><span>Факт</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDelta, formatMoney)}</strong></div>
         <div class="cmp-row"><span>Изм. %</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDeltaPercent, v => v.toFixed(1) + '%')}</strong></div>
         <div class="cmp-row"><span>Выполнение</span><strong class="${c.completionDelta >= 0 ? 'positive' : 'negative'}">${signed(c.completionDelta, v => v.toFixed(1) + ' п.п.')}</strong></div>
-        <div class="cmp-row"><span>Маржа</span><strong class="${c.marginDelta >= 0 ? 'positive' : 'negative'}">${signed(c.marginDelta, formatMoney)}</strong></div>
+        <div class="cmp-row"><span>Маржа</span><strong class="${!isNum(c.marginDelta) ? '' : c.marginDelta >= 0 ? 'positive' : 'negative'}">${isNum(c.marginDelta) ? signed(c.marginDelta, formatMoney) : '—'}</strong></div>
         <div class="cmp-row"><span>Количество</span><strong class="${c.quantityDelta >= 0 ? 'positive' : 'negative'}">${signed(c.quantityDelta, formatNum)}</strong></div>
       </div>
     </div>`;
@@ -591,8 +593,8 @@ function renderStores(summary) {
           <div class="pct-track"><div class="pct-bar ${tone}" style="width:${Math.min(s.percent, 140)}%"></div></div>
         </div>
       </td>
-      <td class="num ${s.margin >= 0 ? 'positive' : 'negative'}">${formatMoney(s.margin)}</td>
-      <td class="num ${s.marginPct >= 20 ? 'good' : s.marginPct >= 10 ? 'warn' : 'bad'}">${s.marginPct}%</td>
+      <td class="num ${!isNum(s.margin) ? '' : s.margin >= 0 ? 'positive' : 'negative'}">${formatMoney(s.margin)}</td>
+      <td class="num ${!isNum(s.marginPct) ? '' : s.marginPct >= 20 ? 'good' : s.marginPct >= 10 ? 'warn' : 'bad'}">${formatPct(s.marginPct)}</td>
       <td class="num">${avgCheck > 0 ? formatMoney(avgCheck) : '—'}</td>
       <td class="num">${formatNum(s.quantity)}</td>
       <td class="num"><span class="spark"><span class="spark-fill ${tone}" style="width:${Math.min(s.percent, 100)}%"></span></span></td>
@@ -745,7 +747,7 @@ async function loadStoreDetails() {
           <div class="detail-fact">${formatMoney(item.fact)}</div>
           <div class="detail-sub">план: ${formatMoney(item.plan)}</div>
           <div class="detail-pct ${tone}">${item.percent}%</div>
-          ${item.margin ? `<div class="detail-sub ${item.margin >= 0 ? 'positive' : 'negative'}">маржа: ${formatMoney(item.margin)}</div>` : ''}
+          ${isNum(item.margin) ? `<div class="detail-sub ${item.margin >= 0 ? 'positive' : 'negative'}">маржа: ${formatMoney(item.margin)}</div>` : ''}
         </div>
       </div>`;
     }).join('')}
@@ -939,87 +941,6 @@ function renderExecutive(summary) {
 }
 
 // ── Recommendations panel ──────────────────────────────────────────────────
-function renderRecommendations(summary) {
-  const el = $('recommendPanel');
-  const badge = $('recommendBadge');
-  if (!el) return;
-  const e = summary.executive;
-  const f = summary.forecast;
-  const tone = f.projectedCompletion >= 100 ? 'good' : f.projectedCompletion >= 90 ? 'warn' : 'bad';
-
-  if (badge) {
-    badge.textContent = f.projectedCompletion >= 100 ? 'В плане' : f.projectedCompletion >= 90 ? 'Риск' : 'Не в плане';
-    badge.className = `rec-badge rec-${tone}`;
-  }
-
-  const headline = `<div class="rec-headline">
-    <div class="rec-kpi ${tone}">
-      <span class="rec-kpi-val">${f.projectedCompletion}%</span>
-      <span class="rec-kpi-label">прогноз выполнения</span>
-    </div>
-    <div class="rec-kpi neutral">
-      <span class="rec-kpi-val">${formatMoney(f.projectedFact)}</span>
-      <span class="rec-kpi-label">ожидается к концу месяца</span>
-    </div>
-    <div class="rec-kpi ${tone}">
-      <span class="rec-kpi-val">${formatMoney(f.requiredPerDayToPlan)}</span>
-      <span class="rec-kpi-label">нужно в день для плана</span>
-    </div>
-  </div>`;
-
-  const priorities = e.priorities.length
-    ? `<div class="rec-section">
-        <div class="rec-section-label rec-prior">▲ Приоритеты</div>
-        <ul class="rec-list">${e.priorities.map(p => `<li>${p}</li>`).join('')}</ul>
-      </div>` : '';
-
-  const alerts = e.alerts.length
-    ? `<div class="rec-section">
-        <div class="rec-section-label rec-risk">! Риски</div>
-        <ul class="rec-list rec-alerts">${e.alerts.map(a => `<li>${a}</li>`).join('')}</ul>
-      </div>` : '';
-
-  const headlines = e.headlines.length
-    ? `<div class="rec-section">
-        <div class="rec-section-label">● Ключевые факты</div>
-        <ul class="rec-list rec-facts">${e.headlines.map(h => `<li>${h}</li>`).join('')}</ul>
-      </div>` : '';
-
-  el.innerHTML = headline + priorities + alerts + headlines;
-}
-
-// ── Market news ────────────────────────────────────────────────────────────
-const MARKET_NEWS = [
-  { tag: 'Тренд', tone: 'accent', date: 'Апрель 2026', title: 'Бенто-торты: рост +25% г/г',
-    text: 'Мини-торты в коробках остаются в топе. Покупатели выбирают их как подарок на 1–2 человека. Фокус на упаковке и персонализации.' },
-  { tag: 'Рынок', tone: 'good', date: 'Q1 2026', title: 'Кофе с собой обгоняет торты',
-    text: 'Кофейный сегмент в кондитерских Сибири +18% год к году. Главный драйвер — офисная аудитория. Рассмотрите расширение линейки.' },
-  { tag: 'Сезон', tone: 'warn', date: 'Май–Июнь 2026', title: 'Выпускные: ожидаемый рост +35%',
-    text: 'Сезон выпускных запускается в мае. Рост заказных тортов +35% в мае-июне — готовьте производственные мощности заранее.' },
-  { tag: 'Новинка', tone: 'accent', date: 'Весна 2026', title: 'Корейский стиль: buttercream flowers',
-    text: 'Торты с цветами из крема в корейском стиле — один из топ-запросов в соцсетях. Высокий средний чек и виральность в Instagram.' },
-  { tag: 'Рынок', tone: 'good', date: 'Q1 2026', title: 'Средний чек вырос на 12%',
-    text: 'В кондитерских Сибири средний чек +12% г/г. Покупатели готовы к премиуму — важно обеспечить соответствующий сервис.' },
-  { tag: 'Совет', tone: 'neutral', date: 'Апрель 2026', title: 'Программы лояльности удерживают 30%+',
-    text: 'Кондитерские с программой лояльности демонстрируют возврат клиентов на 30% выше. Персонализированные предложения к дням рождения особенно эффективны.' }
-];
-const TONE_TAG = { accent: '#0f766e', good: '#16a34a', warn: '#b45309', neutral: '#6b7280', bad: '#dc2626' };
-const TONE_BG  = { accent: '#d5f2ee', good: '#dcfce7', warn: '#fef3c7', neutral: '#f3f4f6', bad: '#fee2e2' };
-
-function renderMarketNews() {
-  const el = $('marketNews');
-  if (!el) return;
-  el.innerHTML = MARKET_NEWS.map(n => `
-    <div class="news-card">
-      <div class="news-meta">
-        <span class="news-tag" style="background:${TONE_BG[n.tone]};color:${TONE_TAG[n.tone]}">${n.tag}</span>
-        <span class="news-date">${n.date}</span>
-      </div>
-      <div class="news-title">${n.title}</div>
-      <div class="news-text">${n.text}</div>
-    </div>`).join('');
-}
-
 // ── Store forecast report ──────────────────────────────────────────────────
 function renderStoreForecastReport(summary) {
   const el = $('storeForecastBody');
@@ -1070,7 +991,7 @@ function renderProductForecastReport(data) {
       <td class="num"><span class="${ptone}">${p.projPct}%</span></td>
       <td class="num">${p.reqPerDay > 0 ? formatMoney(p.reqPerDay) : '<span class="good">—</span>'}</td>
       <td class="num"><span class="${p.gap >= 0 ? 'positive' : 'negative'}">${p.gap >= 0 ? '+' : ''}${formatMoney(p.gap)}</span></td>
-      <td class="num ${p.marginPct >= 20 ? 'good' : p.marginPct >= 10 ? 'warn' : 'bad'}">${p.marginPct}%</td>
+      <td class="num ${!isNum(p.marginPct) ? '' : p.marginPct >= 20 ? 'good' : p.marginPct >= 10 ? 'warn' : 'bad'}">${formatPct(p.marginPct)}</td>
       <td><span class="forecast-status ${p.status}">${statusIcon}</span></td>
     </tr>`;
   }).join('');
@@ -1130,7 +1051,11 @@ function renderGapReport(summary) {
 function renderMarginChart(summary) {
   const el = $('marginChart');
   if (!el) return;
-  const stores = [...summary.stores].filter(s => s.fact > 0).sort((a, b) => b.marginPct - a.marginPct);
+  const stores = [...summary.stores].filter(s => s.fact > 0 && isNum(s.marginPct)).sort((a, b) => b.marginPct - a.marginPct);
+  if (!stores.length) {
+    el.innerHTML = '<div class="empty-state">Маржа за период не пришла из 1С.</div>';
+    return;
+  }
   const maxFact = Math.max(...stores.map(s => s.fact), 1);
   el.innerHTML = stores.map(s => {
     const barW = (s.fact / maxFact * 100).toFixed(1);
@@ -1271,40 +1196,6 @@ function renderMatrix(matrix) {
       </td>
     </tr></tfoot>
   </table>`;
-}
-
-// ── Ingest history ─────────────────────────────────────────────────────────
-function renderIngestHistory(runs) {
-  const el = $('ingestHistory');
-  if (!el) return;
-  if (!runs.length) {
-    el.innerHTML = '<div class="empty-state">Нет истории загрузок.</div>'; return;
-  }
-  const statusBadge = s => {
-    const txt = s === 'success' ? 'Успех' : s === 'duplicate' ? 'Дубликат' : 'Ошибка';
-    return `<span class="ingest-badge ${s}">${txt}</span>`;
-  };
-  el.innerHTML = `<table><thead><tr>
-    <th>Дата</th>
-    <th>Период</th>
-    <th>Источник</th>
-    <th>Объект</th>
-    <th class="num">Планов</th>
-    <th class="num">Продаж</th>
-    <th>Статус</th>
-    <th>Примечание</th>
-  </tr></thead><tbody>
-    ${runs.map(r => `<tr>
-      <td>${formatDateShort(r.createdAt)}</td>
-      <td>${r.period || '—'}</td>
-      <td>${r.sourceSystem || '—'}</td>
-      <td><small class="muted">${(r.sourceObject || '—').slice(0, 40)}</small></td>
-      <td class="num">${r.stats?.plans || 0}</td>
-      <td class="num">${r.stats?.sales || 0}</td>
-      <td>${statusBadge(r.status)}</td>
-      <td><small class="muted">${r.error ? r.error.slice(0, 60) : ''}</small></td>
-    </tr>`).join('')}
-  </tbody></table>`;
 }
 
 // ── Marketing ──────────────────────────────────────────────────────────────
@@ -1563,14 +1454,6 @@ async function loadMatrix() {
   renderMatrix(matrix);
 }
 
-async function loadIngestRuns() {
-  try {
-    const data = await fetchJson('/api/ingest/runs?limit=20');
-    state.ingestRuns = data.runs || [];
-    renderIngestHistory(state.ingestRuns);
-  } catch { renderIngestHistory([]); }
-}
-
 function renderReports(summary) {
   renderAbcTable('abcProducts', computeAbc(summary.products.filter(p => p.productId !== '_total'), 'fact', 'productName'));
   renderAbcTable('abcStores', computeAbc(summary.stores, 'fact', 'storeName'));
@@ -1587,7 +1470,6 @@ function renderReports(summary) {
   renderCategoryChart(summary);
   loadProductForecast();
   loadMatrix();
-  loadIngestRuns();
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
@@ -1667,8 +1549,6 @@ async function loadSummary() {
   renderDailyChart(summary);
   renderComparison(summary);
   renderSpotlight(summary);
-  renderRecommendations(summary);
-  renderMarketNews();
   renderStores(summary);
   renderProducts(summary);
   await loadStoreDetails();

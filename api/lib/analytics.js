@@ -24,6 +24,30 @@ function roundMetric(value) {
   return Number(value.toFixed(2));
 }
 
+// Маржа корректна только если 1С прислала валовую прибыль ИЛИ ненулевую
+// себестоимость. Иначе возвращаем null — на UI это превращается в «—».
+// Если просто посчитать (fact - cost) при cost=0, маржа окажется = факту,
+// что вводит в заблуждение.
+function computeMargin({ fact, cost, grossProfit }) {
+  const f = Number(fact || 0);
+  const c = Number(cost || 0);
+  const gp = Number(grossProfit || 0);
+  if (gp > 0) return gp;
+  if (c > 0) return f - c;
+  return null;
+}
+
+function marginFields(item) {
+  const margin = computeMargin(item);
+  if (margin === null) {
+    return { margin: null, marginPct: null };
+  }
+  return {
+    margin: roundMetric(margin),
+    marginPct: item.fact > 0 ? percent(margin / item.fact) : null
+  };
+}
+
 function parsePeriod(period) {
   const [year, month] = String(period).split('-').map(Number);
   if (!year || !month) {
@@ -205,7 +229,12 @@ function buildPeriodComparison(db, period, currentTotals) {
   const planDelta = roundMetric(currentTotals.plan - previous.totals.plan);
   const completionDelta = roundMetric(currentTotals.completion - previous.totals.completion);
   const quantityDelta = roundMetric(currentTotals.quantity - previous.totals.quantity);
-  const marginDelta = roundMetric((currentTotals.margin || 0) - (previous.totals.margin || 0));
+
+  const haveBothMargins = currentTotals.margin !== null && previous.totals.margin !== null;
+  const marginDelta = haveBothMargins ? roundMetric(currentTotals.margin - previous.totals.margin) : null;
+  const marginDeltaPercent = haveBothMargins && previous.totals.margin > 0
+    ? percent(marginDelta / previous.totals.margin)
+    : null;
 
   return {
     previousPeriod: prevPeriod,
@@ -216,7 +245,7 @@ function buildPeriodComparison(db, period, currentTotals) {
     completionDelta,
     quantityDelta,
     marginDelta,
-    marginDeltaPercent: previous.totals.margin > 0 ? percent(marginDelta / previous.totals.margin) : 0,
+    marginDeltaPercent,
     previousTotals: previous.totals,
     tone: factDelta >= 0 ? 'good' : 'bad'
   };
@@ -236,7 +265,7 @@ function buildTrend(db, period, windowSize = 12) {
       period: currentPeriod,
       plan: roundMetric(summary.totals.plan),
       fact: roundMetric(summary.totals.fact),
-      margin: roundMetric(summary.totals.margin),
+      margin: summary.totals.margin === null ? null : roundMetric(summary.totals.margin),
       marginPct: summary.totals.marginPct,
       completion: summary.totals.completion,
       gap: roundMetric(summary.totals.gap),
@@ -447,36 +476,29 @@ function aggregatePeriodCore(db, period) {
 
   const storesList = Array.from(byStore.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
-    .map((item) => {
-      const margin = item.grossProfit > 0 ? item.grossProfit : (item.fact - item.cost);
-      return {
-        ...item,
-        margin: roundMetric(margin),
-        marginPct: item.fact > 0 ? percent(margin / item.fact) : 0,
-        percent: item.plan > 0 ? percent(item.fact / item.plan) : 0,
-        gap: item.fact - item.plan
-      };
-    })
+    .map((item) => ({
+      ...item,
+      ...marginFields(item),
+      percent: item.plan > 0 ? percent(item.fact / item.plan) : 0,
+      gap: item.fact - item.plan
+    }))
     .sort((a, b) => b.percent - a.percent);
 
   const productsList = Array.from(byProduct.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
-    .map((item) => {
-      const margin = item.grossProfit > 0 ? item.grossProfit : (item.fact - item.cost);
-      return {
-        ...item,
-        margin: roundMetric(margin),
-        marginPct: item.fact > 0 ? percent(margin / item.fact) : 0,
-        percent: item.plan > 0 ? percent(item.fact / item.plan) : 0,
-        gap: item.fact - item.plan
-      };
-    })
+    .map((item) => ({
+      ...item,
+      ...marginFields(item),
+      percent: item.plan > 0 ? percent(item.fact / item.plan) : 0,
+      gap: item.fact - item.plan
+    }))
     .sort((a, b) => b.fact - a.fact);
 
   const totalPlan = storesList.reduce((sum, item) => sum + item.plan, 0);
   const totalFact = storesList.reduce((sum, item) => sum + item.fact, 0);
   const totalCost = storesList.reduce((sum, item) => sum + item.cost, 0);
-  const totalMargin = totalFact - totalCost;
+  const totalGrossProfit = storesList.reduce((sum, item) => sum + Number(item.grossProfit || 0), 0);
+  const totalMargin = computeMargin({ fact: totalFact, cost: totalCost, grossProfit: totalGrossProfit });
   const totalQuantity = storesList.reduce((sum, item) => sum + item.quantity, 0);
   const completion = totalPlan > 0 ? percent(totalFact / totalPlan) : 0;
   const leader = storesList[0] || null;
@@ -491,8 +513,8 @@ function aggregatePeriodCore(db, period) {
       plan: totalPlan,
       fact: totalFact,
       cost: roundMetric(totalCost),
-      margin: roundMetric(totalMargin),
-      marginPct: totalFact > 0 ? percent(totalMargin / totalFact) : 0,
+      margin: totalMargin === null ? null : roundMetric(totalMargin),
+      marginPct: totalMargin === null || totalFact <= 0 ? null : percent(totalMargin / totalFact),
       gap: totalFact - totalPlan,
       quantity: totalQuantity,
       completion
@@ -535,6 +557,7 @@ function storeDetails(db, period, storeId) {
       plan: toNumber(row.amount),
       fact: 0,
       cost: 0,
+      grossProfit: 0,
       quantity: 0
     });
   }
@@ -549,26 +572,24 @@ function storeDetails(db, period, storeId) {
         plan: 0,
         fact: 0,
         cost: 0,
+        grossProfit: 0,
         quantity: 0
       });
     }
     const item = rows.get(row.productId);
     item.fact += toNumber(row.amount);
     item.cost += toNumber(row.cost);
+    item.grossProfit += toNumber(row.grossProfit);
     item.quantity += toNumber(row.quantity);
   }
 
   const items = Array.from(rows.values())
-    .map((item) => {
-      const margin = item.fact - item.cost;
-      return {
-        ...item,
-        margin: roundMetric(margin),
-        marginPct: item.fact > 0 ? percent(margin / item.fact) : 0,
-        percent: item.plan > 0 ? percent(item.fact / item.plan) : 0,
-        gap: item.fact - item.plan
-      };
-    })
+    .map((item) => ({
+      ...item,
+      ...marginFields(item),
+      percent: item.plan > 0 ? percent(item.fact / item.plan) : 0,
+      gap: item.fact - item.plan
+    }))
     .sort((a, b) => b.fact - a.fact);
 
   return {
@@ -821,10 +842,11 @@ function buildStoreProductMatrix(db, period) {
   for (const row of sales) {
     if (!cells[row.storeId]) cells[row.storeId] = {};
     if (!cells[row.storeId][row.productId]) {
-      cells[row.storeId][row.productId] = { plan: 0, fact: 0, cost: 0, quantity: 0 };
+      cells[row.storeId][row.productId] = { plan: 0, fact: 0, cost: 0, grossProfit: 0, quantity: 0 };
     }
     cells[row.storeId][row.productId].fact += toNumber(row.amount);
     cells[row.storeId][row.productId].cost += toNumber(row.cost);
+    cells[row.storeId][row.productId].grossProfit += toNumber(row.grossProfit);
     cells[row.storeId][row.productId].quantity += toNumber(row.quantity);
   }
 
@@ -832,7 +854,8 @@ function buildStoreProductMatrix(db, period) {
     for (const pid of Object.keys(cells[sid])) {
       const c = cells[sid][pid];
       c.percent = c.plan > 0 ? percent(c.fact / c.plan) : null;
-      c.margin = roundMetric(c.fact - c.cost);
+      const m = computeMargin(c);
+      c.margin = m === null ? null : roundMetric(m);
     }
   }
 
