@@ -801,20 +801,22 @@ async function loadSummary() {
   renderProducts(summary);
   await loadStoreDetails();
   await loadComments();
-  loadInsights();
 
   $('lastUpdate').textContent = `обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
 }
 
-async function loadInsights() {
+// AI Топ-5 загружается один раз при открытии страницы и при смене периода.
+// Не привязан к 30-секундному poll и SSE — иначе секция мигает и не даёт
+// дочитать. Кнопка-обновления в заголовке секции — для ручного refresh.
+async function loadInsights({ silent = false } = {}) {
   const el = $('insightsPanel');
   if (!el) return;
-  el.innerHTML = '<div class="empty-state" style="padding:16px">Анализирую…</div>';
+  if (!silent) el.innerHTML = '<div class="empty-state" style="padding:16px">Анализирую…</div>';
   try {
     const data = await fetchJson(`/api/insights?period=${encodeURIComponent(state.period)}`);
     renderInsights(data);
   } catch (err) {
-    el.innerHTML = `<div class="empty-state" style="padding:16px;color:var(--bad)">Не удалось загрузить: ${err.message}</div>`;
+    if (!silent) el.innerHTML = `<div class="empty-state" style="padding:16px;color:var(--bad)">Не удалось загрузить: ${err.message}</div>`;
   }
 }
 
@@ -926,16 +928,20 @@ async function init() {
   $('exportSalesBtn')?.addEventListener('click', exportSales);
   $('exportSalesBtnH')?.addEventListener('click', exportSales);
 
+  $('insightsRefresh')?.addEventListener('click', () => loadInsights());
+
   try {
     const meta = await loadMetadata();
     initPin(meta.pinRequired);
     await loadSummary();
+    loadInsights();
     connectEvents();
     $('periodSelect').addEventListener('change', async e => {
       state.period = e.target.value;
       state.selectedStoreId = '';
       $('storeDetailTitle').textContent = 'Детализация точки';
       await loadSummary();
+      loadInsights();
     });
 
     $('trendWindowBtns')?.addEventListener('click', e => {
