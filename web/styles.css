@@ -545,11 +545,12 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 
 .panel-grid {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 14px;
 }
 
 .panel-grid .panel:not(.panel-narrow) { min-width: 0; }
+.panel-grid .panel.panel-narrow { min-width: 0; }
 
 .panel-header {
   display: flex;
@@ -576,7 +577,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 /* ── KPI grid: BENTO ─────────────────────────────────────────────── */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -625,11 +626,15 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 
 .kpi-value {
-  font-size: 30px;
-  font-weight: 300;
-  letter-spacing: -.04em;
-  line-height: 1.05;
+  font-size: clamp(20px, 1.4vw + 12px, 28px);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  line-height: 1.1;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .kpi-sub {
@@ -637,6 +642,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   color: var(--muted);
   margin-top: 6px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi.good {
@@ -661,7 +669,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 /* ── Forecast cards ───────────────────────────────────────────────── */
 .forecast-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -733,13 +741,15 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 10px 0;
   border-top: 1px solid var(--line);
   font-size: 13px;
+  min-width: 0;
 }
 
-.fc-row span { color: var(--muted); font-weight: 400; }
-.fc-row strong { font-weight: 600; color: var(--ink); }
+.fc-row span { color: var(--muted); font-weight: 400; flex-shrink: 1; min-width: 0; }
+.fc-row strong { font-weight: 600; color: var(--ink); flex-shrink: 0; text-align: right; white-space: nowrap; }
 
 /* ── Comparison cards ─────────────────────────────────────────────── */
 .cmp-card {
@@ -770,14 +780,16 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 9px 0;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
+  min-width: 0;
 }
 
 .cmp-row:last-child { border-bottom: 0; }
-.cmp-row span { color: var(--muted); }
-.cmp-row strong { font-weight: 600; }
+.cmp-row span { color: var(--muted); flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-row strong { font-weight: 600; flex-shrink: 0; text-align: right; white-space: nowrap; }
 
 /* ── Spotlight ────────────────────────────────────────────────────── */
 .spotlight { display: flex; flex-direction: column; gap: 10px; }
@@ -816,9 +828,30 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   margin-bottom: 6px;
 }
 
-.spot-name { font-size: 14px; font-weight: 600; color: var(--ink); }
-.spot-value { font-size: 30px; font-weight: 300; letter-spacing: -.04em; margin: 6px 0; }
-.spot-meta { font-size: 12px; color: var(--muted); }
+.spot-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spot-value {
+  font-size: clamp(20px, 1.4vw + 10px, 28px);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  margin: 6px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spot-meta {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Tables ───────────────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
@@ -986,14 +1019,17 @@ td.col-edit { text-align: center; }
   padding: 11px 0;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
+  min-width: 0;
 }
+
+.detail-row > div:first-child { min-width: 0; flex: 1 1 auto; overflow: hidden; }
 
 .detail-row:last-child { border-bottom: 0; }
 
-.detail-product { font-weight: 500; }
-.detail-cat { font-size: 11px; color: var(--hint); margin-top: 1px; }
+.detail-product { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-cat { font-size: 11px; color: var(--hint); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.detail-right { text-align: right; flex-shrink: 0; }
+.detail-right { text-align: right; flex-shrink: 0; white-space: nowrap; }
 .detail-fact { font-weight: 600; }
 .detail-pct  { font-size: 12px; font-weight: 600; }
 
@@ -1202,13 +1238,13 @@ td.col-edit { text-align: center; }
 .abc-stat.b .abc-stat-group { color: var(--warn); }
 .abc-stat.c .abc-stat-group { color: var(--bad);  }
 
-.abc-stat-pct   { font-size: 26px; font-weight: 300; letter-spacing: -.04em; line-height: 1; }
+.abc-stat-pct   { font-size: clamp(20px, 1vw + 14px, 24px); font-weight: 400; letter-spacing: -.02em; line-height: 1; }
 .abc-stat-count { font-size: 11px; color: var(--muted); margin-top: 5px; }
 
 /* ── Executive grid ───────────────────────────────────────────────── */
 .exec-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -1349,8 +1385,15 @@ td.col-edit { text-align: center; }
 }
 .rec-kpi.neutral { background: var(--glass-strong); }
 
-.rec-kpi-val   { font-size: 18px; font-weight: 500; letter-spacing: -.02em; }
-.rec-kpi-label { font-size: 11px; color: var(--muted); }
+.rec-kpi-val   {
+  font-size: clamp(15px, .9vw + 11px, 18px);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rec-kpi-label { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .rec-section { margin-bottom: 14px; }
 .rec-section:last-child { margin-bottom: 0; }
