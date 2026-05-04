@@ -283,15 +283,30 @@ function renderDailyChart(summary) {
 function renderKpis(summary) {
   const f = summary.forecast;
   const c = summary.comparison;
+  const planIncomplete = summary?.planHealth && summary.planHealth.ok === false;
   const deltaArrow = c?.hasData && c.factDelta > 0 ? '↑' : c?.hasData && c.factDelta < 0 ? '↓' : '';
   const deltaTxt = c?.hasData ? ` ${deltaArrow}${c.factDeltaPercent > 0 ? '+' : ''}${c.factDeltaPercent}%` : '';
+
+  // При неполном плане искажённые KPI прячем за «—», чтобы не вводить в заблуждение
+  const completionVal = planIncomplete ? '—' : `${summary.totals.completion}%`;
+  const completionTone = planIncomplete ? 'neutral' : pctTone(summary.totals.completion);
+  const completionSub  = planIncomplete ? 'план неполный' : '';
+
+  const projectedVal  = planIncomplete ? '—' : formatMoney(f.projectedFact);
+  const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану`;
+  const projectedTone = planIncomplete ? 'neutral' : f.tone;
+
+  const requiredVal  = planIncomplete ? '—' : formatMoney(f.requiredPerDayToPlan);
+  const requiredSub  = planIncomplete ? 'план неполный' : `осталось ${f.remainingDays} дн.`;
+  const requiredTone = planIncomplete ? 'neutral' : (f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral');
+
   const cards = [
-    { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: '', tone: 'neutral' },
+    { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: planIncomplete ? 'возможно неполный' : '', tone: 'neutral' },
     { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt, tone: 'neutral' },
-    { label: 'Выполнение', value: `${summary.totals.completion}%`,    sub: '', tone: pctTone(summary.totals.completion) },
+    { label: 'Выполнение', value: completionVal,                       sub: completionSub, tone: completionTone },
     { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С', tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
-    { label: 'Прогноз',    value: formatMoney(f.projectedFact),       sub: `${f.projectedCompletion}% к плану`, tone: f.tone },
-    { label: 'Нужно/день', value: formatMoney(f.requiredPerDayToPlan), sub: `осталось ${f.remainingDays} дн.`, tone: f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral' }
+    { label: 'Прогноз',    value: projectedVal,                       sub: projectedSub,  tone: projectedTone },
+    { label: 'Нужно/день', value: requiredVal,                        sub: requiredSub,   tone: requiredTone }
   ];
   $('kpis').innerHTML = cards.map(c => `
     <article class="kpi ${c.tone} ${c.cls || ''}">
@@ -321,7 +336,9 @@ function renderPlanHealth(summary) {
   const el = $('planHealthBanner');
   if (!el) return;
   const ph = summary?.planHealth;
-  if (!ph || ph.ok || ph.kind !== 'accumulated') {
+  const incomplete = ph && ph.ok === false && ph.kind === 'accumulated';
+  document.body.classList.toggle('plan-incomplete', incomplete);
+  if (!incomplete) {
     el.classList.add('hidden');
     el.innerHTML = '';
     return;
@@ -346,15 +363,28 @@ function renderPlanHealth(summary) {
 // ── Forecast ───────────────────────────────────────────────────────────────
 function renderForecast(summary) {
   const f = summary.forecast;
-  const paceTone = f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad';
+  const planIncomplete = summary?.planHealth && summary.planHealth.ok === false;
+  const paceTone = planIncomplete ? 'neutral' : (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad');
+
+  // При неполном плане прячем все вычисления, зависящие от плана
+  const projectedFactStr      = planIncomplete ? '—' : formatMoney(f.projectedFact);
+  const projectedCompletionStr = planIncomplete ? '—' : `${f.projectedCompletion}%`;
+  const runwayGapStr          = planIncomplete ? '—' : formatMoney(f.runwayGap);
+  const requiredStr           = planIncomplete ? '—' : formatMoney(f.requiredPerDayToPlan);
+  const planPerDayStr         = planIncomplete ? '—' : formatMoney(f.planPerDay);
+  const paceVsPlanStr         = planIncomplete ? '—' : `${f.paceVsPlan}%`;
+  const fcTitle               = planIncomplete ? 'План неполный — прогноз недоступен' : f.status;
+  const fcTone                = planIncomplete ? 'neutral' : f.tone;
+  const runwayClass           = planIncomplete ? '' : (f.runwayGap >= 0 ? 'positive' : 'negative');
+
   $('forecastPanel').innerHTML = `
-    <article class="fc-card ${f.tone}">
+    <article class="fc-card ${fcTone}">
       <div class="fc-kicker">Прогноз</div>
-      <div class="fc-title">${f.status}</div>
+      <div class="fc-title">${fcTitle}</div>
       <div class="fc-rows">
-        <div class="fc-row"><span>К концу месяца</span><strong>${formatMoney(f.projectedFact)}</strong></div>
-        <div class="fc-row"><span>Ожидаемое %</span><strong>${f.projectedCompletion}%</strong></div>
-        <div class="fc-row"><span>Разрыв прогноза</span><strong class="${f.runwayGap >= 0 ? 'positive' : 'negative'}">${formatMoney(f.runwayGap)}</strong></div>
+        <div class="fc-row"><span>К концу месяца</span><strong>${projectedFactStr}</strong></div>
+        <div class="fc-row"><span>Ожидаемое %</span><strong>${projectedCompletionStr}</strong></div>
+        <div class="fc-row"><span>Разрыв прогноза</span><strong class="${runwayClass}">${runwayGapStr}</strong></div>
       </div>
     </article>
     <article class="fc-card neutral">
@@ -362,8 +392,8 @@ function renderForecast(summary) {
       <div class="fc-title">Ежедневный темп</div>
       <div class="fc-rows">
         <div class="fc-row"><span>Средний факт/день</span><strong>${formatMoney(f.averagePerDay)}</strong></div>
-        <div class="fc-row"><span>Нужно/день к плану</span><strong>${formatMoney(f.requiredPerDayToPlan)}</strong></div>
-        <div class="fc-row"><span>План/день</span><strong>${formatMoney(f.planPerDay)}</strong></div>
+        <div class="fc-row"><span>Нужно/день к плану</span><strong>${requiredStr}</strong></div>
+        <div class="fc-row"><span>План/день</span><strong>${planPerDayStr}</strong></div>
       </div>
     </article>
     <article class="fc-card ${paceTone}">
@@ -372,7 +402,7 @@ function renderForecast(summary) {
       <div class="fc-rows">
         <div class="fc-row"><span>Прошло дней</span><strong>${f.elapsedDays} / ${f.totalDays}</strong></div>
         <div class="fc-row"><span>Осталось</span><strong>${f.remainingDays} дн.</strong></div>
-        <div class="fc-row"><span>Темп к плану</span><strong>${f.paceVsPlan}%</strong></div>
+        <div class="fc-row"><span>Темп к плану</span><strong>${paceVsPlanStr}</strong></div>
       </div>
     </article>`;
 }
@@ -407,18 +437,23 @@ function renderComparison(summary) {
 // ── Spotlight ──────────────────────────────────────────────────────────────
 function renderSpotlight(summary) {
   const l = summary.leader, lg = summary.lagger;
+  const planIncomplete = summary?.planHealth && summary.planHealth.ok === false;
+  const lPctStr  = planIncomplete ? formatMoney(l?.fact || 0)  : `${l ? l.percent : 0}%`;
+  const lgPctStr = planIncomplete ? formatMoney(lg?.fact || 0) : `${lg ? lg.percent : 0}%`;
+  const lMeta    = planIncomplete ? 'факт (% при неполном плане)' : (l ? formatMoney(l.fact) : '');
+  const lgMeta   = planIncomplete ? 'факт (% при неполном плане)' : (lg ? formatMoney(lg.gap) : '');
   $('spotlight').innerHTML = `
     <div class="spot-card leader">
       <div class="spot-label">Лидер</div>
       <div class="spot-name">${l ? l.storeName : '—'}</div>
-      <div class="spot-value">${l ? l.percent : 0}%</div>
-      <div class="spot-meta">${l ? formatMoney(l.fact) : ''}</div>
+      <div class="spot-value">${lPctStr}</div>
+      <div class="spot-meta">${lMeta}</div>
     </div>
     <div class="spot-card lagger">
       <div class="spot-label">Риск</div>
       <div class="spot-name">${lg ? lg.storeName : '—'}</div>
-      <div class="spot-value">${lg ? lg.percent : 0}%</div>
-      <div class="spot-meta">${lg ? formatMoney(lg.gap) : ''}</div>
+      <div class="spot-value">${lgPctStr}</div>
+      <div class="spot-meta">${lgMeta}</div>
     </div>
     <div class="spot-card neutral">
       <div class="spot-label">Последняя продажа</div>

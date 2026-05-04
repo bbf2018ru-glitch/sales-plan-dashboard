@@ -2431,3 +2431,11 @@ body.no-margin-data .cmp-row-margin {
 }
 [data-theme=light] .phb-text code { background: rgba(0,0,0,.06); }
 
+/* При plan-incomplete приглушаем % выполнения в таблице — они искажены */
+body.plan-incomplete .pct-val,
+body.plan-incomplete .pct-bar,
+body.plan-incomplete .spark-fill {
+  opacity: .55;
+  filter: grayscale(.7);
+}
+
