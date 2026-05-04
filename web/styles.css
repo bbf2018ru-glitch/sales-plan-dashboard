@@ -2384,3 +2384,50 @@ body.no-margin-data .cmp-row-margin {
   display: none !important;
 }
 
+/* ── Plan health banner: «план неполный» предупреждение ─────────────────── */
+.plan-health-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(251,191,36,.18), transparent 55%),
+    var(--glass-strong);
+  border: 1px solid rgba(251,191,36,.35);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  margin-bottom: 18px;
+  box-shadow: 0 1px 0 0 rgba(255,255,255,.06) inset, 0 8px 24px -12px rgba(251,191,36,.35);
+}
+.plan-health-banner.hidden { display: none !important; }
+.phb-icon {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--warn);
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(251,191,36,.6));
+}
+.phb-body { flex: 1; min-width: 0; }
+.phb-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+  letter-spacing: -.01em;
+}
+.phb-text {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.phb-text code {
+  font-family: "JetBrains Mono", "Consolas", monospace;
+  font-size: 11.5px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(0,0,0,.18);
+  color: var(--ink);
+}
+[data-theme=light] .phb-text code { background: rgba(0,0,0,.06); }
+

@@ -523,8 +523,50 @@ function aggregateDashboard(db, period, opts = {}) {
     ...summary,
     comparison: buildPeriodComparison(db, period, summary.totals),
     yoy: buildYoYComparison(db, period, summary.totals),
-    trend: buildTrend(db, period, trendWindow)
+    trend: buildTrend(db, period, trendWindow),
+    planHealth: assessPlanHealth(db, period, summary.totals.plan)
   };
+}
+
+// Эвристика «неполный план»: план на текущий месяц похож на накопительный
+// (сумма с начала месяца до сегодня), а не на полный месячный.
+// Срабатывает когда currentPlan ≈ previousPlan × (elapsedDays / daysInMonth).
+function assessPlanHealth(db, period, currentPlan) {
+  const now = new Date();
+  const todayMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const isCurrentMonth = period === todayMonth;
+  if (!isCurrentMonth || !currentPlan || currentPlan <= 0) {
+    return { ok: true };
+  }
+
+  const prevPeriod = previousPeriod(period);
+  const prev = aggregatePeriodCore(db, prevPeriod);
+  const previousPlan = prev?.totals?.plan || 0;
+  if (previousPlan <= 0) return { ok: true };
+
+  const daysInMonth = daysInPeriod(period);
+  const elapsedDays = Math.max(now.getUTCDate(), 1);
+  const elapsedRatio = Math.min(elapsedDays / daysInMonth, 1);
+
+  // Если план "съёжен" и совпадает с долей прошедших дней от прошлого плана —
+  // это явный признак накопительного плана от 1С.
+  const expectedAccumulated = previousPlan * elapsedRatio;
+  const matchAccumulated = currentPlan / Math.max(expectedAccumulated, 1);
+  const ratioVsPrev = currentPlan / previousPlan;
+
+  if (matchAccumulated >= 0.6 && matchAccumulated <= 1.4 && ratioVsPrev < 0.6 && elapsedRatio < 0.7) {
+    return {
+      ok: false,
+      kind: 'accumulated',
+      currentPlan: roundMetric(currentPlan),
+      previousPlan: roundMetric(previousPlan),
+      expectedFullPlan: roundMetric(previousPlan),
+      elapsedRatio: roundMetric(elapsedRatio * 100),
+      message: 'План на текущий месяц похож на накопительный (только за прошедшие дни). Проверьте, что в 1С запрос плана берёт обороты за весь месяц, а не до текущей даты.'
+    };
+  }
+
+  return { ok: true };
 }
 
 function storeDetails(db, period, storeId) {

@@ -316,6 +316,33 @@ function renderSourceBadge(source) {
   return ` <span class="store-source store-source-${source}">${label}</span>`;
 }
 
+// ── Баннер «План на текущий месяц похож на накопительный» ────────────────────
+function renderPlanHealth(summary) {
+  const el = $('planHealthBanner');
+  if (!el) return;
+  const ph = summary?.planHealth;
+  if (!ph || ph.ok || ph.kind !== 'accumulated') {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="phb-icon">⚠</div>
+    <div class="phb-body">
+      <div class="phb-title">План текущего месяца возможно неполный</div>
+      <div class="phb-text">
+        Сейчас в дашборде <strong>${formatMoney(ph.currentPlan)}</strong>,
+        но прошлый месяц был <strong>${formatMoney(ph.previousPlan)}</strong>.
+        Похоже, 1С прислал план только за прошедшие дни месяца
+        (${ph.elapsedRatio}% от месяца), а не на весь май.
+        Покажите 1С-разработчику: в запросе плана <code>КонецПериода</code>
+        нужно установить как <code>КонецМесяца(НачПериода)</code>, а не <code>ТекущаяДата()</code>.
+      </div>
+    </div>
+  `;
+}
+
 // ── Forecast ───────────────────────────────────────────────────────────────
 function renderForecast(summary) {
   const f = summary.forecast;
@@ -849,6 +876,7 @@ async function loadSummary() {
   }
 
   applyMarginVisibility(summary);
+  renderPlanHealth(summary);
   renderKpis(summary);
   renderForecast(summary);
   renderTrendChart(summary);
