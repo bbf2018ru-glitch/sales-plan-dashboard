@@ -113,16 +113,24 @@ function effectiveElapsedDays(period, lastSaleAt) {
     return Number.isNaN(lastSaleDate.getTime()) ? 0 : Math.min(lastSaleDate.getDate(), totalDays);
   }
 
-  const candidateDates = [now];
+  // Текущий период: учитываем только сегодняшнюю дату.
+  // Старая логика брала max(now.getDate(), lastSaleAt.getDate()), но если
+  // в 1С BSL soldAt = дата выгрузки (а не реальная дата чека), то lastSaleAt
+  // мог быть из ПРЕДЫДУЩЕГО месяца с днём 30 — и elapsedDays некорректно
+  // прыгал на 30 при 4-м числе текущего месяца.
+  // Учитываем lastSaleAt только если он попадает в этот же месяц И позже сегодня.
+  let day = now.getDate();
   if (lastSaleAt) {
     const lastSaleDate = new Date(lastSaleAt);
     if (!Number.isNaN(lastSaleDate.getTime())) {
-      candidateDates.push(lastSaleDate);
+      const sameMonth = lastSaleDate.getFullYear() === parsedPeriod.year
+        && lastSaleDate.getMonth() + 1 === parsedPeriod.month;
+      if (sameMonth) {
+        day = Math.max(day, lastSaleDate.getDate());
+      }
     }
   }
-
-  const maxDay = Math.max(...candidateDates.map((date) => date.getDate()));
-  return Math.min(Math.max(maxDay, 1), totalDays);
+  return Math.min(Math.max(day, 1), totalDays);
 }
 
 function forecastTone(value) {
@@ -365,6 +373,7 @@ function aggregatePeriodCore(db, period) {
       storeId: store.id,
       storeName: store.name,
       region: store.region || '',
+      source: store.source || '',
       plan: 0,
       fact: 0,
       cost: 0,
@@ -392,6 +401,7 @@ function aggregatePeriodCore(db, period) {
         storeId: row.storeId,
         storeName: row.storeId,
         region: '',
+        source: '',
         plan: 0,
         fact: 0,
         cost: 0,
@@ -421,6 +431,7 @@ function aggregatePeriodCore(db, period) {
         storeId: row.storeId,
         storeName: row.storeId,
         region: '',
+        source: '',
         plan: 0,
         fact: 0,
         cost: 0,

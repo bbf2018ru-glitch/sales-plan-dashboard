@@ -48,8 +48,8 @@ class PostgresStore {
       await client.query('begin');
       for (const s of (sample.stores || [])) {
         await client.query(
-          `insert into stores (id, name, region) values ($1, $2, $3) on conflict (id) do nothing`,
-          [s.id, s.name, s.region || '']
+          `insert into stores (id, name, region, source) values ($1, $2, $3, $4) on conflict (id) do nothing`,
+          [s.id, s.name, s.region || '', s.source || '']
         );
       }
       for (const p of (sample.products || [])) {
@@ -84,7 +84,7 @@ class PostgresStore {
     await this.init();
 
     const [stores, products, plans, sales, users, userStores] = await Promise.all([
-      this.pool.query('select id, name, region from stores order by name'),
+      this.pool.query('select id, name, region, source from stores order by name'),
       this.pool.query('select id, name, category from products order by name'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount from plans'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount, cost, gross_profit as "grossProfit", quantity, sold_at as "soldAt" from sales'),
@@ -170,12 +170,13 @@ class PostgresStore {
 
       for (const store of Array.isArray(body.stores) ? body.stores : []) {
         await client.query(
-          `insert into stores (id, name, region)
-           values ($1, $2, $3)
+          `insert into stores (id, name, region, source)
+           values ($1, $2, $3, $4)
            on conflict (id) do update set
              name = excluded.name,
-             region = excluded.region`,
-          [String(store.id), store.name || String(store.id), store.region || '']
+             region = excluded.region,
+             source = case when excluded.source = '' then stores.source else excluded.source end`,
+          [String(store.id), store.name || String(store.id), store.region || '', store.source || '']
         );
       }
 
@@ -227,12 +228,13 @@ class PostgresStore {
 
       for (const store of Array.isArray(body.stores) ? body.stores : []) {
         await client.query(
-          `insert into stores (id, name, region)
-           values ($1, $2, $3)
+          `insert into stores (id, name, region, source)
+           values ($1, $2, $3, $4)
            on conflict (id) do update set
              name = excluded.name,
-             region = excluded.region`,
-          [String(store.id), store.name || String(store.id), store.region || '']
+             region = excluded.region,
+             source = case when excluded.source = '' then stores.source else excluded.source end`,
+          [String(store.id), store.name || String(store.id), store.region || '', store.source || '']
         );
       }
 
@@ -339,12 +341,13 @@ class PostgresStore {
 
       for (const store of normalized.stores) {
         await client.query(
-          `insert into stores (id, name, region)
-           values ($1, $2, $3)
+          `insert into stores (id, name, region, source)
+           values ($1, $2, $3, $4)
            on conflict (id) do update set
              name = excluded.name,
-             region = excluded.region`,
-          [store.id, store.name, store.region || '']
+             region = excluded.region,
+             source = case when excluded.source = '' then stores.source else excluded.source end`,
+          [store.id, store.name, store.region || '', store.source || '']
         );
       }
 

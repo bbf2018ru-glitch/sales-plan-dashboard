@@ -11,6 +11,30 @@ const { getUpcomingEvents, seasonalContext, holidayDaysInPeriod } = require('./c
 function detectAnomalies(summary, db, period) {
   const findings = [];
 
+  // Если в периоде нет ни планов, ни фактов — это просто будущий или ещё
+  // не загруженный месяц. Не показываем «прогноз 0%», «-100% YoY» и пр.
+  // Возвращаем только upcoming holidays.
+  const hasAnyData = (summary.totals.plan || 0) > 0 || (summary.totals.fact || 0) > 0;
+  if (!hasAnyData) {
+    const upcoming = getUpcomingEvents(35).filter((e) => e.impact !== 'low');
+    if (upcoming.length) {
+      const e = upcoming[0];
+      findings.push({
+        severity: e.daysFromNow <= 7 ? 'high' : 'medium',
+        kind: 'upcoming-holiday',
+        headline: `${e.name} — через ${e.daysFromNow} дн. (${e.date})`,
+        detail: e.note || 'Закладывайте плановый рост спроса. Заказы на торты приходят за несколько дней.',
+      });
+    }
+    findings.push({
+      severity: 'low',
+      kind: 'no-data',
+      headline: 'За этот период данных пока нет',
+      detail: 'Дождитесь выгрузки из 1С или выберите другой период в селекторе.',
+    });
+    return findings;
+  }
+
   // 1. Точки в риске — выполнение < 80% при оставшихся днях ≤ 7
   const remainingDays = summary.forecast.remainingDays;
   if (remainingDays > 0 && remainingDays <= 10) {

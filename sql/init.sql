@@ -1,8 +1,12 @@
 create table if not exists stores (
   id text primary key,
   name text not null,
-  region text not null default ''
+  region text not null default '',
+  source text not null default ''
 );
+
+-- Идемпотентная миграция для существующих БД
+alter table stores add column if not exists source text not null default '';
 
 create table if not exists products (
   id text primary key,

@@ -42,10 +42,23 @@ async function buildReportText(store) {
 
   const f = summary.forecast;
   const upcoming = getUpcomingEvents(14).filter((e) => e.impact !== 'low').slice(0, 2);
+  const hasAnyData = (summary.totals.plan || 0) > 0 || (summary.totals.fact || 0) > 0;
 
   const lines = [];
   lines.push(`<b>Мария — утренний отчёт за ${fmtDate(yesterday)}</b>`);
   lines.push('');
+
+  if (!hasAnyData) {
+    lines.push(`<i>Данных от 1С за ${period} ещё не приходило.</i>`);
+    if (upcoming.length) {
+      lines.push('');
+      lines.push('<b>Впереди:</b>');
+      for (const e of upcoming) {
+        lines.push(`• ${e.name} — через ${e.daysFromNow} дн.`);
+      }
+    }
+    return lines.join('\n');
+  }
 
   if (yesterdayFact > 0) {
     lines.push(`Вчера: <b>${fmt(yesterdayFact)} ₽</b>`);
@@ -73,8 +86,8 @@ async function buildReportText(store) {
     }
   }
 
-  // YoY
-  if (summary.yoy?.hasData) {
+  // YoY — только если у текущего периода есть факт (иначе -100% бессмыслен)
+  if (summary.yoy?.hasData && summary.totals.fact > 0) {
     const sign = summary.yoy.factDeltaPercent >= 0 ? '+' : '';
     lines.push('');
     lines.push(`vs тот же месяц год назад: <b>${sign}${summary.yoy.factDeltaPercent}%</b>`);
