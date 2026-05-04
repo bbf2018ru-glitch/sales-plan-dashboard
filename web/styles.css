@@ -2358,3 +2358,29 @@ tfoot td { border-top: 1px solid var(--line); }
     --muted: #555;
   }
 }
+
+/* ── Source badge (розница / упр.учёт / опт) ─────────────────────────────── */
+.store-source {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  vertical-align: 1px;
+  margin-left: 6px;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+.store-source-retail    { color: #38bdf8; }
+.store-source-corporate { color: #c084fc; }
+.store-source-wholesale { color: #fbbf24; }
+
+/* ── Авто-скрытие margin-колонок и карточек, когда нет данных по марже ────── */
+body.no-margin-data .col-margin,
+body.no-margin-data .kpi-margin,
+body.no-margin-data .cmp-row-margin {
+  display: none !important;
+}
+

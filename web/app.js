@@ -289,16 +289,31 @@ function renderKpis(summary) {
     { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: '', tone: 'neutral' },
     { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt, tone: 'neutral' },
     { label: 'Выполнение', value: `${summary.totals.completion}%`,    sub: '', tone: pctTone(summary.totals.completion) },
-    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С', tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad' },
+    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С', tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
     { label: 'Прогноз',    value: formatMoney(f.projectedFact),       sub: `${f.projectedCompletion}% к плану`, tone: f.tone },
     { label: 'Нужно/день', value: formatMoney(f.requiredPerDayToPlan), sub: `осталось ${f.remainingDays} дн.`, tone: f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral' }
   ];
   $('kpis').innerHTML = cards.map(c => `
-    <article class="kpi ${c.tone}">
+    <article class="kpi ${c.tone} ${c.cls || ''}">
       <div class="kpi-label">${c.label}</div>
       <div class="kpi-value">${c.value}</div>
       ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
     </article>`).join('');
+}
+
+// ── Авто-определение «маржа недоступна» — скрывает margin-колонки/карточки ────
+function applyMarginVisibility(summary) {
+  const stores = summary?.stores || [];
+  const noMargin = stores.length > 0 && !stores.some(s => isNum(s.margin));
+  document.body.classList.toggle('no-margin-data', noMargin);
+}
+
+// ── Бейдж источника данных по магазину (1С: розница / упр.учёт) ──────────────
+const SOURCE_LABELS = { retail: 'Розница', corporate: 'Упр.учёт', wholesale: 'Опт' };
+function renderSourceBadge(source) {
+  if (!source) return '';
+  const label = SOURCE_LABELS[source] || source;
+  return ` <span class="store-source store-source-${source}">${label}</span>`;
 }
 
 // ── Forecast ───────────────────────────────────────────────────────────────
@@ -350,7 +365,7 @@ function renderCmpCard(label, c) {
       <div class="cmp-row"><span>Факт</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDelta, formatMoney)}</strong></div>
       <div class="cmp-row"><span>Изм. %</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDeltaPercent, v => v.toFixed(1) + '%')}</strong></div>
       <div class="cmp-row"><span>Выполнение</span><strong class="${c.completionDelta >= 0 ? 'positive' : 'negative'}">${signed(c.completionDelta, v => v.toFixed(1) + ' п.п.')}</strong></div>
-      <div class="cmp-row"><span>Маржа</span><strong class="${!isNum(c.marginDelta) ? '' : c.marginDelta >= 0 ? 'positive' : 'negative'}">${isNum(c.marginDelta) ? signed(c.marginDelta, formatMoney) : '—'}</strong></div>
+      <div class="cmp-row cmp-row-margin"><span>Маржа</span><strong class="${!isNum(c.marginDelta) ? '' : c.marginDelta >= 0 ? 'positive' : 'negative'}">${isNum(c.marginDelta) ? signed(c.marginDelta, formatMoney) : '—'}</strong></div>
       <div class="cmp-row"><span>Количество</span><strong class="${c.quantityDelta >= 0 ? 'positive' : 'negative'}">${signed(c.quantityDelta, formatNum)}</strong></div>
     </div>
   </div>`;
@@ -413,7 +428,7 @@ function renderStores(summary) {
     return `
     <tr data-store-id="${s.storeId}" class="${state.selectedStoreId === s.storeId ? 'active' : ''}">
       <td class="col-num">${idx + 1}</td>
-      <td>${s.storeName}<br><small class="muted">${s.region || ''}</small></td>
+      <td>${s.storeName}${renderSourceBadge(s.source)}<br><small class="muted">${s.region || ''}</small></td>
       <td class="num">${formatMoney(s.fact)}</td>
       <td class="num">${formatMoney(s.plan)}</td>
       <td class="num">
@@ -422,8 +437,8 @@ function renderStores(summary) {
           <div class="pct-track"><div class="pct-bar ${tone}" style="width:${Math.min(s.percent, 140)}%"></div></div>
         </div>
       </td>
-      <td class="num ${!isNum(s.margin) ? '' : s.margin >= 0 ? 'positive' : 'negative'}">${formatMoney(s.margin)}</td>
-      <td class="num ${!isNum(s.marginPct) ? '' : s.marginPct >= 20 ? 'good' : s.marginPct >= 10 ? 'warn' : 'bad'}">${formatPct(s.marginPct)}</td>
+      <td class="num col-margin ${!isNum(s.margin) ? '' : s.margin >= 0 ? 'positive' : 'negative'}">${formatMoney(s.margin)}</td>
+      <td class="num col-margin ${!isNum(s.marginPct) ? '' : s.marginPct >= 20 ? 'good' : s.marginPct >= 10 ? 'warn' : 'bad'}">${formatPct(s.marginPct)}</td>
       <td class="num">${avgCheck > 0 ? formatMoney(avgCheck) : '—'}</td>
       <td class="num">${formatNum(s.quantity)}</td>
       <td class="num"><span class="spark"><span class="spark-fill ${tone}" style="width:${Math.min(s.percent, 100)}%"></span></span></td>
@@ -461,23 +476,42 @@ function openPlanEdit(storeId, stores) {
   $('modalStoreName').textContent = store.storeName + (store.region ? ` · ${store.region}` : '');
 
   fetchJson(`/api/dashboard/store?period=${encodeURIComponent(state.period)}&storeId=${encodeURIComponent(storeId)}`).then(d => {
-    const items = d.items || [];
+    const allItems = d.items || [];
+    const items = allItems.filter(item => item.productId !== '_total');
+    const totalAggregate = allItems.find(item => item.productId === '_total');
     state.editPlanData = items.map(item => ({ ...item, newPlan: item.plan }));
-    $('planEditBody').innerHTML = state.editPlanData.map((item, i) => `
-      <tr>
-        <td>${item.productName}<br><small class="muted">${item.category || ''}</small></td>
-        <td class="num">${formatMoney(item.plan)}</td>
-        <td class="num">
-          <input class="plan-edit-input" data-idx="${i}" type="number" value="${item.plan}" min="0" step="1000" />
-        </td>
-      </tr>`).join('');
 
-    document.querySelectorAll('.plan-edit-input').forEach(input => {
-      input.addEventListener('change', e => {
-        const idx = Number(e.target.dataset.idx);
-        state.editPlanData[idx].newPlan = Number(e.target.value) || 0;
+    if (items.length === 0 && totalAggregate) {
+      // План задан только агрегатом по магазину — редактирование по товарам невозможно
+      $('planEditBody').innerHTML = `
+        <tr>
+          <td colspan="3" style="padding:18px;text-align:center;color:var(--muted);font-size:13px;line-height:1.55">
+            План этой точки задан агрегатом по магазину
+            (<strong>${formatMoney(totalAggregate.plan)}</strong>),
+            без разбивки по товарам.<br>
+            <span class="muted" style="font-size:12px">Чтобы изменить — отредактируйте план в 1С.</span>
+          </td>
+        </tr>`;
+    } else if (items.length === 0) {
+      $('planEditBody').innerHTML = `
+        <tr><td colspan="3" style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Нет товаров для редактирования.</td></tr>`;
+    } else {
+      $('planEditBody').innerHTML = state.editPlanData.map((item, i) => `
+        <tr>
+          <td>${item.productName}<br><small class="muted">${item.category || ''}</small></td>
+          <td class="num">${formatMoney(item.plan)}</td>
+          <td class="num">
+            <input class="plan-edit-input" data-idx="${i}" type="number" value="${item.plan}" min="0" step="1000" />
+          </td>
+        </tr>`).join('');
+
+      document.querySelectorAll('.plan-edit-input').forEach(input => {
+        input.addEventListener('change', e => {
+          const idx = Number(e.target.dataset.idx);
+          state.editPlanData[idx].newPlan = Number(e.target.value) || 0;
+        });
       });
-    });
+    }
 
     $('planEditModal').classList.remove('hidden');
   }).catch(() => alert('Ошибка загрузки данных точки'));
@@ -814,6 +848,7 @@ async function loadSummary() {
     $('storeDetailTitle').textContent = summary.stores[0].storeName;
   }
 
+  applyMarginVisibility(summary);
   renderKpis(summary);
   renderForecast(summary);
   renderTrendChart(summary);
