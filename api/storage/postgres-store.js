@@ -482,6 +482,45 @@ class PostgresStore {
     );
     return result.rows[0];
   }
+
+  // ── 1С Diagnostic ──────────────────────────────────────────────────────────
+  async saveUppDiagnostic({ configName, configVersion, payload }) {
+    await this.init();
+    const json = JSON.stringify(payload);
+    const sizeBytes = Buffer.byteLength(json, 'utf8');
+    const result = await this.pool.query(
+      `insert into upp_diagnostic (config_name, config_version, size_bytes, payload)
+       values ($1, $2, $3, $4::jsonb)
+       returning id, received_at as "receivedAt", size_bytes as "sizeBytes"`,
+      [configName || '', configVersion || '', sizeBytes, json]
+    );
+    // Trim — храним последние 10 снимков, более старые удаляем
+    await this.pool.query(`
+      delete from upp_diagnostic
+      where id not in (select id from upp_diagnostic order by received_at desc limit 10)
+    `);
+    return result.rows[0];
+  }
+
+  async getLatestUppDiagnostic() {
+    await this.init();
+    const r = await this.pool.query(
+      `select id, received_at as "receivedAt", config_name as "configName",
+              config_version as "configVersion", size_bytes as "sizeBytes", payload
+       from upp_diagnostic order by received_at desc limit 1`
+    );
+    return r.rows[0] || null;
+  }
+
+  async listUppDiagnostics() {
+    await this.init();
+    const r = await this.pool.query(
+      `select id, received_at as "receivedAt", config_name as "configName",
+              config_version as "configVersion", size_bytes as "sizeBytes"
+       from upp_diagnostic order by received_at desc`
+    );
+    return r.rows;
+  }
 }
 
 module.exports = {

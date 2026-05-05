@@ -512,6 +512,72 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── 1С Diagnostic / Explorer ──────────────────────────────────────────────
+    if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
+      if (!requireApiKey(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        const saved = await store.saveUppDiagnostic({
+          configName: body.configurationName || '',
+          configVersion: body.configurationVersion || '',
+          payload: body
+        });
+        sendJson(res, 200, { ok: true, ...saved });
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || 'Diagnostic save failed' });
+      }
+      return;
+    }
+
+    if (pathname === '/api/upp-explorer/latest' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      const dump = await store.getLatestUppDiagnostic();
+      if (!dump) {
+        sendJson(res, 200, { hasData: false });
+        return;
+      }
+      // index — компактный список объектов для дерева
+      const objects = (dump.payload?.objects || []).map(o => ({
+        kind: o.kind, name: o.name, synonym: o.synonym
+      }));
+      sendJson(res, 200, {
+        hasData: true,
+        receivedAt: dump.receivedAt,
+        configName: dump.configName,
+        configVersion: dump.configVersion,
+        sizeBytes: dump.sizeBytes,
+        objectsCount: objects.length,
+        objects
+      });
+      return;
+    }
+
+    if (pathname === '/api/upp-explorer/object' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      const kind = parsedUrl.searchParams.get('kind');
+      const name = parsedUrl.searchParams.get('name');
+      if (!kind || !name) {
+        sendJson(res, 400, { error: 'kind and name required' });
+        return;
+      }
+      const dump = await store.getLatestUppDiagnostic();
+      const obj = (dump?.payload?.objects || []).find(o => o.kind === kind && o.name === name);
+      if (!obj) {
+        sendJson(res, 404, { error: 'Not found' });
+        return;
+      }
+      sendJson(res, 200, obj);
+      return;
+    }
+
     // ── Static ────────────────────────────────────────────────────────────────
     serveStatic(res, pathname);
 

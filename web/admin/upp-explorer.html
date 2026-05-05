@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1С Explorer · Мария</title>
+  <link rel="icon" type="image/png" href="/logo-girl.png">
+  <link rel="stylesheet" href="/styles.css?v=16">
+  <style>
+    .ux-shell { display: grid; grid-template-columns: 320px 1fr; gap: 14px; padding: 14px; min-height: 100vh; position: relative; z-index: 1; }
+    .ux-side {
+      background: var(--glass);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 16px;
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      backdrop-filter: blur(28px) saturate(180%);
+      position: sticky; top: 14px; height: calc(100vh - 28px); overflow-y: auto;
+      box-shadow: var(--glow-card);
+    }
+    .ux-main {
+      background: var(--glass);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 22px 26px;
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      backdrop-filter: blur(28px) saturate(180%);
+      box-shadow: var(--glow-card);
+      min-width: 0;
+    }
+    .ux-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+    .ux-title { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+    .ux-meta  { font-size: 11px; color: var(--hint); }
+    .ux-search input {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--glass);
+      color: var(--ink); font: inherit; font-size: 13px;
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    }
+    .ux-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .ux-tree { margin-top: 12px; }
+    .ux-cat-h {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .14em; color: var(--hint);
+      padding: 12px 4px 6px; display: flex; justify-content: space-between;
+    }
+    .ux-cat-h .cnt { color: var(--muted); font-weight: 500; }
+    .ux-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; transition: all .12s; gap: 8px;
+    }
+    .ux-item:hover { background: var(--glass-strong); color: var(--accent); }
+    .ux-item.active {
+      background: linear-gradient(90deg, var(--accent-soft), transparent 60%);
+      box-shadow: inset 2px 0 0 var(--accent);
+      color: var(--accent);
+    }
+    .ux-item .syn { font-size: 11px; color: var(--hint); flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ux-pill {
+      display: inline-block; padding: 1px 7px; border-radius: 5px;
+      font-size: 9px; font-weight: 600; letter-spacing: .06em;
+      background: var(--glass-strong); border: 1px solid var(--line);
+      color: var(--muted); flex-shrink: 0;
+    }
+    .ux-empty { padding: 80px 20px; text-align: center; color: var(--hint); font-size: 14px; }
+    .ux-empty h2 { font-size: 18px; color: var(--ink); margin-bottom: 8px; }
+    .ux-empty code {
+      display: inline-block; padding: 4px 10px; border-radius: 6px;
+      background: rgba(0,0,0,.2); font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--accent); margin: 4px;
+    }
+
+    .ux-prop-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 18px; }
+    .ux-prop-table th { padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--hint); border-bottom: 1px solid var(--line); text-align: left; font-weight: 600; }
+    .ux-prop-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    .ux-prop-table .kind {
+      display: inline-block; padding: 1px 7px; border-radius: 5px;
+      font-size: 10px; font-weight: 600; letter-spacing: .06em;
+    }
+    .kind-Измерение { background: rgba(124,92,255,.15); color: #a99dff; }
+    .kind-Ресурс    { background: rgba(34,197,94,.15);  color: #4ade80; }
+    .kind-Реквизит  { background: rgba(56,189,248,.15); color: #7dd3fc; }
+    .kind-Свойство  { background: rgba(156,163,175,.15); color: #9ca3af; }
+
+    .ux-section-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: var(--hint); margin: 18px 0 10px; }
+
+    .ux-sample-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ux-sample-table th { padding: 7px 9px; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--hint); border-bottom: 1px solid var(--line); text-align: left; font-weight: 600; white-space: nowrap; }
+    .ux-sample-table td { padding: 7px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+    .ux-sample-wrap { overflow-x: auto; }
+
+    .ux-login-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .ux-login-overlay.hidden { display: none !important; }
+    .ux-login-box { background: var(--glass-strong); border: 1px solid var(--glass-edge); border-radius: 22px; padding: 32px; max-width: 360px; width: 90%; backdrop-filter: blur(40px); box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+    .ux-login-box h2 { font-size: 20px; margin-bottom: 16px; font-weight: 600; }
+    .ux-login-box input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--glass); color: var(--ink); font: inherit; font-size: 14px; margin-bottom: 12px; }
+    .ux-login-box button { width: 100%; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--accent), #ff9a76); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    .ux-login-box .err { color: var(--bad); font-size: 12px; min-height: 16px; margin-top: 8px; }
+
+    @media (max-width: 900px) {
+      .ux-shell { grid-template-columns: 1fr; padding: 8px; gap: 10px; }
+      .ux-side { position: static; height: auto; max-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loginOverlay" class="ux-login-overlay">
+  <div class="ux-login-box">
+    <h2>Доступ к 1С Explorer</h2>
+    <p style="font-size:12px; color: var(--muted); margin-bottom:12px">Нужен токен админа</p>
+    <input id="userTokenInp" type="text" placeholder="X-User-Token" autocomplete="off">
+    <button onclick="loginExplorer()">Войти</button>
+    <div id="loginErr" class="err"></div>
+    <p style="font-size:11px; color: var(--hint); margin-top: 12px; line-height: 1.5">
+      Токен берётся из главного дашборда (раздел «Доступы») или из URL <code>?userToken=...</code>
+    </p>
+  </div>
+</div>
+
+<div class="ux-shell" id="shell" style="display:none">
+  <aside class="ux-side">
+    <div class="ux-h">
+      <div>
+        <div class="ux-title">1С Explorer</div>
+        <div class="ux-meta" id="metaInfo">загрузка...</div>
+      </div>
+      <a href="/" class="icon-btn" title="К дашборду">←</a>
+    </div>
+    <div class="ux-search">
+      <input id="searchInp" type="text" placeholder="Поиск по имени/синониму..." oninput="renderTree()">
+    </div>
+    <div class="ux-tree" id="tree"></div>
+  </aside>
+
+  <main class="ux-main" id="main">
+    <div class="ux-empty" id="empty">
+      <h2>Снимок ещё не получен</h2>
+      <p>Чтобы Explorer заработал, попроси Hellstaff'а добавить блок <code>ВыгрузитьДиагностику()</code> в существующий модуль <code>ДашбордПродаж</code>.</p>
+      <p style="margin-top:14px; font-size:12px">Готовый код для него — внизу этой страницы (<a href="#bsl" style="color:var(--accent)">▼ BSL-снippet</a>).</p>
+      <hr style="border:none; border-top:1px solid var(--line); margin: 30px 0">
+      <h2 id="bsl" style="font-size:14px">BSL-код для добавления в модуль</h2>
+      <pre id="bslSnippet" style="text-align:left; background: rgba(0,0,0,.25); padding: 16px; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; overflow-x: auto; max-height: 400px; overflow-y: auto;">// см. ниже после загрузки</pre>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let state = { token: '', dump: null, selected: null, tree: [] };
+
+function getTokenFromUrl() {
+  const u = new URL(window.location.href);
+  const t = u.searchParams.get('userToken');
+  if (t) {
+    localStorage.setItem('maria_user_token', t);
+    u.searchParams.delete('userToken');
+    window.history.replaceState({}, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : ''));
+    return t;
+  }
+  return localStorage.getItem('maria_user_token') || '';
+}
+
+function loginExplorer() {
+  const t = $('userTokenInp').value.trim();
+  if (!t) return;
+  localStorage.setItem('maria_user_token', t);
+  state.token = t;
+  init();
+}
+
+async function api(path) {
+  const r = await fetch(path, { headers: { 'X-User-Token': state.token } });
+  if (r.status === 401) { showLogin('Неверный токен или нет прав admin'); throw new Error('auth'); }
+  if (!r.ok) throw new Error('http ' + r.status);
+  return r.json();
+}
+
+function showLogin(err) {
+  $('loginOverlay').classList.remove('hidden');
+  $('shell').style.display = 'none';
+  $('loginErr').textContent = err || '';
+}
+
+function hideLogin() {
+  $('loginOverlay').classList.add('hidden');
+  $('shell').style.display = '';
+}
+
+async function init() {
+  state.token = state.token || getTokenFromUrl();
+  if (!state.token) { showLogin(); return; }
+  hideLogin();
+  try {
+    const d = await api('/api/upp-explorer/latest');
+    state.dump = d;
+    renderMeta();
+    renderBslSnippet();
+    if (d.hasData) {
+      state.tree = d.objects;
+      renderTree();
+    } else {
+      $('main').innerHTML = $('empty').outerHTML;
+      renderBslSnippet();
+    }
+  } catch (e) {
+    if (e.message !== 'auth') alert('Ошибка: ' + e.message);
+  }
+}
+
+function renderMeta() {
+  const d = state.dump;
+  if (!d.hasData) { $('metaInfo').textContent = 'нет снимка'; return; }
+  const dt = new Date(d.receivedAt);
+  const age = Math.round((Date.now() - dt) / 60000);
+  const ageStr = age < 60 ? `${age} мин назад` : age < 1440 ? `${Math.round(age/60)} ч назад` : `${Math.round(age/1440)} дн назад`;
+  $('metaInfo').textContent = `${d.configName || '?'} v${d.configVersion || ''} · ${ageStr} · ${d.objectsCount} объектов`;
+}
+
+function renderTree() {
+  if (!state.dump?.hasData) return;
+  const q = $('searchInp').value.trim().toLowerCase();
+  const filtered = !q ? state.tree :
+    state.tree.filter(o => (o.name || '').toLowerCase().includes(q) || (o.synonym || '').toLowerCase().includes(q));
+
+  // Группировка по kind
+  const ORDER = ['РегистрНакопления','Документ','Справочник','РегистрСведений','Перечисление','ПланВидовХарактеристик','РегистрБухгалтерии','РегистрРасчета','ПланСчетов','ПланОбмена'];
+  const groups = {};
+  for (const o of filtered) {
+    const k = o.kind || '?';
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(o);
+  }
+  const keys = Object.keys(groups).sort((a,b) => {
+    const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  $('tree').innerHTML = keys.map(k => `
+    <div class="ux-cat">
+      <div class="ux-cat-h"><span>${escapeHtml(k)}</span><span class="cnt">${groups[k].length}</span></div>
+      ${groups[k].sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(o => `
+        <div class="ux-item ${state.selected && state.selected.kind === o.kind && state.selected.name === o.name ? 'active' : ''}"
+             onclick="selectObject('${escapeAttr(o.kind)}','${escapeAttr(o.name)}')">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(o.name)}</span>
+          <span class="syn">${escapeHtml(o.synonym || '')}</span>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+async function selectObject(kind, name) {
+  state.selected = { kind, name };
+  renderTree();
+  $('main').innerHTML = '<div class="ux-empty">Загрузка...</div>';
+  try {
+    const o = await api(`/api/upp-explorer/object?kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(name)}`);
+    renderObject(o);
+  } catch (e) {
+    $('main').innerHTML = `<div class="ux-empty">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderObject(o) {
+  const props = o.properties || [];
+  const dimensions = props.filter(p => p.kind === 'Измерение');
+  const resources  = props.filter(p => p.kind === 'Ресурс');
+  const attrs      = props.filter(p => p.kind === 'Реквизит');
+  const others     = props.filter(p => !['Измерение','Ресурс','Реквизит'].includes(p.kind));
+  const sample = o.sample || [];
+
+  let html = `
+    <div class="ux-h">
+      <div>
+        <div class="ux-title">${escapeHtml(o.name)}</div>
+        <div class="ux-meta">${escapeHtml(o.kind)} · ${escapeHtml(o.synonym || '')}</div>
+      </div>
+      <div class="ux-pill">${props.length} полей · ${sample.length} sample</div>
+    </div>`;
+
+  const renderPropTable = (title, list) => list.length ? `
+    <div class="ux-section-h">${title} (${list.length})</div>
+    <table class="ux-prop-table">
+      <thead><tr><th>Имя</th><th>Синоним</th><th>Тип</th></tr></thead>
+      <tbody>${list.map(p => `
+        <tr>
+          <td><strong>${escapeHtml(p.name)}</strong> <span class="kind kind-${escapeAttr(p.kind)}">${escapeHtml(p.kind)}</span></td>
+          <td style="color:var(--muted)">${escapeHtml(p.synonym || '')}</td>
+          <td style="color:var(--hint); font-family:monospace; font-size:11px">${escapeHtml(p.type || '')}</td>
+        </tr>`).join('')}</tbody>
+    </table>` : '';
+
+  html += renderPropTable('Измерения', dimensions);
+  html += renderPropTable('Ресурсы',   resources);
+  html += renderPropTable('Реквизиты', attrs);
+  if (others.length) html += renderPropTable('Прочие свойства', others);
+
+  if (sample.length) {
+    const cols = Object.keys(sample[0]);
+    html += `
+      <div class="ux-section-h">Sample-данные (${sample.length} строк)</div>
+      <div class="ux-sample-wrap">
+        <table class="ux-sample-table">
+          <thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+          <tbody>${sample.map(row => `
+            <tr>${cols.map(c => `<td title="${escapeAttr(String(row[c] ?? ''))}">${escapeHtml(formatValue(row[c]))}</td>`).join('')}</tr>
+          `).join('')}</tbody>
+        </table>
+      </div>`;
+  } else {
+    html += `<div class="ux-section-h">Sample-данные</div><p style="color:var(--hint); font-size:12px">Не выгружены (объект не из ключевых).</p>`;
+  }
+
+  $('main').innerHTML = html;
+}
+
+function formatValue(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  const s = String(v);
+  return s.length > 60 ? s.slice(0, 60) + '…' : s;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+function renderBslSnippet() {
+  const el = $('bslSnippet');
+  if (!el) return;
+  el.textContent = BSL_SNIPPET;
+}
+
+const BSL_SNIPPET = `// ─── ДИАГНОСТИЧЕСКАЯ ВЫГРУЗКА В ДАШБОРД ─────────────────────────────────────
+// Добавить в существующий модуль ДашбордПродаж.
+// Шлёт полную структуру конфигурации + sample ключевых регистров на дашборд
+// раз в сутки (в 00:00–01:00). Дашборд хранит снимок и отдаёт мне через
+// /admin/upp-explorer.html — я могу бродить без беспокойства Hellstaff'а.
+
+Процедура ВыгрузитьДиагностикуВДашборд() Экспорт
+    Хост   = "sales-plan-dashboard.onrender.com";
+    Порт   = 443;
+    Путь   = "/api/ingest/upp-diagnostic";
+    ApiKey = "85307b26064e3764b0b19ce3223353057b0fe754b31f0f3a";
+
+    Объекты = Новый Массив;
+
+    // 1. Регистры накопления (структура)
+    Для Каждого МД Из Метаданные.РегистрыНакопления Цикл
+        Объекты.Добавить(СобратьМетаОбъекта("РегистрНакопления", МД));
+    КонецЦикла;
+
+    // 2. Документы
+    Для Каждого МД Из Метаданные.Документы Цикл
+        Объекты.Добавить(СобратьМетаОбъекта("Документ", МД));
+    КонецЦикла;
+
+    // 3. Справочники
+    Для Каждого МД Из Метаданные.Справочники Цикл
+        Объекты.Добавить(СобратьМетаОбъекта("Справочник", МД));
+    КонецЦикла;
+
+    // 4. Перечисления (с значениями)
+    Для Каждого МД Из Метаданные.Перечисления Цикл
+        О = СобратьМетаОбъекта("Перечисление", МД);
+        Значения = Новый Массив;
+        Для Каждого Зн Из МД.ЗначенияПеречисления Цикл
+            Значения.Добавить(Новый Структура("name,synonym", Зн.Имя, Зн.Синоним));
+        КонецЦикла;
+        О.Вставить("values", Значения);
+        Объекты.Добавить(О);
+    КонецЦикла;
+
+    // 5. Регистры сведений (структура)
+    Для Каждого МД Из Метаданные.РегистрыСведений Цикл
+        Объекты.Добавить(СобратьМетаОбъекта("РегистрСведений", МД));
+    КонецЦикла;
+
+    // 6. Sample данных из ключевых регистров (за текущий месяц, до 50 строк)
+    НачМес = НачалоМесяца(ТекущаяДата());
+    КонМес = КонецМесяца(ТекущаяДата());
+    ДобавитьСамплРегистра(Объекты, "РегистрНакопления", "Продажи",
+        "ВЫБРАТЬ ПЕРВЫЕ 50 * ИЗ РегистрНакопления.Продажи
+        |ГДЕ Период МЕЖДУ &Н И &К", НачМес, КонМес);
+    ДобавитьСамплРегистра(Объекты, "РегистрНакопления", "ПродажиСебестоимость",
+        "ВЫБРАТЬ ПЕРВЫЕ 50 * ИЗ РегистрНакопления.ПродажиСебестоимость
+        |ГДЕ Период МЕЖДУ &Н И &К", НачМес, КонМес);
+    ДобавитьСамплРегистра(Объекты, "РегистрНакопления", "ф_ПланФактПоПродавцам",
+        "ВЫБРАТЬ ПЕРВЫЕ 50 * ИЗ РегистрНакопления.ф_ПланФактПоПродавцам
+        |ГДЕ Период МЕЖДУ &Н И &К", НачМес, КонМес);
+    ДобавитьСамплРегистра(Объекты, "РегистрНакопления", "ПланыПродаж",
+        "ВЫБРАТЬ ПЕРВЫЕ 50 * ИЗ РегистрНакопления.ПланыПродаж
+        |ГДЕ Период МЕЖДУ &Н И &К", НачМес, КонМес);
+
+    Пакет = Новый Структура;
+    Пакет.Вставить("configurationName",    Метаданные.Имя);
+    Пакет.Вставить("configurationVersion", Метаданные.Версия);
+    Пакет.Вставить("snapshotAt", Формат(ТекущаяДата(), "ДФ=yyyy-MM-ddTHH:mm:ss"));
+    Пакет.Вставить("objects",    Объекты);
+
+    JSONСтрока = СериализоватьJSON(Пакет);
+    ОтправитьPOST(Хост, Порт, Путь, ApiKey, JSONСтрока);
+    Сообщить("Диагностика 1С отправлена на дашборд (" + Объекты.Количество() + " объектов).");
+КонецПроцедуры
+
+Функция СобратьМетаОбъекта(Вид, МД)
+    Свойства = Новый Массив;
+
+    // Стандартные свойства
+    Если Метаданные.НайтиПоПолномуИмени(Вид + "." + МД.Имя) <> Неопределено Тогда
+        Если Вид = "РегистрНакопления" Тогда
+            Для Каждого И Из МД.Измерения Цикл
+                Свойства.Добавить(СобратьСвойство("Измерение", И));
+            КонецЦикла;
+            Для Каждого Р Из МД.Ресурсы Цикл
+                Свойства.Добавить(СобратьСвойство("Ресурс", Р));
+            КонецЦикла;
+            Для Каждого Р Из МД.Реквизиты Цикл
+                Свойства.Добавить(СобратьСвойство("Реквизит", Р));
+            КонецЦикла;
+        ИначеЕсли Вид = "РегистрСведений" Тогда
+            Для Каждого И Из МД.Измерения Цикл
+                Свойства.Добавить(СобратьСвойство("Измерение", И));
+            КонецЦикла;
+            Для Каждого Р Из МД.Ресурсы Цикл
+                Свойства.Добавить(СобратьСвойство("Ресурс", Р));
+            КонецЦикла;
+            Для Каждого Р Из МД.Реквизиты Цикл
+                Свойства.Добавить(СобратьСвойство("Реквизит", Р));
+            КонецЦикла;
+        ИначеЕсли Вид = "Документ" Тогда
+            Для Каждого Р Из МД.Реквизиты Цикл
+                Свойства.Добавить(СобратьСвойство("Реквизит", Р));
+            КонецЦикла;
+            Для Каждого Т Из МД.ТабличныеЧасти Цикл
+                Свойства.Добавить(СобратьСвойство("ТабличнаяЧасть", Т));
+                Для Каждого Р Из Т.Реквизиты Цикл
+                    Реквизит = СобратьСвойство("Реквизит", Р);
+                    Реквизит.name = Т.Имя + "." + Р.Имя;
+                    Свойства.Добавить(Реквизит);
+                КонецЦикла;
+            КонецЦикла;
+        ИначеЕсли Вид = "Справочник" Тогда
+            Для Каждого Р Из МД.Реквизиты Цикл
+                Свойства.Добавить(СобратьСвойство("Реквизит", Р));
+            КонецЦикла;
+            Для Каждого Т Из МД.ТабличныеЧасти Цикл
+                Свойства.Добавить(СобратьСвойство("ТабличнаяЧасть", Т));
+            КонецЦикла;
+        КонецЕсли;
+    КонецЕсли;
+
+    Стр = Новый Структура;
+    Стр.Вставить("kind", Вид);
+    Стр.Вставить("name", МД.Имя);
+    Стр.Вставить("synonym", МД.Синоним);
+    Стр.Вставить("comment", МД.Комментарий);
+    Стр.Вставить("properties", Свойства);
+    Возврат Стр;
+КонецФункции
+
+Функция СобратьСвойство(КлассСвойства, СвойствоМД)
+    Стр = Новый Структура;
+    Стр.Вставить("kind", КлассСвойства);
+    Стр.Вставить("name", СвойствоМД.Имя);
+    Стр.Вставить("synonym", СвойствоМД.Синоним);
+    Стр.Вставить("type", "" + СвойствоМД.Тип);
+    Возврат Стр;
+КонецФункции
+
+Процедура ДобавитьСамплРегистра(Объекты, Вид, Имя, ТекстЗапроса, Н, К)
+    Попытка
+        Запрос = Новый Запрос(ТекстЗапроса);
+        Запрос.УстановитьПараметр("Н", Н);
+        Запрос.УстановитьПараметр("К", К);
+        Таблица = Запрос.Выполнить().Выгрузить();
+        Sample = Новый Массив;
+        Для Каждого Стр Из Таблица Цикл
+            Запись = Новый Структура;
+            Для Каждого Кол Из Таблица.Колонки Цикл
+                Запись.Вставить(Кол.Имя, "" + Стр[Кол.Имя]);
+            КонецЦикла;
+            Sample.Добавить(Запись);
+        КонецЦикла;
+        // Найти объект и добавить sample
+        Для Каждого О Из Объекты Цикл
+            Если О.kind = Вид И О.name = Имя Тогда
+                О.Вставить("sample", Sample);
+                Прервать;
+            КонецЕсли;
+        КонецЦикла;
+    Исключение
+        Сообщить("Sample " + Имя + " пропущен: " + ОписаниеОшибки());
+    КонецПопытки;
+КонецПроцедуры
+
+// ─── В существующую процедуру ВыполнитьВыгрузкуВДашборд() ────────────────────
+// добавить ОДНУ строку в самый конец, перед КонецПроцедуры:
+//
+//    // Раз в сутки (между 00:00 и 01:00) шлём диагностику
+//    Если Час(ТекущаяДата()) = 0 Тогда
+//        Попытка ВыгрузитьДиагностикуВДашборд() Исключение Сообщить(ОписаниеОшибки()) КонецПопытки;
+//    КонецЕсли;
+`;
+
+init();
+</script>
+</body>
+</html>

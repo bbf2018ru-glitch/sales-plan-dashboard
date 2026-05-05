@@ -8,6 +8,17 @@ create table if not exists stores (
 -- Идемпотентная миграция для существующих БД
 alter table stores add column if not exists source text not null default '';
 
+-- Снимок структуры 1С (метаданные + sample), приходит из 1С раз в сутки
+create table if not exists upp_diagnostic (
+  id           serial primary key,
+  received_at  timestamptz not null default now(),
+  config_name  text,
+  config_version text,
+  size_bytes   integer not null default 0,
+  payload      jsonb   not null
+);
+create index if not exists idx_upp_diagnostic_received_at on upp_diagnostic(received_at desc);
+
 create table if not exists products (
   id text primary key,
   name text not null,

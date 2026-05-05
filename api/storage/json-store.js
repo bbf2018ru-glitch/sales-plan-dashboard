@@ -234,6 +234,38 @@ class JsonStore {
     await this.saveDb(db);
     return run;
   }
+
+  // ── 1С Diagnostic ──────────────────────────────────────────────────────────
+  async saveUppDiagnostic({ configName, configVersion, payload }) {
+    const db = await this.getDb();
+    if (!Array.isArray(db.uppDiagnostics)) db.uppDiagnostics = [];
+    const sizeBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    const entry = {
+      id: crypto.randomUUID(),
+      receivedAt: new Date().toISOString(),
+      configName: configName || '',
+      configVersion: configVersion || '',
+      sizeBytes,
+      payload
+    };
+    db.uppDiagnostics.unshift(entry);
+    db.uppDiagnostics = db.uppDiagnostics.slice(0, 10); // храним 10 последних
+    await this.saveDb(db);
+    return { id: entry.id, receivedAt: entry.receivedAt, sizeBytes };
+  }
+
+  async getLatestUppDiagnostic() {
+    const db = await this.getDb();
+    return (db.uppDiagnostics || [])[0] || null;
+  }
+
+  async listUppDiagnostics() {
+    const db = await this.getDb();
+    return (db.uppDiagnostics || []).map(d => ({
+      id: d.id, receivedAt: d.receivedAt,
+      configName: d.configName, configVersion: d.configVersion, sizeBytes: d.sizeBytes
+    }));
+  }
 }
 
 module.exports = {
