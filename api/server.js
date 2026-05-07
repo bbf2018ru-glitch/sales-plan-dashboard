@@ -512,6 +512,52 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Raw payload inspection (admin) — для диагностики что шлёт 1С ──────────
+    if (pathname === '/api/admin/last-raw-payload' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      const period = parsedUrl.searchParams.get('period') || '2026-05';
+      try {
+        let payload = null;
+        if (process.env.DATABASE_URL) {
+          const { Pool } = require('pg');
+          const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+          const r = await pool.query(
+            `select package_id, period, payload_json, created_at
+             from raw_upp_payloads where period = $1 order by created_at desc limit 1`, [period]);
+          await pool.end();
+          if (r.rows[0]) payload = r.rows[0];
+        } else {
+          const db = await store.getDb();
+          payload = (db.rawUppPayloads || []).filter(p => p.period === period)[0];
+        }
+        if (!payload) { sendJson(res, 404, { error: 'no payload' }); return; }
+        // Возвращаем сэмпл — первые продажи и магазины, чтобы не отдавать целиком 5+ MB
+        const data = typeof payload.payload_json === 'string' ? JSON.parse(payload.payload_json) : (payload.payload_json || payload);
+        const summary = {
+          packageId: payload.package_id || data.packageId,
+          period: payload.period || data.period,
+          createdAt: payload.created_at,
+          rootKeys: Object.keys(data),
+          storesCount: (data.stores || []).length,
+          firstStore: (data.stores || [])[0],
+          plansCount: (data.plans || []).length,
+          firstPlan: (data.plans || [])[0],
+          salesCount: (data.sales || []).length,
+          firstSale: (data.sales || [])[0],
+          salesWithCost: (data.sales || []).filter(s => s.cost > 0).length,
+          storesWithSource: (data.stores || []).filter(s => s.source).length
+        };
+        sendJson(res, 200, summary);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+
     // ── 1С Diagnostic / Explorer ──────────────────────────────────────────────
     if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
