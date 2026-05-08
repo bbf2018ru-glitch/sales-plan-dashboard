@@ -19,7 +19,15 @@ const { createStore } = require('./storage');
 loadProjectEnv();
 
 const PORT = Number(process.env.PORT || 3000);
-const API_KEY = process.env.INGEST_API_KEY || '85307b26064e3764b0b19ce3223353057b0fe754b31f0f3a';
+// INGEST_API_KEY: дефолт оставлен для обратной совместимости с уже задеплоенным
+// BSL-модулем в 1С. Если вы видите этот warning — поставьте свой ключ через
+// Render env, а в BSL-модуле обновите константу ApiKey, иначе любой может
+// слать данные в /api/ingest/upp по ключу из публичного GitHub.
+const DEFAULT_API_KEY = '85307b26064e3764b0b19ce3223353057b0fe754b31f0f3a';
+const API_KEY = process.env.INGEST_API_KEY || DEFAULT_API_KEY;
+if (!process.env.INGEST_API_KEY && process.env.DATABASE_URL) {
+  console.warn('[security] INGEST_API_KEY не задан — используется публичный дефолт. Установите свой ключ через Render env.');
+}
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'db.json');
 const SAMPLE_DB_PATH = path.join(__dirname, '..', 'data', 'sample-db.json');
 const DATABASE_URL = process.env.DATABASE_URL || '';
@@ -517,6 +525,31 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Wipe demo seed-data (admin) — удаляет фейковые stores из sample-db.json ──
+    // Реальные магазины из 1С имеют source='retail'/'corporate'/'mixed' и не
+    // пострадают. Удаляются только stores с source='' (это и есть seed-данные).
+    if (pathname === '/api/admin/wipe-demo' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      const apiKey = req.headers['x-api-key'];
+      // Авторизация: либо admin-токен, либо ingest-api-key (для bootstrap, когда
+      // админ-юзер ещё не создан после миграции БД).
+      const isAdmin = user && user.role === 'admin';
+      const isApiKey = apiKey && apiKey === API_KEY;
+      if (!isAdmin && !isApiKey) {
+        sendJson(res, 401, { error: 'Admin token or X-API-Key required' });
+        return;
+      }
+      try {
+        const stats = store.wipeDemoData
+          ? await store.wipeDemoData()
+          : { stores: 0, plans: 0, sales: 0, note: 'JSON store: skip' };
+        sendJson(res, 200, { ok: true, deleted: stats });
+      } catch (error) {
+        sendJson(res, 500, { error: error.message });
+      }
+      return;
+    }
+
     // ── Raw payload inspection (admin) — для диагностики что шлёт 1С ──────────
     if (pathname === '/api/admin/last-raw-payload' && req.method === 'GET') {
       const user = await resolveUser(req);
@@ -524,17 +557,11 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 401, { error: 'Admin required' });
         return;
       }
-      const period = parsedUrl.searchParams.get('period') || '2026-05';
+      const period = parsedUrl.searchParams.get('period') || monthKey();
       try {
         let payload = null;
-        if (process.env.DATABASE_URL) {
-          const { Pool } = require('pg');
-          const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-          const r = await pool.query(
-            `select package_id, period, payload_json, created_at
-             from raw_upp_payloads where period = $1 order by created_at desc limit 1`, [period]);
-          await pool.end();
-          if (r.rows[0]) payload = r.rows[0];
+        if (process.env.DATABASE_URL && store.getRawPayload) {
+          payload = await store.getRawPayload(period);
         } else {
           const db = await store.getDb();
           payload = (db.rawUppPayloads || []).filter(p => p.period === period)[0];

@@ -43,14 +43,52 @@ class PostgresStore {
       await this.pool.query(`delete from upp_diagnostic where id not in (select id from upp_diagnostic order by received_at desc limit 3)`);
     } catch (_) { /* таблицы может ещё не быть */ }
 
-    // Seed sample data on first run (when no stores exist)
-    const existing = await this.pool.query('select count(*)::int as cnt from stores');
-    if (existing.rows[0].cnt === 0) {
-      try {
-        const sample = JSON.parse(fs.readFileSync(SAMPLE_PATH, 'utf8'));
-        await this._seedSample(sample);
-      } catch (_) { /* non-fatal: seed failure should not break startup */ }
+    // Seed sample data on first run только если явно разрешено через env.
+    // Раньше засеивалось автоматически на пустой БД — это спамит прод
+    // фейковыми магазинами (angarsk-18 и т.д.) после миграции на свежую БД.
+    if (process.env.SEED_DEMO === 'yes') {
+      const existing = await this.pool.query('select count(*)::int as cnt from stores');
+      if (existing.rows[0].cnt === 0) {
+        try {
+          const sample = JSON.parse(fs.readFileSync(SAMPLE_PATH, 'utf8'));
+          await this._seedSample(sample);
+        } catch (_) { /* non-fatal: seed failure should not break startup */ }
+      }
     }
+  }
+
+  // Удаляет demo seed-данные: магазины с пустым source и всё связанное
+  // (sales/plans/user_stores). Реальные магазины из 1С имеют source='retail'/
+  // 'corporate'/'mixed' — они не пострадают.
+  async wipeDemoData() {
+    await this.init();
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      const beforeStores = (await client.query(`select count(*)::int as cnt from stores where source = ''`)).rows[0].cnt;
+      const beforePlans = (await client.query(`select count(*)::int as cnt from plans where store_id in (select id from stores where source = '')`)).rows[0].cnt;
+      const beforeSales = (await client.query(`select count(*)::int as cnt from sales where store_id in (select id from stores where source = '')`)).rows[0].cnt;
+      await client.query(`delete from sales where store_id in (select id from stores where source = '')`);
+      await client.query(`delete from plans where store_id in (select id from stores where source = '')`);
+      await client.query(`delete from user_stores where store_id in (select id from stores where source = '')`);
+      await client.query(`delete from stores where source = ''`);
+      await client.query('commit');
+      return { stores: beforeStores, plans: beforePlans, sales: beforeSales };
+    } catch (e) {
+      await client.query('rollback');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getRawPayload(period) {
+    await this.init();
+    const r = await this.pool.query(
+      `select package_id, period, payload_json, created_at
+       from raw_upp_payloads where period = $1 order by created_at desc limit 1`, [period]
+    );
+    return r.rows[0] || null;
   }
 
   async _seedSample(sample) {

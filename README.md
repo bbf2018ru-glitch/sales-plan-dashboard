@@ -56,7 +56,8 @@ docker compose up --build
 ## Переменные окружения
 
 - `PORT` — порт, по умолчанию `3000`
-- `INGEST_API_KEY` — ключ для загрузки данных из 1С, по умолчанию `demo-secret`
+- `INGEST_API_KEY` — ключ для загрузки данных из 1С. В dev (без `DATABASE_URL`) дефолт `demo-secret`. На проде с `DATABASE_URL` обязателен — иначе сервис не стартует.
+- `SEED_DEMO` — `yes`, чтобы при первом запуске залить `data/sample-db.json` (только для dev). На проде не выставлять.
 - `DB_PATH` — путь к json-файлу хранилища, по умолчанию `./data/db.json`
 - `DATABASE_URL` — строка подключения PostgreSQL. Если задана, сервис работает с PostgreSQL вместо JSON.
 - `DASHBOARD_PIN` — PIN для входа в дашборд (по умолчанию выключен)
@@ -134,50 +135,11 @@ npm start
 X-API-Key: demo-secret
 ```
 
-### Загрузка маркетинговых метрик
+### Маркетинговые метрики
 
-`POST /api/ingest/marketing`
-
-```json
-{
-  "period": "2026-04",
-  "metrics": [
-    {
-      "channelId": "yandex-direct",
-      "channelName": "Яндекс Директ",
-      "spend": 85000,
-      "leads": 620,
-      "orders": 164,
-      "revenue": 402000,
-      "impressions": 480000,
-      "clicks": 11800,
-      "sessions": 9700
-    }
-  ]
-}
-```
-
-### Получение маркетинговой сводки
-
-`GET /api/dashboard/marketing?period=2026-04`
-
-### Запуск анализа
-
-`POST /api/analysis/marketing`
-
-```json
-{
-  "period": "2026-04"
-}
-```
-
-Ответ содержит:
-
-- агрегированные метрики по маркетингу;
-- текстовый summary;
-- список выводов;
-- список рисков;
-- список рекомендаций.
+Маркетинговые метрики передаются внутри unified-пакета `/api/ingest/upp` через
+поле `marketingMetrics` (см. ниже). Отдельных endpoint'ов `/api/ingest/marketing`
+и `/api/dashboard/marketing` нет — они были описаны в ранних версиях и удалены.
 
 ### Unified import для 1С:УПП
 
@@ -278,14 +240,25 @@ DELETE /api/users/:id
 
 Если `token` не передан в POST — генерируется автоматически.
 
-В `data/sample-db.json` уже заведены демо-пользователи:
+**Bootstrap первого администратора:** когда таблица `users` пуста, `POST /api/users`
+с заголовком `X-API-Key: <INGEST_API_KEY>` создаёт первого пользователя с ролью
+`admin` (поле `role` игнорируется и форсится в `admin`). После того как админ
+создан, этот путь больше не работает — нужен `X-User-Token` существующего админа.
 
-- `admin-demo-token` — админ
-- `mgr-yadr-token` — менеджер точки «Ядринцева»
-- `mgr-kond-token` — менеджер точек «Кондитерская» и «Декабрьских Событий»
-- `mgr-angarsk-token` — менеджер точки «Ангарск»
+### Demo-данные (только для dev)
 
-Для production обязательно поменяйте токены через `/api/users`.
+В `data/sample-db.json` лежат демо-магазины и продажи. По умолчанию они НЕ
+заливаются в БД. Чтобы сидировать на dev-БД для локальных проверок, поставьте
+env-переменную `SEED_DEMO=yes`. На проде её не выставлять — иначе фейковые
+магазины (`angarsk-18` и т.д.) попадут в боевую БД.
+
+Для очистки случайно засеянных demo-данных есть админ-endpoint:
+```
+POST /api/admin/wipe-demo
+Header: X-User-Token: <admin> ИЛИ X-API-Key: <INGEST_API_KEY>
+```
+Удаляет stores с пустым `source` (реальные имеют `retail`/`corporate`/`mixed`)
+и связанные с ними plans, sales, user_stores.
 
 ## Что дальше
 
