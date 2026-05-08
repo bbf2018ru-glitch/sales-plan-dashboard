@@ -147,9 +147,14 @@ function notFound(res) {
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
+    // Лимит 50 МБ — диагностический пакет 1С с метаданными 200+ регистров
+    // и sample-данными ключевых регистров может быть 5-20 МБ.
+    // Раньше был 1 МБ — пакет от 1С отклонялся, и Попытка/Исключение в BSL
+    // глотала ошибку, диагностика не попадала на дашборд.
+    const MAX = 50_000_000;
     req.on('data', (chunk) => {
       raw += chunk;
-      if (raw.length > 1_000_000) { reject(new Error('Payload too large')); req.destroy(); }
+      if (raw.length > MAX) { reject(new Error('Payload too large')); req.destroy(); }
     });
     req.on('end', () => {
       if (!raw) { resolve({}); return; }
@@ -562,14 +567,17 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
       const body = await parseBody(req);
+      console.log(`[upp-diagnostic] received: config=${body.configurationName} v=${body.configurationVersion} objects=${(body.objects || []).length}`);
       try {
         const saved = await store.saveUppDiagnostic({
           configName: body.configurationName || '',
           configVersion: body.configurationVersion || '',
           payload: body
         });
+        console.log(`[upp-diagnostic] saved id=${saved.id} bytes=${saved.sizeBytes}`);
         sendJson(res, 200, { ok: true, ...saved });
       } catch (error) {
+        console.error('[upp-diagnostic] save failed:', error.message);
         sendJson(res, 500, { error: error.message || 'Diagnostic save failed' });
       }
       return;
