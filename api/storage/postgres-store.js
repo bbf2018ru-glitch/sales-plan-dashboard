@@ -32,6 +32,14 @@ class PostgresStore {
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
     await this.pool.query(schema);
 
+    // Авто-очистка слишком больших диагностических снимков (>30 МБ).
+    // Они валят Render Free (512 МБ memory) при чтении /latest. Также
+    // чистим всё кроме 3 последних — БД не должна пухнуть.
+    try {
+      await this.pool.query(`delete from upp_diagnostic where size_bytes > 30000000`);
+      await this.pool.query(`delete from upp_diagnostic where id not in (select id from upp_diagnostic order by received_at desc limit 3)`);
+    } catch (_) { /* таблицы может ещё не быть */ }
+
     // Seed sample data on first run (when no stores exist)
     const existing = await this.pool.query('select count(*)::int as cnt from stores');
     if (existing.rows[0].cnt === 0) {
@@ -488,28 +496,71 @@ class PostgresStore {
     await this.init();
     const json = JSON.stringify(payload);
     const sizeBytes = Buffer.byteLength(json, 'utf8');
+    // Защита: если пакет >30 МБ — отклоняем, иначе Render Free (512 МБ) валится OOM
+    if (sizeBytes > 30_000_000) {
+      throw new Error(`Diagnostic payload too large (${sizeBytes} bytes, limit 30MB)`);
+    }
     const result = await this.pool.query(
       `insert into upp_diagnostic (config_name, config_version, size_bytes, payload)
        values ($1, $2, $3, $4::jsonb)
        returning id, received_at as "receivedAt", size_bytes as "sizeBytes"`,
       [configName || '', configVersion || '', sizeBytes, json]
     );
-    // Trim — храним последние 10 снимков, более старые удаляем
+    // Храним только 3 последних снимка — иначе БД пухнет, /latest падает в OOM
     await this.pool.query(`
       delete from upp_diagnostic
-      where id not in (select id from upp_diagnostic order by received_at desc limit 10)
+      where id not in (select id from upp_diagnostic order by received_at desc limit 3)
     `);
     return result.rows[0];
   }
 
   async getLatestUppDiagnostic() {
     await this.init();
-    const r = await this.pool.query(
+    // Сначала достаём только метаданные — лёгкий запрос
+    const meta = await this.pool.query(
       `select id, received_at as "receivedAt", config_name as "configName",
-              config_version as "configVersion", size_bytes as "sizeBytes", payload
+              config_version as "configVersion", size_bytes as "sizeBytes"
        from upp_diagnostic order by received_at desc limit 1`
     );
-    return r.rows[0] || null;
+    if (!meta.rows[0]) return null;
+    // Затем тянем payload отдельно (он может быть тяжёлым)
+    const r = await this.pool.query(
+      `select payload from upp_diagnostic where id = $1`, [meta.rows[0].id]
+    );
+    return { ...meta.rows[0], payload: r.rows[0]?.payload };
+  }
+
+  // Лёгкий вариант — только meta + индекс объектов БЕЗ sample-данных
+  async getLatestUppDiagnosticIndex() {
+    await this.init();
+    const r = await this.pool.query(
+      `select id, received_at as "receivedAt", config_name as "configName",
+              config_version as "configVersion", size_bytes as "sizeBytes",
+              jsonb_array_length(coalesce(payload->'objects', '[]'::jsonb)) as "objectsCount"
+       from upp_diagnostic order by received_at desc limit 1`
+    );
+    if (!r.rows[0]) return null;
+    // Список объектов — только {kind, name, synonym}, без properties и sample.
+    // Через jsonb_path_query — ленивая выборка, не тянет всё в память Node.
+    const idx = await this.pool.query(
+      `select jsonb_agg(jsonb_build_object('kind', o->>'kind', 'name', o->>'name', 'synonym', o->>'synonym')) as objects
+       from upp_diagnostic, jsonb_array_elements(payload->'objects') as o
+       where id = $1`, [r.rows[0].id]
+    );
+    return { ...r.rows[0], objects: idx.rows[0]?.objects || [] };
+  }
+
+  // Достаёт ОДИН объект из последнего снимка (не тянет остальные)
+  async getUppDiagnosticObject(kind, name) {
+    await this.init();
+    const r = await this.pool.query(
+      `select o.value as obj
+       from upp_diagnostic, jsonb_array_elements(payload->'objects') as o
+       where o.value->>'kind' = $1 and o.value->>'name' = $2
+       order by received_at desc
+       limit 1`, [kind, name]
+    );
+    return r.rows[0]?.obj || null;
   }
 
   async listUppDiagnostics() {

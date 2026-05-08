@@ -589,21 +589,24 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 401, { error: 'Admin required' });
         return;
       }
-      const dump = await store.getLatestUppDiagnostic();
-      if (!dump) {
+      // Лёгкий путь — только meta + индекс объектов БЕЗ sample-данных
+      // (раньше тянули весь payload в память Node, при больших дампах падало OOM)
+      const idx = store.getLatestUppDiagnosticIndex
+        ? await store.getLatestUppDiagnosticIndex()
+        : await store.getLatestUppDiagnostic();
+      if (!idx) {
         sendJson(res, 200, { hasData: false });
         return;
       }
-      // index — компактный список объектов для дерева
-      const objects = (dump.payload?.objects || []).map(o => ({
+      const objects = idx.objects || (idx.payload?.objects || []).map(o => ({
         kind: o.kind, name: o.name, synonym: o.synonym
       }));
       sendJson(res, 200, {
         hasData: true,
-        receivedAt: dump.receivedAt,
-        configName: dump.configName,
-        configVersion: dump.configVersion,
-        sizeBytes: dump.sizeBytes,
+        receivedAt: idx.receivedAt,
+        configName: idx.configName,
+        configVersion: idx.configVersion,
+        sizeBytes: idx.sizeBytes,
         objectsCount: objects.length,
         objects
       });
@@ -622,8 +625,14 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: 'kind and name required' });
         return;
       }
-      const dump = await store.getLatestUppDiagnostic();
-      const obj = (dump?.payload?.objects || []).find(o => o.kind === kind && o.name === name);
+      // Тянем ТОЛЬКО нужный объект — не загружаем весь payload в память
+      let obj = null;
+      if (store.getUppDiagnosticObject) {
+        obj = await store.getUppDiagnosticObject(kind, name);
+      } else {
+        const dump = await store.getLatestUppDiagnostic();
+        obj = (dump?.payload?.objects || []).find(o => o.kind === kind && o.name === name);
+      }
       if (!obj) {
         sendJson(res, 404, { error: 'Not found' });
         return;
