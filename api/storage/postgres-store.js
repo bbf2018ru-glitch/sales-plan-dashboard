@@ -25,8 +25,11 @@ class PostgresStore {
       throw new Error('Для PostgreSQL нужен пакет `pg`. Выполните `npm install` перед запуском с DATABASE_URL.');
     }
 
+    // Если URL не содержит sslmode=disable — включаем SSL (Render PG / Neon требуют)
+    const needsSSL = !/sslmode=disable/i.test(this.connectionString);
     this.pool = new Pool({
-      connectionString: this.connectionString
+      connectionString: this.connectionString,
+      ssl: needsSSL ? { rejectUnauthorized: false } : false
     });
 
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
