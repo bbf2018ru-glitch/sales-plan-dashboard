@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=19" />
+    <link rel="stylesheet" href="/styles.css?v=20" />
   </head>
   <body>
 
@@ -302,8 +302,13 @@
 
           <!-- A1. План/факт по каналам продаж -->
           <section class="section">
-            <div class="section-label">План / факт по каналам продаж</div>
-            <div class="section-hint">Розница (ЧекККМ) · Опт/корпоративные (РегистрНакопления.Продажи) · Микс</div>
+            <div class="section-header">
+              <div>
+                <div class="section-label">План / факт по каналам продаж</div>
+                <div class="section-hint">Розница (ЧекККМ) · Опт/корпоративные · Микс</div>
+              </div>
+              <button class="icon-btn" data-csv="channel">CSV</button>
+            </div>
             <div class="panel">
               <div class="table-wrap">
                 <table id="analyticsByChannelTbl">
@@ -326,8 +331,13 @@
 
           <!-- A19/B2. Доля категорий + % наценки по группам -->
           <section class="section">
-            <div class="section-label">По группам товаров</div>
-            <div class="section-hint">Доля группы в общем объёме · % наценки (Сумма продаж / Себестоимость − 1)</div>
+            <div class="section-header">
+              <div>
+                <div class="section-label">По группам товаров</div>
+                <div class="section-hint">Доля группы в общем объёме · % наценки (Сумма продаж / Себестоимость − 1)</div>
+              </div>
+              <button class="icon-btn" data-csv="category">CSV</button>
+            </div>
             <div class="panel">
               <div class="table-wrap">
                 <table id="analyticsByCategoryTbl">
@@ -354,11 +364,14 @@
                 <div class="section-label">ABC-анализ ассортимента</div>
                 <div class="section-hint">A — 80% выручки · B — следующие 15% · C — последние 5%</div>
               </div>
-              <div class="btn-group" id="abcFilterBtns">
-                <button class="btn-xs btn-xs-active" data-abc="all">Все</button>
-                <button class="btn-xs" data-abc="A">A</button>
-                <button class="btn-xs" data-abc="B">B</button>
-                <button class="btn-xs" data-abc="C">C</button>
+              <div style="display:flex;gap:8px;align-items:center">
+                <div class="btn-group" id="abcFilterBtns">
+                  <button class="btn-xs btn-xs-active" data-abc="all">Все</button>
+                  <button class="btn-xs" data-abc="A">A</button>
+                  <button class="btn-xs" data-abc="B">B</button>
+                  <button class="btn-xs" data-abc="C">C</button>
+                </div>
+                <button class="icon-btn" data-csv="abc">CSV</button>
               </div>
             </div>
             <div class="panel">
@@ -384,8 +397,13 @@
 
           <!-- A22. Выручка по неделям -->
           <section class="section">
-            <div class="section-label">Выручка по неделям</div>
-            <div class="section-hint">Понедельник — воскресенье. Сравнение с прошлогодней неделей появится когда в БД будет полный год истории.</div>
+            <div class="section-header">
+              <div>
+                <div class="section-label">Выручка по неделям</div>
+                <div class="section-hint">Понедельник — воскресенье. L2L появится когда в БД будет полный год истории.</div>
+              </div>
+              <button class="icon-btn" data-csv="weekly">CSV</button>
+            </div>
             <div class="panel">
               <div id="analyticsWeeklyChart" class="chart-wrap"></div>
               <div class="table-wrap" style="margin-top:8px">
@@ -404,6 +422,100 @@
             </div>
           </section>
 
+          <!-- A9. График продаж по группам товаров -->
+          <section class="section">
+            <div class="section-label">График продаж по группам товаров</div>
+            <div class="section-hint">Топ-15 групп по выручке за период · цвет — % маржи (зелёный ≥70%, жёлтый 30-70%, красный &lt;30%)</div>
+            <div class="panel">
+              <div id="analyticsCategoryChart" class="chart-wrap"></div>
+            </div>
+          </section>
+
+          <!-- ABC по группам -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">ABC-анализ групп товаров</div>
+                <div class="section-hint">Какие группы дают 80% выручки сети</div>
+              </div>
+              <button class="icon-btn" data-csv="categoryAbc">CSV</button>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsCategoryAbcTbl">
+                  <thead><tr>
+                    <th>Группа</th>
+                    <th class="num">Класс</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Доля</th>
+                    <th class="num">Накопл.</th>
+                    <th class="num">Марж.%</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Продажи по дням недели -->
+          <section class="section">
+            <div class="section-label">Продажи по дням недели</div>
+            <div class="section-hint">Сумма за все понедельники/вторники/… месяца. «Ср/день» — средняя выручка такого дня недели.</div>
+            <div class="panel">
+              <div id="analyticsWeekdayChart" class="chart-wrap"></div>
+              <div class="table-wrap" style="margin-top:8px">
+                <table id="analyticsWeekdayTbl">
+                  <thead><tr>
+                    <th>День</th>
+                    <th class="num">Дней</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Ср/день</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Динамика факта по дням месяца -->
+          <section class="section">
+            <div class="section-label">Динамика факта по дням</div>
+            <div class="section-hint">Выручка каждого дня месяца с накоплением</div>
+            <div class="panel">
+              <div id="analyticsDailyChart" class="chart-wrap"></div>
+            </div>
+          </section>
+
+          <!-- B2 (расширение). Наценка по магазинам -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Наценка по магазинам</div>
+                <div class="section-hint">% наценки и валовая маржа по каждому магазину · отсортировано от высшей наценки</div>
+              </div>
+              <button class="icon-btn" data-csv="storeMarkup">CSV</button>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsStoreMarkupTbl">
+                  <thead><tr>
+                    <th class="col-num">#</th>
+                    <th>Магазин</th>
+                    <th>Канал</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Себест.</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                    <th class="num">Наценка %</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <!-- В разработке -->
           <section class="section">
             <div class="section-label">В разработке</div>
@@ -415,6 +527,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=19"></script>
+    <script src="/app.js?v=20"></script>
   </body>
 </html>

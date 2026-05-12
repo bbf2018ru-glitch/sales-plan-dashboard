@@ -203,18 +203,124 @@ function weeklyRevenue(db, period, opts) {
     }));
 }
 
+// ── Доп.отчёт: ABC по группам товаров ─────────────────────────────────
+// Применяет A/B/C класс не к отдельным товарам, а к группам — даёт картину
+// какие группы дают 80% выручки.
+function abcCategories(byCategoryRows) {
+  const sorted = [...byCategoryRows].sort((a, b) => b.fact - a.fact);
+  const total = sorted.reduce((s, c) => s + c.fact, 0);
+  let cum = 0;
+  return sorted.map(c => {
+    cum += c.fact;
+    const cumPct = total > 0 ? cum / total : 0;
+    const cls = cumPct <= 0.80 ? 'A' : cumPct <= 0.95 ? 'B' : 'C';
+    return { ...c, cumShare: roundMetric(cumPct * 100), abc: cls };
+  });
+}
+
+// ── Доп.отчёт: продажи по дням недели ─────────────────────────────────
+// Группируем sales по дню недели (пн-вс). Помогает увидеть пиковые дни.
+const WEEKDAYS_RU = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+
+function byWeekday(db, period, opts) {
+  const { storeCostScale } = opts;
+  const sales = db.sales.filter(r => r.period === period);
+  const buckets = WEEKDAYS_RU.map((name, idx) => ({ idx, name, fact: 0, cost: 0, quantity: 0, salesDays: new Set() }));
+  for (const row of sales) {
+    const d = new Date(row.soldAt);
+    if (isNaN(d.getTime())) continue;
+    const idx = (d.getDay() + 6) % 7; // 0=пн ... 6=вс
+    buckets[idx].fact += toNumber(row.amount);
+    buckets[idx].cost += correctedCost(row, storeCostScale);
+    buckets[idx].quantity += toNumber(row.quantity);
+    const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    buckets[idx].salesDays.add(dayKey);
+  }
+  return buckets.map(b => ({
+    weekday: b.name,
+    weekdayIdx: b.idx,
+    fact: roundMetric(b.fact),
+    cost: roundMetric(b.cost),
+    margin: b.cost > 0 ? roundMetric(b.fact - b.cost) : null,
+    marginPct: b.cost > 0 && b.fact > 0 ? percent((b.fact - b.cost) / b.fact) : null,
+    quantity: roundMetric(b.quantity),
+    daysCount: b.salesDays.size,
+    avgPerDay: b.salesDays.size > 0 ? roundMetric(b.fact / b.salesDays.size) : 0
+  }));
+}
+
+// ── Доп.отчёт: динамика факта по дням месяца ──────────────────────────
+function dailyDynamic(db, period, opts) {
+  const { storeCostScale } = opts;
+  const sales = db.sales.filter(r => r.period === period);
+  const buckets = new Map();
+  for (const row of sales) {
+    const d = new Date(row.soldAt);
+    if (isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (!buckets.has(key)) buckets.set(key, { date: key, fact: 0, cost: 0, quantity: 0 });
+    const it = buckets.get(key);
+    it.fact += toNumber(row.amount);
+    it.cost += correctedCost(row, storeCostScale);
+    it.quantity += toNumber(row.quantity);
+  }
+  return Array.from(buckets.values())
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(it => ({
+      date: it.date,
+      fact: roundMetric(it.fact),
+      cost: roundMetric(it.cost),
+      margin: it.cost > 0 ? roundMetric(it.fact - it.cost) : null,
+      quantity: roundMetric(it.quantity)
+    }));
+}
+
+// ── Доп.отчёт: наценка по магазинам (% и абсолют) ──────────────────────
+function markupByStore(db, period, opts) {
+  const { storeCostScale } = opts;
+  const storeMap = new Map(db.stores.map(s => [s.id, s]));
+  const sales = db.sales.filter(r => r.period === period);
+  const acc = new Map();
+  for (const row of sales) {
+    if (!acc.has(row.storeId)) acc.set(row.storeId, { storeId: row.storeId, fact: 0, cost: 0 });
+    const it = acc.get(row.storeId);
+    it.fact += toNumber(row.amount);
+    it.cost += correctedCost(row, storeCostScale);
+  }
+  return Array.from(acc.values())
+    .map(it => {
+      const s = storeMap.get(it.storeId) || {};
+      return {
+        storeId: it.storeId,
+        storeName: s.name || it.storeId,
+        source: s.source || '',
+        fact: roundMetric(it.fact),
+        cost: roundMetric(it.cost),
+        margin: it.cost > 0 ? roundMetric(it.fact - it.cost) : null,
+        marginPct: it.cost > 0 && it.fact > 0 ? percent((it.fact - it.cost) / it.fact) : null,
+        markupPct: it.cost > 0 ? percent((it.fact - it.cost) / it.cost) : null
+      };
+    })
+    .sort((a, b) => (b.markupPct || 0) - (a.markupPct || 0));
+}
+
 // ── Главный entry ─────────────────────────────────────────────────────────
 function buildSalesAnalytics(db, period) {
   const markups = getStoreMarkups();
   const sales = db.sales.filter(r => r.period === period);
   const storeCostScale = buildStoreCostScale(sales, markups);
   const opts = { storeCostScale };
+  const cats = byCategory(db, period, opts);
   return {
     period,
     byChannel: byChannel(db, period, opts),
-    byCategory: byCategory(db, period, opts),
+    byCategory: cats,
+    byCategoryAbc: abcCategories(cats),
     abc: abc(db, period, opts),
-    weekly: weeklyRevenue(db, period, opts)
+    weekly: weeklyRevenue(db, period, opts),
+    byWeekday: byWeekday(db, period, opts),
+    daily: dailyDynamic(db, period, opts),
+    byStoreMarkup: markupByStore(db, period, opts)
   };
 }
 

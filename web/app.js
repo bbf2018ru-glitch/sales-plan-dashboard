@@ -1116,6 +1116,7 @@ function initPageNav() {
       renderAbc();
     });
   });
+  initCsvButtons();
 }
 
 function switchPage(page) {
@@ -1132,8 +1133,13 @@ async function loadAnalytics() {
     $('analyticsPeriodTag').textContent = `период ${data.period}`;
     renderByChannel();
     renderByCategory();
+    renderCategoryChart();
+    renderCategoryAbc();
     renderAbc();
     renderWeekly();
+    renderWeekday();
+    renderDaily();
+    renderStoreMarkup();
   } catch (err) {
     console.error('analytics load failed', err);
   }
@@ -1265,6 +1271,170 @@ function renderWeekly() {
       </g>`;
     }).join('')}
   </svg>`;
+}
+
+// Горизонтальный бар-чарт: топ-15 групп по выручке с цветовой кодировкой маржи
+function renderCategoryChart() {
+  const el = $('analyticsCategoryChart');
+  if (!el) return;
+  const rows = (analyticsState.data?.byCategory || []).slice(0, 15);
+  if (!rows.length) { el.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
+  const max = Math.max(...rows.map(r => r.fact));
+  const labelW = 180;
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;padding:8px 4px">${rows.map(r => {
+    const w = max > 0 ? (r.fact / max * 100) : 0;
+    const tone = r.marginPct === null ? '#94a3b8'
+      : r.marginPct >= 70 ? '#22c55e'
+      : r.marginPct >= 30 ? '#eab308'
+      : '#f43f5e';
+    return `<div style="display:flex;align-items:center;gap:10px;font-size:12px">
+      <div style="width:${labelW}px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.category)}">${escapeHtml(r.category)}</div>
+      <div style="flex:1;height:22px;background:var(--glass-soft);border-radius:6px;position:relative">
+        <div style="width:${w}%;height:100%;background:${tone};opacity:.85;border-radius:6px"></div>
+        <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-weight:600;color:var(--ink);text-shadow:0 0 4px var(--bg)">${fmtNum(r.fact)} ₽ · ${r.marginPct === null ? '—' : r.marginPct + '%'}</span>
+      </div>
+      <div style="width:60px;text-align:right;color:var(--muted)">${r.share.toFixed(1)}%</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderCategoryAbc() {
+  const tbody = document.querySelector('#analyticsCategoryAbcTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.byCategoryAbc || [];
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${escapeHtml(r.category)}</b></td>
+      <td class="num"><span class="abc-badge abc-${r.abc}">${r.abc}</span></td>
+      <td class="num">${fmtNum(r.fact)}</td>
+      <td class="num">${r.share.toFixed(1)}%</td>
+      <td class="num">${r.cumShare.toFixed(1)}%</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderWeekday() {
+  const tbody = document.querySelector('#analyticsWeekdayTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.byWeekday || [];
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${escapeHtml(r.weekday)}</b></td>
+      <td class="num">${r.daysCount}</td>
+      <td class="num">${fmtNum(r.fact)}</td>
+      <td class="num">${fmtNum(r.avgPerDay)}</td>
+      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+    </tr>
+  `).join('');
+  // Бар-чарт
+  const chart = $('analyticsWeekdayChart');
+  if (!chart || !rows.length) { if (chart) chart.innerHTML = ''; return; }
+  const max = Math.max(...rows.map(r => r.avgPerDay));
+  const w = 700, h = 200, padL = 100, padR = 20, padT = 16, padB = 16;
+  const innerH = h - padT - padB;
+  const rowH = innerH / rows.length;
+  const barH = rowH * 0.7;
+  chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:220px">
+    ${rows.map((r, i) => {
+      const bw = max > 0 ? (r.avgPerDay / max) * (w - padL - padR - 60) : 0;
+      const y = padT + rowH*i + (rowH - barH)/2;
+      return `<g>
+        <text x="${padL - 8}" y="${y + barH/2 + 4}" text-anchor="end" font-size="11" fill="currentColor">${r.weekday.slice(0,3)}</text>
+        <rect x="${padL}" y="${y}" width="${bw}" height="${barH}" rx="3" fill="var(--accent)" opacity="0.85"/>
+        <text x="${padL + bw + 6}" y="${y + barH/2 + 4}" font-size="11" fill="currentColor" fill-opacity=".7">${fmtNum(r.avgPerDay)} ₽/день</text>
+      </g>`;
+    }).join('')}
+  </svg>`;
+}
+
+function renderDaily() {
+  const chart = $('analyticsDailyChart');
+  if (!chart) return;
+  const rows = analyticsState.data?.daily || [];
+  if (!rows.length) { chart.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
+  const max = Math.max(...rows.map(r => r.fact));
+  const w = 900, h = 240, padL = 70, padR = 20, padT = 20, padB = 36;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const step = innerW / rows.length;
+  const barW = step * 0.7;
+  // Накопительная сумма для линии
+  let cum = 0;
+  const cumPoints = rows.map((r, i) => {
+    cum += r.fact;
+    return { x: padL + step*i + step/2, y: padT + innerH - (cum / (rows.reduce((s,r)=>s+r.fact,0)||1)) * innerH };
+  });
+  const linePath = cumPoints.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ',' + p.y).join(' ');
+  chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:260px">
+    ${[0, .25, .5, .75, 1].map(t => `
+      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.08"/>
+      <text x="${padL-6}" y="${padT + innerH*(1-t) + 4}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">${fmtAxis(max*t)}</text>
+    `).join('')}
+    ${rows.map((r, i) => {
+      const bh = max > 0 ? (r.fact / max) * innerH : 0;
+      const x = padL + step*i + (step - barW)/2;
+      const y = padT + innerH - bh;
+      const day = Number(r.date.slice(-2));
+      return `<g>
+        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2" fill="var(--accent)" opacity="0.75">
+          <title>${r.date}: ${fmtNum(r.fact)} ₽</title>
+        </rect>
+        ${day % 5 === 0 || i === rows.length - 1 ? `<text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity="0.6">${day}</text>` : ''}
+      </g>`;
+    }).join('')}
+    <path d="${linePath}" stroke="#f43f5e" stroke-width="2" fill="none" opacity="0.7"/>
+    ${cumPoints.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2" fill="#f43f5e" opacity="0.8"/>`).join('')}
+  </svg>
+  <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px">Красная линия — накопительная доля выручки</div>`;
+}
+
+function renderStoreMarkup() {
+  const tbody = document.querySelector('#analyticsStoreMarkupTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.byStoreMarkup || [];
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="col-num">${i+1}</td>
+      <td><b>${escapeHtml(r.storeName)}</b></td>
+      <td><span class="muted" style="font-size:11px">${escapeHtml(CHANNEL_NAMES[r.source] || r.source || '—')}</span></td>
+      <td class="num">${fmtNum(r.fact)}</td>
+      <td class="num">${fmtNum(r.cost)}</td>
+      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+      <td class="num"><b>${r.markupPct === null ? '—' : r.markupPct.toFixed(0) + '%'}</b></td>
+    </tr>
+  `).join('');
+}
+
+// CSV экспорт по нажатию на data-csv кнопки
+function initCsvButtons() {
+  document.querySelectorAll('#page-analytics [data-csv]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.csv;
+      const d = analyticsState.data;
+      if (!d) return;
+      const period = d.period;
+      const map = {
+        channel:    { rows: d.byChannel,      file: `analytics-channels-${period}.csv`,    fields: ['source','storesCount','plan','fact','cost','margin','marginPct','quantity','completion'] },
+        category:   { rows: d.byCategory,     file: `analytics-categories-${period}.csv`,  fields: ['category','products','fact','share','cost','margin','marginPct','markupPct','quantity'] },
+        categoryAbc:{ rows: d.byCategoryAbc,  file: `analytics-category-abc-${period}.csv`,fields: ['category','abc','fact','share','cumShare','marginPct'] },
+        abc:        { rows: d.abc,            file: `analytics-abc-${period}.csv`,         fields: ['productId','productName','category','abc','fact','share','cumShare','quantity','marginPct'] },
+        weekly:     { rows: d.weekly,         file: `analytics-weekly-${period}.csv`,      fields: ['weekStart','fact','cost','margin','quantity'] },
+        weekday:    { rows: d.byWeekday,      file: `analytics-weekday-${period}.csv`,     fields: ['weekday','daysCount','fact','avgPerDay','margin','marginPct'] },
+        daily:      { rows: d.daily,          file: `analytics-daily-${period}.csv`,       fields: ['date','fact','cost','margin','quantity'] },
+        storeMarkup:{ rows: d.byStoreMarkup,  file: `analytics-store-markup-${period}.csv`,fields: ['storeId','storeName','source','fact','cost','margin','marginPct','markupPct'] }
+      };
+      const def = map[kind];
+      if (!def) return;
+      const rows = (def.rows || []).map(r => {
+        const obj = {};
+        def.fields.forEach(f => obj[f] = r[f]);
+        return obj;
+      });
+      exportCsv(rows, def.file);
+    });
+  });
 }
 
 const PENDING_REPORTS = [
