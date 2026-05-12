@@ -155,18 +155,26 @@ function notFound(res) {
 
 function parseBody(req) {
   return new Promise((resolve, reject) => {
-    let raw = '';
-    // Лимит 50 МБ — диагностический пакет 1С с метаданными 200+ регистров
-    // и sample-данными ключевых регистров может быть 5-20 МБ.
-    // Раньше был 1 МБ — пакет от 1С отклонялся, и Попытка/Исключение в BSL
-    // глотала ошибку, диагностика не попадала на дашборд.
+    // КРИТИЧНО: собираем chunks как Buffer и декодируем UTF-8 один раз
+    // в конце. Раньше делали raw += chunk — это вызывает chunk.toString()
+    // на каждом куске. Когда chunk разрезает многобайтный UTF-8 символ
+    // (например 'Ц' = 0xD0 0xA6) на границе — оба байта превращаются в
+    // replacement-символы (U+FFFD '�'). На пакетах 1С 5-50 МБ это давало
+    // битые storeId в БД (например '��Б0000012' вместо 'ЦБ0000012').
+    // Лимит 50 МБ — пакет с диагностикой 1С (метаданные 2172 объектов +
+    // sample) может быть до 20 МБ. Раньше был 1 МБ → BSL Попытка/Исключение
+    // тихо глотала ошибку, диагностика не попадала на дашборд.
     const MAX = 50_000_000;
+    const chunks = [];
+    let total = 0;
     req.on('data', (chunk) => {
-      raw += chunk;
-      if (raw.length > MAX) { reject(new Error('Payload too large')); req.destroy(); }
+      chunks.push(chunk);
+      total += chunk.length;
+      if (total > MAX) { reject(new Error('Payload too large')); req.destroy(); }
     });
     req.on('end', () => {
-      if (!raw) { resolve({}); return; }
+      if (total === 0) { resolve({}); return; }
+      const raw = Buffer.concat(chunks).toString('utf8');
       try { resolve(JSON.parse(raw)); } catch { reject(new Error('Invalid JSON')); }
     });
     req.on('error', reject);
