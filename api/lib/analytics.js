@@ -428,6 +428,29 @@ function aggregatePeriodCore(db, period, opts = {}) {
   const plans = db.plans.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
   const sales = db.sales.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
 
+  // Pre-pass: для каждого магазина с заданным markup считаем scale-фактор,
+  // приводящий суммарный cost магазина к целевому (fact / (1 + markup/100)).
+  // Это даёт точное совпадение тоталов по магазину с отчётом «Валовая прибыль»,
+  // сохраняя распределение cost между товарами.
+  const storeCostScale = new Map();
+  if (Object.keys(storeMarkups).length > 0) {
+    const rawByStore = new Map();
+    for (const row of sales) {
+      const cur = rawByStore.get(row.storeId) || { fact: 0, cost: 0 };
+      cur.fact += toNumber(row.amount);
+      cur.cost += toNumber(row.cost);
+      rawByStore.set(row.storeId, cur);
+    }
+    for (const [sid, { fact, cost }] of rawByStore) {
+      const markup = storeMarkups[sid];
+      if (!markup || cost <= 0) continue;
+      const targetCost = fact / (1 + markup / 100);
+      // Применяем scale только если он уменьшает cost (никогда не наращиваем).
+      const scale = targetCost / cost;
+      storeCostScale.set(sid, scale < 1 ? scale : 1);
+    }
+  }
+
   const byStore = new Map();
   const byProduct = new Map();
 
@@ -514,7 +537,10 @@ function aggregatePeriodCore(db, period, opts = {}) {
         quantity: 0
       });
     }
-    const cappedRowCost = capCost(row.amount, row.cost, costCapRatio, row.storeId, storeMarkups);
+    const scale = storeCostScale.get(row.storeId);
+    const cappedRowCost = scale !== undefined
+      ? toNumber(row.cost) * scale
+      : capCost(row.amount, row.cost, costCapRatio);
     byStore.get(row.storeId).fact += toNumber(row.amount);
     byStore.get(row.storeId).cost += cappedRowCost;
     byStore.get(row.storeId).grossProfit += toNumber(row.grossProfit);
@@ -640,6 +666,19 @@ function storeDetails(db, period, storeId, opts = {}) {
   const productMap = new Map(db.products.map((item) => [item.id, item]));
   const plans = db.plans.filter((item) => item.period === period && item.storeId === storeId);
   const sales = db.sales.filter((item) => item.period === period && item.storeId === storeId);
+
+  // Pre-pass scale (как в aggregatePeriodCore) — для того же магазина
+  let storeCostScale;
+  const markup = storeMarkups[storeId];
+  if (markup) {
+    let rawFact = 0, rawCost = 0;
+    for (const row of sales) { rawFact += toNumber(row.amount); rawCost += toNumber(row.cost); }
+    if (rawCost > 0) {
+      const targetCost = rawFact / (1 + markup / 100);
+      const sc = targetCost / rawCost;
+      if (sc < 1) storeCostScale = sc;
+    }
+  }
   const rows = new Map();
 
   for (const row of plans) {
@@ -672,7 +711,9 @@ function storeDetails(db, period, storeId, opts = {}) {
     }
     const item = rows.get(row.productId);
     item.fact += toNumber(row.amount);
-    item.cost += capCost(row.amount, row.cost, costCapRatio, row.storeId, storeMarkups);
+    item.cost += storeCostScale !== undefined
+      ? toNumber(row.cost) * storeCostScale
+      : capCost(row.amount, row.cost, costCapRatio);
     item.grossProfit += toNumber(row.grossProfit);
     item.quantity += toNumber(row.quantity);
   }
