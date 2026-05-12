@@ -346,6 +346,14 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .status-pill.live    { background: var(--good-soft); color: var(--good); box-shadow: 0 0 0 1px rgba(52,211,153,.25); }
 .status-pill.syncing { background: var(--accent-soft); color: var(--accent); }
 
+/* ── Page switcher (Dashboard / Analytics) ────────────────────────── */
+#page-dashboard.hidden,
+#page-analytics.hidden,
+.empty-state.hidden,
+.btn-group [data-tw].hidden {
+  display: none !important;
+}
+
 /* ── Sidebar navigation (Dashboard / Analytics) ───────────────────── */
 .sidebar-nav {
   display: flex;
