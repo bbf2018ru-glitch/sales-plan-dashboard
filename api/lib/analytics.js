@@ -12,18 +12,34 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-// Кап себестоимости: cost не может превышать fact в рамках одной строки sales.
+// Кап себестоимости: cost не может превышать fact × COST_CAP_RATIO
+// в рамках одной строки sales.
 // 1С присылает СтоимостьРасход из ПартииТоваровНаСкладах — это себестоимость
 // СПИСАННОГО товара (включая списания в брак, дегустации, потери), а отчёт
-// «Валовая прибыль» считает себестоимость ПРОДАННОГО (через регистры Продажи
-// + ПродажиСебестоимость). Без капа маржа на дашборде занижается на ~1 млн ₽
-// в месяц из-за партий типа «Торт КУСОЧЕК», где списан весь торт, а продана
-// только часть кусочков. Кап cost ≤ fact приближает дашборд к отчёту.
-function capCost(amount, cost) {
+// «Валовая прибыль» считает себестоимость ПРОДАННОГО. Без капа маржа
+// занижается на ~1 млн ₽/мес из-за партий типа «Торт КУСОЧЕК».
+//
+// Ratio < 1.0 ужесточает кап (cost не может быть выше указанной доли от
+// выручки). На сети «Марии» отчёт «Валовая прибыль» даёт маржу ~74% →
+// средний cost/fact ~26%. С COST_CAP_RATIO ~0.5-0.7 дашборд приближается
+// к отчёту даже до фикса BSL. Default = 1.0 (cap = fact).
+function getCostCapRatio(override) {
+  if (override !== undefined && override !== null && override !== '') {
+    const n = Number(override);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const fromEnv = Number(process.env.COST_CAP_RATIO);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return 1.0;
+}
+
+function capCost(amount, cost, ratio) {
   const f = toNumber(amount);
   const c = toNumber(cost);
   if (c <= 0) return 0;
-  return c > f ? f : c;
+  const r = ratio === undefined ? 1.0 : Number(ratio);
+  const maxCost = f * (Number.isFinite(r) && r > 0 ? r : 1.0);
+  return c > maxCost ? maxCost : c;
 }
 
 function percent(value) {
@@ -373,7 +389,8 @@ function scopeDbForUser(db, user) {
   };
 }
 
-function aggregatePeriodCore(db, period) {
+function aggregatePeriodCore(db, period, opts = {}) {
+  const costCapRatio = getCostCapRatio(opts.costCapRatio);
   const stores = new Map(db.stores.map((item) => [item.id, item]));
   const products = new Map(db.products.map((item) => [item.id, item]));
   const plans = db.plans.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
@@ -465,7 +482,7 @@ function aggregatePeriodCore(db, period) {
         quantity: 0
       });
     }
-    const cappedRowCost = capCost(row.amount, row.cost);
+    const cappedRowCost = capCost(row.amount, row.cost, costCapRatio);
     byStore.get(row.storeId).fact += toNumber(row.amount);
     byStore.get(row.storeId).cost += cappedRowCost;
     byStore.get(row.storeId).grossProfit += toNumber(row.grossProfit);
@@ -532,7 +549,7 @@ function aggregatePeriodCore(db, period) {
 }
 
 function aggregateDashboard(db, period, opts = {}) {
-  const summary = aggregatePeriodCore(db, period);
+  const summary = aggregatePeriodCore(db, period, opts);
   const trendWindow = opts.trendWindow || 12;
   return {
     ...summary,
@@ -584,7 +601,8 @@ function assessPlanHealth(db, period, currentPlan) {
   return { ok: true };
 }
 
-function storeDetails(db, period, storeId) {
+function storeDetails(db, period, storeId, opts = {}) {
+  const costCapRatio = getCostCapRatio(opts.costCapRatio);
   const store = db.stores.find((item) => item.id === storeId) || { id: storeId, name: storeId };
   const productMap = new Map(db.products.map((item) => [item.id, item]));
   const plans = db.plans.filter((item) => item.period === period && item.storeId === storeId);
@@ -621,7 +639,7 @@ function storeDetails(db, period, storeId) {
     }
     const item = rows.get(row.productId);
     item.fact += toNumber(row.amount);
-    item.cost += capCost(row.amount, row.cost);
+    item.cost += capCost(row.amount, row.cost, costCapRatio);
     item.grossProfit += toNumber(row.grossProfit);
     item.quantity += toNumber(row.quantity);
   }

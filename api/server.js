@@ -525,6 +525,28 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Подбор COST_CAP_RATIO (admin) — пересчёт margin с переопределённым ratio
+    // без перезапуска сервиса. Используется чтобы подобрать значение,
+    // которое потом ставится в env-переменную COST_CAP_RATIO постоянно.
+    if (pathname === '/api/admin/test-cap' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      const ratio = parsedUrl.searchParams.get('ratio');
+      const period = monthKey(parsedUrl.searchParams.get('period'));
+      const db = await store.getDb();
+      const summary = aggregateDashboard(db, period, { costCapRatio: ratio });
+      sendJson(res, 200, {
+        period,
+        ratioUsed: Number(ratio) || 1.0,
+        totals: summary.totals,
+        stores: summary.stores.map(s => ({ storeId: s.storeId, fact: s.fact, cost: s.cost, margin: s.margin }))
+      });
+      return;
+    }
+
     // ── Wipe demo seed-data (admin) — удаляет фейковые stores из sample-db.json ──
     // Реальные магазины из 1С имеют source='retail'/'corporate'/'mixed' и не
     // пострадают. Удаляются только stores с source='' (это и есть seed-данные).
