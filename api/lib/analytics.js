@@ -12,6 +12,20 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+// Кап себестоимости: cost не может превышать fact в рамках одной строки sales.
+// 1С присылает СтоимостьРасход из ПартииТоваровНаСкладах — это себестоимость
+// СПИСАННОГО товара (включая списания в брак, дегустации, потери), а отчёт
+// «Валовая прибыль» считает себестоимость ПРОДАННОГО (через регистры Продажи
+// + ПродажиСебестоимость). Без капа маржа на дашборде занижается на ~1 млн ₽
+// в месяц из-за партий типа «Торт КУСОЧЕК», где списан весь торт, а продана
+// только часть кусочков. Кап cost ≤ fact приближает дашборд к отчёту.
+function capCost(amount, cost) {
+  const f = toNumber(amount);
+  const c = toNumber(cost);
+  if (c <= 0) return 0;
+  return c > f ? f : c;
+}
+
 function percent(value) {
   return Number((value * 100).toFixed(1));
 }
@@ -451,12 +465,13 @@ function aggregatePeriodCore(db, period) {
         quantity: 0
       });
     }
+    const cappedRowCost = capCost(row.amount, row.cost);
     byStore.get(row.storeId).fact += toNumber(row.amount);
-    byStore.get(row.storeId).cost += toNumber(row.cost);
+    byStore.get(row.storeId).cost += cappedRowCost;
     byStore.get(row.storeId).grossProfit += toNumber(row.grossProfit);
     byStore.get(row.storeId).quantity += toNumber(row.quantity);
     byProduct.get(row.productId).fact += toNumber(row.amount);
-    byProduct.get(row.productId).cost += toNumber(row.cost);
+    byProduct.get(row.productId).cost += cappedRowCost;
     byProduct.get(row.productId).grossProfit += toNumber(row.grossProfit);
     byProduct.get(row.productId).quantity += toNumber(row.quantity);
   }
@@ -606,7 +621,7 @@ function storeDetails(db, period, storeId) {
     }
     const item = rows.get(row.productId);
     item.fact += toNumber(row.amount);
-    item.cost += toNumber(row.cost);
+    item.cost += capCost(row.amount, row.cost);
     item.grossProfit += toNumber(row.grossProfit);
     item.quantity += toNumber(row.quantity);
   }
