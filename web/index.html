@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=21" />
+    <link rel="stylesheet" href="/styles.css?v=22" />
   </head>
   <body>
 
@@ -298,10 +298,17 @@
               </div>
               <span id="analyticsPeriodTag" class="muted" style="font-size:11px"></span>
             </div>
+            <div class="analytics-tabs" id="analyticsTabs">
+              <button class="atab atab-active" data-tab="network">Сеть</button>
+              <button class="atab" data-tab="products">Товары</button>
+              <button class="atab" data-tab="time">Время</button>
+              <button class="atab" data-tab="returns">Возвраты</button>
+              <button class="atab" data-tab="pending">В разработке</button>
+            </div>
           </section>
 
           <!-- A1. План/факт по каналам продаж -->
-          <section class="section">
+          <section class="section atab-section" data-atab="network">
             <div class="section-header">
               <div>
                 <div class="section-label">План / факт по каналам продаж</div>
@@ -330,7 +337,7 @@
           </section>
 
           <!-- A19/B2. Доля категорий + % наценки по группам -->
-          <section class="section">
+          <section class="section atab-section" data-atab="products">
             <div class="section-header">
               <div>
                 <div class="section-label">По группам товаров</div>
@@ -358,7 +365,7 @@
           </section>
 
           <!-- A8. ABC анализ ассортимента -->
-          <section class="section">
+          <section class="section atab-section" data-atab="products">
             <div class="section-header">
               <div>
                 <div class="section-label">ABC-анализ ассортимента</div>
@@ -396,7 +403,7 @@
           </section>
 
           <!-- A22. Выручка по неделям -->
-          <section class="section">
+          <section class="section atab-section" data-atab="time">
             <div class="section-header">
               <div>
                 <div class="section-label">Выручка по неделям</div>
@@ -423,7 +430,7 @@
           </section>
 
           <!-- A9. График продаж по группам товаров -->
-          <section class="section">
+          <section class="section atab-section" data-atab="products">
             <div class="section-label">График продаж по группам товаров</div>
             <div class="section-hint">Топ-15 групп по выручке за период · цвет — % маржи (зелёный ≥70%, жёлтый 30-70%, красный &lt;30%)</div>
             <div class="panel">
@@ -432,7 +439,7 @@
           </section>
 
           <!-- ABC по группам -->
-          <section class="section">
+          <section class="section atab-section" data-atab="products">
             <div class="section-header">
               <div>
                 <div class="section-label">ABC-анализ групп товаров</div>
@@ -458,7 +465,7 @@
           </section>
 
           <!-- Продажи по дням недели -->
-          <section class="section">
+          <section class="section atab-section" data-atab="time">
             <div class="section-label">Продажи по дням недели</div>
             <div class="section-hint">Сумма за все понедельники/вторники/… месяца. «Ср/день» — средняя выручка такого дня недели.</div>
             <div class="panel">
@@ -480,7 +487,7 @@
           </section>
 
           <!-- Динамика факта по дням месяца -->
-          <section class="section">
+          <section class="section atab-section" data-atab="time">
             <div class="section-label">Динамика факта по дням</div>
             <div class="section-hint">Выручка каждого дня месяца с накоплением</div>
             <div class="panel">
@@ -489,7 +496,7 @@
           </section>
 
           <!-- B2 (расширение). Наценка по магазинам -->
-          <section class="section">
+          <section class="section atab-section" data-atab="network">
             <div class="section-header">
               <div>
                 <div class="section-label">Наценка по магазинам</div>
@@ -517,7 +524,7 @@
           </section>
 
           <!-- Продажи по часам суток (Иркутск UTC+8) -->
-          <section class="section">
+          <section class="section atab-section" data-atab="time">
             <div class="section-label">Продажи по часам суток</div>
             <div class="section-hint">Распределение выручки по часам (время Иркутск, UTC+8) · помогает найти пиковые часы для маркетинга</div>
             <div class="panel">
@@ -526,7 +533,7 @@
           </section>
 
           <!-- Heatmap день × час -->
-          <section class="section">
+          <section class="section atab-section" data-atab="time">
             <div class="section-label">Тепловая карта: день недели × час</div>
             <div class="section-hint">Чем темнее ячейка — тем больше выручка в это время. Помогает планировать смены.</div>
             <div class="panel">
@@ -535,7 +542,7 @@
           </section>
 
           <!-- Топ-маржинальные товары -->
-          <section class="section">
+          <section class="section atab-section" data-atab="products">
             <div class="section-header">
               <div>
                 <div class="section-label">Топ-30 товаров по марже</div>
@@ -563,7 +570,7 @@
           </section>
 
           <!-- Возвраты (C2) -->
-          <section class="section">
+          <section class="section atab-section" data-atab="returns">
             <div class="section-header">
               <div>
                 <div class="section-label">Возвраты</div>
@@ -597,7 +604,7 @@
           </section>
 
           <!-- В разработке -->
-          <section class="section">
+          <section class="section atab-section" data-atab="pending">
             <div class="section-label">В разработке</div>
             <div class="section-hint">Отчёты, для которых нужно расширить выгрузку из 1С (BSL-модуль)</div>
             <div id="analyticsPending" class="panel" style="padding:16px"></div>
@@ -607,6 +614,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=21"></script>
+    <script src="/app.js?v=22"></script>
   </body>
 </html>

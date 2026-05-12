@@ -350,8 +350,38 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 #page-dashboard.hidden,
 #page-analytics.hidden,
 .empty-state.hidden,
-.btn-group [data-tw].hidden {
+.btn-group [data-tw].hidden,
+.atab-section.hidden {
   display: none !important;
+}
+
+/* ── Analytics tabs (внутри страницы аналитики) ───────────────────── */
+.analytics-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.atab {
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .18s;
+  white-space: nowrap;
+}
+.atab:hover { color: var(--ink); }
+.atab-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
 }
 
 /* ── Sidebar navigation (Dashboard / Analytics) ───────────────────── */

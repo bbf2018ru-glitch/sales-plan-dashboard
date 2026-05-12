@@ -1093,6 +1093,7 @@ async function init() {
 
 const analyticsState = {
   currentPage: 'dashboard',
+  currentTab: localStorage.getItem('maria_atab') || 'network',
   data: null,
   abcFilter: 'all',
   abcLimit: 50
@@ -1117,6 +1118,25 @@ function initPageNav() {
     });
   });
   initCsvButtons();
+  initAnalyticsTabs();
+  // Применяем сохранённый таб при загрузке
+  switchAnalyticsTab(analyticsState.currentTab);
+}
+
+function initAnalyticsTabs() {
+  document.querySelectorAll('#analyticsTabs .atab').forEach(btn => {
+    btn.addEventListener('click', () => switchAnalyticsTab(btn.dataset.tab));
+  });
+}
+
+function switchAnalyticsTab(tab) {
+  analyticsState.currentTab = tab;
+  localStorage.setItem('maria_atab', tab);
+  document.querySelectorAll('#analyticsTabs .atab').forEach(b => b.classList.toggle('atab-active', b.dataset.tab === tab));
+  document.querySelectorAll('.atab-section').forEach(s => s.classList.toggle('hidden', s.dataset.atab !== tab));
+  // Скролл наверх страницы при переключении
+  const pageEl = $('page-analytics');
+  if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function switchPage(page) {
