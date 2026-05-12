@@ -1064,6 +1064,8 @@ async function init() {
       $('storeDetailTitle').textContent = 'Детализация точки';
       await loadSummary();
       loadInsights();
+      analyticsState.data = null;
+      if (analyticsState.currentPage === 'analytics') await loadAnalytics();
     });
 
     $('trendWindowBtns')?.addEventListener('click', e => {
@@ -1075,9 +1077,219 @@ async function init() {
     });
 
     setInterval(loadSummary, 30000);
+
+    initPageNav();
+    renderPendingReports();
   } catch (err) {
     document.body.innerHTML = `<main style="padding:48px;text-align:center;color:#dc2626">Ошибка загрузки: ${err.message}</main>`;
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// АНАЛИТИКА ПРОДАЖ — переключатель страниц + отчёты
+// ════════════════════════════════════════════════════════════════════════
+
+const analyticsState = {
+  currentPage: 'dashboard',
+  data: null,
+  abcFilter: 'all',
+  abcLimit: 50
+};
+
+function initPageNav() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const page = btn.dataset.page;
+      switchPage(page);
+      if (page === 'analytics' && !analyticsState.data) {
+        await loadAnalytics();
+      }
+    });
+  });
+  document.querySelectorAll('#abcFilterBtns [data-abc]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#abcFilterBtns [data-abc]').forEach(b => b.classList.toggle('btn-xs-active', b === btn));
+      analyticsState.abcFilter = btn.dataset.abc;
+      analyticsState.abcLimit = 50;
+      renderAbc();
+    });
+  });
+}
+
+function switchPage(page) {
+  analyticsState.currentPage = page;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('nav-active', b.dataset.page === page));
+  $('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
+  $('page-analytics').classList.toggle('hidden', page !== 'analytics');
+}
+
+async function loadAnalytics() {
+  try {
+    const data = await fetchJson(`/api/analytics/sales?period=${encodeURIComponent(state.period)}`);
+    analyticsState.data = data;
+    $('analyticsPeriodTag').textContent = `период ${data.period}`;
+    renderByChannel();
+    renderByCategory();
+    renderAbc();
+    renderWeekly();
+  } catch (err) {
+    console.error('analytics load failed', err);
+  }
+}
+
+function fmtMoneyShort(v) {
+  if (!Number.isFinite(v)) return '—';
+  if (Math.abs(v) >= 1_000_000) return (v/1_000_000).toFixed(2).replace(/\.?0+$/, '') + ' млн';
+  if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('ru-RU');
+  return v.toLocaleString('ru-RU');
+}
+function fmtNum(v) {
+  if (!Number.isFinite(v)) return '—';
+  return Math.round(v).toLocaleString('ru-RU');
+}
+function fmtPct(v) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  return v.toFixed(1) + '%';
+}
+
+const CHANNEL_NAMES = { retail: 'Розница (ЧекККМ)', corporate: 'Опт / корпоративные', mixed: 'Смешанные', unknown: '— без источника' };
+
+function renderByChannel() {
+  const tbody = document.querySelector('#analyticsByChannelTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.byChannel || [];
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${escapeHtml(CHANNEL_NAMES[r.source] || r.source)}</b></td>
+      <td class="num">${r.storesCount}</td>
+      <td class="num">${fmtNum(r.plan)}</td>
+      <td class="num"><b>${fmtNum(r.fact)}</b></td>
+      <td class="num">${r.completion ? r.completion.toFixed(1) + '%' : '—'}</td>
+      <td class="num">${fmtNum(r.cost)}</td>
+      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+      <td class="num">${fmtNum(r.quantity)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderByCategory() {
+  const tbody = document.querySelector('#analyticsByCategoryTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.byCategory || [];
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${escapeHtml(r.category)}</b></td>
+      <td class="num">${r.products}</td>
+      <td class="num"><b>${fmtNum(r.fact)}</b></td>
+      <td class="num">${r.share.toFixed(1)}%</td>
+      <td class="num">${fmtNum(r.cost)}</td>
+      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+      <td class="num">${r.markupPct === null ? '—' : r.markupPct.toFixed(0) + '%'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderAbc() {
+  const tbody = document.querySelector('#analyticsAbcTbl tbody');
+  const moreEl = $('analyticsAbcMore');
+  if (!tbody) return;
+  let rows = analyticsState.data?.abc || [];
+  if (analyticsState.abcFilter !== 'all') {
+    rows = rows.filter(r => r.abc === analyticsState.abcFilter);
+  }
+  const total = rows.length;
+  const shown = rows.slice(0, analyticsState.abcLimit);
+  tbody.innerHTML = shown.map((r, i) => `
+    <tr>
+      <td class="col-num">${i+1}</td>
+      <td>${escapeHtml(r.productName)}</td>
+      <td><span class="muted" style="font-size:11px">${escapeHtml(r.category || '—')}</span></td>
+      <td class="num"><span class="abc-badge abc-${r.abc}">${r.abc}</span></td>
+      <td class="num">${fmtNum(r.fact)}</td>
+      <td class="num">${r.share.toFixed(2)}%</td>
+      <td class="num">${r.cumShare.toFixed(1)}%</td>
+      <td class="num">${fmtNum(r.quantity)}</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+    </tr>
+  `).join('');
+  if (total > analyticsState.abcLimit) {
+    moreEl.classList.remove('hidden');
+    moreEl.innerHTML = `Показано ${analyticsState.abcLimit} из ${total}. <button class="link-btn" id="abcShowMore">Показать ещё</button>`;
+    $('abcShowMore')?.addEventListener('click', () => { analyticsState.abcLimit += 50; renderAbc(); });
+  } else {
+    moreEl.classList.add('hidden');
+    moreEl.innerHTML = '';
+  }
+}
+
+function renderWeekly() {
+  const tbody = document.querySelector('#analyticsWeeklyTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.weekly || [];
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.weekStart}</td>
+      <td class="num"><b>${fmtNum(r.fact)}</b></td>
+      <td class="num">${fmtNum(r.cost)}</td>
+      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${r.cost > 0 ? ((r.fact - r.cost)/r.fact*100).toFixed(1) + '%' : '—'}</td>
+      <td class="num">${fmtNum(r.quantity)}</td>
+    </tr>
+  `).join('');
+  // Простой бар-чарт (SVG inline)
+  const chart = $('analyticsWeeklyChart');
+  if (!chart || rows.length === 0) { if (chart) chart.innerHTML = ''; return; }
+  const maxFact = Math.max(...rows.map(r => r.fact));
+  const w = 800, h = 220, padL = 60, padR = 20, padT = 20, padB = 40;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const barW = innerW / rows.length * 0.7;
+  const step = innerW / rows.length;
+  chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:240px">
+    ${[0, .25, .5, .75, 1].map(t => `
+      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.08"/>
+      <text x="${padL-6}" y="${padT + innerH*(1-t) + 4}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">${fmtAxis(maxFact*t)}</text>
+    `).join('')}
+    ${rows.map((r, i) => {
+      const bh = (r.fact / maxFact) * innerH;
+      const x = padL + step*i + (step - barW)/2;
+      const y = padT + innerH - bh;
+      return `<g>
+        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="var(--accent)" opacity="0.85">
+          <title>${r.weekStart}: ${fmtNum(r.fact)} ₽</title>
+        </rect>
+        <text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">${r.weekStart.slice(5)}</text>
+      </g>`;
+    }).join('')}
+  </svg>`;
+}
+
+const PENDING_REPORTS = [
+  { title: 'Средний чек и количество чеков', note: 'Нужно: НомерЧекаККМ из Документ.ЧекККМ — группировка по чекам' },
+  { title: 'Новые / постоянные клиенты', note: 'Нужно: ДисконтнаяКарта в payload sales (первая покупка vs повторная)' },
+  { title: 'Количество карт, % чеков с картами', note: 'Нужно: ДисконтнаяКарта + признак "без карты" в каждой строке sales' },
+  { title: 'Скидки по видам (Бонусы, Дни рождения, Торт месяца)', note: 'Нужно: ВидСкидки + Сумма по каждому виду из ЧекККМ' },
+  { title: 'Продано в килограммах', note: 'Нужно: ЭталонныйВес из карточки номенклатуры + признак штучный/весовой' },
+  { title: 'Доли категорий в количестве чеков', note: 'Нужно: chek_id для группировки строк sales в чеки' },
+  { title: 'Категории тортов по ценовым сегментам', note: 'Нужно: сегмент в карточке номенклатуры (ЦеновойСегмент)' },
+  { title: 'Средний чек по форматам магазинов', note: 'Нужно: ФорматМагазина в карточке Склада (кондитерская/рынок/с кухней)' },
+  { title: 'Динамика акционных позиций', note: 'Нужно: признак "акция" + период акции из ЧекККМ' },
+  { title: 'Выпуск продукции в кг', note: 'Нужно: РегистрНакопления.ВыпускПродукции с эталонными весами' },
+  { title: 'Сумма возвратов с L2L', note: 'Нужно: отдельный поток sales с ВидОперации=Возврат (сейчас они суммированы как минус)' },
+  { title: 'Новые позиции в ассортименте', note: 'Нужно: признак "новый" или дата первого появления товара в продажах' }
+];
+
+function renderPendingReports() {
+  const el = $('analyticsPending');
+  if (!el) return;
+  el.innerHTML = `<div class="pending-list">` + PENDING_REPORTS.map(r => `
+    <div class="pending-card">
+      <div class="pending-card-title">${escapeHtml(r.title)}</div>
+      <div class="pending-card-note">${escapeHtml(r.note)}</div>
+    </div>
+  `).join('') + `</div>`;
+}
+
 init();
+

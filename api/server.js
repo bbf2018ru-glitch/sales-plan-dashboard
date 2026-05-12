@@ -13,6 +13,7 @@ const {
   storeDetails
 } = require('./lib/analytics');
 const { buildInsights } = require('./lib/insights');
+const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { startMorningReport, buildReportText } = require('./lib/morning-report');
 const { createStore } = require('./storage');
 
@@ -318,6 +319,14 @@ const server = http.createServer(async (req, res) => {
       }
       const ok = await morningReportHandle.sendNow();
       sendJson(res, 200, { ok });
+      return;
+    }
+
+    // ── Аналитика продаж — расширенные отчёты по каналам/категориям/неделям ──
+    if (pathname === '/api/analytics/sales' && req.method === 'GET') {
+      const { db } = await getScopedDb(req);
+      const period = monthKey(parsedUrl.searchParams.get('period'));
+      sendJson(res, 200, buildSalesAnalytics(db, period));
       return;
     }
 

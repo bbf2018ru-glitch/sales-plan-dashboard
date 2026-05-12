@@ -346,6 +346,79 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .status-pill.live    { background: var(--good-soft); color: var(--good); box-shadow: 0 0 0 1px rgba(52,211,153,.25); }
 .status-pill.syncing { background: var(--accent-soft); color: var(--accent); }
 
+/* ── Sidebar navigation (Dashboard / Analytics) ───────────────────── */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .18s;
+  text-align: left;
+}
+.nav-btn:hover {
+  background: var(--glass);
+  color: var(--ink);
+}
+.nav-btn.nav-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.nav-btn svg { flex-shrink: 0; opacity: .85; }
+
+/* ── ABC class badges ─────────────────────────────────────────────── */
+.abc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+}
+.abc-A { background: rgba(34,197,94,.15); color: rgb(34,197,94); }
+.abc-B { background: rgba(234,179,8,.15); color: rgb(202,138,4); }
+.abc-C { background: rgba(244,63,94,.15); color: rgb(244,63,94); }
+
+/* ── Pending reports list ─────────────────────────────────────────── */
+.pending-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+}
+.pending-card {
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--glass-soft);
+}
+.pending-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.pending-card-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 /* ── Sidebar action buttons ───────────────────────────────────────── */
 .sidebar-section { display: flex; flex-direction: column; gap: 6px; }
 .sidebar-section.hidden { display: none !important; }

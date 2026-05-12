@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=16" />
+    <link rel="stylesheet" href="/styles.css?v=17" />
   </head>
   <body>
 
@@ -94,6 +94,17 @@
           </div>
         </div>
 
+        <nav class="sidebar-nav">
+          <button class="nav-btn nav-active" data-page="dashboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+            Дашборд
+          </button>
+          <button class="nav-btn" data-page="analytics">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+            Аналитика продаж
+          </button>
+        </nav>
+
         <div class="sidebar-card">
           <label class="field-label" for="periodSelect">Период</label>
           <select id="periodSelect"></select>
@@ -121,6 +132,8 @@
 
       <!-- ═══ MAIN ═══ -->
       <main class="content">
+
+        <div id="page-dashboard">
 
         <div id="planHealthBanner" class="plan-health-banner hidden"></div>
 
@@ -272,8 +285,136 @@
           </div>
         </section>
 
+        </div><!-- /#page-dashboard -->
+
+        <!-- ═══ АНАЛИТИКА ПРОДАЖ ═══ -->
+        <div id="page-analytics" class="hidden">
+
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Аналитика продаж</div>
+                <div class="section-hint">Расширенные разрезы по каналам, категориям, неделям. Данные из чеков ККМ и реализации.</div>
+              </div>
+              <span id="analyticsPeriodTag" class="muted" style="font-size:11px"></span>
+            </div>
+          </section>
+
+          <!-- A1. План/факт по каналам продаж -->
+          <section class="section">
+            <div class="section-label">План / факт по каналам продаж</div>
+            <div class="section-hint">Розница (ЧекККМ) · Опт/корпоративные (РегистрНакопления.Продажи) · Микс</div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsByChannelTbl">
+                  <thead><tr>
+                    <th>Канал</th>
+                    <th class="num">Точек</th>
+                    <th class="num">План</th>
+                    <th class="num">Факт</th>
+                    <th class="num">%</th>
+                    <th class="num">Себест.</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                    <th class="num">Кол-во</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- A19/B2. Доля категорий + % наценки по группам -->
+          <section class="section">
+            <div class="section-label">По группам товаров</div>
+            <div class="section-hint">Доля группы в общем объёме · % наценки (Сумма продаж / Себестоимость − 1)</div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsByCategoryTbl">
+                  <thead><tr>
+                    <th>Группа</th>
+                    <th class="num">Товаров</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Доля</th>
+                    <th class="num">Себест.</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                    <th class="num">Наценка %</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- A8. ABC анализ ассортимента -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">ABC-анализ ассортимента</div>
+                <div class="section-hint">A — 80% выручки · B — следующие 15% · C — последние 5%</div>
+              </div>
+              <div class="btn-group" id="abcFilterBtns">
+                <button class="btn-xs btn-xs-active" data-abc="all">Все</button>
+                <button class="btn-xs" data-abc="A">A</button>
+                <button class="btn-xs" data-abc="B">B</button>
+                <button class="btn-xs" data-abc="C">C</button>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsAbcTbl">
+                  <thead><tr>
+                    <th class="col-num">#</th>
+                    <th>Товар</th>
+                    <th>Группа</th>
+                    <th class="num">Класс</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Доля</th>
+                    <th class="num">Накопл.</th>
+                    <th class="num">Кол-во</th>
+                    <th class="num">Марж.%</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div id="analyticsAbcMore" class="empty-state hidden" style="padding:12px;text-align:center"></div>
+            </div>
+          </section>
+
+          <!-- A22. Выручка по неделям -->
+          <section class="section">
+            <div class="section-label">Выручка по неделям</div>
+            <div class="section-hint">Понедельник — воскресенье. Сравнение с прошлогодней неделей появится когда в БД будет полный год истории.</div>
+            <div class="panel">
+              <div id="analyticsWeeklyChart" class="chart-wrap"></div>
+              <div class="table-wrap" style="margin-top:8px">
+                <table id="analyticsWeeklyTbl">
+                  <thead><tr>
+                    <th>Неделя с</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Себест.</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                    <th class="num">Кол-во</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- В разработке -->
+          <section class="section">
+            <div class="section-label">В разработке</div>
+            <div class="section-hint">Отчёты, для которых нужно расширить выгрузку из 1С (BSL-модуль)</div>
+            <div id="analyticsPending" class="panel" style="padding:16px"></div>
+          </section>
+
+        </div><!-- /#page-analytics -->
+
       </main>
     </div>
-    <script src="/app.js?v=16"></script>
+    <script src="/app.js?v=17"></script>
   </body>
 </html>
