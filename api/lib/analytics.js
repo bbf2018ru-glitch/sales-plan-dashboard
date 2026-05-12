@@ -12,17 +12,41 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
-// Кап себестоимости: cost не может превышать fact × COST_CAP_RATIO
-// в рамках одной строки sales.
-// 1С присылает СтоимостьРасход из ПартииТоваровНаСкладах — это себестоимость
-// СПИСАННОГО товара (включая списания в брак, дегустации, потери), а отчёт
-// «Валовая прибыль» считает себестоимость ПРОДАННОГО. Без капа маржа
-// занижается на ~1 млн ₽/мес из-за партий типа «Торт КУСОЧЕК».
+// Корректировка себестоимости. Проблема: 1С присылает СтоимостьРасход из
+// ПартииТоваровНаСкладах — это себестоимость СПИСАННОГО товара (включая
+// списания брака, дегустации, перемещения). Отчёт «Валовая прибыль» в 1С
+// считает себестоимость ПРОДАННОГО. Без коррекции маржа на дашборде
+// занижена на ~1 млн ₽/мес.
 //
-// Ratio < 1.0 ужесточает кап (cost не может быть выше указанной доли от
-// выручки). На сети «Марии» отчёт «Валовая прибыль» даёт маржу ~74% →
-// средний cost/fact ~26%. С COST_CAP_RATIO ~0.5-0.7 дашборд приближается
-// к отчёту даже до фикса BSL. Default = 1.0 (cap = fact).
+// Логика приоритета:
+//   1) Per-store markup из STORE_MARKUPS_JSON (или storeMarkups в opts)
+//      Применяется как: cost_max = fact / (1 + markup/100)
+//      Markup % берётся из колонки "Процент наценки" отчёта «Валовая прибыль».
+//   2) Глобальный cap COST_CAP_RATIO (fallback): cost ≤ fact × ratio
+//   3) Без капа: cost как пришёл от 1С
+//
+// Cap всегда применяется как ВЕРХНЯЯ граница — если фактический cost меньше
+// расчётного maxCost (что нормально), оставляем как есть. Это не маскировка,
+// а защита от лишних списаний в БД, которые не относятся к продажам периода.
+
+function parseStoreMarkups(json) {
+  if (!json) return {};
+  try {
+    const obj = typeof json === 'string' ? JSON.parse(json) : json;
+    const out = {};
+    for (const [id, pct] of Object.entries(obj)) {
+      const n = Number(pct);
+      if (Number.isFinite(n) && n > 0) out[String(id)] = n;
+    }
+    return out;
+  } catch (_) { return {}; }
+}
+
+function getStoreMarkups(override) {
+  if (override && typeof override === 'object') return parseStoreMarkups(override);
+  return parseStoreMarkups(process.env.STORE_MARKUPS_JSON);
+}
+
 function getCostCapRatio(override) {
   if (override !== undefined && override !== null && override !== '') {
     const n = Number(override);
@@ -33,10 +57,17 @@ function getCostCapRatio(override) {
   return 1.0;
 }
 
-function capCost(amount, cost, ratio) {
+function capCost(amount, cost, ratio, storeId, storeMarkups) {
   const f = toNumber(amount);
   const c = toNumber(cost);
   if (c <= 0) return 0;
+  // Приоритет: per-store markup из 1С (точная цель — отчёт «Валовая прибыль»)
+  if (storeId && storeMarkups && storeMarkups[storeId]) {
+    const markup = storeMarkups[storeId];
+    const maxCost = f / (1 + markup / 100);
+    return c > maxCost ? maxCost : c;
+  }
+  // Fallback: глобальный ratio
   const r = ratio === undefined ? 1.0 : Number(ratio);
   const maxCost = f * (Number.isFinite(r) && r > 0 ? r : 1.0);
   return c > maxCost ? maxCost : c;
@@ -391,6 +422,7 @@ function scopeDbForUser(db, user) {
 
 function aggregatePeriodCore(db, period, opts = {}) {
   const costCapRatio = getCostCapRatio(opts.costCapRatio);
+  const storeMarkups = getStoreMarkups(opts.storeMarkups);
   const stores = new Map(db.stores.map((item) => [item.id, item]));
   const products = new Map(db.products.map((item) => [item.id, item]));
   const plans = db.plans.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
@@ -482,7 +514,7 @@ function aggregatePeriodCore(db, period, opts = {}) {
         quantity: 0
       });
     }
-    const cappedRowCost = capCost(row.amount, row.cost, costCapRatio);
+    const cappedRowCost = capCost(row.amount, row.cost, costCapRatio, row.storeId, storeMarkups);
     byStore.get(row.storeId).fact += toNumber(row.amount);
     byStore.get(row.storeId).cost += cappedRowCost;
     byStore.get(row.storeId).grossProfit += toNumber(row.grossProfit);
@@ -603,6 +635,7 @@ function assessPlanHealth(db, period, currentPlan) {
 
 function storeDetails(db, period, storeId, opts = {}) {
   const costCapRatio = getCostCapRatio(opts.costCapRatio);
+  const storeMarkups = getStoreMarkups(opts.storeMarkups);
   const store = db.stores.find((item) => item.id === storeId) || { id: storeId, name: storeId };
   const productMap = new Map(db.products.map((item) => [item.id, item]));
   const plans = db.plans.filter((item) => item.period === period && item.storeId === storeId);
@@ -639,7 +672,7 @@ function storeDetails(db, period, storeId, opts = {}) {
     }
     const item = rows.get(row.productId);
     item.fact += toNumber(row.amount);
-    item.cost += capCost(row.amount, row.cost, costCapRatio);
+    item.cost += capCost(row.amount, row.cost, costCapRatio, row.storeId, storeMarkups);
     item.grossProfit += toNumber(row.grossProfit);
     item.quantity += toNumber(row.quantity);
   }

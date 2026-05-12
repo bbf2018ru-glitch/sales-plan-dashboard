@@ -535,14 +535,20 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const ratio = parsedUrl.searchParams.get('ratio');
+      const markupsStr = parsedUrl.searchParams.get('markups');
       const period = monthKey(parsedUrl.searchParams.get('period'));
       const db = await store.getDb();
-      const summary = aggregateDashboard(db, period, { costCapRatio: ratio });
+      const opts = { costCapRatio: ratio };
+      if (markupsStr) {
+        try { opts.storeMarkups = JSON.parse(markupsStr); } catch (_) {}
+      }
+      const summary = aggregateDashboard(db, period, opts);
       sendJson(res, 200, {
         period,
         ratioUsed: Number(ratio) || 1.0,
+        markupsUsed: opts.storeMarkups || null,
         totals: summary.totals,
-        stores: summary.stores.map(s => ({ storeId: s.storeId, fact: s.fact, cost: s.cost, margin: s.margin }))
+        stores: summary.stores.map(s => ({ storeId: s.storeId, storeName: s.storeName, fact: s.fact, cost: s.cost, margin: s.margin, marginPct: s.marginPct }))
       });
       return;
     }
