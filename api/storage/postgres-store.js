@@ -91,6 +91,33 @@ class PostgresStore {
     return r.rows[0] || null;
   }
 
+  // Перечитывает stores из последнего raw_upp_payloads и обновляет имена/source
+  // в таблице stores. Используется для починки битых имён (U+FFFD), которые
+  // могли попасть в БД до фикса parseBody.
+  async refreshStoresFromPayload() {
+    await this.init();
+    const r = await this.pool.query(
+      `select payload_json from raw_upp_payloads order by created_at desc limit 1`
+    );
+    if (!r.rows[0]) return { updated: 0, note: 'no raw payload' };
+    const payload = typeof r.rows[0].payload_json === 'string'
+      ? JSON.parse(r.rows[0].payload_json)
+      : r.rows[0].payload_json;
+    const stores = Array.isArray(payload.stores) ? payload.stores : [];
+    let updated = 0;
+    for (const s of stores) {
+      if (!s.id) continue;
+      const res = await this.pool.query(
+        `update stores set name = $2, region = $3,
+           source = case when $4 = '' then source else $4 end
+         where id = $1`,
+        [String(s.id), s.name || String(s.id), s.region || '', s.source || '']
+      );
+      updated += res.rowCount || 0;
+    }
+    return { updated, totalInPayload: stores.length };
+  }
+
   async _seedSample(sample) {
     const client = await this.pool.connect();
     try {

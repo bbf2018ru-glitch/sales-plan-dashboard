@@ -570,6 +570,22 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Refresh stores из последнего raw payload (admin) — починка битых имён ─
+    if (pathname === '/api/admin/refresh-stores' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      try {
+        const result = store.refreshStoresFromPayload
+          ? await store.refreshStoresFromPayload()
+          : { updated: 0, note: 'JSON store: not supported' };
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Wipe demo seed-data (admin) — удаляет фейковые stores из sample-db.json ──
     // Реальные магазины из 1С имеют source='retail'/'corporate'/'mixed' и не
     // пострадают. Удаляются только stores с source='' (это и есть seed-данные).
