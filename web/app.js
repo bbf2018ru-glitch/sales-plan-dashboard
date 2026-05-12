@@ -1052,6 +1052,11 @@ async function init() {
 
   $('insightsRefresh')?.addEventListener('click', () => loadInsights());
 
+  // Навигация сайдбара и список pending-отчётов работают независимо
+  // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
+  initPageNav();
+  renderPendingReports();
+
   try {
     const meta = await loadMetadata();
     initPin(meta.pinRequired);
@@ -1077,9 +1082,6 @@ async function init() {
     });
 
     setInterval(loadSummary, 30000);
-
-    initPageNav();
-    renderPendingReports();
   } catch (err) {
     document.body.innerHTML = `<main style="padding:48px;text-align:center;color:#dc2626">Ошибка загрузки: ${err.message}</main>`;
   }

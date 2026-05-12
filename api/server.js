@@ -220,7 +220,17 @@ function serveStatic(res, pathname) {
       '.webp': 'image/webp',
       '.gif': 'image/gif'
     }[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
+    // HTML не кэшируем — иначе после деплоя пользователь видит старый
+    // index.html с устаревшими ?v= параметрами для css/js.
+    // Статика (js/css/svg) грузится по URL с ?v=, который меняется при
+    // правках — она может кэшироваться браузером свободно.
+    const headers = { 'Content-Type': contentType };
+    if (ext === '.html' || pathname === '/') {
+      headers['Cache-Control'] = 'no-cache, must-revalidate';
+    } else {
+      headers['Cache-Control'] = 'public, max-age=300';
+    }
+    res.writeHead(200, headers);
     res.end(content);
   });
 }
