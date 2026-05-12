@@ -304,6 +304,113 @@ function markupByStore(db, period, opts) {
     .sort((a, b) => (b.markupPct || 0) - (a.markupPct || 0));
 }
 
+// ── Отчёт C2: возвраты (sales с отрицательной amount) ─────────────────
+// BSL шлёт возвраты как отдельные sales со знаком минус (через ОБЪЕДИНИТЬ
+// ВСЕ для ВидОперации = Возврат). Считаем абсолютные суммы.
+function returns(db, period, opts) {
+  const { storeCostScale } = opts;
+  const storeMap = new Map(db.stores.map(s => [s.id, s]));
+  const productMap = new Map(db.products.map(p => [p.id, p]));
+  const sales = db.sales.filter(r => r.period === period && toNumber(r.amount) < 0);
+
+  let total = 0;
+  let totalQty = 0;
+  const byStore = new Map();
+  const byProduct = new Map();
+
+  for (const row of sales) {
+    const amt = Math.abs(toNumber(row.amount));
+    const qty = Math.abs(toNumber(row.quantity));
+    total += amt;
+    totalQty += qty;
+
+    if (!byStore.has(row.storeId)) byStore.set(row.storeId, { storeId: row.storeId, amount: 0, quantity: 0 });
+    const bs = byStore.get(row.storeId);
+    bs.amount += amt;
+    bs.quantity += qty;
+
+    if (!byProduct.has(row.productId)) byProduct.set(row.productId, { productId: row.productId, amount: 0, quantity: 0 });
+    const bp = byProduct.get(row.productId);
+    bp.amount += amt;
+    bp.quantity += qty;
+  }
+
+  return {
+    totalAmount: roundMetric(total),
+    totalQuantity: roundMetric(totalQty),
+    rowsCount: sales.length,
+    byStore: Array.from(byStore.values())
+      .map(it => ({ ...it, storeName: storeMap.get(it.storeId)?.name || it.storeId, amount: roundMetric(it.amount), quantity: roundMetric(it.quantity) }))
+      .sort((a, b) => b.amount - a.amount),
+    byProduct: Array.from(byProduct.values())
+      .map(it => ({ ...it, productName: productMap.get(it.productId)?.name || it.productId, amount: roundMetric(it.amount), quantity: roundMetric(it.quantity) }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 30)
+  };
+}
+
+// ── Отчёт: продажи по часам суток ─────────────────────────────────────
+// Из soldAt timestamp группируем по часу (0-23). Иркутск UTC+8.
+const IRK_TZ_HOURS = 8;
+function byHour(db, period, opts) {
+  const { storeCostScale } = opts;
+  const sales = db.sales.filter(r => r.period === period && toNumber(r.amount) > 0);
+  const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: h, fact: 0, cost: 0, quantity: 0, txCount: 0 }));
+  for (const row of sales) {
+    const d = new Date(row.soldAt);
+    if (isNaN(d.getTime())) continue;
+    // Корректировка UTC → Иркутск (UTC+8)
+    const utcH = d.getUTCHours();
+    const irkH = (utcH + IRK_TZ_HOURS) % 24;
+    buckets[irkH].fact += toNumber(row.amount);
+    buckets[irkH].cost += correctedCost(row, storeCostScale);
+    buckets[irkH].quantity += toNumber(row.quantity);
+    buckets[irkH].txCount += 1;
+  }
+  return buckets.map(b => ({
+    hour: b.hour,
+    fact: roundMetric(b.fact),
+    cost: roundMetric(b.cost),
+    margin: b.cost > 0 ? roundMetric(b.fact - b.cost) : null,
+    marginPct: b.cost > 0 && b.fact > 0 ? percent((b.fact - b.cost) / b.fact) : null,
+    quantity: roundMetric(b.quantity),
+    txCount: b.txCount
+  }));
+}
+
+// ── Отчёт: топ-маржинальные товары ────────────────────────────────────
+// Сортировка abc-данных по margin DESC. Берём top-30.
+function topMarginProducts(abcRows, limit = 30) {
+  return [...abcRows]
+    .filter(r => r.margin !== null && r.margin > 0)
+    .sort((a, b) => b.margin - a.margin)
+    .slice(0, limit);
+}
+
+// ── Heatmap: день недели × час ────────────────────────────────────────
+// Матрица 7x24 — где средняя выручка в этот час недели максимальна.
+function heatmapDayHour(db, period, opts) {
+  const sales = db.sales.filter(r => r.period === period && toNumber(r.amount) > 0);
+  // 7 дней × 24 часа
+  const grid = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ fact: 0, count: 0 })));
+  for (const row of sales) {
+    const d = new Date(row.soldAt);
+    if (isNaN(d.getTime())) continue;
+    const dayIdx = (d.getUTCDay() + 6) % 7; // 0=пн ... 6=вс
+    const irkH = (d.getUTCHours() + IRK_TZ_HOURS) % 24;
+    grid[dayIdx][irkH].fact += toNumber(row.amount);
+    grid[dayIdx][irkH].count += 1;
+  }
+  // Превращаем в плоский список для удобства фронта
+  const cells = [];
+  for (let d = 0; d < 7; d++) {
+    for (let h = 0; h < 24; h++) {
+      cells.push({ day: d, hour: h, fact: roundMetric(grid[d][h].fact), count: grid[d][h].count });
+    }
+  }
+  return cells;
+}
+
 // ── Главный entry ─────────────────────────────────────────────────────────
 function buildSalesAnalytics(db, period) {
   const markups = getStoreMarkups();
@@ -311,16 +418,21 @@ function buildSalesAnalytics(db, period) {
   const storeCostScale = buildStoreCostScale(sales, markups);
   const opts = { storeCostScale };
   const cats = byCategory(db, period, opts);
+  const abcRows = abc(db, period, opts);
   return {
     period,
     byChannel: byChannel(db, period, opts),
     byCategory: cats,
     byCategoryAbc: abcCategories(cats),
-    abc: abc(db, period, opts),
+    abc: abcRows,
+    topMargin: topMarginProducts(abcRows, 30),
     weekly: weeklyRevenue(db, period, opts),
     byWeekday: byWeekday(db, period, opts),
+    byHour: byHour(db, period, opts),
     daily: dailyDynamic(db, period, opts),
-    byStoreMarkup: markupByStore(db, period, opts)
+    byStoreMarkup: markupByStore(db, period, opts),
+    returns: returns(db, period, opts),
+    heatmap: heatmapDayHour(db, period, opts)
   };
 }
 

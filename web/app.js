@@ -1140,6 +1140,10 @@ async function loadAnalytics() {
     renderWeekday();
     renderDaily();
     renderStoreMarkup();
+    renderHourChart();
+    renderHeatmap();
+    renderTopMargin();
+    renderReturns();
   } catch (err) {
     console.error('analytics load failed', err);
   }
@@ -1407,6 +1411,124 @@ function renderStoreMarkup() {
   `).join('');
 }
 
+function renderHourChart() {
+  const chart = $('analyticsHourChart');
+  if (!chart) return;
+  const rows = analyticsState.data?.byHour || [];
+  if (!rows.length) { chart.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
+  const max = Math.max(...rows.map(r => r.fact));
+  const w = 900, h = 240, padL = 60, padR = 20, padT = 20, padB = 40;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const step = innerW / 24;
+  const barW = step * 0.7;
+  chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:260px">
+    ${[0, .25, .5, .75, 1].map(t => `
+      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.08"/>
+      <text x="${padL-6}" y="${padT + innerH*(1-t) + 4}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">${fmtAxis(max*t)}</text>
+    `).join('')}
+    ${rows.map(r => {
+      const bh = max > 0 ? (r.fact / max) * innerH : 0;
+      const x = padL + step*r.hour + (step - barW)/2;
+      const y = padT + innerH - bh;
+      const peak = r.fact / max > 0.7;
+      return `<g>
+        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${peak ? '#22c55e' : 'var(--accent)'}" opacity="${peak ? 0.95 : 0.75}">
+          <title>${r.hour}:00 — ${fmtNum(r.fact)} ₽ · ${r.txCount} строк</title>
+        </rect>
+        ${r.hour % 2 === 0 ? `<text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.65">${r.hour}</text>` : ''}
+      </g>`;
+    }).join('')}
+    <text x="${w/2}" y="${h - 4}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.5">часы (Иркутск UTC+8)</text>
+  </svg>`;
+}
+
+function renderHeatmap() {
+  const el = $('analyticsHeatmap');
+  if (!el) return;
+  const cells = analyticsState.data?.heatmap || [];
+  if (!cells.length) { el.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
+  const max = Math.max(...cells.map(c => c.fact));
+  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const cellSize = 26;
+  const labelW = 36;
+  const grid = {};
+  cells.forEach(c => { grid[`${c.day}-${c.hour}`] = c; });
+  el.innerHTML = `
+    <div style="display:flex;gap:1px;align-items:center;font-size:10px;color:var(--muted);margin-bottom:4px">
+      <div style="width:${labelW}px"></div>
+      ${Array.from({length:24}, (_,h)=>`<div style="width:${cellSize}px;text-align:center">${h}</div>`).join('')}
+    </div>
+    ${days.map((dName, d) => `
+      <div style="display:flex;gap:1px;align-items:center;margin-bottom:1px">
+        <div style="width:${labelW}px;font-size:11px;color:var(--muted)">${dName}</div>
+        ${Array.from({length:24}, (_,h) => {
+          const c = grid[`${d}-${h}`] || { fact: 0, count: 0 };
+          const intensity = max > 0 ? c.fact / max : 0;
+          const bg = intensity === 0
+            ? 'var(--glass-soft)'
+            : `rgba(168, 85, 247, ${0.15 + intensity * 0.85})`;
+          return `<div title="${dName} ${h}:00 — ${fmtNum(c.fact)} ₽ · ${c.count} строк" style="width:${cellSize}px;height:${cellSize}px;background:${bg};border-radius:3px"></div>`;
+        }).join('')}
+      </div>
+    `).join('')}
+    <div style="font-size:10px;color:var(--muted);margin-top:8px">Часы Иркутск (UTC+8) · ховер ячейки для деталей</div>
+  `;
+}
+
+function renderTopMargin() {
+  const tbody = document.querySelector('#analyticsTopMarginTbl tbody');
+  if (!tbody) return;
+  const rows = analyticsState.data?.topMargin || [];
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="col-num">${i+1}</td>
+      <td><b>${escapeHtml(r.productName)}</b></td>
+      <td><span class="muted" style="font-size:11px">${escapeHtml(r.category || '—')}</span></td>
+      <td class="num"><span class="abc-badge abc-${r.abc}">${r.abc}</span></td>
+      <td class="num">${fmtNum(r.fact)}</td>
+      <td class="num"><b>${fmtNum(r.margin)}</b></td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+      <td class="num">${fmtNum(r.quantity)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderReturns() {
+  const r = analyticsState.data?.returns;
+  if (!r) return;
+
+  const summary = $('analyticsReturnsSummary');
+  if (summary) {
+    summary.innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Сумма возвратов</div><div class="kpi-value">${fmtNum(r.totalAmount)} ₽</div></div>
+      <div class="kpi-card"><div class="kpi-label">Количество единиц</div><div class="kpi-value">${fmtNum(r.totalQuantity)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Строк возвратов</div><div class="kpi-value">${r.rowsCount}</div></div>
+    `;
+  }
+
+  const byStoreTbody = document.querySelector('#analyticsReturnsByStoreTbl tbody');
+  if (byStoreTbody) {
+    byStoreTbody.innerHTML = (r.byStore || []).slice(0, 20).map(s => `
+      <tr>
+        <td>${escapeHtml(s.storeName)}</td>
+        <td class="num">${fmtNum(s.amount)}</td>
+        <td class="num">${fmtNum(s.quantity)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="3" class="empty-state" style="padding:8px">Возвратов нет</td></tr>';
+  }
+
+  const byProductTbody = document.querySelector('#analyticsReturnsByProductTbl tbody');
+  if (byProductTbody) {
+    byProductTbody.innerHTML = (r.byProduct || []).slice(0, 20).map(p => `
+      <tr>
+        <td>${escapeHtml(p.productName)}</td>
+        <td class="num">${fmtNum(p.amount)}</td>
+        <td class="num">${fmtNum(p.quantity)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="3" class="empty-state" style="padding:8px">Возвратов нет</td></tr>';
+  }
+}
+
 // CSV экспорт по нажатию на data-csv кнопки
 function initCsvButtons() {
   document.querySelectorAll('#page-analytics [data-csv]').forEach(btn => {
@@ -1423,7 +1545,9 @@ function initCsvButtons() {
         weekly:     { rows: d.weekly,         file: `analytics-weekly-${period}.csv`,      fields: ['weekStart','fact','cost','margin','quantity'] },
         weekday:    { rows: d.byWeekday,      file: `analytics-weekday-${period}.csv`,     fields: ['weekday','daysCount','fact','avgPerDay','margin','marginPct'] },
         daily:      { rows: d.daily,          file: `analytics-daily-${period}.csv`,       fields: ['date','fact','cost','margin','quantity'] },
-        storeMarkup:{ rows: d.byStoreMarkup,  file: `analytics-store-markup-${period}.csv`,fields: ['storeId','storeName','source','fact','cost','margin','marginPct','markupPct'] }
+        storeMarkup:{ rows: d.byStoreMarkup,  file: `analytics-store-markup-${period}.csv`,fields: ['storeId','storeName','source','fact','cost','margin','marginPct','markupPct'] },
+        topMargin:  { rows: d.topMargin,      file: `analytics-top-margin-${period}.csv`,  fields: ['productName','category','abc','fact','margin','marginPct','quantity'] },
+        returns:    { rows: d.returns?.byProduct || [], file: `analytics-returns-${period}.csv`, fields: ['productName','amount','quantity'] }
       };
       const def = map[kind];
       if (!def) return;
@@ -1438,18 +1562,18 @@ function initCsvButtons() {
 }
 
 const PENDING_REPORTS = [
-  { title: 'Средний чек и количество чеков', note: 'Нужно: НомерЧекаККМ из Документ.ЧекККМ — группировка по чекам' },
-  { title: 'Новые / постоянные клиенты', note: 'Нужно: ДисконтнаяКарта в payload sales (первая покупка vs повторная)' },
-  { title: 'Количество карт, % чеков с картами', note: 'Нужно: ДисконтнаяКарта + признак "без карты" в каждой строке sales' },
-  { title: 'Скидки по видам (Бонусы, Дни рождения, Торт месяца)', note: 'Нужно: ВидСкидки + Сумма по каждому виду из ЧекККМ' },
-  { title: 'Продано в килограммах', note: 'Нужно: ЭталонныйВес из карточки номенклатуры + признак штучный/весовой' },
-  { title: 'Доли категорий в количестве чеков', note: 'Нужно: chek_id для группировки строк sales в чеки' },
-  { title: 'Категории тортов по ценовым сегментам', note: 'Нужно: сегмент в карточке номенклатуры (ЦеновойСегмент)' },
-  { title: 'Средний чек по форматам магазинов', note: 'Нужно: ФорматМагазина в карточке Склада (кондитерская/рынок/с кухней)' },
-  { title: 'Динамика акционных позиций', note: 'Нужно: признак "акция" + период акции из ЧекККМ' },
-  { title: 'Выпуск продукции в кг', note: 'Нужно: РегистрНакопления.ВыпускПродукции с эталонными весами' },
-  { title: 'Сумма возвратов с L2L', note: 'Нужно: отдельный поток sales с ВидОперации=Возврат (сейчас они суммированы как минус)' },
-  { title: 'Новые позиции в ассортименте', note: 'Нужно: признак "новый" или дата первого появления товара в продажах' }
+  { title: 'Средний чек и количество чеков', note: 'Добавить в BSL: НомерЧекаККМ из Документ.ЧекККМ в каждой строке sales → группировка строк в чеки' },
+  { title: 'Новые / постоянные клиенты', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "первая покупка" (через PV запрос истории карты)' },
+  { title: 'Количество карт, % чеков с картами', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "без карты" в каждой строке' },
+  { title: 'Скидки по видам (Бонусы, ДР, Торт месяца)', note: 'Добавить в BSL: разбивка СуммаСкидки по ВидамСкидок (Бонусы/Подарочные/Автоматические)' },
+  { title: 'Продано в килограммах', note: 'Добавить в BSL: Номенклатура.ЭталонныйВес + Номенклатура.БазоваяЕдиница (штучн/весовая)' },
+  { title: 'Доли категорий в количестве чеков', note: 'Нужен НомерЧекаККМ (как для среднего чека) — после этого считается из существующих category' },
+  { title: 'Категории тортов по ценовым сегментам', note: 'Добавить в BSL: Номенклатура.ЦеновойСегмент или фильтр по цене (350/500/800 ₽)' },
+  { title: 'Средний чек по форматам магазинов', note: 'Добавить в BSL: Склад.ФорматМагазина (кондитерская/рынок/с кофе/с кухней)' },
+  { title: 'Динамика акционных позиций', note: 'Добавить в BSL: признак ВидОперации=Акция + период действия акции' },
+  { title: 'Выпуск продукции в кг', note: 'Добавить в BSL новый поток данных: РегистрНакопления.ВыпускПродукции с эталонными весами' },
+  { title: 'Новые позиции в ассортименте', note: 'Добавить в BSL: Номенклатура.ДатаПервойПродажи или флаг "новый" (за период до 30 дней)' },
+  { title: 'Сравнительный круговой отчёт по точкам', note: 'Реализуется после готовности предыдущих метрик (надо собрать все KPI в один радар)' }
 ];
 
 function renderPendingReports() {

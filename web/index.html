@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=20" />
+    <link rel="stylesheet" href="/styles.css?v=21" />
   </head>
   <body>
 
@@ -516,6 +516,86 @@
             </div>
           </section>
 
+          <!-- Продажи по часам суток (Иркутск UTC+8) -->
+          <section class="section">
+            <div class="section-label">Продажи по часам суток</div>
+            <div class="section-hint">Распределение выручки по часам (время Иркутск, UTC+8) · помогает найти пиковые часы для маркетинга</div>
+            <div class="panel">
+              <div id="analyticsHourChart" class="chart-wrap"></div>
+            </div>
+          </section>
+
+          <!-- Heatmap день × час -->
+          <section class="section">
+            <div class="section-label">Тепловая карта: день недели × час</div>
+            <div class="section-hint">Чем темнее ячейка — тем больше выручка в это время. Помогает планировать смены.</div>
+            <div class="panel">
+              <div id="analyticsHeatmap" style="overflow-x:auto;padding:8px 4px"></div>
+            </div>
+          </section>
+
+          <!-- Топ-маржинальные товары -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Топ-30 товаров по марже</div>
+                <div class="section-hint">Самые прибыльные позиции в абсолютном выражении (₽)</div>
+              </div>
+              <button class="icon-btn" data-csv="topMargin">CSV</button>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsTopMarginTbl">
+                  <thead><tr>
+                    <th class="col-num">#</th>
+                    <th>Товар</th>
+                    <th>Группа</th>
+                    <th class="num">Класс</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                    <th class="num">Кол-во</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- Возвраты (C2) -->
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Возвраты</div>
+                <div class="section-hint">ВидОперации = Возврат из ЧекККМ. L2L с прошлым годом появится когда в БД будет история.</div>
+              </div>
+              <button class="icon-btn" data-csv="returns">CSV</button>
+            </div>
+            <div class="panel" style="padding:14px">
+              <div id="analyticsReturnsSummary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div>
+                  <div class="muted" style="font-size:11px;margin-bottom:6px">По магазинам</div>
+                  <div class="table-wrap">
+                    <table id="analyticsReturnsByStoreTbl">
+                      <thead><tr><th>Магазин</th><th class="num">Сумма</th><th class="num">Кол-во</th></tr></thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <div class="muted" style="font-size:11px;margin-bottom:6px">Топ-возвращаемые товары</div>
+                  <div class="table-wrap">
+                    <table id="analyticsReturnsByProductTbl">
+                      <thead><tr><th>Товар</th><th class="num">Сумма</th><th class="num">Кол-во</th></tr></thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- В разработке -->
           <section class="section">
             <div class="section-label">В разработке</div>
@@ -527,6 +607,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=20"></script>
+    <script src="/app.js?v=21"></script>
   </body>
 </html>
