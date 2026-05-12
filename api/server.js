@@ -570,6 +570,25 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Ручное переименование магазина (admin) ─────────────────────────────
+    if (pathname === '/api/admin/store-name' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      const body = await parseBody(req);
+      if (!body.storeId || !body.name) {
+        sendJson(res, 400, { error: 'storeId and name required' });
+        return;
+      }
+      try {
+        const r = store.setStoreName ? await store.setStoreName(body.storeId, body.name) : null;
+        sendJson(res, 200, { ok: !!r, store: r });
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Refresh stores из последнего raw payload (admin) — починка битых имён ─
     if (pathname === '/api/admin/refresh-stores' && req.method === 'POST') {
       const user = await resolveUser(req);

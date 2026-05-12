@@ -91,6 +91,15 @@ class PostgresStore {
     return r.rows[0] || null;
   }
 
+  async setStoreName(id, name) {
+    await this.init();
+    const r = await this.pool.query(
+      `update stores set name = $2 where id = $1 returning id, name`,
+      [String(id), String(name)]
+    );
+    return r.rows[0] || null;
+  }
+
   // Перечитывает stores из последнего raw_upp_payloads и обновляет имена/source
   // в таблице stores. Используется для починки битых имён (U+FFFD), которые
   // могли попасть в БД до фикса parseBody.
