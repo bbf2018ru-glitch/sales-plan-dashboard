@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=24" />
+    <link rel="stylesheet" href="/styles.css?v=25" />
   </head>
   <body>
 
@@ -386,6 +386,30 @@
             </div>
           </section>
 
+          <!-- A17/A18. Средний чек по форматам магазинов -->
+          <section class="section atab-section" data-atab="network">
+            <div class="section-label">Средний чек по форматам магазинов</div>
+            <div class="section-hint">Сравнение форматов: кондитерская с кухней / рынок / просто с кофе / магазин — зависит от поля Склад.ФорматМагазина в 1С</div>
+            <div id="analyticsByFormatEmpty" class="empty-state hidden" style="padding:16px">
+              Поле «Формат магазина» не задано в 1С. Чтобы активировать отчёт — добавить в карточку справочника «Склады» реквизит ФорматМагазина и заполнить значениями (кондитерская/рынок/с кухней и т.д.). BSL-модуль уже умеет передавать это поле в дашборд.
+            </div>
+            <div id="analyticsByFormatContent" class="panel">
+              <div class="table-wrap">
+                <table id="analyticsByFormatTbl">
+                  <thead><tr>
+                    <th>Формат</th>
+                    <th class="num">Магазинов</th>
+                    <th class="num">Чеков</th>
+                    <th class="num">Ср. чек</th>
+                    <th class="num">% карт</th>
+                    <th class="num">Сумма</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <!-- A10. Скидки по видам -->
           <section class="section atab-section" data-atab="network">
             <div class="section-label">Скидки по видам</div>
@@ -632,6 +656,63 @@
             </div>
           </section>
 
+          <!-- A23. Новые позиции в ассортименте -->
+          <section class="section atab-section" data-atab="products">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Новые позиции в ассортименте</div>
+                <div class="section-hint">Товары, у которых первая продажа в БД пришлась на текущий период · показывает что начало продаваться впервые</div>
+              </div>
+              <button class="icon-btn" data-csv="newProducts">CSV</button>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsNewProductsTbl">
+                  <thead><tr>
+                    <th class="col-num">#</th>
+                    <th>Товар</th>
+                    <th>Группа</th>
+                    <th>Первая продажа</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Кол-во</th>
+                    <th class="num">Марж.%</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div id="analyticsNewProductsEmpty" class="empty-state hidden" style="padding:14px">
+                В этом периоде нет товаров с первой продажей. Когда в БД накопится история нескольких месяцев — здесь будут появляться действительно новые SKU.
+              </div>
+            </div>
+          </section>
+
+          <!-- A16. Категории тортов по ценовым сегментам -->
+          <section class="section atab-section" data-atab="products">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Торты и пироги по ценовым сегментам</div>
+                <div class="section-hint">Распределение тортов/пирогов по средней цене за единицу: бюджет / стандарт / премиум / люкс</div>
+              </div>
+              <button class="icon-btn" data-csv="cakeSegments">CSV</button>
+            </div>
+            <div class="panel">
+              <div class="table-wrap">
+                <table id="analyticsCakeSegmentsTbl">
+                  <thead><tr>
+                    <th>Сегмент</th>
+                    <th class="num">Позиций</th>
+                    <th class="num">Шт</th>
+                    <th class="num">Факт</th>
+                    <th class="num">Доля</th>
+                    <th class="num">Маржа</th>
+                    <th class="num">Марж.%</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <!-- Топ-маржинальные товары -->
           <section class="section atab-section" data-atab="products">
             <div class="section-header">
@@ -705,6 +786,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=24"></script>
+    <script src="/app.js?v=25"></script>
   </body>
 </html>

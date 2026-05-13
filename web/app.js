@@ -1172,6 +1172,9 @@ async function loadAnalytics() {
     renderComparison();
     renderCheques();
     renderDiscounts();
+    renderNewProducts();
+    renderCakeSegments();
+    renderByStoreFormat();
     updateDateRangeStatus();
   } catch (err) {
     console.error('analytics load failed', err);
@@ -1708,6 +1711,81 @@ function renderDiscounts() {
   `;
 }
 
+// ── Новые позиции в ассортименте ──────────────────────────────────────
+function renderNewProducts() {
+  const rows = analyticsState.data?.newProducts || [];
+  const tbody = document.querySelector('#analyticsNewProductsTbl tbody');
+  const emptyEl = $('analyticsNewProductsEmpty');
+  if (!rows.length) {
+    if (tbody) tbody.innerHTML = '';
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+  if (tbody) {
+    tbody.innerHTML = rows.slice(0, 50).map((r, i) => `
+      <tr>
+        <td class="col-num">${i+1}</td>
+        <td><b>${escapeHtml(r.productName)}</b></td>
+        <td><span class="muted" style="font-size:11px">${escapeHtml(r.category || '—')}</span></td>
+        <td>${r.firstSoldAt}</td>
+        <td class="num">${fmtNum(r.fact)}</td>
+        <td class="num">${fmtNum(r.quantity)}</td>
+        <td class="num">${fmtPct(r.marginPct)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+// ── Ценовые сегменты тортов и пирогов ─────────────────────────────────
+function renderCakeSegments() {
+  const rows = analyticsState.data?.cakeSegments || [];
+  const tbody = document.querySelector('#analyticsCakeSegmentsTbl tbody');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state" style="padding:8px">Нет данных о тортах/пирогах в этом периоде</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${escapeHtml(r.segment)}</b></td>
+      <td class="num">${r.products}</td>
+      <td class="num">${fmtNum(r.quantity)}</td>
+      <td class="num"><b>${fmtNum(r.fact)}</b></td>
+      <td class="num">${r.share.toFixed(1)}%</td>
+      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${fmtPct(r.marginPct)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Средний чек по форматам магазинов ─────────────────────────────────
+function renderByStoreFormat() {
+  const rows = analyticsState.data?.byStoreFormat;
+  const tbody = document.querySelector('#analyticsByFormatTbl tbody');
+  const emptyEl = $('analyticsByFormatEmpty');
+  const contentEl = $('analyticsByFormatContent');
+  if (!rows || rows.length === 0) {
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (contentEl) contentEl.style.display = 'none';
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+  if (contentEl) contentEl.style.display = '';
+  if (tbody) {
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><b>${escapeHtml(r.format)}</b></td>
+        <td class="num">${r.storeCount}</td>
+        <td class="num">${fmtNum(r.chequeCount)}</td>
+        <td class="num"><b>${fmtNum(r.avgCheque)}</b> ₽</td>
+        <td class="num">${r.cardSharePct}%</td>
+        <td class="num">${fmtNum(r.factSum)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
 // ── Сравнительный радар-чарт ──────────────────────────────────────────
 function renderComparison() {
   const c = analyticsState.data?.comparison;
@@ -1820,7 +1898,9 @@ function initCsvButtons() {
         storeMarkup:{ rows: d.byStoreMarkup,  file: `analytics-store-markup-${period}.csv`,fields: ['storeId','storeName','source','fact','cost','margin','marginPct','markupPct'] },
         topMargin:  { rows: d.topMargin,      file: `analytics-top-margin-${period}.csv`,  fields: ['productName','category','abc','fact','margin','marginPct','quantity'] },
         returns:    { rows: d.returns?.byProduct || [], file: `analytics-returns-${period}.csv`, fields: ['productName','amount','quantity'] },
-        chequesByStore: { rows: d.cheques?.byStore || [], file: `analytics-cheques-${period}.csv`, fields: ['storeName','chequeCount','avgCheque','withCardCount','cardSharePct','factSum'] }
+        chequesByStore: { rows: d.cheques?.byStore || [], file: `analytics-cheques-${period}.csv`, fields: ['storeName','chequeCount','avgCheque','withCardCount','cardSharePct','factSum'] },
+        newProducts: { rows: d.newProducts || [], file: `analytics-new-products-${period}.csv`, fields: ['productName','category','firstSoldAt','fact','quantity','marginPct'] },
+        cakeSegments: { rows: d.cakeSegments || [], file: `analytics-cake-segments-${period}.csv`, fields: ['segment','products','quantity','fact','share','margin','marginPct'] }
       };
       const def = map[kind];
       if (!def) return;
@@ -1835,17 +1915,17 @@ function initCsvButtons() {
 }
 
 const PENDING_REPORTS = [
-  { title: '✓ Средний чек и количество чеков', note: 'ГОТОВО на сервере — ждём пока Hellstaff обновит общий модуль ДашбордПродаж и запустит выгрузку. Файл BSL обновлён (функция ПолучитьСтатистикуЧеков).' },
-  { title: '✓ % чеков с дисконтной картой', note: 'ГОТОВО на сервере — приходит вместе с чеками. Раздел «Чеки» в табе «Сеть» заполнится после деплоя BSL.' },
-  { title: '✓ Скидки по видам', note: 'ГОТОВО на сервере — разбивка по ручной/авто/подарочные/бонусы. Заполнится после деплоя BSL.' },
-  { title: 'Новые / постоянные клиенты', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "первая покупка" (через PV запрос истории карты по этому магазину)' },
+  { title: '✓ Средний чек и количество чеков', note: 'ГОТОВО — раздел «Чеки» в табе «Сеть» заполнится после деплоя BSL у Hellstaff' },
+  { title: '✓ % чеков с дисконтной картой', note: 'ГОТОВО — приходит вместе с чеками' },
+  { title: '✓ Скидки по видам', note: 'ГОТОВО — разбивка ручная/авто/подарочные/бонусы' },
+  { title: '✓ Новые позиции (свежие SKU)', note: 'ГОТОВО — вычисляется на сервере по первому soldAt, в табе «Товары». Будет точнее когда в БД накопится история нескольких месяцев.' },
+  { title: '✓ Торты по ценовым сегментам', note: 'ГОТОВО — по средней цене за единицу: до 300 / 300-500 / 500-800 / 800-1500 / 1500+, в табе «Товары»' },
+  { title: '✓ Средний чек по форматам магазинов', note: 'ГОТОВО на сервере — заполнится после того как в 1С заполнят реквизит Склад.ФорматМагазина (BSL уже умеет передавать)' },
+  { title: 'Новые / постоянные клиенты', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "первая покупка" (запрос истории карты по магазину)' },
   { title: 'Продано в килограммах', note: 'Добавить в BSL: Номенклатура.ЭталонныйВес + Номенклатура.БазоваяЕдиница (штучн/весовая)' },
   { title: 'Доли категорий в количестве чеков', note: 'Нужен НомерЧекаККМ в каждой строке sales (отдельно от агрегата cheques) → потом группировать chek_id × category' },
-  { title: 'Категории тортов по ценовым сегментам', note: 'Добавить в BSL: Номенклатура.ЦеновойСегмент или фильтр по цене (350/500/800 ₽)' },
-  { title: 'Средний чек по форматам магазинов', note: 'Добавить в BSL: Склад.ФорматМагазина (кондитерская/рынок/с кофе/с кухней)' },
   { title: 'Динамика акционных позиций', note: 'Добавить в BSL: признак ВидОперации=Акция + период действия акции' },
-  { title: 'Выпуск продукции в кг', note: 'Добавить в BSL новый поток данных: РегистрНакопления.ВыпускПродукции с эталонными весами' },
-  { title: 'Новые позиции в ассортименте', note: 'Добавить в BSL: Номенклатура.ДатаПервойПродажи или флаг "новый" (за период до 30 дней)' }
+  { title: 'Выпуск продукции в кг', note: 'Добавить в BSL новый поток данных: РегистрНакопления.ВыпускПродукции с эталонными весами' }
 ];
 
 function renderPendingReports() {

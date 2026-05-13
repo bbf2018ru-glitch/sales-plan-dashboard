@@ -2,11 +2,13 @@ create table if not exists stores (
   id text primary key,
   name text not null,
   region text not null default '',
-  source text not null default ''
+  source text not null default '',
+  format text not null default ''
 );
 
 -- Идемпотентная миграция для существующих БД
 alter table stores add column if not exists source text not null default '';
+alter table stores add column if not exists format text not null default '';
 
 -- Снимок структуры 1С (метаданные + sample), приходит из 1С раз в сутки
 create table if not exists upp_diagnostic (

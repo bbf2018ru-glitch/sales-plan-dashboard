@@ -503,6 +503,135 @@ function comparisonRadar(db, period, opts) {
   };
 }
 
+// ── Отчёт A23: новые позиции в ассортименте ──────────────────────────
+// Считаем для каждого товара минимальную дату продажи (по всей истории БД).
+// "Новые" — те, у которых первая продажа в текущем периоде, ИЛИ за
+// последние N дней (по умолчанию 30) если нет полной истории.
+function newProducts(db, period, opts) {
+  const { storeCostScale } = opts;
+  const productMap = new Map(db.products.map(p => [p.id, p]));
+  // Группируем по productId — собираем min(soldAt) и текущие метрики периода
+  const stats = new Map();
+  for (const row of db.sales) {
+    if (toNumber(row.amount) <= 0) continue;
+    const t = new Date(row.soldAt).getTime();
+    if (isNaN(t)) continue;
+    if (!stats.has(row.productId)) stats.set(row.productId, { firstSoldAt: t, fact: 0, cost: 0, quantity: 0 });
+    const it = stats.get(row.productId);
+    if (t < it.firstSoldAt) it.firstSoldAt = t;
+    if (row.period === period) {
+      it.fact += toNumber(row.amount);
+      it.cost += correctedCost(row, storeCostScale);
+      it.quantity += toNumber(row.quantity);
+    }
+  }
+  // Граница "новизны": первое появление в этом периоде
+  const periodStart = new Date(period + '-01T00:00:00+08:00').getTime();
+  const items = [];
+  for (const [pid, it] of stats) {
+    if (it.firstSoldAt < periodStart) continue;
+    if (it.fact <= 0) continue;
+    const p = productMap.get(pid) || {};
+    items.push({
+      productId: pid,
+      productName: p.name || pid,
+      category: p.category || '',
+      firstSoldAt: new Date(it.firstSoldAt).toISOString().slice(0, 10),
+      fact: roundMetric(it.fact),
+      cost: roundMetric(it.cost),
+      margin: it.cost > 0 ? roundMetric(it.fact - it.cost) : null,
+      marginPct: it.cost > 0 && it.fact > 0 ? percent((it.fact - it.cost) / it.fact) : null,
+      quantity: roundMetric(it.quantity)
+    });
+  }
+  return items.sort((a, b) => b.fact - a.fact);
+}
+
+// ── Отчёт A16: категории тортов по ценовым сегментам ─────────────────
+// Берём товары из category содержащего "Торт" и группируем по средней
+// цене за единицу. Диапазоны: до 300, 300-500, 500-800, 800-1500, 1500+.
+const PRICE_SEGMENTS = [
+  { id: 'budget', label: 'До 300 ₽', from: 0, to: 300 },
+  { id: 'standard', label: '300–500 ₽', from: 300, to: 500 },
+  { id: 'mid', label: '500–800 ₽', from: 500, to: 800 },
+  { id: 'premium', label: '800–1500 ₽', from: 800, to: 1500 },
+  { id: 'luxury', label: '1500+ ₽', from: 1500, to: Infinity }
+];
+function cakePriceSegments(db, period, opts) {
+  const { storeCostScale } = opts;
+  const productMap = new Map(db.products.map(p => [p.id, p]));
+  const sales = db.sales.filter(r => r.period === period && toNumber(r.amount) > 0);
+
+  // Считаем для каждого товара среднюю цену и метрики
+  const productStats = new Map();
+  for (const row of sales) {
+    const p = productMap.get(row.productId);
+    if (!p || !/торт|бенто|пирог/i.test(p.category || '')) continue;
+    if (!productStats.has(row.productId)) productStats.set(row.productId, { fact: 0, cost: 0, quantity: 0 });
+    const it = productStats.get(row.productId);
+    it.fact += toNumber(row.amount);
+    it.cost += correctedCost(row, storeCostScale);
+    it.quantity += toNumber(row.quantity);
+  }
+
+  // Назначаем сегменты по средней цене
+  const buckets = PRICE_SEGMENTS.map(s => ({ ...s, fact: 0, cost: 0, quantity: 0, products: 0 }));
+  for (const [pid, st] of productStats) {
+    if (st.quantity <= 0) continue;
+    const avgPrice = st.fact / st.quantity;
+    const seg = buckets.find(s => avgPrice >= s.from && avgPrice < s.to);
+    if (!seg) continue;
+    seg.fact += st.fact;
+    seg.cost += st.cost;
+    seg.quantity += st.quantity;
+    seg.products += 1;
+  }
+
+  const total = buckets.reduce((s, b) => s + b.fact, 0);
+  return buckets.map(b => ({
+    segment: b.label,
+    fromPrice: b.from,
+    toPrice: b.to === Infinity ? null : b.to,
+    products: b.products,
+    fact: roundMetric(b.fact),
+    cost: roundMetric(b.cost),
+    margin: b.cost > 0 ? roundMetric(b.fact - b.cost) : null,
+    marginPct: b.cost > 0 && b.fact > 0 ? percent((b.fact - b.cost) / b.fact) : null,
+    quantity: roundMetric(b.quantity),
+    share: total > 0 ? percent(b.fact / total) : 0
+  })).filter(b => b.products > 0 || b.fact > 0);
+}
+
+// ── Отчёт A17/A18: средний чек по форматам магазинов ─────────────────
+// stores.format должен прийти из 1С (новое поле). Если его нет —
+// возвращаем null (UI покажет empty state).
+function chequesByStoreFormat(db, period) {
+  const stats = (db.chequeStats || []).filter(c => c.period === period);
+  if (!stats.length) return null;
+  const formatMap = new Map(db.stores.map(s => [s.id, s.format || '']));
+  const hasFormats = db.stores.some(s => s.format);
+  if (!hasFormats) return null;
+
+  const buckets = new Map();
+  for (const c of stats) {
+    const fmt = formatMap.get(c.storeId) || '— без формата';
+    if (!buckets.has(fmt)) buckets.set(fmt, { format: fmt, chequeCount: 0, factSum: 0, withCardCount: 0, storeCount: 0 });
+    const b = buckets.get(fmt);
+    b.chequeCount += toNumber(c.chequeCount);
+    b.factSum += toNumber(c.factSum);
+    b.withCardCount += toNumber(c.withCardCount);
+    b.storeCount += 1;
+  }
+  return Array.from(buckets.values()).map(b => ({
+    format: b.format,
+    storeCount: b.storeCount,
+    chequeCount: b.chequeCount,
+    factSum: roundMetric(b.factSum),
+    avgCheque: b.chequeCount > 0 ? roundMetric(b.factSum / b.chequeCount) : 0,
+    cardSharePct: b.chequeCount > 0 ? percent(b.withCardCount / b.chequeCount) : 0
+  })).sort((a, b) => b.avgCheque - a.avgCheque);
+}
+
 // ── Отчёты A2/A13/A21: средний чек, кол-во чеков, % с картой ─────────
 // Использует таблицу cheque_stats — агрегаты по чекам ККМ из 1С.
 // Если 1С ещё не присылает cheques (старый BSL-модуль) — возвращает null.
@@ -587,7 +716,10 @@ function buildSalesAnalytics(db, period, opts = {}) {
     returns: returns(filtered, period, innerOpts),
     heatmap: heatmapDayHour(filtered, period, innerOpts),
     comparison: comparisonRadar(filtered, period, innerOpts),
-    cheques: chequeReports(filtered, period)
+    cheques: chequeReports(filtered, period),
+    newProducts: newProducts(filtered, period, innerOpts),
+    cakeSegments: cakePriceSegments(filtered, period, innerOpts),
+    byStoreFormat: chequesByStoreFormat(filtered, period)
   };
 }
 

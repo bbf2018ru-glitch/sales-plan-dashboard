@@ -36,7 +36,8 @@ function mapStore(item) {
     id,
     name: item.name || item.storeName || id,
     region: item.region || item.city || '',
-    source: item.source || ''   // 'retail' | 'corporate' | 'mixed' — для бейджа в UI
+    source: item.source || '',   // 'retail' | 'corporate' | 'mixed'
+    format: item.format || item.storeFormat || ''  // ФорматМагазина (опц.)
   };
 }
 
