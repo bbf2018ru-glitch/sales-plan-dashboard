@@ -445,6 +445,70 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Проверка связи с 1С HTTP-сервисом ─────────────────────────────────────
+    if (pathname === '/api/admin/upp-health' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      if (!UPP_PULL_URL) { sendJson(res, 400, { error: 'UPP_PULL_URL не настроен в env' }); return; }
+      try {
+        // Подменяем path с /pull на /health для health-check
+        const healthUrl = UPP_PULL_URL.replace(/\/pull(\?.*)?$/, '/health');
+        const { fetchUppPackage } = require('./lib/upp-pull');
+        const result = await fetchUppPackage({ ...uppPullConfig, url: healthUrl, period: '' });
+        sendJson(res, 200, { ok: true, url: healthUrl, response: result });
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || 'UPP health failed' });
+      }
+      return;
+    }
+
+    // ── Массовая историческая загрузка через pull ─────────────────────────────
+    if (pathname === '/api/admin/upp-pull-history' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      if (!UPP_PULL_URL) { sendJson(res, 400, { error: 'UPP_PULL_URL не настроен' }); return; }
+      const body = await parseBody(req);
+      const months = Math.min(Math.max(Number(body.months || 24), 1), 36);
+      const skipExisting = body.skipExisting !== false;
+
+      try {
+        const { fetchUppPackage } = require('./lib/upp-pull');
+        const existingPeriods = new Set();
+        if (skipExisting) {
+          const db = await store.getDb();
+          db.sales.forEach(s => existingPeriods.add(s.period));
+        }
+        const results = [];
+        const now = new Date();
+        for (let i = months; i >= 1; i -= 1) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          if (skipExisting && existingPeriods.has(period)) {
+            results.push({ period, status: 'skipped', reason: 'already in db' });
+            continue;
+          }
+          try {
+            const payload = await fetchUppPackage({ ...uppPullConfig, period });
+            const run = await store.ingestUppPayload(payload);
+            results.push({ period, status: run.status, salesCount: run.stats?.sales || 0 });
+          } catch (err) {
+            results.push({ period, status: 'failed', error: err.message });
+          }
+        }
+        sendJson(res, 200, {
+          ok: true,
+          totalMonths: months,
+          successCount: results.filter(r => r.status === 'success').length,
+          skippedCount: results.filter(r => r.status === 'skipped').length,
+          failedCount: results.filter(r => r.status === 'failed').length,
+          results
+        });
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || 'pull-history failed' });
+      }
+      return;
+    }
+
     const userIdMatch = pathname.match(/^\/api\/users\/([^/]+)$/);
     if (userIdMatch && req.method === 'DELETE') {
       const user = await resolveUser(req);
