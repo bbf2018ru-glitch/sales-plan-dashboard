@@ -168,13 +168,18 @@ class PostgresStore {
   async getDb() {
     await this.init();
 
-    const [stores, products, plans, sales, users, userStores] = await Promise.all([
+    const [stores, products, plans, sales, users, userStores, cheques] = await Promise.all([
       this.pool.query('select id, name, region, source from stores order by name'),
       this.pool.query('select id, name, category from products order by name'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount from plans'),
       this.pool.query('select period, store_id as "storeId", product_id as "productId", amount, cost, gross_profit as "grossProfit", quantity, sold_at as "soldAt" from sales'),
       this.pool.query('select id, name, role, token from users').catch(() => ({ rows: [] })),
-      this.pool.query('select user_id as "userId", store_id as "storeId" from user_stores').catch(() => ({ rows: [] }))
+      this.pool.query('select user_id as "userId", store_id as "storeId" from user_stores').catch(() => ({ rows: [] })),
+      this.pool.query(`select period, store_id as "storeId", cheque_count as "chequeCount",
+                              with_card_count as "withCardCount", fact_sum as "factSum",
+                              discount_manual as "discountManual", discount_auto as "discountAuto",
+                              payment_gift as "paymentGift", payment_bonus as "paymentBonus"
+                       from cheque_stats`).catch(() => ({ rows: [] }))
     ]);
 
     const userStoreMap = new Map();
@@ -183,13 +188,15 @@ class PostgresStore {
       userStoreMap.get(row.userId).push(row.storeId);
     }
 
-    return normalizeDb({
+    const result = normalizeDb({
       stores: stores.rows,
       products: products.rows,
       plans: plans.rows,
       sales: sales.rows,
       users: users.rows.map((u) => ({ ...u, stores: userStoreMap.get(u.id) || [] }))
     });
+    result.chequeStats = cheques.rows;
+    return result;
   }
 
   async listUsers() {
@@ -455,6 +462,29 @@ class PostgresStore {
            values ($1, $2, $3, $4)`,
           [normalized.period, item.storeId, item.productId, item.amount]
         );
+      }
+
+      // Cheque stats per store (опционально — только если 1С прислала cheques)
+      if (Array.isArray(normalized.cheques) && normalized.cheques.length > 0) {
+        await client.query('delete from cheque_stats where period = $1', [normalized.period]);
+        for (const ch of normalized.cheques) {
+          if (!ch.storeId) continue;
+          await client.query(
+            `insert into cheque_stats (period, store_id, cheque_count, with_card_count, fact_sum, discount_manual, discount_auto, payment_gift, payment_bonus)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             on conflict (period, store_id) do update set
+               cheque_count = excluded.cheque_count,
+               with_card_count = excluded.with_card_count,
+               fact_sum = excluded.fact_sum,
+               discount_manual = excluded.discount_manual,
+               discount_auto = excluded.discount_auto,
+               payment_gift = excluded.payment_gift,
+               payment_bonus = excluded.payment_bonus,
+               updated_at = now()`,
+            [normalized.period, ch.storeId, ch.chequeCount, ch.withCardCount, ch.factSum,
+             ch.discountManual || 0, ch.discountAuto || 0, ch.paymentGift, ch.paymentBonus]
+          );
+        }
       }
 
       await client.query('delete from sales where period = $1', [normalized.period]);

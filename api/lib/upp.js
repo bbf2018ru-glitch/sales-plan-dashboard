@@ -92,6 +92,15 @@ function normalizeUppPayload(payload) {
     quantity: Number(item.quantity || item.qty || 0),
     soldAt: item.soldAt || item.date || item.datetime || new Date().toISOString()
   }));
+  const cheques = (payload.cheques || []).map((item) => ({
+    storeId: asId(item.storeId, item.store, item.storeCode),
+    chequeCount: Number(item.chequeCount || item.count || 0),
+    withCardCount: Number(item.withCardCount || item.cardCount || 0),
+    factSum: Number(item.factSum || item.fact || 0),
+    discountSum: Number(item.discountSum || 0),
+    paymentGift: Number(item.paymentGift || 0),
+    paymentBonus: Number(item.paymentBonus || 0)
+  }));
   const metrics = (payload.marketing || payload.marketingMetrics || payload.campaigns || []).map((item) => ({
     channelId: asId(item.channelId, item.channel, item.source, item.code),
     channelName: item.channelName || item.name || asId(item.channelId, item.channel, item.source, item.code),
@@ -145,6 +154,7 @@ function normalizeUppPayload(payload) {
     products,
     plans,
     sales,
+    cheques,
     metrics,
     raw: payload,
     stats: {
@@ -152,6 +162,7 @@ function normalizeUppPayload(payload) {
       products: products.length,
       plans: plans.length,
       sales: sales.length,
+      cheques: cheques.length,
       marketing: metrics.length,
       autoStores: autoStores.length,
       autoProducts: autoProducts.length

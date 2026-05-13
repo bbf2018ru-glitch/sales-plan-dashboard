@@ -1170,6 +1170,8 @@ async function loadAnalytics() {
     renderTopMargin();
     renderReturns();
     renderComparison();
+    renderCheques();
+    renderDiscounts();
     updateDateRangeStatus();
   } catch (err) {
     console.error('analytics load failed', err);
@@ -1632,6 +1634,80 @@ function updateDateRangeStatus() {
   el.textContent = `период: ${r.from || '−∞'} … ${r.to || '+∞'}`;
 }
 
+// ── Чеки и средний чек ─────────────────────────────────────────────────
+function renderCheques() {
+  const c = analyticsState.data?.cheques;
+  const emptyEl = $('analyticsChequesEmpty');
+  const contentEl = $('analyticsChequesContent');
+  if (!c) {
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (contentEl) contentEl.style.display = 'none';
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+  if (contentEl) contentEl.style.display = '';
+
+  const totalsEl = $('analyticsChequesTotals');
+  if (totalsEl) {
+    totalsEl.innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Всего чеков</div><div class="kpi-value">${fmtNum(c.totals.chequeCount)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Средний чек</div><div class="kpi-value">${fmtNum(c.totals.avgCheque)} ₽</div></div>
+      <div class="kpi-card"><div class="kpi-label">С картой</div><div class="kpi-value">${c.totals.cardSharePct}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Чеков/магазин</div><div class="kpi-value">${fmtNum(c.totals.avgChequesPerStore)}</div></div>
+    `;
+  }
+  const tbody = document.querySelector('#analyticsChequesByStoreTbl tbody');
+  if (tbody) {
+    tbody.innerHTML = c.byStore.map((s, i) => `
+      <tr>
+        <td class="col-num">${i+1}</td>
+        <td><b>${escapeHtml(s.storeName)}</b></td>
+        <td class="num">${fmtNum(s.chequeCount)}</td>
+        <td class="num"><b>${fmtNum(s.avgCheque)}</b> ₽</td>
+        <td class="num">${fmtNum(s.withCardCount)}</td>
+        <td class="num">${s.cardSharePct}%</td>
+        <td class="num">${fmtNum(s.factSum)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+function renderDiscounts() {
+  const c = analyticsState.data?.cheques;
+  const emptyEl = $('analyticsDiscountsEmpty');
+  const contentEl = $('analyticsDiscountsContent');
+  if (!c || !c.discountBreakdown || c.discountBreakdown.length === 0) {
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (contentEl) contentEl.style.display = 'none';
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+  if (contentEl) contentEl.style.display = '';
+
+  const chart = $('analyticsDiscountsChart');
+  if (!chart) return;
+  const items = c.discountBreakdown;
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899'];
+  chart.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:8px 4px">
+      ${items.map((d, i) => {
+        const w = total > 0 ? (d.amount / total * 100) : 0;
+        const color = colors[i % colors.length];
+        return `<div style="display:flex;align-items:center;gap:10px;font-size:12px">
+          <div style="width:180px;color:var(--ink)">${escapeHtml(d.type)}</div>
+          <div style="flex:1;height:22px;background:var(--glass-soft);border-radius:6px;position:relative">
+            <div style="width:${w}%;height:100%;background:${color};opacity:.85;border-radius:6px"></div>
+            <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-weight:600;color:var(--ink);text-shadow:0 0 4px var(--bg)">${fmtNum(d.amount)} ₽</span>
+          </div>
+          <div style="width:60px;text-align:right;color:var(--muted)">${w.toFixed(1)}%</div>
+        </div>`;
+      }).join('')}
+      <div style="text-align:right;margin-top:8px;font-size:13px;color:var(--muted)">Итого скидок: <b style="color:var(--ink)">${fmtNum(total)} ₽</b></div>
+    </div>
+  `;
+}
+
 // ── Сравнительный радар-чарт ──────────────────────────────────────────
 function renderComparison() {
   const c = analyticsState.data?.comparison;
@@ -1743,7 +1819,8 @@ function initCsvButtons() {
         daily:      { rows: d.daily,          file: `analytics-daily-${period}.csv`,       fields: ['date','fact','cost','margin','quantity'] },
         storeMarkup:{ rows: d.byStoreMarkup,  file: `analytics-store-markup-${period}.csv`,fields: ['storeId','storeName','source','fact','cost','margin','marginPct','markupPct'] },
         topMargin:  { rows: d.topMargin,      file: `analytics-top-margin-${period}.csv`,  fields: ['productName','category','abc','fact','margin','marginPct','quantity'] },
-        returns:    { rows: d.returns?.byProduct || [], file: `analytics-returns-${period}.csv`, fields: ['productName','amount','quantity'] }
+        returns:    { rows: d.returns?.byProduct || [], file: `analytics-returns-${period}.csv`, fields: ['productName','amount','quantity'] },
+        chequesByStore: { rows: d.cheques?.byStore || [], file: `analytics-cheques-${period}.csv`, fields: ['storeName','chequeCount','avgCheque','withCardCount','cardSharePct','factSum'] }
       };
       const def = map[kind];
       if (!def) return;
@@ -1758,12 +1835,12 @@ function initCsvButtons() {
 }
 
 const PENDING_REPORTS = [
-  { title: 'Средний чек и количество чеков', note: 'Добавить в BSL: НомерЧекаККМ из Документ.ЧекККМ в каждой строке sales → группировка строк в чеки' },
-  { title: 'Новые / постоянные клиенты', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "первая покупка" (через PV запрос истории карты)' },
-  { title: 'Количество карт, % чеков с картами', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "без карты" в каждой строке' },
-  { title: 'Скидки по видам (Бонусы, ДР, Торт месяца)', note: 'Добавить в BSL: разбивка СуммаСкидки по ВидамСкидок (Бонусы/Подарочные/Автоматические)' },
+  { title: '✓ Средний чек и количество чеков', note: 'ГОТОВО на сервере — ждём пока Hellstaff обновит общий модуль ДашбордПродаж и запустит выгрузку. Файл BSL обновлён (функция ПолучитьСтатистикуЧеков).' },
+  { title: '✓ % чеков с дисконтной картой', note: 'ГОТОВО на сервере — приходит вместе с чеками. Раздел «Чеки» в табе «Сеть» заполнится после деплоя BSL.' },
+  { title: '✓ Скидки по видам', note: 'ГОТОВО на сервере — разбивка по ручной/авто/подарочные/бонусы. Заполнится после деплоя BSL.' },
+  { title: 'Новые / постоянные клиенты', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "первая покупка" (через PV запрос истории карты по этому магазину)' },
   { title: 'Продано в килограммах', note: 'Добавить в BSL: Номенклатура.ЭталонныйВес + Номенклатура.БазоваяЕдиница (штучн/весовая)' },
-  { title: 'Доли категорий в количестве чеков', note: 'Нужен НомерЧекаККМ (как для среднего чека) — после этого считается из существующих category' },
+  { title: 'Доли категорий в количестве чеков', note: 'Нужен НомерЧекаККМ в каждой строке sales (отдельно от агрегата cheques) → потом группировать chek_id × category' },
   { title: 'Категории тортов по ценовым сегментам', note: 'Добавить в BSL: Номенклатура.ЦеновойСегмент или фильтр по цене (350/500/800 ₽)' },
   { title: 'Средний чек по форматам магазинов', note: 'Добавить в BSL: Склад.ФорматМагазина (кондитерская/рынок/с кофе/с кухней)' },
   { title: 'Динамика акционных позиций', note: 'Добавить в BSL: признак ВидОперации=Акция + период действия акции' },

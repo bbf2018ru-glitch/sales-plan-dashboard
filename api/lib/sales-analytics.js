@@ -503,6 +503,62 @@ function comparisonRadar(db, period, opts) {
   };
 }
 
+// ── Отчёты A2/A13/A21: средний чек, кол-во чеков, % с картой ─────────
+// Использует таблицу cheque_stats — агрегаты по чекам ККМ из 1С.
+// Если 1С ещё не присылает cheques (старый BSL-модуль) — возвращает null.
+function chequeReports(db, period) {
+  const storeMap = new Map(db.stores.map(s => [s.id, s]));
+  const stats = (db.chequeStats || []).filter(c => c.period === period);
+  if (!stats.length) return null;
+
+  const byStore = stats.map(c => {
+    const s = storeMap.get(c.storeId) || {};
+    const factSum = toNumber(c.factSum);
+    const count = toNumber(c.chequeCount);
+    const withCard = toNumber(c.withCardCount);
+    return {
+      storeId: c.storeId,
+      storeName: s.name || c.storeId,
+      source: s.source || '',
+      chequeCount: count,
+      withCardCount: withCard,
+      noCardCount: count - withCard,
+      cardSharePct: count > 0 ? percent(withCard / count) : 0,
+      factSum: roundMetric(factSum),
+      avgCheque: count > 0 ? roundMetric(factSum / count) : 0,
+      discountManual: roundMetric(toNumber(c.discountManual)),
+      discountAuto: roundMetric(toNumber(c.discountAuto)),
+      paymentGift: roundMetric(toNumber(c.paymentGift)),
+      paymentBonus: roundMetric(toNumber(c.paymentBonus))
+    };
+  }).sort((a, b) => b.chequeCount - a.chequeCount);
+
+  const totalCheques = byStore.reduce((s, x) => s + x.chequeCount, 0);
+  const totalWithCard = byStore.reduce((s, x) => s + x.withCardCount, 0);
+  const totalFact = byStore.reduce((s, x) => s + x.factSum, 0);
+  const totalDiscountManual = byStore.reduce((s, x) => s + x.discountManual, 0);
+  const totalDiscountAuto = byStore.reduce((s, x) => s + x.discountAuto, 0);
+  const totalGift = byStore.reduce((s, x) => s + x.paymentGift, 0);
+  const totalBonus = byStore.reduce((s, x) => s + x.paymentBonus, 0);
+
+  return {
+    totals: {
+      chequeCount: totalCheques,
+      withCardCount: totalWithCard,
+      cardSharePct: totalCheques > 0 ? percent(totalWithCard / totalCheques) : 0,
+      avgCheque: totalCheques > 0 ? roundMetric(totalFact / totalCheques) : 0,
+      avgChequesPerStore: byStore.length > 0 ? Math.round(totalCheques / byStore.length) : 0
+    },
+    byStore,
+    discountBreakdown: [
+      { type: 'Ручная скидка', amount: roundMetric(totalDiscountManual) },
+      { type: 'Автоматическая скидка', amount: roundMetric(totalDiscountAuto) },
+      { type: 'Подарочные сертификаты', amount: roundMetric(totalGift) },
+      { type: 'Бонусы', amount: roundMetric(totalBonus) }
+    ].filter(d => d.amount > 0)
+  };
+}
+
 // ── Главный entry ─────────────────────────────────────────────────────────
 function buildSalesAnalytics(db, period, opts = {}) {
   const fromDate = opts.from || null;
@@ -530,7 +586,8 @@ function buildSalesAnalytics(db, period, opts = {}) {
     byStoreMarkup: markupByStore(filtered, period, innerOpts),
     returns: returns(filtered, period, innerOpts),
     heatmap: heatmapDayHour(filtered, period, innerOpts),
-    comparison: comparisonRadar(filtered, period, innerOpts)
+    comparison: comparisonRadar(filtered, period, innerOpts),
+    cheques: chequeReports(filtered, period)
   };
 }
 

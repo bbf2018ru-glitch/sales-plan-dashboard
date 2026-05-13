@@ -128,6 +128,24 @@ create table if not exists users (
   token text not null unique
 );
 
+-- Статистика по чекам ККМ. Приходит из 1С агрегатами (Склад × месяц).
+-- Не дублирует sales: тут только метрики о чеках (количество, ср.сумма,
+-- разбивка скидок), не о товарах.
+create table if not exists cheque_stats (
+  period text not null,
+  store_id text not null references stores(id) on delete cascade,
+  cheque_count integer not null default 0,
+  with_card_count integer not null default 0,
+  fact_sum numeric(14,2) not null default 0,
+  discount_manual numeric(14,2) not null default 0,
+  discount_auto numeric(14,2) not null default 0,
+  payment_gift numeric(14,2) not null default 0,
+  payment_bonus numeric(14,2) not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (period, store_id)
+);
+create index if not exists idx_cheque_stats_period on cheque_stats(period);
+
 create table if not exists user_stores (
   user_id text not null references users(id) on delete cascade,
   store_id text not null references stores(id) on delete cascade,

@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=23" />
+    <link rel="stylesheet" href="/styles.css?v=24" />
   </head>
   <body>
 
@@ -351,6 +351,53 @@
             </div>
           </section>
 
+          <!-- A2/A13/A21. Чеки и средний чек -->
+          <section class="section atab-section" data-atab="network">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Чеки и средний чек</div>
+                <div class="section-hint">Из Документ.ЧекККМ — количество чеков, средняя сумма, % покупок с дисконтной картой, разбивка скидок</div>
+              </div>
+              <button class="icon-btn" data-csv="chequesByStore">CSV</button>
+            </div>
+            <div id="analyticsChequesEmpty" class="empty-state hidden" style="padding:16px">
+              Данные ещё не поступили из 1С. Нужно обновить общий модуль ДашбордПродаж (добавлена функция ПолучитьСтатистикуЧеков) и перезапустить регламентное задание.
+            </div>
+            <div id="analyticsChequesContent">
+              <div class="panel" style="padding:14px;margin-bottom:14px">
+                <div id="analyticsChequesTotals" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div>
+              </div>
+              <div class="panel">
+                <div class="table-wrap">
+                  <table id="analyticsChequesByStoreTbl">
+                    <thead><tr>
+                      <th class="col-num">#</th>
+                      <th>Магазин</th>
+                      <th class="num">Чеков</th>
+                      <th class="num">Ср.чек</th>
+                      <th class="num">С картой</th>
+                      <th class="num">% карт</th>
+                      <th class="num">Сумма</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- A10. Скидки по видам -->
+          <section class="section atab-section" data-atab="network">
+            <div class="section-label">Скидки по видам</div>
+            <div class="section-hint">Распределение по видам скидок: ручные, автоматические, подарочные сертификаты, бонусы</div>
+            <div id="analyticsDiscountsEmpty" class="empty-state hidden" style="padding:16px">
+              Данные ещё не поступили из 1С. Требуется обновление BSL-модуля.
+            </div>
+            <div id="analyticsDiscountsContent" class="panel">
+              <div id="analyticsDiscountsChart" class="chart-wrap"></div>
+            </div>
+          </section>
+
           <!-- A1. План/факт по каналам продаж -->
           <section class="section atab-section" data-atab="network">
             <div class="section-header">
@@ -658,6 +705,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=23"></script>
+    <script src="/app.js?v=24"></script>
   </body>
 </html>
