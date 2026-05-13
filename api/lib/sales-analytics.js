@@ -411,28 +411,126 @@ function heatmapDayHour(db, period, opts) {
   return cells;
 }
 
+// ── Фильтрация по диапазону дат ───────────────────────────────────────────
+// Если задан from/to (ISO даты вида '2026-05-01'), отфильтровываем sales
+// по soldAt в этом диапазоне. Возвращаем модифицированный db.
+function filterDbByDateRange(db, from, to) {
+  if (!from && !to) return db;
+  const fromT = from ? new Date(from + 'T00:00:00+08:00').getTime() : -Infinity;
+  const toT = to ? new Date(to + 'T23:59:59+08:00').getTime() : Infinity;
+  return {
+    ...db,
+    sales: db.sales.filter(r => {
+      const t = new Date(r.soldAt).getTime();
+      if (isNaN(t)) return true; // строки без даты оставляем (не отсекаем)
+      return t >= fromT && t <= toT;
+    })
+  };
+}
+
+// ── Сравнительный круговой отчёт по магазинам (C3 из xlsx) ─────────────
+// Радар-чарт: для каждого магазина 5 метрик в нормализованном виде (0-100%):
+//   1. План/факт (% выполнения)
+//   2. Маржинальность (margin% / max_margin% по сети)
+//   3. Доля в выручке сети (fact / total_fact)
+//   4. Средняя сумма строки sales (≈ средний чек по позиции)
+//   5. Наценка % / max_markup
+// Это даёт компактную картину "сила vs слабость" по каждому магазину.
+function comparisonRadar(db, period, opts) {
+  const { storeCostScale } = opts;
+  const storeMap = new Map(db.stores.map(s => [s.id, s]));
+  const sales = db.sales.filter(r => r.period === period && toNumber(r.amount) > 0);
+  const plans = db.plans.filter(r => r.period === period);
+
+  const acc = new Map();
+  for (const row of plans) {
+    if (!acc.has(row.storeId)) acc.set(row.storeId, { storeId: row.storeId, fact: 0, cost: 0, plan: 0, rowCount: 0 });
+    acc.get(row.storeId).plan += toNumber(row.amount);
+  }
+  for (const row of sales) {
+    if (!acc.has(row.storeId)) acc.set(row.storeId, { storeId: row.storeId, fact: 0, cost: 0, plan: 0, rowCount: 0 });
+    const it = acc.get(row.storeId);
+    it.fact += toNumber(row.amount);
+    it.cost += correctedCost(row, storeCostScale);
+    it.rowCount += 1;
+  }
+
+  const items = Array.from(acc.values())
+    .filter(it => it.fact > 0)
+    .map(it => {
+      const s = storeMap.get(it.storeId) || {};
+      const marginPct = it.cost > 0 ? (it.fact - it.cost) / it.fact * 100 : 0;
+      const markupPct = it.cost > 0 ? (it.fact - it.cost) / it.cost * 100 : 0;
+      const completion = it.plan > 0 ? it.fact / it.plan * 100 : 0;
+      const avgRow = it.rowCount > 0 ? it.fact / it.rowCount : 0;
+      return {
+        storeId: it.storeId,
+        storeName: s.name || it.storeId,
+        fact: roundMetric(it.fact),
+        plan: roundMetric(it.plan),
+        completion: roundMetric(completion),
+        marginPct: roundMetric(marginPct),
+        markupPct: roundMetric(markupPct),
+        avgRow: roundMetric(avgRow),
+        rowCount: it.rowCount
+      };
+    });
+
+  if (!items.length) return { stores: [], metrics: [] };
+
+  // Нормализация: для каждой метрики max → 100, остальные пропорционально.
+  const maxC = Math.max(...items.map(i => i.completion), 1);
+  const maxM = Math.max(...items.map(i => i.marginPct), 1);
+  const maxK = Math.max(...items.map(i => i.markupPct), 1);
+  const maxA = Math.max(...items.map(i => i.avgRow), 1);
+  const totalFact = items.reduce((s, i) => s + i.fact, 0);
+
+  return {
+    metrics: ['Выполнение плана', 'Маржа %', 'Наценка %', 'Ср. сумма продажи', 'Доля в сети'],
+    stores: items.map(it => ({
+      storeId: it.storeId,
+      storeName: it.storeName,
+      raw: { completion: it.completion, marginPct: it.marginPct, markupPct: it.markupPct, avgRow: it.avgRow, fact: it.fact, plan: it.plan },
+      // Нормализованные значения 0-100 для радара
+      normalized: [
+        Math.min(it.completion, 100),
+        Math.min(it.marginPct, 100),
+        roundMetric(it.markupPct / maxK * 100),
+        roundMetric(it.avgRow / maxA * 100),
+        roundMetric(it.fact / totalFact * 100)
+      ]
+    })).sort((a, b) => b.raw.fact - a.raw.fact)
+  };
+}
+
 // ── Главный entry ─────────────────────────────────────────────────────────
-function buildSalesAnalytics(db, period) {
+function buildSalesAnalytics(db, period, opts = {}) {
+  const fromDate = opts.from || null;
+  const toDate = opts.to || null;
+  const filtered = filterDbByDateRange(db, fromDate, toDate);
+
   const markups = getStoreMarkups();
-  const sales = db.sales.filter(r => r.period === period);
+  const sales = filtered.sales.filter(r => r.period === period);
   const storeCostScale = buildStoreCostScale(sales, markups);
-  const opts = { storeCostScale };
-  const cats = byCategory(db, period, opts);
-  const abcRows = abc(db, period, opts);
+  const innerOpts = { storeCostScale };
+  const cats = byCategory(filtered, period, innerOpts);
+  const abcRows = abc(filtered, period, innerOpts);
   return {
     period,
-    byChannel: byChannel(db, period, opts),
+    range: fromDate || toDate ? { from: fromDate, to: toDate } : null,
+    byChannel: byChannel(filtered, period, innerOpts),
     byCategory: cats,
     byCategoryAbc: abcCategories(cats),
     abc: abcRows,
     topMargin: topMarginProducts(abcRows, 30),
-    weekly: weeklyRevenue(db, period, opts),
-    byWeekday: byWeekday(db, period, opts),
-    byHour: byHour(db, period, opts),
-    daily: dailyDynamic(db, period, opts),
-    byStoreMarkup: markupByStore(db, period, opts),
-    returns: returns(db, period, opts),
-    heatmap: heatmapDayHour(db, period, opts)
+    weekly: weeklyRevenue(filtered, period, innerOpts),
+    byWeekday: byWeekday(filtered, period, innerOpts),
+    byHour: byHour(filtered, period, innerOpts),
+    daily: dailyDynamic(filtered, period, innerOpts),
+    byStoreMarkup: markupByStore(filtered, period, innerOpts),
+    returns: returns(filtered, period, innerOpts),
+    heatmap: heatmapDayHour(filtered, period, innerOpts),
+    comparison: comparisonRadar(filtered, period, innerOpts)
   };
 }
 

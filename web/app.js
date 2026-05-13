@@ -1096,7 +1096,8 @@ const analyticsState = {
   currentTab: localStorage.getItem('maria_atab') || 'network',
   data: null,
   abcFilter: 'all',
-  abcLimit: 50
+  abcLimit: 50,
+  range: { from: null, to: null }
 };
 
 function initPageNav() {
@@ -1119,6 +1120,7 @@ function initPageNav() {
   });
   initCsvButtons();
   initAnalyticsTabs();
+  initDateRange();
   // Применяем сохранённый таб при загрузке
   switchAnalyticsTab(analyticsState.currentTab);
 }
@@ -1148,7 +1150,10 @@ function switchPage(page) {
 
 async function loadAnalytics() {
   try {
-    const data = await fetchJson(`/api/analytics/sales?period=${encodeURIComponent(state.period)}`);
+    const params = new URLSearchParams({ period: state.period });
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from);
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to);
+    const data = await fetchJson(`/api/analytics/sales?${params.toString()}`);
     analyticsState.data = data;
     $('analyticsPeriodTag').textContent = `период ${data.period}`;
     renderByChannel();
@@ -1164,6 +1169,8 @@ async function loadAnalytics() {
     renderHeatmap();
     renderTopMargin();
     renderReturns();
+    renderComparison();
+    updateDateRangeStatus();
   } catch (err) {
     console.error('analytics load failed', err);
   }
@@ -1549,6 +1556,175 @@ function renderReturns() {
   }
 }
 
+// ── Date range фильтр ─────────────────────────────────────────────────
+function initDateRange() {
+  $('drFrom')?.addEventListener('change', () => { applyDateRange($('drFrom').value, $('drTo').value); });
+  $('drTo')?.addEventListener('change', () => { applyDateRange($('drFrom').value, $('drTo').value); });
+  $('drApply')?.addEventListener('click', () => applyDateRange($('drFrom').value, $('drTo').value));
+  $('drReset')?.addEventListener('click', () => applyDateRange(null, null));
+  document.querySelectorAll('.dr-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.dr-preset').forEach(b => b.classList.toggle('active', b === btn));
+      const range = computePresetRange(btn.dataset.preset);
+      applyDateRange(range.from, range.to);
+    });
+  });
+}
+
+function computePresetRange(preset) {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0, 10);
+  const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+
+  switch (preset) {
+    case 'today': {
+      const d = startOfDay(today);
+      return { from: fmt(d), to: fmt(d) };
+    }
+    case '7d': {
+      const from = startOfDay(today); from.setDate(from.getDate() - 6);
+      return { from: fmt(from), to: fmt(today) };
+    }
+    case '14d': {
+      const from = startOfDay(today); from.setDate(from.getDate() - 13);
+      return { from: fmt(from), to: fmt(today) };
+    }
+    case '30d': {
+      const from = startOfDay(today); from.setDate(from.getDate() - 29);
+      return { from: fmt(from), to: fmt(today) };
+    }
+    case 'month': {
+      const from = new Date(today.getFullYear(), today.getMonth(), 1);
+      const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return { from: fmt(from), to: fmt(to) };
+    }
+    case 'prev-month': {
+      const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const to = new Date(today.getFullYear(), today.getMonth(), 0);
+      return { from: fmt(from), to: fmt(to) };
+    }
+    default:
+      return { from: null, to: null };
+  }
+}
+
+async function applyDateRange(from, to) {
+  analyticsState.range.from = from || null;
+  analyticsState.range.to = to || null;
+  if ($('drFrom')) $('drFrom').value = from || '';
+  if ($('drTo')) $('drTo').value = to || '';
+  // Если from/to задан — синхронизируем period с месяцем from чтобы фильтр работал
+  if (from) {
+    const newPeriod = from.slice(0, 7);
+    if (newPeriod !== state.period) {
+      state.period = newPeriod;
+      if ($('periodSelect')) $('periodSelect').value = newPeriod;
+    }
+  }
+  await loadAnalytics();
+}
+
+function updateDateRangeStatus() {
+  const el = $('drStatus');
+  if (!el) return;
+  const r = analyticsState.data?.range;
+  if (!r) { el.textContent = `показан весь период ${state.period}`; return; }
+  el.textContent = `период: ${r.from || '−∞'} … ${r.to || '+∞'}`;
+}
+
+// ── Сравнительный радар-чарт ──────────────────────────────────────────
+function renderComparison() {
+  const c = analyticsState.data?.comparison;
+  if (!c) return;
+  const tbody = document.querySelector('#comparisonTbl tbody');
+  if (tbody) {
+    tbody.innerHTML = (c.stores || []).map((s, i) => `
+      <tr>
+        <td class="col-num">${i+1}</td>
+        <td><b>${escapeHtml(s.storeName)}</b></td>
+        <td class="num">${s.raw.completion.toFixed(1)}%</td>
+        <td class="num">${s.raw.marginPct.toFixed(1)}%</td>
+        <td class="num">${s.raw.markupPct.toFixed(0)}%</td>
+        <td class="num">${fmtNum(s.raw.avgRow)}</td>
+        <td class="num">${(s.raw.fact / (c.stores.reduce((sum,x)=>sum+x.raw.fact,0)||1) * 100).toFixed(1)}%</td>
+      </tr>
+    `).join('');
+  }
+
+  const chart = $('comparisonRadar');
+  if (!chart) return;
+  const stores = c.stores || [];
+  const metrics = c.metrics || [];
+  if (!stores.length || !metrics.length) { chart.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
+
+  // Рисуем сетку из 4 магазинов на чарт (топ-4 по выручке), иначе перекрытие
+  const top = stores.slice(0, 4);
+  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899'];
+  const w = 600, h = 480, cx = w/2, cy = h/2 + 10, R = 160;
+  const N = metrics.length;
+  const angle = (i) => (Math.PI * 2 * i / N) - Math.PI/2;
+
+  // Сеточные кольца
+  const rings = [20, 40, 60, 80, 100];
+  const ringsSvg = rings.map(r => {
+    const pts = metrics.map((_, i) => {
+      const a = angle(i);
+      const rr = R * (r/100);
+      return `${cx + Math.cos(a) * rr},${cy + Math.sin(a) * rr}`;
+    }).join(' ');
+    return `<polygon points="${pts}" fill="none" stroke="currentColor" stroke-opacity="0.08"/>`;
+  }).join('');
+
+  // Спицы
+  const spokes = metrics.map((_, i) => {
+    const a = angle(i);
+    return `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(a)*R}" y2="${cy + Math.sin(a)*R}" stroke="currentColor" stroke-opacity="0.1"/>`;
+  }).join('');
+
+  // Подписи метрик
+  const labels = metrics.map((m, i) => {
+    const a = angle(i);
+    const lr = R + 26;
+    const x = cx + Math.cos(a) * lr;
+    const y = cy + Math.sin(a) * lr;
+    const anchor = Math.abs(Math.cos(a)) < 0.3 ? 'middle' : Math.cos(a) > 0 ? 'start' : 'end';
+    return `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" font-size="11" fill="currentColor" fill-opacity="0.75">${m}</text>`;
+  }).join('');
+
+  // Полигоны магазинов
+  const polys = top.map((s, idx) => {
+    const pts = s.normalized.map((v, i) => {
+      const a = angle(i);
+      const rr = R * Math.min(v, 100) / 100;
+      return `${cx + Math.cos(a)*rr},${cy + Math.sin(a)*rr}`;
+    }).join(' ');
+    return `<polygon points="${pts}" fill="${colors[idx]}" fill-opacity="0.18" stroke="${colors[idx]}" stroke-width="2"/>`;
+  }).join('');
+
+  // Точки
+  const dots = top.map((s, idx) => s.normalized.map((v, i) => {
+    const a = angle(i);
+    const rr = R * Math.min(v, 100) / 100;
+    return `<circle cx="${cx + Math.cos(a)*rr}" cy="${cy + Math.sin(a)*rr}" r="3" fill="${colors[idx]}"/>`;
+  }).join('')).join('');
+
+  // Легенда
+  const legend = top.map((s, idx) => `
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px">
+      <span style="width:14px;height:14px;background:${colors[idx]};border-radius:3px;opacity:0.7"></span>
+      <b>${escapeHtml(s.storeName)}</b>
+    </div>
+  `).join('');
+
+  chart.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:500px">
+      ${ringsSvg}${spokes}${labels}${polys}${dots}
+    </svg>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:6px">${legend}</div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px">Топ-4 магазина по выручке. Все метрики нормализованы 0–100 для сопоставимости.</div>
+  `;
+}
+
 // CSV экспорт по нажатию на data-csv кнопки
 function initCsvButtons() {
   document.querySelectorAll('#page-analytics [data-csv]').forEach(btn => {
@@ -1592,8 +1768,7 @@ const PENDING_REPORTS = [
   { title: 'Средний чек по форматам магазинов', note: 'Добавить в BSL: Склад.ФорматМагазина (кондитерская/рынок/с кофе/с кухней)' },
   { title: 'Динамика акционных позиций', note: 'Добавить в BSL: признак ВидОперации=Акция + период действия акции' },
   { title: 'Выпуск продукции в кг', note: 'Добавить в BSL новый поток данных: РегистрНакопления.ВыпускПродукции с эталонными весами' },
-  { title: 'Новые позиции в ассортименте', note: 'Добавить в BSL: Номенклатура.ДатаПервойПродажи или флаг "новый" (за период до 30 дней)' },
-  { title: 'Сравнительный круговой отчёт по точкам', note: 'Реализуется после готовности предыдущих метрик (надо собрать все KPI в один радар)' }
+  { title: 'Новые позиции в ассортименте', note: 'Добавить в BSL: Номенклатура.ДатаПервойПродажи или флаг "новый" (за период до 30 дней)' }
 ];
 
 function renderPendingReports() {

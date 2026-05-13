@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=22" />
+    <link rel="stylesheet" href="/styles.css?v=23" />
   </head>
   <body>
 
@@ -298,12 +298,56 @@
               </div>
               <span id="analyticsPeriodTag" class="muted" style="font-size:11px"></span>
             </div>
+
+            <!-- Date range filter -->
+            <div class="date-range">
+              <div class="date-range-presets">
+                <button class="dr-preset" data-preset="month">Этот месяц</button>
+                <button class="dr-preset" data-preset="prev-month">Прошлый месяц</button>
+                <button class="dr-preset" data-preset="today">Сегодня</button>
+                <button class="dr-preset" data-preset="7d">7 дней</button>
+                <button class="dr-preset" data-preset="14d">14 дней</button>
+                <button class="dr-preset" data-preset="30d">30 дней</button>
+              </div>
+              <div class="date-range-inputs">
+                <label class="dr-label">с <input type="date" id="drFrom" class="dr-input"></label>
+                <label class="dr-label">по <input type="date" id="drTo" class="dr-input"></label>
+                <button id="drApply" class="btn-xs btn-xs-active">Применить</button>
+                <button id="drReset" class="btn-xs">Сброс</button>
+                <span id="drStatus" class="muted" style="font-size:11px"></span>
+              </div>
+            </div>
+
             <div class="analytics-tabs" id="analyticsTabs">
               <button class="atab atab-active" data-tab="network">Сеть</button>
               <button class="atab" data-tab="products">Товары</button>
               <button class="atab" data-tab="time">Время</button>
               <button class="atab" data-tab="returns">Возвраты</button>
+              <button class="atab" data-tab="comparison">Сравнение</button>
               <button class="atab" data-tab="pending">В разработке</button>
+            </div>
+          </section>
+
+          <!-- Сравнительный круговой отчёт (C3) -->
+          <section class="section atab-section" data-atab="comparison">
+            <div class="section-label">Сравнение магазинов (радар)</div>
+            <div class="section-hint">Профиль каждого магазина по 5 нормализованным метрикам. Большая площадь = сильнее по этой метрике относительно других.</div>
+            <div class="panel" style="padding:16px">
+              <div id="comparisonRadar" class="chart-wrap"></div>
+              <div class="table-wrap" style="margin-top:12px">
+                <table id="comparisonTbl">
+                  <thead><tr>
+                    <th class="col-num">#</th>
+                    <th>Магазин</th>
+                    <th class="num">Выполнение</th>
+                    <th class="num">Маржа %</th>
+                    <th class="num">Наценка %</th>
+                    <th class="num">Ср. строка</th>
+                    <th class="num">Доля сети</th>
+                  </tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
           </section>
 
@@ -614,6 +658,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=22"></script>
+    <script src="/app.js?v=23"></script>
   </body>
 </html>

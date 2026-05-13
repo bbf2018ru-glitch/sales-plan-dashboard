@@ -344,7 +344,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/analytics/sales' && req.method === 'GET') {
       const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
-      sendJson(res, 200, buildSalesAnalytics(db, period));
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      sendJson(res, 200, buildSalesAnalytics(db, period, { from, to }));
       return;
     }
 
