@@ -26,7 +26,10 @@ async function callRegister(name, fromYM, toYM, limit = 10000) {
 
 // Бонусы — движения за период, агрегируем по карте
 async function bonusMovements(fromYM, toYM) {
-  const data = await callRegister('Бонусы', fromYM, toYM, 100000);
+  // ВРЕМЕННО: текущий HTTP-сервис 1С имеет баг — Формат числа > 999 даёт
+  // "10 000" с разделителем тысяч и запрос ломается. Используем 999.
+  // Будет снят после обновления BSL (Формат(Лимит, "ЧГ=") уже в файле).
+  const data = await callRegister('Бонусы', fromYM, toYM, 999);
   const byCard = new Map();
   for (const r of data.rows || []) {
     const card = r['БонуснаяКарта'] || '';
@@ -49,7 +52,7 @@ async function bonusMovements(fromYM, toYM) {
 // Получить все карты с активными движениями за период
 async function activeCardsCount(fromYM, toYM) {
   try {
-    const data = await callRegister('Бонусы', fromYM, toYM, 100000);
+    const data = await callRegister('Бонусы', fromYM, toYM, 999);
     const cards = new Set();
     for (const r of data.rows || []) {
       if (r['БонуснаяКарта']) cards.add(r['БонуснаяКарта']);
