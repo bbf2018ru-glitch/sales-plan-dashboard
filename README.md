@@ -56,7 +56,7 @@ docker compose up --build
 ## Переменные окружения
 
 - `PORT` — порт, по умолчанию `3000`
-- `INGEST_API_KEY` — ключ для загрузки данных из 1С. В dev (без `DATABASE_URL`) дефолт `demo-secret`. На проде с `DATABASE_URL` обязателен — иначе сервис не стартует.
+- `INGEST_API_KEY` — ключ для загрузки данных из 1С. **На проде (с `DATABASE_URL`) обязателен — сервис не стартует без него.** В dev-режиме (без `DATABASE_URL`) фоллбэк `dev-insecure`. Установите свой ключ в Render env и пропишите его в константу `КлючAPI` BSL-модуля 1С.
 - `SEED_DEMO` — `yes`, чтобы при первом запуске залить `data/sample-db.json` (только для dev). На проде не выставлять.
 - `DB_PATH` — путь к json-файлу хранилища, по умолчанию `./data/db.json`
 - `DATABASE_URL` — строка подключения PostgreSQL. Если задана, сервис работает с PostgreSQL вместо JSON.

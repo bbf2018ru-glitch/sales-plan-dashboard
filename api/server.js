@@ -20,14 +20,16 @@ const { createStore } = require('./storage');
 loadProjectEnv();
 
 const PORT = Number(process.env.PORT || 3000);
-// INGEST_API_KEY: дефолт оставлен для обратной совместимости с уже задеплоенным
-// BSL-модулем в 1С. Если вы видите этот warning — поставьте свой ключ через
-// Render env, а в BSL-модуле обновите константу ApiKey, иначе любой может
-// слать данные в /api/ingest/upp по ключу из публичного GitHub.
-const DEFAULT_API_KEY = '85307b26064e3764b0b19ce3223353057b0fe754b31f0f3a';
-const API_KEY = process.env.INGEST_API_KEY || DEFAULT_API_KEY;
-if (!process.env.INGEST_API_KEY && process.env.DATABASE_URL) {
-  console.warn('[security] INGEST_API_KEY не задан — используется публичный дефолт. Установите свой ключ через Render env.');
+// INGEST_API_KEY обязателен в проде (когда задан DATABASE_URL). В dev-режиме
+// (in-memory storage) допускаем фоллбэк 'dev-insecure' для локальной отладки.
+const IS_PROD = !!process.env.DATABASE_URL;
+const API_KEY = process.env.INGEST_API_KEY || (IS_PROD ? null : 'dev-insecure');
+if (IS_PROD && !process.env.INGEST_API_KEY) {
+  console.error('[FATAL] INGEST_API_KEY обязателен в проде (DATABASE_URL задан). Установите ключ через env и обновите константу ApiKey в BSL-модуле 1С.');
+  process.exit(1);
+}
+if (!IS_PROD && !process.env.INGEST_API_KEY) {
+  console.warn('[dev] INGEST_API_KEY не задан — используется фоллбэк "dev-insecure". Для прода обязательно задайте env.');
 }
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'db.json');
 const SAMPLE_DB_PATH = path.join(__dirname, '..', 'data', 'sample-db.json');
