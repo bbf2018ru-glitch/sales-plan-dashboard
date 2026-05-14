@@ -646,6 +646,91 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Снимок БД для миграции (admin) — экспорт всего в один JSON ────────
+    if (pathname === '/api/admin/export-snapshot' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') {
+        sendJson(res, 401, { error: 'Admin required' });
+        return;
+      }
+      try {
+        const db = await store.getDb();
+        const snapshot = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          stores: db.stores,
+          products: db.products,
+          plans: db.plans,
+          sales: db.sales,
+          chequeStats: db.chequeStats || [],
+          comments: db.comments || [],
+          users: db.users || []
+        };
+        sendJson(res, 200, snapshot);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+
+    // ── Импорт снимка (admin) — для миграции на новый хостинг ─────────────
+    if (pathname === '/api/admin/import-snapshot' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      const apiKey = req.headers['x-api-key'];
+      if (!(user && user.role === 'admin') && !(apiKey && apiKey === API_KEY)) {
+        sendJson(res, 401, { error: 'Admin token or X-API-Key required' });
+        return;
+      }
+      try {
+        const body = await parseBody(req);
+        if (!body.stores || !body.sales) {
+          sendJson(res, 400, { error: 'invalid snapshot (need stores+sales)' });
+          return;
+        }
+        const counts = { stores: 0, products: 0, plans: 0, sales: 0, cheques: 0 };
+        // Залить через стандартный ingestUppPayload — он сам сделает upsert
+        // и распределит по периодам. Группируем sales по period.
+        const byPeriod = new Map();
+        for (const s of body.sales) {
+          if (!byPeriod.has(s.period)) byPeriod.set(s.period, []);
+          byPeriod.get(s.period).push(s);
+        }
+        for (const [period, sales] of byPeriod) {
+          const plans = (body.plans || []).filter(p => p.period === period);
+          const cheques = (body.chequeStats || []).filter(c => c.period === period);
+          const payload = {
+            sourceSystem: '1c-upp',
+            sourceObject: 'snapshot-import',
+            packageId: `snapshot-${period}-${Date.now()}`,
+            period,
+            stores: body.stores,
+            products: body.products,
+            plans,
+            sales,
+            cheques: cheques.map(c => ({
+              storeId: c.storeId,
+              chequeCount: c.chequeCount,
+              withCardCount: c.withCardCount,
+              factSum: c.factSum,
+              discountSum: 0,
+              paymentGift: c.paymentGift,
+              paymentBonus: c.paymentBonus
+            }))
+          };
+          await store.ingestUppPayload(payload);
+          counts.sales += sales.length;
+          counts.plans += plans.length;
+          counts.cheques += cheques.length;
+        }
+        counts.stores = body.stores.length;
+        counts.products = (body.products || []).length;
+        sendJson(res, 200, { ok: true, imported: counts, periods: byPeriod.size });
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+
     // ── Ручное переименование магазина (admin) ─────────────────────────────
     if (pathname === '/api/admin/store-name' && req.method === 'POST') {
       const user = await resolveUser(req);
