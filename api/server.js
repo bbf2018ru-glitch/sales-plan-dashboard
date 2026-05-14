@@ -14,6 +14,7 @@ const {
 } = require('./lib/analytics');
 const { buildInsights } = require('./lib/insights');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
+const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { startMorningReport, buildReportText } = require('./lib/morning-report');
 const { createStore } = require('./storage');
 
@@ -339,6 +340,19 @@ const server = http.createServer(async (req, res) => {
       }
       const ok = await morningReportHandle.sendNow();
       sendJson(res, 200, { ok });
+      return;
+    }
+
+    // ── Клиентская аналитика (бонусы, карты) — тянет из 1С напрямую ───────
+    if (pathname === '/api/analytics/customers' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        const data = await buildCustomerAnalytics({ from, to });
+        sendJson(res, 200, data);
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
 

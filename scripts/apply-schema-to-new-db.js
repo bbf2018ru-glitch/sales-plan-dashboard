@@ -15,9 +15,11 @@ if (!url) {
   process.exit(1);
 }
 
+// убираем sslmode из URL чтобы pg не интерпретировал его как verify-full
+const cleanUrl = url.replace(/[?&]sslmode=[^&]*/g, '');
 const pool = new Pool({
-  connectionString: url + (url.includes('?') ? '&' : '?') + 'sslmode=require',
-  ssl: { rejectUnauthorized: false },
+  connectionString: cleanUrl,
+  ssl: { rejectUnauthorized: false, checkServerIdentity: () => undefined },
   connectionTimeoutMillis: 30000,
   idleTimeoutMillis: 30000
 });

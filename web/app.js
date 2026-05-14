@@ -1129,6 +1129,10 @@ function initAnalyticsTabs() {
   document.querySelectorAll('#analyticsTabs .atab').forEach(btn => {
     btn.addEventListener('click', () => switchAnalyticsTab(btn.dataset.tab));
   });
+  $('customersRefresh')?.addEventListener('click', () => {
+    analyticsState.customersData = null;
+    loadCustomers();
+  });
 }
 
 function switchAnalyticsTab(tab) {
@@ -1136,9 +1140,86 @@ function switchAnalyticsTab(tab) {
   localStorage.setItem('maria_atab', tab);
   document.querySelectorAll('#analyticsTabs .atab').forEach(b => b.classList.toggle('atab-active', b.dataset.tab === tab));
   document.querySelectorAll('.atab-section').forEach(s => s.classList.toggle('hidden', s.dataset.atab !== tab));
-  // Скролл наверх страницы при переключении
+  // Лениво грузим клиентскую аналитику только при первом открытии
+  if (tab === 'customers' && !analyticsState.customersData) loadCustomers();
   const pageEl = $('page-analytics');
   if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function loadCustomers() {
+  const availEl = $('customersAvailability');
+  const contentEl = $('customersContent');
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
+    if (!params.has('from')) params.set('from', state.period);
+    if (!params.has('to')) params.set('to', state.period);
+    const data = await fetchJson(`/api/analytics/customers?${params.toString()}`);
+    analyticsState.customersData = data;
+    if (!data.available) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Канал к 1С не настроен.</b> ${escapeHtml(data.note || '')}`;
+      contentEl.style.display = 'none';
+      return;
+    }
+    if (data.error) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Ошибка обращения к 1С:</b> ${escapeHtml(data.error)}`;
+      contentEl.style.display = 'none';
+      return;
+    }
+    availEl.classList.add('hidden');
+    contentEl.style.display = '';
+    renderCustomersKpis(data);
+    renderCustomersTop(data);
+    renderCustomersFuture(data);
+  } catch (e) {
+    if (availEl) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
+    }
+    if (contentEl) contentEl.style.display = 'none';
+  }
+}
+
+function renderCustomersKpis(d) {
+  const b = d.bonuses || {};
+  $('customersKpis').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Активных карт</div><div class="kpi-value">${fmtNum(b.totalCards || 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Транзакций</div><div class="kpi-value">${fmtNum(b.totalMovements || 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Бонусов начислено</div><div class="kpi-value">${fmtNum(b.totalSum || 0)} ₽</div></div>
+    <div class="kpi-card"><div class="kpi-label">Период</div><div class="kpi-value" style="font-size:14px">${b.period?.from || '?'} — ${b.period?.to || '?'}</div></div>
+  `;
+}
+
+function renderCustomersTop(d) {
+  const tbody = document.querySelector('#customersTopTbl tbody');
+  if (!tbody) return;
+  const rows = d.bonuses?.topCards || [];
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="col-num">${i+1}</td>
+      <td><b>${escapeHtml(r.card)}</b></td>
+      <td class="num">${fmtNum(r.sum)} ₽</td>
+      <td class="num">${fmtNum(r.movements)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderCustomersFuture(d) {
+  const el = $('customersFutureNote');
+  if (!el) return;
+  const items = [];
+  if (d.birthdays && !d.birthdays.available) {
+    items.push(`<b>Дни рождения / Гео-аналитика:</b> ${escapeHtml(d.birthdays.note)}`);
+  }
+  if (!items.length) { el.parentElement.style.display = 'none'; return; }
+  el.innerHTML = '<b>Что появится после обновления HTTP-сервиса (новые операции):</b><br>• ' + items.join('<br>• ') +
+    '<br>• Топ клиентов по обороту (через /sales-detail)' +
+    '<br>• Когортный анализ возвратов клиентов через год' +
+    '<br>• Гео-карта по микрорайонам Иркутска' +
+    '<br>• Дни рождения сегодня/неделя → push в Telegram-бот maria-bot';
 }
 
 function switchPage(page) {

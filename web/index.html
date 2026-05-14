@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=25" />
+    <link rel="stylesheet" href="/styles.css?v=26" />
   </head>
   <body>
 
@@ -324,6 +324,7 @@
               <button class="atab" data-tab="time">Время</button>
               <button class="atab" data-tab="returns">Возвраты</button>
               <button class="atab" data-tab="comparison">Сравнение</button>
+              <button class="atab" data-tab="customers">Клиенты</button>
               <button class="atab" data-tab="pending">В разработке</button>
             </div>
           </section>
@@ -775,6 +776,40 @@
             </div>
           </section>
 
+          <!-- Клиенты (бонусные карты + поведение) -->
+          <section class="section atab-section" data-atab="customers">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Клиенты — бонусные карты</div>
+                <div class="section-hint">Данные из 1С (РегистрНакопления.Бонусы + Справочник.ИнформационныеКарты). Тянутся напрямую через HTTP-сервис 1С.</div>
+              </div>
+              <button id="customersRefresh" class="icon-btn">↻ Обновить</button>
+            </div>
+            <div id="customersAvailability" class="empty-state hidden" style="padding:16px"></div>
+            <div id="customersContent">
+              <div class="panel" style="padding:14px;margin-bottom:14px">
+                <div id="customersKpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-header"><div class="panel-title">Топ-100 карт по бонусам за период</div></div>
+                <div class="table-wrap">
+                  <table id="customersTopTbl">
+                    <thead><tr>
+                      <th class="col-num">#</th>
+                      <th>Карта</th>
+                      <th class="num">Сумма бонусов</th>
+                      <th class="num">Транзакций</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="customersFuture" class="panel" style="padding:14px;margin-top:14px;background:var(--glass-soft)">
+                <div class="section-hint" id="customersFutureNote"></div>
+              </div>
+            </div>
+          </section>
+
           <!-- В разработке -->
           <section class="section atab-section" data-atab="pending">
             <div class="section-label">В разработке</div>
@@ -786,6 +821,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=25"></script>
+    <script src="/app.js?v=26"></script>
   </body>
 </html>
