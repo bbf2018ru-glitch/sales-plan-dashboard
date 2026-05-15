@@ -3,12 +3,35 @@ function readUserToken() {
   const url = new URL(window.location.href);
   const fromUrl = url.searchParams.get('userToken');
   if (fromUrl) {
+    // Сохраняем в localStorage (для обратной совместимости) и сразу шлём
+    // на /api/auth чтобы сервер выставил httpOnly cookie. После этого
+    // токен будет защищён от XSS — JS его прочитать уже не сможет.
     localStorage.setItem('maria_user_token', fromUrl);
     url.searchParams.delete('userToken');
     window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash);
+    // Не блокируем загрузку — кук-запрос отправляем без await
+    fetch('/api/auth', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userToken: fromUrl })
+    }).catch(() => {});
     return fromUrl;
   }
   return localStorage.getItem('maria_user_token') || '';
+}
+
+async function doLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+  } catch (_) {}
+  localStorage.removeItem('maria_user_token');
+  sessionStorage.removeItem('maria_session');
+  state.userToken = '';
+  state.sessionToken = '';
+  state.currentUser = null;
+  // Полная перезагрузка — почистит in-memory состояние
+  window.location.href = '/';
 }
 
 const state = {
@@ -57,6 +80,9 @@ async function fetchJson(path, opts = {}) {
   if (state.sessionToken) headers['X-Session-Token'] = state.sessionToken;
   if (state.userToken) headers['X-User-Token'] = state.userToken;
   opts.headers = headers;
+  // credentials: 'same-origin' — отправляем httpOnly auth-cookies (новая модель,
+  // вытесняет передачу токенов в URL/localStorage)
+  if (!opts.credentials) opts.credentials = 'same-origin';
   // Жёсткий таймаут 90 сек чтобы fetch не висел вечно при сетевых заминках —
   // иначе UI стопорится и кнопки не реагируют
   const ac = new AbortController();
@@ -904,13 +930,13 @@ function renderUserBadge() {
   badge.innerHTML = `<span class="user-dot good"></span><b>${u.name}</b> <span class="user-role">${roleLabel}</span> <button class="link-btn" id="userLogoutBtn">выйти</button>`;
   badge.classList.remove('hidden');
   $('userLogoutBtn')?.addEventListener('click', userLogout);
+  // Показываем иконку выхода в шапке когда пользователь успешно идентифицирован
+  $('logoutBtn')?.classList.remove('hidden');
 }
 
 function userLogout() {
-  localStorage.removeItem('maria_user_token');
-  state.userToken = '';
-  state.currentUser = null;
-  window.location.reload();
+  // Делегируем в doLogout — он чистит и httpOnly cookie через /api/auth/logout
+  doLogout();
 }
 
 async function loadSummary() {
@@ -1040,6 +1066,7 @@ async function init() {
   });
 
   $('printBtn').addEventListener('click', () => window.print());
+  $('logoutBtn')?.addEventListener('click', doLogout);
 
   $('planSaveBtn').addEventListener('click', savePlanEdit);
   $('planCancelBtn').addEventListener('click', closePlanEdit);

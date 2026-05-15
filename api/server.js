@@ -88,16 +88,63 @@ function createSession() {
   return token;
 }
 
+// Минималистичный парсер Cookie: name1=val1; name2=val2
+function parseCookies(req) {
+  const out = {};
+  const raw = req.headers['cookie'] || '';
+  for (const part of raw.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    const k = part.slice(0, eq).trim();
+    const v = part.slice(eq + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  }
+  return out;
+}
+
+const SESSION_COOKIE = 'maria_session';
+const USER_TOKEN_COOKIE = 'maria_user_token';
+
+function setSessionCookie(res, token) {
+  // 8 часов, httpOnly, SameSite=Strict — токен недоступен для JS и не утечёт через cross-site.
+  // Secure не ставим пока http — добавим автоматически когда поднимем HTTPS.
+  const parts = [`${SESSION_COOKIE}=${encodeURIComponent(token)}`, 'Path=/', 'HttpOnly', 'SameSite=Strict', 'Max-Age=' + (8 * 3600)];
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function setUserTokenCookie(res, userToken) {
+  // 30 дней — для удобства, чтобы admin не вводил токен каждый день
+  const parts = [`${USER_TOKEN_COOKIE}=${encodeURIComponent(userToken)}`, 'Path=/', 'HttpOnly', 'SameSite=Strict', 'Max-Age=' + (30 * 86400)];
+  // append к существующим Set-Cookie
+  const prev = res.getHeader('Set-Cookie');
+  const next = parts.join('; ');
+  if (prev) res.setHeader('Set-Cookie', Array.isArray(prev) ? [...prev, next] : [prev, next]);
+  else res.setHeader('Set-Cookie', next);
+}
+
+function clearAuthCookies(res) {
+  res.setHeader('Set-Cookie', [
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`,
+    `${USER_TOKEN_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`
+  ]);
+}
+
 function checkSession(req) {
   if (!DASHBOARD_PIN) return true;
-  const token = req.headers['x-session-token'] || '';
+  const cookies = parseCookies(req);
+  const token = cookies[SESSION_COOKIE] || req.headers['x-session-token'] || '';
   const expiry = sessions.get(token);
   return !!(expiry && Date.now() <= expiry);
 }
 
 async function resolveUser(req) {
+  const cookies = parseCookies(req);
   const url = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
-  const token = req.headers['x-user-token'] || url.searchParams.get('userToken') || '';
+  // Приоритет: cookie > заголовок > query (query — для обратной совместимости со старыми ссылками).
+  const token = cookies[USER_TOKEN_COOKIE]
+    || req.headers['x-user-token']
+    || url.searchParams.get('userToken')
+    || '';
   if (!token) return null;
   try {
     return await store.getUserByToken(String(token));
@@ -270,14 +317,36 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/auth' && req.method === 'POST') {
       const body = await parseBody(req);
       if (!DASHBOARD_PIN) {
+        // Если в body есть userToken — переложим его в cookie (упрощаем выход из ?userToken=… в URL)
+        if (body.userToken) {
+          try {
+            const u = await store.getUserByToken(String(body.userToken));
+            if (u) setUserTokenCookie(res, body.userToken);
+          } catch (_) {}
+        }
         sendJson(res, 200, { ok: true, token: null, pinRequired: false });
         return;
       }
       if (body.pin === DASHBOARD_PIN) {
-        sendJson(res, 200, { ok: true, token: createSession(), pinRequired: true });
+        const sessionToken = createSession();
+        setSessionCookie(res, sessionToken);
+        if (body.userToken) {
+          try {
+            const u = await store.getUserByToken(String(body.userToken));
+            if (u) setUserTokenCookie(res, body.userToken);
+          } catch (_) {}
+        }
+        // sessionToken в теле оставляем для legacy-клиентов, но новые версии используют cookie
+        sendJson(res, 200, { ok: true, token: sessionToken, pinRequired: true });
       } else {
         sendJson(res, 401, { ok: false, error: 'Неверный PIN' });
       }
+      return;
+    }
+
+    if (pathname === '/api/auth/logout' && req.method === 'POST') {
+      clearAuthCookies(res);
+      sendJson(res, 200, { ok: true });
       return;
     }
 
