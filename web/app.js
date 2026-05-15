@@ -1237,8 +1237,10 @@ async function loadPromo() {
       contentEl.style.display = 'none';
       return;  // НЕ сохраняем в state
     }
-    // Только успешные ответы кешируются
+    // Успешный ответ — показываем контейнер (могло быть скрыто после прошлой ошибки)
     analyticsState.promoData = data;
+    availEl.classList.add('hidden');
+    contentEl.style.display = '';
     availEl.classList.add('hidden');
     contentEl.style.display = '';
 
