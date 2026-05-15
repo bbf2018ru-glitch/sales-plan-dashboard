@@ -15,6 +15,7 @@ const {
 const { buildInsights } = require('./lib/insights');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
+const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const { startMorningReport, buildReportText } = require('./lib/morning-report');
 const { createStore } = require('./storage');
 
@@ -340,6 +341,19 @@ const server = http.createServer(async (req, res) => {
       }
       const ok = await morningReportHandle.sendNow();
       sendJson(res, 200, { ok });
+      return;
+    }
+
+    // ── Промо-аналитика (скидки, купоны, сертификаты) ─────────────────────
+    if (pathname === '/api/analytics/promo' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        const data = await buildPromoAnalytics({ from, to });
+        sendJson(res, 200, data);
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
 

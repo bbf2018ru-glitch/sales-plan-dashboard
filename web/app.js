@@ -1133,6 +1133,10 @@ function initAnalyticsTabs() {
     analyticsState.customersData = null;
     loadCustomers();
   });
+  $('promoRefresh')?.addEventListener('click', () => {
+    analyticsState.promoData = null;
+    loadPromo();
+  });
 }
 
 function switchAnalyticsTab(tab) {
@@ -1140,8 +1144,9 @@ function switchAnalyticsTab(tab) {
   localStorage.setItem('maria_atab', tab);
   document.querySelectorAll('#analyticsTabs .atab').forEach(b => b.classList.toggle('atab-active', b.dataset.tab === tab));
   document.querySelectorAll('.atab-section').forEach(s => s.classList.toggle('hidden', s.dataset.atab !== tab));
-  // Лениво грузим клиентскую аналитику только при первом открытии
+  // Лениво грузим клиентскую и промо аналитику при первом открытии таба
   if (tab === 'customers' && !analyticsState.customersData) loadCustomers();
+  if (tab === 'promo' && !analyticsState.promoData) loadPromo();
   const pageEl = $('page-analytics');
   if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1205,6 +1210,97 @@ function renderCustomersTop(d) {
       <td class="num">${fmtNum(r.movements)}</td>
     </tr>
   `).join('');
+}
+
+async function loadPromo() {
+  const availEl = $('promoAvailability');
+  const contentEl = $('promoContent');
+  const truncEl = $('promoTruncated');
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
+    if (!params.has('from')) params.set('from', state.period);
+    if (!params.has('to')) params.set('to', state.period);
+    const data = await fetchJson(`/api/analytics/promo?${params.toString()}`);
+    analyticsState.promoData = data;
+    if (!data.available) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Канал к 1С не настроен.</b> ${escapeHtml(data.note || '')}`;
+      contentEl.style.display = 'none';
+      return;
+    }
+    if (data.error || data.discounts?.error) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(data.error || data.discounts?.error || '')}`;
+      contentEl.style.display = 'none';
+      return;
+    }
+    availEl.classList.add('hidden');
+    contentEl.style.display = '';
+
+    const d = data.discounts || {};
+    if (d.truncatedNote) {
+      truncEl.classList.remove('hidden');
+      truncEl.textContent = '⚠ ' + d.truncatedNote;
+    } else {
+      truncEl.classList.add('hidden');
+    }
+
+    // KPI
+    const gift = data.giftCertificates || {};
+    const coffee = data.coffeeCertificates || {};
+    $('promoKpis').innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Сумма скидок</div><div class="kpi-value">${fmtNum(d.totalSum || 0)} ₽</div></div>
+      <div class="kpi-card"><div class="kpi-label">Применений</div><div class="kpi-value">${fmtNum(d.totalRows || 0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Подарочные сертификаты</div><div class="kpi-value">${fmtNum(gift.totalSum || 0)} ₽<div style="font-size:11px;color:var(--muted)">${fmtNum(gift.movements || 0)} операций</div></div></div>
+      <div class="kpi-card"><div class="kpi-label">Сертификаты на кофе</div><div class="kpi-value">${fmtNum(coffee.movements || 0)}<div style="font-size:11px;color:var(--muted)">операций</div></div></div>
+    `;
+
+    // По условиям
+    const condTbody = document.querySelector('#promoConditionTbl tbody');
+    if (condTbody) {
+      condTbody.innerHTML = (d.byCondition || []).map((r, i) => `
+        <tr>
+          <td class="col-num">${i+1}</td>
+          <td><b>${escapeHtml(r.condition)}</b></td>
+          <td class="num">${fmtNum(r.sum)} ₽</td>
+          <td class="num">${fmtNum(r.count)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // По товарам
+    const prodTbody = document.querySelector('#promoProductTbl tbody');
+    if (prodTbody) {
+      prodTbody.innerHTML = (d.byProduct || []).map((r, i) => `
+        <tr>
+          <td class="col-num">${i+1}</td>
+          <td>${escapeHtml(r.product)}</td>
+          <td class="num">${fmtNum(r.sum)} ₽</td>
+          <td class="num">${fmtNum(r.count)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // По типу документа
+    const docTbody = document.querySelector('#promoDocTbl tbody');
+    if (docTbody) {
+      docTbody.innerHTML = (d.byDocType || []).map(r => `
+        <tr>
+          <td><b>${escapeHtml(r.docType)}</b></td>
+          <td class="num">${fmtNum(r.sum)} ₽</td>
+          <td class="num">${fmtNum(r.count)}</td>
+        </tr>
+      `).join('');
+    }
+  } catch (e) {
+    if (availEl) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
+    }
+    if (contentEl) contentEl.style.display = 'none';
+  }
 }
 
 function renderCustomersFuture(d) {

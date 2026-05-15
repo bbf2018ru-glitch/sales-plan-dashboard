@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=26" />
+    <link rel="stylesheet" href="/styles.css?v=27" />
   </head>
   <body>
 
@@ -325,6 +325,7 @@
               <button class="atab" data-tab="returns">Возвраты</button>
               <button class="atab" data-tab="comparison">Сравнение</button>
               <button class="atab" data-tab="customers">Клиенты</button>
+              <button class="atab" data-tab="promo">Промо</button>
               <button class="atab" data-tab="pending">В разработке</button>
             </div>
           </section>
@@ -810,6 +811,69 @@
             </div>
           </section>
 
+          <!-- Промо: скидки, купоны, сертификаты -->
+          <section class="section atab-section" data-atab="promo">
+            <div class="section-header">
+              <div>
+                <div class="section-label">Промо-аналитика</div>
+                <div class="section-hint">Скидки, купоны, акции, подарочные сертификаты — данные напрямую из 1С (РегистрНакопления.ПредоставленныеСкидки, .ПодарочныеСертификаты, .СертификатыНаКофе).</div>
+              </div>
+              <button id="promoRefresh" class="icon-btn">↻ Обновить</button>
+            </div>
+            <div id="promoAvailability" class="empty-state hidden" style="padding:16px"></div>
+            <div id="promoTruncated" class="empty-state hidden" style="padding:14px;background:rgba(234,179,8,.08);border-left:3px solid rgb(234,179,8);margin-bottom:14px"></div>
+
+            <div id="promoContent">
+              <div class="panel" style="padding:14px;margin-bottom:14px">
+                <div id="promoKpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-header"><div class="panel-title">По типам скидок (условие)</div></div>
+                <div class="table-wrap">
+                  <table id="promoConditionTbl">
+                    <thead><tr>
+                      <th class="col-num">#</th>
+                      <th>Условие скидки</th>
+                      <th class="num">Сумма</th>
+                      <th class="num">Применений</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel" style="margin-top:14px">
+                <div class="panel-header"><div class="panel-title">Топ-30 товаров со скидками</div></div>
+                <div class="table-wrap">
+                  <table id="promoProductTbl">
+                    <thead><tr>
+                      <th class="col-num">#</th>
+                      <th>Товар</th>
+                      <th class="num">Сумма скидки</th>
+                      <th class="num">Раз</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="panel" style="margin-top:14px">
+                <div class="panel-header"><div class="panel-title">По типу документа</div></div>
+                <div class="table-wrap">
+                  <table id="promoDocTbl">
+                    <thead><tr>
+                      <th>Тип документа</th>
+                      <th class="num">Сумма скидки</th>
+                      <th class="num">Применений</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- В разработке -->
           <section class="section atab-section" data-atab="pending">
             <div class="section-label">В разработке</div>
@@ -821,6 +885,6 @@
 
       </main>
     </div>
-    <script src="/app.js?v=26"></script>
+    <script src="/app.js?v=27"></script>
   </body>
 </html>
