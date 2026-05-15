@@ -1149,6 +1149,10 @@ function initAnalyticsTabs() {
     analyticsState.promoData = null;
     loadPromo();
   });
+  $('productionRefresh')?.addEventListener('click', () => {
+    analyticsState.productionData = null;
+    loadProduction();
+  });
 }
 
 function switchAnalyticsTab(tab) {
@@ -1159,6 +1163,7 @@ function switchAnalyticsTab(tab) {
   // Лениво грузим клиентскую и промо аналитику при первом открытии таба
   if (tab === 'customers' && !analyticsState.customersData) loadCustomers();
   if (tab === 'promo' && !analyticsState.promoData) loadPromo();
+  if (tab === 'production' && !analyticsState.productionData) loadProduction();
   const pageEl = $('page-analytics');
   if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1192,6 +1197,7 @@ async function loadCustomers() {
     renderCustomersKpis(data);
     renderCustomersTop(data);
     renderCustomersFuture(data);
+    loadRetention();
   } catch (e) {
     if (availEl) {
       availEl.classList.remove('hidden');
@@ -1311,12 +1317,186 @@ async function loadPromo() {
         </tr>
       `).join('');
     }
+
+    loadPromoDynamics();
   } catch (e) {
     if (availEl) {
       availEl.classList.remove('hidden');
       availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
     }
     if (contentEl) contentEl.style.display = 'none';
+  }
+}
+
+async function loadRetention() {
+  const availEl = $('retentionAvailability');
+  const contentEl = $('retentionContent');
+  const noteEl = $('retentionBaselineNote');
+  if (!availEl || !contentEl) return;
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
+    if (!params.has('from')) params.set('from', state.period);
+    if (!params.has('to')) params.set('to', state.period);
+    const data = await fetchJson(`/api/analytics/customers-retention?${params.toString()}`);
+    if (!data.available || data.error) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Недоступно:</b> ${escapeHtml(data.note || data.error || '')}`;
+      contentEl.style.display = 'none';
+      return;
+    }
+    availEl.classList.add('hidden');
+    contentEl.style.display = '';
+    const s = data.summary || {};
+    $('retTotalCards').textContent = fmtNum(s.totalActiveCards || 0);
+    $('retNewCards').textContent = `${fmtNum(s.newCards || 0)} (${s.newPct || 0}%)`;
+    $('retReturningCards').textContent = `${fmtNum(s.returningCards || 0)} (${s.returningPct || 0}%)`;
+    $('retReturningPct').textContent = `${s.returningPct || 0}%`;
+    if (noteEl) {
+      const b = data.baseline || {};
+      noteEl.textContent = `baseline ${b.from || '?'}…${b.to || '?'} (${fmtNum(b.totalCardsKnown || 0)} известных карт)`;
+    }
+  } catch (e) {
+    if (availEl) {
+      availEl.classList.remove('hidden');
+      availEl.innerHTML = `<b>Ошибка retention:</b> ${escapeHtml(e.message)}`;
+    }
+    if (contentEl) contentEl.style.display = 'none';
+  }
+}
+
+async function loadPromoDynamics() {
+  const tbody = document.querySelector('#promoDynamicsTbl tbody');
+  const noteEl = $('promoDynamicsNote');
+  if (!tbody) return;
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
+    if (!params.has('from')) params.set('from', state.period);
+    if (!params.has('to')) params.set('to', state.period);
+    const data = await fetchJson(`/api/analytics/promo-dynamics?${params.toString()}`);
+    if (!data.available || data.error) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
+      return;
+    }
+    const top = data.topProducts || [];
+    const series = data.series || [];
+    tbody.innerHTML = top.map((p, i) => {
+      const s = series.find(x => x.product === p.product);
+      const daysActive = s ? s.points.filter(pt => pt.sum > 0).length : 0;
+      return `
+        <tr>
+          <td class="col-num">${i+1}</td>
+          <td>${escapeHtml(p.product)}</td>
+          <td class="num">${fmtNum(p.sum)} ₽</td>
+          <td class="num">${daysActive}</td>
+        </tr>`;
+    }).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">За период нет акционных позиций</td></tr>`;
+    if (noteEl) {
+      noteEl.textContent = data.truncatedNote ? `⚠ ${data.truncatedNote}` : `${fmtNum(data.totalRows || 0)} строк за период`;
+    }
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+async function loadProduction() {
+  const availEl = $('productionAvailability');
+  const contentEl = $('productionContent');
+  if (!availEl || !contentEl) return;
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,10));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,10));
+    const periodYM = state.period;
+    const fromYM = analyticsState.range.from ? analyticsState.range.from.slice(0,7) : periodYM;
+    const toYM = analyticsState.range.to ? analyticsState.range.to.slice(0,7) : periodYM;
+
+    // Параллельно для скорости: sales-kg и production-kg
+    const [salesKg, prodKg] = await Promise.all([
+      fetchJson(`/api/analytics/sales-kg?${params.toString()}`).catch(e => ({ available: false, error: e.message })),
+      fetchJson(`/api/analytics/production-kg?from=${fromYM}&to=${toYM}`).catch(e => ({ available: false, error: e.message }))
+    ]);
+    analyticsState.productionData = { salesKg, prodKg };
+
+    // Sales-kg
+    const skKpis = $('salesKgKpis');
+    const skTbody = document.querySelector('#salesKgCategoryTbl tbody');
+    if (!salesKg.available) {
+      skKpis.innerHTML = `<div class="empty-state" style="grid-column:span 4;padding:14px">${escapeHtml(salesKg.note || salesKg.error || 'Недоступно')}</div>`;
+      if (skTbody) skTbody.innerHTML = '';
+    } else {
+      const s = salesKg.summary || {};
+      skKpis.innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Всего кг продано</div><div class="kpi-value">${fmtNum(s.totalKg || 0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Шт с весом</div><div class="kpi-value">${fmtNum(s.totalQtyMatched || 0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Шт без веса</div><div class="kpi-value">${fmtNum(s.totalQtyUnmatched || 0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">% с весом</div><div class="kpi-value">${s.matchedPct || 0}%</div></div>`;
+      if (skTbody) {
+        skTbody.innerHTML = (salesKg.byCategory || []).map(r => `
+          <tr>
+            <td><b>${escapeHtml(r.category)}</b></td>
+            <td class="num">${fmtNum(r.kg)}</td>
+            <td class="num">${fmtNum(r.qty)}</td>
+            <td class="num">${fmtNum(r.amount)} ₽</td>
+          </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
+      }
+    }
+
+    // Production-kg
+    const pkKpis = $('productionKgKpis');
+    const pkTbody = document.querySelector('#productionKgTopTbl tbody');
+    if (!prodKg.available) {
+      pkKpis.innerHTML = `<div class="empty-state" style="grid-column:span 4;padding:14px">${escapeHtml(prodKg.note || prodKg.error || 'Недоступно')}</div>`;
+      if (pkTbody) pkTbody.innerHTML = '';
+    } else {
+      const s = prodKg.summary || {};
+      pkKpis.innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Выпущено кг</div><div class="kpi-value">${fmtNum(s.totalKg || 0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Всего шт/ед.</div><div class="kpi-value">${fmtNum(s.totalQty || 0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">SKU с весом</div><div class="kpi-value">${fmtNum(s.productsWithWeight || 0)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">SKU без веса</div><div class="kpi-value">${fmtNum(s.productsWithoutWeight || 0)}</div></div>`;
+      if (pkTbody) {
+        pkTbody.innerHTML = (prodKg.topProducts || []).map((r, i) => `
+          <tr>
+            <td class="col-num">${i+1}</td>
+            <td>${escapeHtml(r.product)}</td>
+            <td class="num">${fmtNum(r.qty)}</td>
+            <td class="num">${fmtNum(r.kg)}</td>
+          </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Нет выпуска за период</td></tr>`;
+      }
+    }
+
+    availEl.classList.add('hidden');
+    contentEl.style.display = '';
+  } catch (e) {
+    availEl.classList.remove('hidden');
+    availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
+    contentEl.style.display = 'none';
+  }
+}
+
+async function loadChequeCategories() {
+  const tbody = document.querySelector('#chequeCategoriesTbl tbody');
+  const totalEl = $('chequeCategoriesTotal');
+  if (!tbody) return;
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,10));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,10));
+    const data = await fetchJson(`/api/analytics/cheque-categories?${params.toString()}`);
+    if (totalEl) totalEl.textContent = fmtNum(data.totalCheques || 0);
+    tbody.innerHTML = (data.byCategory || []).map(r => `
+      <tr>
+        <td><b>${escapeHtml(r.category)}</b></td>
+        <td class="num">${fmtNum(r.chequeCount)}</td>
+        <td class="num">${r.chequePct}%</td>
+        <td class="num">${fmtNum(r.amount)} ₽</td>
+      </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -1370,6 +1550,7 @@ async function loadAnalytics() {
     renderCakeSegments();
     renderByStoreFormat();
     updateDateRangeStatus();
+    loadChequeCategories();
   } catch (err) {
     console.error('analytics load failed', err);
   }
@@ -1833,6 +2014,7 @@ async function applyDateRange(from, to) {
     await loadAnalytics();
     if (analyticsState.currentTab === 'customers') await loadCustomers();
     if (analyticsState.currentTab === 'promo') await loadPromo();
+    if (analyticsState.currentTab === 'production') await loadProduction();
   } catch (e) {
     console.error('applyDateRange failed', e);
     if (status) status.textContent = 'ошибка: ' + e.message;
@@ -2133,11 +2315,11 @@ const PENDING_REPORTS = [
   { title: '✓ Новые позиции (свежие SKU)', note: 'ГОТОВО — вычисляется на сервере по первому soldAt, в табе «Товары». Будет точнее когда в БД накопится история нескольких месяцев.' },
   { title: '✓ Торты по ценовым сегментам', note: 'ГОТОВО — по средней цене за единицу: до 300 / 300-500 / 500-800 / 800-1500 / 1500+, в табе «Товары»' },
   { title: '✓ Средний чек по форматам магазинов', note: 'ГОТОВО на сервере — заполнится после того как в 1С заполнят реквизит Склад.ФорматМагазина (BSL уже умеет передавать)' },
-  { title: 'Новые / постоянные клиенты', note: 'Добавить в BSL: ДисконтнаяКарта.Код + флаг "первая покупка" (запрос истории карты по магазину)' },
-  { title: 'Продано в килограммах', note: 'Добавить в BSL: Номенклатура.ЭталонныйВес + Номенклатура.БазоваяЕдиница (штучн/весовая)' },
-  { title: 'Доли категорий в количестве чеков', note: 'Нужен НомерЧекаККМ в каждой строке sales (отдельно от агрегата cheques) → потом группировать chek_id × category' },
-  { title: 'Динамика акционных позиций', note: 'Добавить в BSL: признак ВидОперации=Акция + период действия акции' },
-  { title: 'Выпуск продукции в кг', note: 'Добавить в BSL новый поток данных: РегистрНакопления.ВыпускПродукции с эталонными весами' }
+  { title: '✓ Новые / постоянные клиенты', note: 'ГОТОВО — блок в табе «Клиенты». Сравниваем bonus-карты текущего периода с baseline 6 мес.' },
+  { title: '✓ Продано в килограммах', note: 'ГОТОВО — таб «Производство», блок «Продажи в кг». Веса из Справочник.Номенклатура × sales.quantity.' },
+  { title: '✓ Доли категорий в количестве чеков', note: 'ГОТОВО — секция в табе «Товары». Чек восстанавливается из БД sales по (магазин × время до секунды).' },
+  { title: '✓ Динамика акционных позиций', note: 'ГОТОВО — блок в табе «Промо». Топ-10 акционных товаров за период (из ПредоставленныеСкидки).' },
+  { title: '✓ Выпуск продукции в кг', note: 'ГОТОВО — таб «Производство», блок «Выпуск». РегистрНакопления.ВыпускПродукции × Номенклатура.ЭталонныйВес.' }
 ];
 
 function renderPendingReports() {

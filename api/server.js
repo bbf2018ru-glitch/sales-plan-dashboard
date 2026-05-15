@@ -16,6 +16,13 @@ const { buildInsights } = require('./lib/insights');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
+const {
+  getCustomersRetention,
+  getSalesKg,
+  getChequeCategories,
+  getPromoDynamics,
+  getProductionKg
+} = require('./lib/extended-analytics');
 const { startMorningReport, buildReportText } = require('./lib/morning-report');
 const { createStore } = require('./storage');
 
@@ -366,6 +373,60 @@ const server = http.createServer(async (req, res) => {
       try {
         const data = await buildCustomerAnalytics({ from, to });
         sendJson(res, 200, data);
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // ── Расширенная аналитика (бывший таб «В разработке») ──────────────────
+    if (pathname === '/api/analytics/customers-retention' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        sendJson(res, 200, await getCustomersRetention({ from, to }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    if (pathname === '/api/analytics/sales-kg' && req.method === 'GET') {
+      const { db } = await getScopedDb(req);
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        sendJson(res, 200, await getSalesKg(db, { from, to }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    if (pathname === '/api/analytics/cheque-categories' && req.method === 'GET') {
+      const { db } = await getScopedDb(req);
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      sendJson(res, 200, getChequeCategories(db, { from, to }));
+      return;
+    }
+
+    if (pathname === '/api/analytics/promo-dynamics' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        sendJson(res, 200, await getPromoDynamics({ from, to }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    if (pathname === '/api/analytics/production-kg' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        sendJson(res, 200, await getProductionKg({ from, to }));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
