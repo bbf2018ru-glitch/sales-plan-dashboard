@@ -393,7 +393,22 @@ const server = http.createServer(async (req, res) => {
       const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       const trendWindow = Number(parsedUrl.searchParams.get('trend_window')) || 12;
-      sendJson(res, 200, aggregateDashboard(db, period, { trendWindow }));
+      const summary = aggregateDashboard(db, period, { trendWindow });
+      // Сравнение с прошлым месяцем — лёгкий блок без полного аггрегата
+      if (parsedUrl.searchParams.get('compare') !== '0') {
+        try {
+          const [y, m] = period.split('-').map(Number);
+          const prevDate = new Date(Date.UTC(y, m - 2, 1));
+          const prevPeriod = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, '0')}`;
+          const prev = aggregateDashboard(db, prevPeriod, { trendWindow: 1 });
+          summary.prevPeriod = {
+            period: prevPeriod,
+            totals: prev.totals,
+            storesPercent: Object.fromEntries((prev.stores || []).map(s => [s.storeId, s.percent]))
+          };
+        } catch (_) {}
+      }
+      sendJson(res, 200, summary);
       return;
     }
 

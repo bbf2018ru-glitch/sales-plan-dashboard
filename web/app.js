@@ -402,11 +402,23 @@ function renderKpis(summary) {
   const requiredSub  = planIncomplete ? 'план неполный' : `осталось ${f.remainingDays} дн.`;
   const requiredTone = planIncomplete ? 'neutral' : (f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral');
 
+  // Сравнение vs прошлый месяц
+  const prev = summary.prevPeriod?.totals;
+  const vsPrev = (key) => {
+    if (!prev || !isNum(prev[key]) || prev[key] === 0) return '';
+    const cur = summary.totals[key] || 0;
+    const deltaPct = ((cur - prev[key]) / prev[key]) * 100;
+    if (Math.abs(deltaPct) < 0.1) return '';
+    const sign = deltaPct > 0 ? '↑' : '↓';
+    const cls = deltaPct > 0 ? 'kpi-delta-up' : 'kpi-delta-down';
+    return ` <span class="kpi-delta ${cls}">${sign}${Math.abs(deltaPct).toFixed(0)}% vs прошл.мес</span>`;
+  };
+
   const cards = [
-    { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: planIncomplete ? 'возможно неполный' : '', tone: 'neutral' },
-    { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt, tone: 'neutral' },
-    { label: 'Выполнение', value: completionVal,                       sub: completionSub, tone: completionTone },
-    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С', tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
+    { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: (planIncomplete ? 'возможно неполный' : '') + vsPrev('plan'), tone: 'neutral' },
+    { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt + vsPrev('fact'), tone: 'neutral' },
+    { label: 'Выполнение', value: completionVal,                       sub: completionSub + vsPrev('completion'), tone: completionTone },
+    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'), tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
     { label: 'Прогноз',    value: projectedVal,                       sub: projectedSub,  tone: projectedTone },
     { label: 'Нужно/день', value: requiredVal,                        sub: requiredSub,   tone: requiredTone }
   ];
