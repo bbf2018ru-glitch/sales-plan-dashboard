@@ -326,7 +326,6 @@
               <button class="atab" data-tab="comparison">Сравнение</button>
               <button class="atab" data-tab="customers">Клиенты</button>
               <button class="atab" data-tab="promo">Промо</button>
-              <button class="atab" data-tab="production">Производство</button>
               <button class="atab" data-tab="pending">В разработке</button>
             </div>
           </section>
@@ -832,6 +831,25 @@
                   </table>
                 </div>
               </div>
+              <div class="panel" style="margin-top:14px">
+                <div class="panel-header">
+                  <div class="panel-title">Топ-100 клиентов по обороту (₽)</div>
+                  <div class="panel-hint" id="topCustomersNote"></div>
+                </div>
+                <div class="table-wrap">
+                  <table id="topCustomersTbl">
+                    <thead><tr>
+                      <th class="col-num">#</th>
+                      <th>Карта / клиент</th>
+                      <th class="num">Выручка ₽</th>
+                      <th class="num">Покупок</th>
+                      <th class="num">Средний чек</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
               <div class="panel" style="margin-top:14px" id="retentionPanel">
                 <div class="panel-header">
                   <div class="panel-title">Новые vs постоянные (по бонусным картам)</div>

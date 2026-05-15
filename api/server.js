@@ -21,7 +21,8 @@ const {
   getSalesKg,
   getChequeCategories,
   getPromoDynamics,
-  getProductionKg
+  getProductionKg,
+  getTopCustomersByRevenue
 } = require('./lib/extended-analytics');
 const { startMorningReport, buildReportText } = require('./lib/morning-report');
 const { createStore } = require('./storage');
@@ -416,6 +417,17 @@ const server = http.createServer(async (req, res) => {
       const to = parsedUrl.searchParams.get('to');
       try {
         sendJson(res, 200, await getPromoDynamics({ from, to }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    if (pathname === '/api/analytics/top-customers' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const from = parsedUrl.searchParams.get('from');
+      const to = parsedUrl.searchParams.get('to');
+      try {
+        sendJson(res, 200, await getTopCustomersByRevenue({ from, to }));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

@@ -1149,10 +1149,6 @@ function initAnalyticsTabs() {
     analyticsState.promoData = null;
     loadPromo();
   });
-  $('productionRefresh')?.addEventListener('click', () => {
-    analyticsState.productionData = null;
-    loadProduction();
-  });
 }
 
 function switchAnalyticsTab(tab) {
@@ -1163,7 +1159,6 @@ function switchAnalyticsTab(tab) {
   // Лениво грузим клиентскую и промо аналитику при первом открытии таба
   if (tab === 'customers' && !analyticsState.customersData) loadCustomers();
   if (tab === 'promo' && !analyticsState.promoData) loadPromo();
-  if (tab === 'production' && !analyticsState.productionData) loadProduction();
   const pageEl = $('page-analytics');
   if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1198,6 +1193,7 @@ async function loadCustomers() {
     renderCustomersTop(data);
     renderCustomersFuture(data);
     loadRetention();
+    loadTopCustomers();
   } catch (e) {
     if (availEl) {
       availEl.classList.remove('hidden');
@@ -1325,6 +1321,40 @@ async function loadPromo() {
       availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
     }
     if (contentEl) contentEl.style.display = 'none';
+  }
+}
+
+async function loadTopCustomers() {
+  const tbody = document.querySelector('#topCustomersTbl tbody');
+  const noteEl = $('topCustomersNote');
+  if (!tbody) return;
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
+    if (!params.has('from')) params.set('from', state.period);
+    if (!params.has('to')) params.set('to', state.period);
+    const data = await fetchJson(`/api/analytics/top-customers?${params.toString()}`);
+    if (!data.available || data.error) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
+      return;
+    }
+    const top = data.topCards || [];
+    tbody.innerHTML = top.map((r, i) => `
+      <tr>
+        <td class="col-num">${i+1}</td>
+        <td>${escapeHtml(r.owner || r.card)}<div style="font-size:11px;color:var(--muted)">${escapeHtml(r.card)}</div></td>
+        <td class="num">${fmtNum(r.revenue)} ₽</td>
+        <td class="num">${fmtNum(r.transactions)}</td>
+        <td class="num">${fmtNum(r.avgTicket)} ₽</td>
+      </tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
+    if (noteEl) {
+      noteEl.textContent = data.truncatedNote
+        ? `⚠ ${data.truncatedNote}`
+        : `${fmtNum(data.totalCards || 0)} карт, ${fmtNum(data.totalTransactions || 0)} операций, ${fmtNum(data.totalRevenue || 0)} ₽ оборота`;
+    }
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -2014,7 +2044,6 @@ async function applyDateRange(from, to) {
     await loadAnalytics();
     if (analyticsState.currentTab === 'customers') await loadCustomers();
     if (analyticsState.currentTab === 'promo') await loadPromo();
-    if (analyticsState.currentTab === 'production') await loadProduction();
   } catch (e) {
     console.error('applyDateRange failed', e);
     if (status) status.textContent = 'ошибка: ' + e.message;
@@ -2316,10 +2345,11 @@ const PENDING_REPORTS = [
   { title: '✓ Торты по ценовым сегментам', note: 'ГОТОВО — по средней цене за единицу: до 300 / 300-500 / 500-800 / 800-1500 / 1500+, в табе «Товары»' },
   { title: '✓ Средний чек по форматам магазинов', note: 'ГОТОВО на сервере — заполнится после того как в 1С заполнят реквизит Склад.ФорматМагазина (BSL уже умеет передавать)' },
   { title: '✓ Новые / постоянные клиенты', note: 'ГОТОВО — блок в табе «Клиенты». Сравниваем bonus-карты текущего периода с baseline 6 мес.' },
-  { title: '✓ Продано в килограммах', note: 'ГОТОВО — таб «Производство», блок «Продажи в кг». Веса из Справочник.Номенклатура × sales.quantity.' },
   { title: '✓ Доли категорий в количестве чеков', note: 'ГОТОВО — секция в табе «Товары». Чек восстанавливается из БД sales по (магазин × время до секунды).' },
   { title: '✓ Динамика акционных позиций', note: 'ГОТОВО — блок в табе «Промо». Топ-10 акционных товаров за период (из ПредоставленныеСкидки).' },
-  { title: '✓ Выпуск продукции в кг', note: 'ГОТОВО — таб «Производство», блок «Выпуск». РегистрНакопления.ВыпускПродукции × Номенклатура.ЭталонныйВес.' }
+  { title: '✓ Топ клиентов по обороту', note: 'ГОТОВО — добавлено после probe 1С. РегистрНакопления.ПродажиПоДисконтнымКартам отдаёт выручку по карте (отдельно от бонусов).' },
+  { title: '⏳ Продано в килограммах', note: 'Нужна правка BSL: функция ВыполнитьProductsDetail обращается к Н.БазоваяЕдиницаИзмерения.Коэффициент, которого нет в УПП Маши. После правки — заработает через ф_ВесШтукивКг.' },
+  { title: '⏳ Выпуск продукции в кг', note: 'РегистрНакопления.ВыпускПродукции в УПП Маши пустой за апрель. Нужно подтверждение — в каком регистре реально лежат данные о выпуске (Выпуск? ВыпускПродукцииНаработка?).' }
 ];
 
 function renderPendingReports() {

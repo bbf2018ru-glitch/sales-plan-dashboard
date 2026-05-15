@@ -162,108 +162,22 @@ async function buildCustomersRetention(fromYM, toYM) {
 }
 
 // ─── 2) Sales-kg ────────────────────────────────────────────────────────────
-// Тянет /products-detail — он отдаёт уже подготовленные {weight, unit, unitRatio,
-// group} из Справочник.Номенклатура. Затем для каждой записи sales БД умножает
-// quantity на weight. Группирует по категории.
-async function fetchNomenclatureWeights() {
-  const data = await callProductsDetail(999);
-  const rows = data.rows || [];
-  const truncated = rows.length >= 999;
-  const byName = new Map();
-  const byCode = new Map();
-  for (const row of rows) {
-    const name = (row.name || '').trim();
-    const code = (row.code || '').trim();
-    const weight = Number(row.weight || 0);
-    const unit = (row.unit || '').trim();
-    const entry = { name, code, weight, unit };
-    if (name) byName.set(name, entry);
-    if (code) byCode.set(code, entry);
-  }
-  return { weightField: 'weight', byName, byCode, totalProducts: rows.length, truncated };
-}
-
-async function buildSalesKg(db, fromISO, toISO) {
-  // Берём sales из локальной БД, агрегат по продукту: sum(quantity)
-  // В БД pg или памяти — у нас единый интерфейс через db.sales (массив)
-  const sales = db.sales || [];
-  const products = new Map((db.products || []).map(p => [p.id, p]));
-  const stores = new Map((db.stores || []).map(s => [s.id, s]));
-
-  const from = fromISO ? new Date(fromISO) : null;
-  const to = toISO ? new Date(toISO + 'T23:59:59') : null;
-
-  const qtyByProductId = new Map();
-  for (const s of sales) {
-    if (from && new Date(s.soldAt || s.sold_at) < from) continue;
-    if (to && new Date(s.soldAt || s.sold_at) > to) continue;
-    const pid = s.productId || s.product_id;
-    const qty = Number(s.quantity || 0);
-    if (!qtyByProductId.has(pid)) qtyByProductId.set(pid, { productId: pid, qty: 0, amount: 0 });
-    const e = qtyByProductId.get(pid);
-    e.qty += qty;
-    e.amount += Number(s.amount || 0);
-  }
-
-  let weights = null;
-  try {
-    weights = await fetchNomenclatureWeights();
-  } catch (e) {
-    return {
-      available: false,
-      note: `Не удалось получить веса из 1С: ${e.message}`
-    };
-  }
-
-  let totalKg = 0;
-  let totalQtyMatched = 0;
-  let totalQtyUnmatched = 0;
-  const byCategory = new Map();
-
-  for (const [pid, e] of qtyByProductId) {
-    const product = products.get(pid);
-    const productName = product?.name || pid;
-    const category = product?.category || '—';
-    // Сначала match по имени, потом по коду
-    const w = weights.byName.get(productName) || weights.byCode.get(pid) || weights.byCode.get(productName);
-    const weight = w?.weight || 0;
-    if (weight > 0) {
-      const kg = e.qty * weight;
-      totalKg += kg;
-      totalQtyMatched += e.qty;
-      if (!byCategory.has(category)) byCategory.set(category, { category, kg: 0, qty: 0, amount: 0 });
-      const c = byCategory.get(category);
-      c.kg += kg;
-      c.qty += e.qty;
-      c.amount += e.amount;
-    } else {
-      totalQtyUnmatched += e.qty;
-    }
-  }
-
+// БЛОКЕР: текущая BSL-версия /products-detail падает на поле
+// `Н.БазоваяЕдиницаИзмерения.Коэффициент` — у Номенклатуры УПП Маши тип
+// БазоваяЕдиницаИзмерения = КлассификаторЕдиницИзмерения, где нет Коэффициента
+// (он только у Справочник.ЕдиницыИзмерения). Запрос /catalog тоже не работает
+// (URL шаблон не зарегистрирован). Веса остаются недоступными.
+//
+// Альтернатива: реквизит `ф_ВесШтукивКг` (Число) у Справочник.Номенклатура
+// есть и его можно использовать, но нужна BSL-правка `/products-detail`
+// (убрать обращение к Коэффициенту).
+//
+// Пока возвращаем pending.
+async function buildSalesKg(_db, _fromISO, _toISO) {
   return {
-    available: true,
-    weightField: weights.weightField,
-    totalProductsInCatalog: weights.totalProducts,
-    truncatedNote: weights.truncated
-      ? 'Справочник номенклатуры обрезан до 999 позиций (баг BSL с разделителем тысяч). После применения финального BSL вес будет для всех ~5000 SKU.'
-      : null,
-    summary: {
-      totalKg: Number(totalKg.toFixed(2)),
-      totalQtyMatched: Number(totalQtyMatched.toFixed(2)),
-      totalQtyUnmatched: Number(totalQtyUnmatched.toFixed(2)),
-      matchedPct: (totalQtyMatched + totalQtyUnmatched) > 0
-        ? Number(((totalQtyMatched / (totalQtyMatched + totalQtyUnmatched)) * 100).toFixed(1))
-        : 0
-    },
-    byCategory: Array.from(byCategory.values())
-      .sort((a, b) => b.kg - a.kg)
-      .map(x => ({
-        category: x.category,
-        kg: Number(x.kg.toFixed(2)),
-        qty: Number(x.qty.toFixed(2)),
-        amount: Number(x.amount.toFixed(2))
-      }))
+    available: false,
+    pending: true,
+    note: 'Веса в УПП Маши лежат в Справочник.Номенклатура.ф_ВесШтукивКг, но текущий BSL HTTP-сервиса (функция ВыполнитьProductsDetail, строка 421) обращается к несуществующему полю Н.БазоваяЕдиницаИзмерения.Коэффициент → 500. Откроется после правки BSL пользователем или Hellstaff (см. файл на Desktop: maria-dashboard-1c-webservice.bsl).'
   };
 }
 
@@ -390,69 +304,64 @@ async function buildPromoDynamics(fromYM, toYM) {
 }
 
 // ─── 5) Production-kg ───────────────────────────────────────────────────────
-// Выпуск продукции в кг — РегистрНакопления.ВыпускПродукции × ЭталонныйВес.
-async function buildProductionKg(fromYM, toYM) {
-  const weights = await fetchNomenclatureWeights().catch(e => ({ error: e.message }));
-  if (weights.error) {
-    return { available: false, note: `Не удалось получить веса: ${weights.error}` };
-  }
+// БЛОКЕР: РегистрНакопления.ВыпускПродукции в УПП Маши **пустой** (probe за
+// 2026-04 вернул 0 строк) + веса по той же причине что в sales-kg недоступны.
+// Возможно у Маши выпуск не отражается в этом регистре, либо данные пишутся
+// в РегистрНакопления.Выпуск (без "Продукции") — нужно подтверждение от
+// пользователя/Hellstaff где реально лежат данные о выпуске.
+async function buildProductionKg(_fromYM, _toYM) {
+  return {
+    available: false,
+    pending: true,
+    note: 'РегистрНакопления.ВыпускПродукции в УПП Маши пустой (probe за 2026-04 → 0 строк). Нужно подтверждение пользователя/Hellstaff: в каком регистре реально лежат данные о выпуске? Кандидаты: РегистрНакопления.Выпуск, .ВыпускПродукцииНаработка. Также нужны веса (см. sales-kg).'
+  };
+}
 
+// ─── 6) Top customers by revenue ────────────────────────────────────────────
+// РегистрНакопления.ПродажиПоДисконтнымКартам — реальный оборот по карте.
+// Поля: ДисконтнаяКарта, ВладелецДисконтнойКарты, Сумма, Период.
+// Используется для топ-100 клиентов по выручке (не по бонусам).
+async function buildTopCustomersByRevenue(fromYM, toYM) {
   const months = rangeMonths(fromYM, toYM);
-  const byProduct = new Map(); // product -> { qty, kg }
-  const byDay = new Map(); // day -> { qty, kg }
+  const byCard = new Map(); // card -> { card, owner, revenue, transactions }
   let totalRows = 0;
   let truncatedMonths = 0;
 
   for (const ym of months) {
-    let data;
-    try {
-      data = await callRegister('ВыпускПродукции', ym, ym, 999);
-    } catch (e) {
-      return { available: false, note: `РегистрНакопления.ВыпускПродукции — ${e.message}` };
-    }
-    const rows = data.rows || [];
+    const d = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 999);
+    const rows = d.rows || [];
     totalRows += rows.length;
     if (rows.length >= 999) truncatedMonths += 1;
     for (const r of rows) {
-      const product = (r['Номенклатура'] || '').trim() || '—';
-      const qty = parseRu(r['Количество']);
-      const w = weights.byName?.get(product);
-      const weight = w?.weight || 0;
-      const kg = qty * weight;
-      if (!byProduct.has(product)) byProduct.set(product, { product, qty: 0, kg: 0, hasWeight: weight > 0 });
-      const p = byProduct.get(product);
-      p.qty += qty;
-      p.kg += kg;
-      const period = parseRuDate(r['Период']);
-      const day = period ? period.toISOString().slice(0, 10) : ym + '-01';
-      if (!byDay.has(day)) byDay.set(day, { day, qty: 0, kg: 0 });
-      const d = byDay.get(day);
-      d.qty += qty;
-      d.kg += kg;
+      const card = (r['ДисконтнаяКарта'] || '').trim();
+      const owner = (r['ВладелецДисконтнойКарты'] || '').trim();
+      const sum = parseRu(r['Сумма']);
+      if (!card) continue;
+      if (!byCard.has(card)) byCard.set(card, { card, owner, revenue: 0, transactions: 0 });
+      const c = byCard.get(card);
+      c.revenue += sum;
+      c.transactions += 1;
     }
   }
 
+  const arr = Array.from(byCard.values()).sort((a, b) => b.revenue - a.revenue);
+  const totalRevenue = arr.reduce((s, c) => s + c.revenue, 0);
   return {
-    available: true,
     period: { from: fromYM, to: toYM },
-    totalRows,
+    totalCards: arr.length,
+    totalTransactions: totalRows,
+    totalRevenue: Number(totalRevenue.toFixed(2)),
     truncatedMonths,
     truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} мес упёрлись в лимит 999 — после обновления BSL лимит поднимется до 100k.`
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 строк — данные могут быть неполными.`
       : null,
-    summary: {
-      totalQty: Number(Array.from(byProduct.values()).reduce((s, p) => s + p.qty, 0).toFixed(2)),
-      totalKg: Number(Array.from(byProduct.values()).reduce((s, p) => s + p.kg, 0).toFixed(2)),
-      productsWithWeight: Array.from(byProduct.values()).filter(p => p.hasWeight).length,
-      productsWithoutWeight: Array.from(byProduct.values()).filter(p => !p.hasWeight).length
-    },
-    topProducts: Array.from(byProduct.values())
-      .sort((a, b) => b.kg - a.kg || b.qty - a.qty)
-      .slice(0, 20)
-      .map(p => ({ product: p.product, qty: Number(p.qty.toFixed(2)), kg: Number(p.kg.toFixed(2)) })),
-    daily: Array.from(byDay.values())
-      .sort((a, b) => a.day.localeCompare(b.day))
-      .map(d => ({ day: d.day, qty: Number(d.qty.toFixed(2)), kg: Number(d.kg.toFixed(2)) }))
+    topCards: arr.slice(0, 100).map(c => ({
+      card: c.card,
+      owner: c.owner,
+      revenue: Number(c.revenue.toFixed(2)),
+      transactions: c.transactions,
+      avgTicket: Number((c.revenue / c.transactions).toFixed(2))
+    }))
   };
 }
 
@@ -527,6 +436,19 @@ async function getProductionKg(opts = {}) {
   });
 }
 
+async function getTopCustomersByRevenue(opts = {}) {
+  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  const fromYM = opts.from || nowYM();
+  const toYM = opts.to || fromYM;
+  return cached(`topcust:${fromYM}:${toYM}`, async () => {
+    try {
+      return { available: true, ...(await buildTopCustomersByRevenue(fromYM, toYM)) };
+    } catch (e) {
+      return { available: false, error: e.message };
+    }
+  });
+}
+
 function nowYM() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -537,5 +459,6 @@ module.exports = {
   getSalesKg,
   getChequeCategories,
   getPromoDynamics,
-  getProductionKg
+  getProductionKg,
+  getTopCustomersByRevenue
 };
