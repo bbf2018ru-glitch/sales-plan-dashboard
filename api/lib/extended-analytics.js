@@ -10,81 +10,19 @@
 //   4) promo-dynamics        — динамика акционных позиций (СкидкиНоменклатурыНатуральные)
 //   5) production-kg         — выпуск продукции в кг (ВыпускПродукции × ЭталонныйВес)
 
-const { fetchUppPackage } = require('./upp-pull');
+const {
+  hasBase,
+  parseRu,
+  parseRuDate,
+  prevMonth,
+  rangeMonths,
+  callRegister,
+  callDocument,
+  makeCache,
+  nowYM
+} = require('./upp-client');
 
-const BASE_URL = process.env.UPP_PULL_URL || '';
-const BASE = BASE_URL.replace(/\/pull(\?.*)?$/, '');
-
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const cache = new Map();
-
-function parseRu(num) {
-  return parseFloat(String(num || '0').replace(/\s+/g, '').replace(',', '.')) || 0;
-}
-
-function parseRuDate(s) {
-  // 1C формат: "01.05.2026 6:05:21"
-  if (!s) return null;
-  const m = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?/.exec(String(s));
-  if (!m) return null;
-  return new Date(Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)));
-}
-
-async function callRegister(name, fromYM, toYM, limit = 999) {
-  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
-  const url = `${BASE}/register?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
-  return fetchUppPackage({
-    url,
-    username: process.env.UPP_PULL_USER,
-    password: process.env.UPP_PULL_PASSWORD,
-    period: ''
-  });
-}
-
-async function callCatalog(name, limit = 10000) {
-  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
-  const url = `${BASE}/catalog?name=${encodeURIComponent(name)}&limit=${limit}`;
-  return fetchUppPackage({
-    url,
-    username: process.env.UPP_PULL_USER,
-    password: process.env.UPP_PULL_PASSWORD,
-    period: ''
-  });
-}
-
-// /products-detail — работает на текущем BSL и сразу отдаёт {code, name, weight,
-// unit, unitRatio, group, kind}. ЛИМИТ 999: на сервере применена старая версия
-// BSL, где Формат(Лимит, "ЧГ=") возвращает "10 000" с пробелом и ломает SQL.
-// После применения финального BSL (Hellstaff) можно поднять до 10000.
-async function callProductsDetail(limit = 999) {
-  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
-  const url = `${BASE}/products-detail?limit=${limit}`;
-  return fetchUppPackage({
-    url,
-    username: process.env.UPP_PULL_USER,
-    password: process.env.UPP_PULL_PASSWORD,
-    period: ''
-  });
-}
-
-function prevMonth(ym) {
-  const [y, m] = ym.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 2, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-function rangeMonths(fromYM, toYM) {
-  const [yF, mF] = fromYM.split('-').map(Number);
-  const [yT, mT] = toYM.split('-').map(Number);
-  const out = [];
-  let y = yF, m = mF;
-  while (y < yT || (y === yT && m <= mT)) {
-    out.push(`${y}-${String(m).padStart(2, '0')}`);
-    m += 1;
-    if (m > 12) { m = 1; y += 1; }
-  }
-  return out;
-}
+const cache = makeCache(5 * 60 * 1000);
 
 // ─── 1) Customers retention ─────────────────────────────────────────────────
 // Считает: новых клиентов в периоде (первая активность карты попадает в from..to)
@@ -423,17 +361,6 @@ async function buildPromoByAction(fromYM, toYM) {
   };
 }
 
-async function callDocument(name, fromYM, toYM, limit = 999) {
-  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
-  const url = `${BASE}/document?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
-  return fetchUppPackage({
-    url,
-    username: process.env.UPP_PULL_USER,
-    password: process.env.UPP_PULL_PASSWORD,
-    period: ''
-  });
-}
-
 async function buildUdsPromoCodes(fromYM, toYM) {
   const months = rangeMonths(fromYM, toYM);
   const allCodes = []; // {code, date, doc, sum, store}
@@ -497,16 +424,11 @@ async function buildUdsPromoCodes(fromYM, toYM) {
 
 // ─── Внешние обёртки с кешированием ─────────────────────────────────────────
 
-async function cached(key, fn) {
-  const c = cache.get(key);
-  if (c && Date.now() - c.at < CACHE_TTL_MS) return { ...c.data, fromCache: true };
-  const data = await fn();
-  if (!data?.error) cache.set(key, { data, at: Date.now() });
-  return data;
-}
+const cached = (key, fn) => cache.wrap(key, fn);
+const BASE = () => hasBase();
 
 async function getCustomersRetention(opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
   const toYM = opts.to || fromYM;
   return cached(`retention:${fromYM}:${toYM}`, async () => {
@@ -519,7 +441,7 @@ async function getCustomersRetention(opts = {}) {
 }
 
 async function getSalesKg(db, opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromISO = opts.from || null;
   const toISO = opts.to || null;
   return cached(`saleskg:${fromISO}:${toISO}`, async () => {
@@ -541,7 +463,7 @@ function getChequeCategories(db, opts = {}) {
 }
 
 async function getPromoDynamics(opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
   const toYM = opts.to || fromYM;
   return cached(`promodyn:${fromYM}:${toYM}`, async () => {
@@ -554,7 +476,7 @@ async function getPromoDynamics(opts = {}) {
 }
 
 async function getProductionKg(opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
   const toYM = opts.to || fromYM;
   return cached(`prodkg:${fromYM}:${toYM}`, async () => {
@@ -567,7 +489,7 @@ async function getProductionKg(opts = {}) {
 }
 
 async function getUdsPromoCodes(opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
   const toYM = opts.to || fromYM;
   return cached(`uds:${fromYM}:${toYM}`, async () => {
@@ -580,7 +502,7 @@ async function getUdsPromoCodes(opts = {}) {
 }
 
 async function getPromoByAction(opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
   const toYM = opts.to || fromYM;
   return cached(`promoaction:${fromYM}:${toYM}`, async () => {
@@ -593,7 +515,7 @@ async function getPromoByAction(opts = {}) {
 }
 
 async function getTopCustomersByRevenue(opts = {}) {
-  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
   const toYM = opts.to || fromYM;
   return cached(`topcust:${fromYM}:${toYM}`, async () => {
@@ -603,11 +525,6 @@ async function getTopCustomersByRevenue(opts = {}) {
       return { available: false, error: e.message };
     }
   });
-}
-
-function nowYM() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 module.exports = {
