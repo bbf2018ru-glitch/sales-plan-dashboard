@@ -969,6 +969,72 @@ function exportCsv(rows, filename) {
   a.click();
 }
 
+// Сборка таблиц всего видимого таба в один TSV (Excel-friendly).
+// Каждая таблица отдельной секцией с заголовком.
+function exportFullTab() {
+  const lines = [];
+  const tab = document.querySelector('#page-analytics .atab-section:not(.hidden), #page-dashboard:not(.hidden)');
+  const isAnalytics = !$('page-analytics').classList.contains('hidden');
+  const root = isAnalytics
+    ? document.querySelector('.atab-section:not(.hidden)')
+    : $('page-dashboard');
+  if (!root) return;
+  const tabName = isAnalytics
+    ? (document.querySelector('#analyticsTabs .atab-active')?.textContent || 'аналитика').trim()
+    : 'Дашборд';
+
+  lines.push(`Отчёт: ${tabName}`);
+  lines.push(`Период: ${state.period}${analyticsState?.range?.from ? ` (${analyticsState.range.from} … ${analyticsState.range.to})` : ''}`);
+  lines.push(`Скачано: ${new Date().toLocaleString('ru-RU')}`);
+  lines.push('');
+
+  // Все таблицы внутри root
+  const tables = root.querySelectorAll('table');
+  tables.forEach((tbl, idx) => {
+    // Заголовок секции = ближайший .panel-title или .section-label
+    let title = '';
+    let node = tbl.parentElement;
+    while (node && !title) {
+      const t = node.querySelector(':scope > .panel-header .panel-title, :scope > .section-header .section-label, :scope > .section-label');
+      if (t) title = t.textContent.trim();
+      node = node.parentElement;
+    }
+    if (title) lines.push(`# ${title}`);
+    const rows = [];
+    const headerCells = tbl.querySelectorAll('thead th');
+    if (headerCells.length) {
+      rows.push(Array.from(headerCells).map(th => th.textContent.trim()).join('\t'));
+    }
+    tbl.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = tr.querySelectorAll('td');
+      if (cells.length) rows.push(Array.from(cells).map(td => td.textContent.trim().replace(/\t/g, ' ')).join('\t'));
+    });
+    lines.push(rows.join('\n'));
+    lines.push('');
+  });
+
+  // KPI-карточки (.kpi-card, .kpi)
+  const kpis = root.querySelectorAll('.kpi-card, .kpi');
+  if (kpis.length) {
+    lines.push('# KPI');
+    kpis.forEach(k => {
+      const label = k.querySelector('.kpi-label')?.textContent.trim() || '';
+      const val = k.querySelector('.kpi-value')?.textContent.trim() || '';
+      const sub = k.querySelector('.kpi-sub')?.textContent.trim() || '';
+      lines.push(`${label}\t${val}${sub ? '\t' + sub : ''}`);
+    });
+    lines.push('');
+  }
+
+  const tsv = '﻿' + lines.join('\n');
+  const blob = new Blob([tsv], { type: 'text/tab-separated-values;charset=utf-8;' });
+  const filename = `maria-${tabName.toLowerCase().replace(/[^а-яa-z0-9]+/gi, '-')}-${state.period}.tsv`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
 // ── Data loading ───────────────────────────────────────────────────────────
 async function loadMetadata() {
   const meta = await fetchJson('/api/metadata');
@@ -1143,6 +1209,7 @@ async function init() {
   });
 
   $('printBtn').addEventListener('click', () => window.print());
+  $('exportTabBtn')?.addEventListener('click', exportFullTab);
   $('logoutBtn')?.addEventListener('click', doLogout);
 
   $('planSaveBtn').addEventListener('click', savePlanEdit);
