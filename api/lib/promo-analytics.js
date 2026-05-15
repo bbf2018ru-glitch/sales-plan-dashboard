@@ -115,10 +115,20 @@ async function fetchCoffeeCertificates(fromYM, toYM) {
   }
 }
 
+// Кеш на 5 минут — старый IIS 1С Маши не любит частых дёрганий
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const cache = new Map();
+
 async function buildPromoAnalytics(opts = {}) {
   const now = new Date();
   const fromYM = opts.from || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const toYM = opts.to || fromYM;
+
+  const cacheKey = `promo:${fromYM}:${toYM}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return { ...cached.data, fromCache: true };
+  }
 
   const result = {
     period: { from: fromYM, to: toYM },
@@ -130,11 +140,12 @@ async function buildPromoAnalytics(opts = {}) {
   }
 
   try {
-    const [discountsRaw, gifts, coffee] = await Promise.all([
-      fetchAllDiscounts(fromYM, toYM).catch(e => ({ error: e.message })),
-      fetchGiftCertificates(fromYM, toYM),
-      fetchCoffeeCertificates(fromYM, toYM)
-    ]);
+    // ПОСЛЕДОВАТЕЛЬНО (не Promise.all): старый IIS 1С не любит параллельных
+    // запросов, один из них падает по таймауту. С последовательным — стабильно.
+    const discountsRaw = await fetchAllDiscounts(fromYM, toYM).catch(e => ({ error: e.message }));
+    const gifts = await fetchGiftCertificates(fromYM, toYM);
+    const coffee = await fetchCoffeeCertificates(fromYM, toYM);
+
     if (discountsRaw.error) {
       result.discounts = { error: discountsRaw.error };
     } else {
@@ -150,6 +161,11 @@ async function buildPromoAnalytics(opts = {}) {
     result.coffeeCertificates = coffee;
   } catch (e) {
     result.error = e.message;
+  }
+
+  // Кешируем только успешные ответы — ошибки не сохраняем чтобы retry помог
+  if (!result.error && !result.discounts?.error) {
+    cache.set(cacheKey, { data: result, at: Date.now() });
   }
   return result;
 }

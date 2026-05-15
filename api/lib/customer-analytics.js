@@ -73,10 +73,18 @@ async function birthdays() {
   };
 }
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const cache = new Map();
+
 async function buildCustomerAnalytics(opts = {}) {
   const now = new Date();
   const fromYM = opts.from || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const toYM = opts.to || fromYM;
+  const cacheKey = `cust:${fromYM}:${toYM}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return { ...cached.data, fromCache: true };
+  }
   const result = {
     period: { from: fromYM, to: toYM },
     available: !!BASE
@@ -86,15 +94,21 @@ async function buildCustomerAnalytics(opts = {}) {
     return result;
   }
   try {
-    const [bonuses, cardCount] = await Promise.all([
-      bonusMovements(fromYM, toYM).catch(e => ({ error: e.message })),
-      activeCardsCount(fromYM, toYM).catch(e => ({ error: e.message }))
-    ]);
-    result.bonuses = bonuses;
-    result.activeCardsThisPeriod = cardCount;
+    // bonuses и cardCount тянут одни и те же данные — оптимизируем
+    // одним запросом + переиспользуем для obeих метрик.
+    result.bonuses = await bonusMovements(fromYM, toYM).catch(e => ({ error: e.message }));
+    if (result.bonuses && !result.bonuses.error) {
+      result.activeCardsThisPeriod = {
+        activeCards: result.bonuses.totalCards,
+        totalMovements: result.bonuses.totalMovements
+      };
+    }
     result.birthdays = await birthdays();
   } catch (e) {
     result.error = e.message;
+  }
+  if (!result.error && !result.bonuses?.error) {
+    cache.set(cacheKey, { data: result, at: Date.now() });
   }
   return result;
 }

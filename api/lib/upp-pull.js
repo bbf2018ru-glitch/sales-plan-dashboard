@@ -2,7 +2,7 @@ const http = require('node:http');
 const https = require('node:https');
 const { URL } = require('node:url');
 
-const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_TIMEOUT_MS = 60000;
 
 function fetchUppPackage({ url, username, password, period, timeoutMs }) {
   if (!url) throw new Error('UPP_PULL_URL не задан');
