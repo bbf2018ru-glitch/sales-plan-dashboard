@@ -971,6 +971,76 @@ function exportCsv(rows, filename) {
 
 // Сборка таблиц всего видимого таба в один TSV (Excel-friendly).
 // Каждая таблица отдельной секцией с заголовком.
+// ─── Закладки/избранное на панелях ────────────────────────────────────────
+const PINNED_KEY = 'maria_pinned_panels_v1';
+function getPinned() {
+  try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function setPinned(set) {
+  localStorage.setItem(PINNED_KEY, JSON.stringify([...set]));
+}
+function slugifyPanel(text) {
+  return String(text || '').toLowerCase()
+    .replace(/[^а-яёa-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+function enhancePinningInSection(rootEl) {
+  if (!rootEl) return;
+  const pinned = getPinned();
+  const panels = Array.from(rootEl.querySelectorAll('.panel, .section'));
+  // Карта: panel → wrapper (.section если есть, иначе .panel)
+  for (const panel of panels) {
+    // Берём только панели с заголовком — без заголовка пиновать нечего
+    const titleEl = panel.querySelector(':scope > .panel-header .panel-title, :scope > .section-header .section-label, :scope > .section-label');
+    if (!titleEl) continue;
+    const id = slugifyPanel(titleEl.textContent);
+    if (!id) continue;
+    panel.dataset.pinId = id;
+    // Добавляем кнопку если её ещё нет
+    if (!panel.querySelector(':scope > .pin-btn-host > .pin-btn')) {
+      const host = document.createElement('span');
+      host.className = 'pin-btn-host';
+      host.innerHTML = `<button class="pin-btn ${pinned.has(id) ? 'pinned' : ''}" title="Закрепить наверху" aria-label="Закрепить">★</button>`;
+      // Вставляем рядом с заголовком
+      titleEl.appendChild(host);
+      host.querySelector('.pin-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pset = getPinned();
+        if (pset.has(id)) pset.delete(id); else pset.add(id);
+        setPinned(pset);
+        applyPinnedOrder();
+      });
+    }
+  }
+  applyPinnedOrder();
+}
+function applyPinnedOrder() {
+  const pinned = getPinned();
+  document.querySelectorAll('[data-pin-id]').forEach(p => {
+    const isPinned = pinned.has(p.dataset.pinId);
+    p.classList.toggle('panel-pinned', isPinned);
+    const btn = p.querySelector('.pin-btn');
+    if (btn) btn.classList.toggle('pinned', isPinned);
+  });
+  // Перемещаем pinned в начало внутри каждого таба/страницы
+  const roots = [
+    ...document.querySelectorAll('.atab-section:not(.hidden)'),
+    document.querySelector('#page-dashboard:not(.hidden)')
+  ].filter(Boolean);
+  for (const root of roots) {
+    const panels = Array.from(root.querySelectorAll(':scope > .panel[data-pin-id], :scope > .section[data-pin-id]'));
+    // Stable sort: pinned первыми, остальные сохраняют порядок
+    const sorted = panels.slice().sort((a, b) => {
+      const pa = pinned.has(a.dataset.pinId) ? 0 : 1;
+      const pb = pinned.has(b.dataset.pinId) ? 0 : 1;
+      return pa - pb;
+    });
+    sorted.forEach(el => root.appendChild(el));
+  }
+}
+
 function exportFullTab() {
   const lines = [];
   const tab = document.querySelector('#page-analytics .atab-section:not(.hidden), #page-dashboard:not(.hidden)');
@@ -1105,6 +1175,7 @@ async function loadSummary() {
   await loadComments();
 
   $('lastUpdate').textContent = `обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
+  enhancePinningOnPage();
 }
 
 // AI Топ-5 загружается один раз при открытии страницы и при смене периода.
@@ -1327,6 +1398,8 @@ function switchAnalyticsTab(tab) {
   localStorage.setItem('maria_atab', tab);
   document.querySelectorAll('#analyticsTabs .atab').forEach(b => b.classList.toggle('atab-active', b.dataset.tab === tab));
   document.querySelectorAll('.atab-section').forEach(s => s.classList.toggle('hidden', s.dataset.atab !== tab));
+  // Закладки: добавляем pin-кнопки + применяем порядок в активной секции
+  document.querySelectorAll('.atab-section:not(.hidden)').forEach(s => enhancePinningInSection(s));
   // Лениво грузим клиентскую и промо аналитику при первом открытии таба
   if (tab === 'customers' && !analyticsState.customersData) loadCustomers();
   if (tab === 'promo' && !analyticsState.promoData) loadPromo();
@@ -1757,6 +1830,12 @@ function renderCustomersFuture(d) {
     '<br>• Когортный анализ возвратов клиентов через год' +
     '<br>• Гео-карта по микрорайонам Иркутска' +
     '<br>• Дни рождения сегодня/неделя → push в Telegram-бот maria-bot';
+}
+
+function enhancePinningOnPage() {
+  // Вызывается после каждой загрузки данных — на случай новых динамических панелей
+  enhancePinningInSection($('page-dashboard'));
+  document.querySelectorAll('.atab-section:not(.hidden)').forEach(s => enhancePinningInSection(s));
 }
 
 function switchPage(page) {

@@ -2710,3 +2710,51 @@ body.plan-incomplete .spark-fill {
 }
 .kpi-delta-up   { background: rgba(34,197,94,.15);  color: rgb(34,197,94); }
 .kpi-delta-down { background: rgba(239,68,68,.15);  color: rgb(239,68,68); }
+
+/* ─── Закладки (pin) ──────────────────────────────────────────────────── */
+.pin-btn-host {
+  display: inline-flex;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.pin-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: .35;
+  transition: opacity .15s, color .15s, background .15s;
+}
+.pin-btn:hover {
+  opacity: 1;
+  background: rgba(0,0,0,.05);
+}
+.pin-btn.pinned {
+  opacity: 1;
+  color: rgb(234,179,8);
+}
+
+/* Подсветка закреплённых */
+.panel-pinned {
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(234,179,8,.25), 0 2px 8px rgba(234,179,8,.05);
+}
+.panel-pinned::before {
+  content: "★ закреплено";
+  position: absolute;
+  top: -1px;
+  right: 12px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  background: rgb(234,179,8);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 0 0 4px 4px;
+  z-index: 1;
+  pointer-events: none;
+}
