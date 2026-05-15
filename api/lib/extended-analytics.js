@@ -365,6 +365,82 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
   };
 }
 
+// ─── 7) UDS промокоды ───────────────────────────────────────────────────────
+// Документ.ЧекККМ имеет поле `uds_КодСкидки` (Строка) — это уникальный
+// одноразовый промокод от платформы UDS. Связан с конкретным клиентом.
+// Также есть `uds_ДатаТранзакции` (Дата) и сама сумма чека.
+async function callDocument(name, fromYM, toYM, limit = 999) {
+  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
+  const url = `${BASE}/document?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
+  return fetchUppPackage({
+    url,
+    username: process.env.UPP_PULL_USER,
+    password: process.env.UPP_PULL_PASSWORD,
+    period: ''
+  });
+}
+
+async function buildUdsPromoCodes(fromYM, toYM) {
+  const months = rangeMonths(fromYM, toYM);
+  const allCodes = []; // {code, date, doc, sum, store}
+  let totalChecks = 0;
+  let truncatedMonths = 0;
+
+  for (const ym of months) {
+    const d = await callDocument('ЧекККМ', ym, ym, 999);
+    const rows = d.rows || [];
+    totalChecks += rows.length;
+    if (rows.length >= 999) truncatedMonths += 1;
+    for (const r of rows) {
+      const code = (r['uds_КодСкидки'] || '').trim();
+      if (!code) continue;
+      const sum = parseRu(r['СуммаДокумента']);
+      allCodes.push({
+        code,
+        date: r['Дата'] || '',
+        docNumber: r['Номер'] || '',
+        store: (r['Склад'] || r['КассаККМ'] || '').toString(),
+        sum: Number(sum.toFixed(2))
+      });
+    }
+  }
+
+  // Группируем по коду — обычно UDS-коды одноразовые, но всё равно агрегируем
+  const byCode = new Map();
+  for (const c of allCodes) {
+    if (!byCode.has(c.code)) byCode.set(c.code, { code: c.code, uses: 0, totalSum: 0, firstDate: c.date, stores: new Set() });
+    const e = byCode.get(c.code);
+    e.uses += 1;
+    e.totalSum += c.sum;
+    if (c.store) e.stores.add(c.store);
+  }
+
+  return {
+    period: { from: fromYM, to: toYM },
+    totalChecksScanned: totalChecks,
+    checksWithPromocode: allCodes.length,
+    promocodeRate: totalChecks ? Number(((allCodes.length / totalChecks) * 100).toFixed(2)) : 0,
+    uniqueCodes: byCode.size,
+    truncatedMonths,
+    truncatedNote: truncatedMonths > 0
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 чеков — данные неполные. После обновления BSL лимит поднимется.`
+      : null,
+    topCodes: Array.from(byCode.values())
+      .sort((a, b) => b.totalSum - a.totalSum || b.uses - a.uses)
+      .slice(0, 50)
+      .map(e => ({
+        code: e.code,
+        uses: e.uses,
+        totalSum: Number(e.totalSum.toFixed(2)),
+        stores: e.stores.size,
+        firstDate: e.firstDate
+      })),
+    recentApplications: allCodes
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      .slice(0, 100)
+  };
+}
+
 // ─── Внешние обёртки с кешированием ─────────────────────────────────────────
 
 async function cached(key, fn) {
@@ -436,6 +512,19 @@ async function getProductionKg(opts = {}) {
   });
 }
 
+async function getUdsPromoCodes(opts = {}) {
+  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  const fromYM = opts.from || nowYM();
+  const toYM = opts.to || fromYM;
+  return cached(`uds:${fromYM}:${toYM}`, async () => {
+    try {
+      return { available: true, ...(await buildUdsPromoCodes(fromYM, toYM)) };
+    } catch (e) {
+      return { available: false, error: e.message };
+    }
+  });
+}
+
 async function getTopCustomersByRevenue(opts = {}) {
   if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
@@ -460,5 +549,6 @@ module.exports = {
   getChequeCategories,
   getPromoDynamics,
   getProductionKg,
-  getTopCustomersByRevenue
+  getTopCustomersByRevenue,
+  getUdsPromoCodes
 };

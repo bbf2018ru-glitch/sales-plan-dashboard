@@ -1315,6 +1315,7 @@ async function loadPromo() {
     }
 
     loadPromoDynamics();
+    loadUdsPromoCodes();
   } catch (e) {
     if (availEl) {
       availEl.classList.remove('hidden');
@@ -1393,6 +1394,45 @@ async function loadRetention() {
       availEl.innerHTML = `<b>Ошибка retention:</b> ${escapeHtml(e.message)}`;
     }
     if (contentEl) contentEl.style.display = 'none';
+  }
+}
+
+async function loadUdsPromoCodes() {
+  const tbody = document.querySelector('#udsPromoTbl tbody');
+  const kpis = $('udsPromoKpis');
+  const noteEl = $('udsPromoNote');
+  if (!tbody || !kpis) return;
+  try {
+    const params = new URLSearchParams();
+    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
+    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
+    if (!params.has('from')) params.set('from', state.period);
+    if (!params.has('to')) params.set('to', state.period);
+    const data = await fetchJson(`/api/analytics/uds-promocodes?${params.toString()}`);
+    if (!data.available || data.error) {
+      kpis.innerHTML = '';
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
+      return;
+    }
+    kpis.innerHTML = `
+      <div class="kpi-card"><div class="kpi-label">Чеков с промокодом</div><div class="kpi-value">${fmtNum(data.checksWithPromocode || 0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">% чеков с кодом</div><div class="kpi-value">${data.promocodeRate || 0}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Уникальных кодов</div><div class="kpi-value">${fmtNum(data.uniqueCodes || 0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Проверено чеков</div><div class="kpi-value">${fmtNum(data.totalChecksScanned || 0)}</div></div>`;
+    tbody.innerHTML = (data.topCodes || []).map((r, i) => `
+      <tr>
+        <td class="col-num">${i+1}</td>
+        <td><code>${escapeHtml(r.code)}</code></td>
+        <td class="num">${fmtNum(r.uses)}</td>
+        <td class="num">${fmtNum(r.totalSum)} ₽</td>
+        <td class="num">${fmtNum(r.stores)}</td>
+        <td style="font-size:11px;color:var(--muted)">${escapeHtml(r.firstDate)}</td>
+      </tr>`).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">За период ни одного UDS-промокода</td></tr>`;
+    if (noteEl) {
+      noteEl.textContent = data.truncatedNote ? `⚠ ${data.truncatedNote}` : '';
+    }
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
