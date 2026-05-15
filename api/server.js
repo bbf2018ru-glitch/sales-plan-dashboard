@@ -922,6 +922,30 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── 1С Live probe — проксирует к работающим endpoint'ам HTTP-сервиса 1С ─
+    // Используется для одноразового исследования структуры. Только GET.
+    if (pathname === '/api/admin/probe-1c' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const path = parsedUrl.searchParams.get('path'); // напр. "object?kind=Справочник&name=Номенклатура"
+      if (!path) { sendJson(res, 400, { error: 'path required (e.g. object?kind=Справочник&name=Номенклатура)' }); return; }
+      if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
+      try {
+        const { fetchUppPackage } = require('./lib/upp-pull');
+        const base = UPP_PULL_URL.replace(/\/pull(\?.*)?$/, '');
+        const result = await fetchUppPackage({
+          url: `${base}/${path}`,
+          username: UPP_PULL_USER,
+          password: UPP_PULL_PASSWORD,
+          period: ''
+        });
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+
     // ── 1С Diagnostic / Explorer ──────────────────────────────────────────────
     if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
