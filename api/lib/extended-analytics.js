@@ -365,10 +365,64 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
   };
 }
 
-// ─── 7) UDS промокоды ───────────────────────────────────────────────────────
-// Документ.ЧекККМ имеет поле `uds_КодСкидки` (Строка) — это уникальный
-// одноразовый промокод от платформы UDS. Связан с конкретным клиентом.
-// Также есть `uds_ДатаТранзакции` (Дата) и сама сумма чека.
+// ─── 7) Скидки по акциям (промокоды) ────────────────────────────────────────
+// У Маши «промокод» = название акции в Справочник.Акции (типа "Промокод СУШИ").
+// В отчёте 1С «Скидки по акциям» эта связь идёт через ТЧ документа
+// (Товары.ЗначениеУсловияАвтоматическойСкидки = ссылка на Акции).
+//
+// Текущий BSL /document отдаёт только реквизиты-шапки, до ТЧ не дотягивается.
+// Поэтому пока строим частичный отчёт из РегистрНакопления.ПредоставленныеСкидки
+// (условие `"По акции (ДК)"`) — даём документ/товар/сумму, но без имени акции.
+// После добавления endpoint'а /promo-by-action в BSL — имена появятся.
+async function buildPromoByAction(fromYM, toYM) {
+  const months = rangeMonths(fromYM, toYM);
+  const promoRows = [];
+  let truncatedMonths = 0;
+
+  for (const ym of months) {
+    const d = await callRegister('ПредоставленныеСкидки', ym, ym, 999);
+    const rows = d.rows || [];
+    if (rows.length >= 999) truncatedMonths += 1;
+    for (const r of rows) {
+      const cond = (r['УсловиеСкидки'] || '').trim();
+      if (!/акци/i.test(cond)) continue;
+      promoRows.push({
+        date: r['Период'] || '',
+        product: (r['Номенклатура'] || '').trim() || '—',
+        document: (r['ДокументСкидки'] || '').trim() || '—',
+        store: (r['ПолучательСкидки'] || '').trim() || '—',
+        condition: cond,
+        sum: parseRu(r['СуммаСкидки'])
+      });
+    }
+  }
+
+  // Группировка по документу (один заказ/чек = одно «применение промокода»)
+  const byDoc = new Map();
+  for (const r of promoRows) {
+    if (!byDoc.has(r.document)) byDoc.set(r.document, { document: r.document, date: r.date, store: r.store, products: [], totalSum: 0 });
+    const e = byDoc.get(r.document);
+    e.products.push({ product: r.product, sum: Number(r.sum.toFixed(2)) });
+    e.totalSum += r.sum;
+  }
+  const docList = Array.from(byDoc.values())
+    .sort((a, b) => b.totalSum - a.totalSum)
+    .map(d => ({ ...d, totalSum: Number(d.totalSum.toFixed(2)), productCount: d.products.length }));
+
+  return {
+    period: { from: fromYM, to: toYM },
+    totalApplications: promoRows.length,
+    uniqueDocuments: byDoc.size,
+    totalDiscountSum: Number(promoRows.reduce((s, r) => s + r.sum, 0).toFixed(2)),
+    truncatedMonths,
+    truncatedNote: truncatedMonths > 0
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 строк регистра — данные неполные.`
+      : null,
+    bslLimitNote: 'Имя конкретной акции (типа "Промокод СУШИ") пока не показывается — оно в ТЧ документа. Добавь endpoint /promo-by-action в BSL и здесь появится.',
+    documents: docList.slice(0, 200)
+  };
+}
+
 async function callDocument(name, fromYM, toYM, limit = 999) {
   if (!BASE) throw new Error('UPP_PULL_URL не настроен');
   const url = `${BASE}/document?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
@@ -525,6 +579,19 @@ async function getUdsPromoCodes(opts = {}) {
   });
 }
 
+async function getPromoByAction(opts = {}) {
+  if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  const fromYM = opts.from || nowYM();
+  const toYM = opts.to || fromYM;
+  return cached(`promoaction:${fromYM}:${toYM}`, async () => {
+    try {
+      return { available: true, ...(await buildPromoByAction(fromYM, toYM)) };
+    } catch (e) {
+      return { available: false, error: e.message };
+    }
+  });
+}
+
 async function getTopCustomersByRevenue(opts = {}) {
   if (!BASE) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromYM = opts.from || nowYM();
@@ -550,5 +617,6 @@ module.exports = {
   getPromoDynamics,
   getProductionKg,
   getTopCustomersByRevenue,
-  getUdsPromoCodes
+  getUdsPromoCodes,
+  getPromoByAction
 };
