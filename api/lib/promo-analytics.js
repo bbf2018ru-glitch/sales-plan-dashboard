@@ -57,8 +57,18 @@ function aggregateDiscounts(rows) {
     p.count += 1;
 
     const doc = (r['ДокументСкидки'] || '').trim() || '—';
-    // Извлекаем тип документа (Реализация / Чек ККМ / Отчёт)
-    const docType = doc.split(' ').slice(0, 3).join(' ');
+    // Извлекаем тип документа БЕЗ номера (Чек ККМ / Реализация товаров /
+    // Отчёт о розничных продажах). Останавливаемся на первом слове с цифрами
+    // или капсом который похож на номер документа.
+    const words = doc.split(' ');
+    const typeWords = [];
+    for (const w of words) {
+      // Слово начинается с цифры/букв в верхнем регистре подряд (типа ЦБКА1052441) — это номер
+      if (/^[А-ЯA-Z]{2,}\d+/.test(w) || /^\d{5,}/.test(w)) break;
+      typeWords.push(w);
+      if (typeWords.length >= 4) break; // безопасный потолок
+    }
+    const docType = typeWords.join(' ').trim() || doc.slice(0, 30);
     if (!byDoc.has(docType)) byDoc.set(docType, { docType, sum: 0, count: 0 });
     const d = byDoc.get(docType);
     d.sum += sum;
