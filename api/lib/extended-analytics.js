@@ -53,8 +53,10 @@ async function callCatalog(name, limit = 10000) {
 }
 
 // /products-detail — работает на текущем BSL и сразу отдаёт {code, name, weight,
-// unit, unitRatio, group, kind}. Используем как основной источник весов.
-async function callProductsDetail(limit = 10000) {
+// unit, unitRatio, group, kind}. ЛИМИТ 999: на сервере применена старая версия
+// BSL, где Формат(Лимит, "ЧГ=") возвращает "10 000" с пробелом и ломает SQL.
+// После применения финального BSL (Hellstaff) можно поднять до 10000.
+async function callProductsDetail(limit = 999) {
   if (!BASE) throw new Error('UPP_PULL_URL не настроен');
   const url = `${BASE}/products-detail?limit=${limit}`;
   return fetchUppPackage({
@@ -164,8 +166,9 @@ async function buildCustomersRetention(fromYM, toYM) {
 // group} из Справочник.Номенклатура. Затем для каждой записи sales БД умножает
 // quantity на weight. Группирует по категории.
 async function fetchNomenclatureWeights() {
-  const data = await callProductsDetail(10000);
+  const data = await callProductsDetail(999);
   const rows = data.rows || [];
+  const truncated = rows.length >= 999;
   const byName = new Map();
   const byCode = new Map();
   for (const row of rows) {
@@ -177,7 +180,7 @@ async function fetchNomenclatureWeights() {
     if (name) byName.set(name, entry);
     if (code) byCode.set(code, entry);
   }
-  return { weightField: 'weight', byName, byCode, totalProducts: rows.length };
+  return { weightField: 'weight', byName, byCode, totalProducts: rows.length, truncated };
 }
 
 async function buildSalesKg(db, fromISO, toISO) {
@@ -242,6 +245,9 @@ async function buildSalesKg(db, fromISO, toISO) {
     available: true,
     weightField: weights.weightField,
     totalProductsInCatalog: weights.totalProducts,
+    truncatedNote: weights.truncated
+      ? 'Справочник номенклатуры обрезан до 999 позиций (баг BSL с разделителем тысяч). После применения финального BSL вес будет для всех ~5000 SKU.'
+      : null,
     summary: {
       totalKg: Number(totalKg.toFixed(2)),
       totalQtyMatched: Number(totalQtyMatched.toFixed(2)),
