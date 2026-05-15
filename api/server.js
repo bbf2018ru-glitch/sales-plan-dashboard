@@ -27,6 +27,7 @@ const {
   getPromoByAction
 } = require('./lib/extended-analytics');
 const { startMorningReport, buildReportText } = require('./lib/morning-report');
+const { startCriticalAlerts } = require('./lib/critical-alerts');
 const { createStore } = require('./storage');
 
 loadProjectEnv();
@@ -1051,6 +1052,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Ручной запуск critical-alerts (для тестирования или принудительного дёргания)
+    if (pathname === '/api/admin/alerts/run' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      if (!criticalAlertsHandle?.runNow) { sendJson(res, 503, { error: 'Critical alerts not initialized' }); return; }
+      try {
+        await criticalAlertsHandle.runNow();
+        sendJson(res, 200, { ok: true, state: criticalAlertsHandle.state });
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── 1С Live probe — проксирует к работающим endpoint'ам HTTP-сервиса 1С ─
     // Используется для одноразового исследования структуры. Только GET.
     if (pathname === '/api/admin/probe-1c' && req.method === 'GET') {
@@ -1162,6 +1175,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 let morningReportHandle = null;
+let criticalAlertsHandle = null;
 
 server.listen(PORT, async () => {
   await store.init();
@@ -1176,6 +1190,12 @@ server.listen(PORT, async () => {
     store,
     botToken: TELEGRAM_BOT_TOKEN,
     chatId: TELEGRAM_CHAT_ID,
+  });
+
+  criticalAlertsHandle = startCriticalAlerts({
+    store,
+    botToken: TELEGRAM_BOT_TOKEN,
+    chatId: TELEGRAM_CHAT_ID
   });
 
   if (UPP_PULL_URL && UPP_PULL_INTERVAL_MIN > 0) {
