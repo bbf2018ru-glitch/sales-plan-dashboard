@@ -1161,19 +1161,20 @@ async function loadCustomers() {
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/customers?${params.toString()}`);
-    analyticsState.customersData = data;
     if (!data.available) {
       availEl.classList.remove('hidden');
       availEl.innerHTML = `<b>Канал к 1С не настроен.</b> ${escapeHtml(data.note || '')}`;
       contentEl.style.display = 'none';
       return;
     }
-    if (data.error) {
+    if (data.error || data.bonuses?.error) {
       availEl.classList.remove('hidden');
-      availEl.innerHTML = `<b>Ошибка обращения к 1С:</b> ${escapeHtml(data.error)}`;
+      availEl.innerHTML = `<b>Ошибка обращения к 1С:</b> ${escapeHtml(data.error || data.bonuses?.error || '')} <button class="link-btn" id="customersRetry">Повторить</button>`;
+      $('customersRetry')?.addEventListener('click', () => { analyticsState.customersData = null; loadCustomers(); });
       contentEl.style.display = 'none';
-      return;
+      return;  // НЕ сохраняем в state
     }
+    analyticsState.customersData = data;
     availEl.classList.add('hidden');
     contentEl.style.display = '';
     renderCustomersKpis(data);
@@ -1223,7 +1224,6 @@ async function loadPromo() {
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/promo?${params.toString()}`);
-    analyticsState.promoData = data;
     if (!data.available) {
       availEl.classList.remove('hidden');
       availEl.innerHTML = `<b>Канал к 1С не настроен.</b> ${escapeHtml(data.note || '')}`;
@@ -1232,10 +1232,13 @@ async function loadPromo() {
     }
     if (data.error || data.discounts?.error) {
       availEl.classList.remove('hidden');
-      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(data.error || data.discounts?.error || '')}`;
+      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(data.error || data.discounts?.error || '')} <button class="link-btn" id="promoRetry">Повторить</button>`;
+      $('promoRetry')?.addEventListener('click', () => { analyticsState.promoData = null; loadPromo(); });
       contentEl.style.display = 'none';
-      return;
+      return;  // НЕ сохраняем в state
     }
+    // Только успешные ответы кешируются
+    analyticsState.promoData = data;
     availEl.classList.add('hidden');
     contentEl.style.display = '';
 
@@ -1803,7 +1806,14 @@ async function applyDateRange(from, to) {
       if ($('periodSelect')) $('periodSelect').value = newPeriod;
     }
   }
+  // Сбрасываем кеш клиентов и промо — они привязаны к диапазону дат и
+  // должны перезагрузиться. Иначе зависает старая ошибка/данные.
+  analyticsState.customersData = null;
+  analyticsState.promoData = null;
   await loadAnalytics();
+  // Если открыт таб Клиенты или Промо — перезагружаем сразу
+  if (analyticsState.currentTab === 'customers') await loadCustomers();
+  if (analyticsState.currentTab === 'promo') await loadPromo();
 }
 
 function updateDateRangeStatus() {

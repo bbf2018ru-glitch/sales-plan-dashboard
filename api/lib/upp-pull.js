@@ -4,7 +4,18 @@ const { URL } = require('node:url');
 
 const DEFAULT_TIMEOUT_MS = 60000;
 
-function fetchUppPackage({ url, username, password, period, timeoutMs }) {
+async function fetchUppPackage(opts) {
+  // Retry: 1 повтор через 2 сек на случай разового таймаута/сбоя сети
+  try {
+    return await fetchUppPackageOnce(opts);
+  } catch (e) {
+    if (!/timeout|ECONN|ETIMEDOUT|EHOSTUNREACH/i.test(e.message)) throw e;
+    await new Promise(r => setTimeout(r, 2000));
+    return fetchUppPackageOnce(opts);
+  }
+}
+
+function fetchUppPackageOnce({ url, username, password, period, timeoutMs }) {
   if (!url) throw new Error('UPP_PULL_URL не задан');
   const target = new URL(url);
   if (period) target.searchParams.set('period', period);
