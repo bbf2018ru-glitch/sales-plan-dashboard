@@ -52,6 +52,19 @@ async function callCatalog(name, limit = 10000) {
   });
 }
 
+// /products-detail — работает на текущем BSL и сразу отдаёт {code, name, weight,
+// unit, unitRatio, group, kind}. Используем как основной источник весов.
+async function callProductsDetail(limit = 10000) {
+  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
+  const url = `${BASE}/products-detail?limit=${limit}`;
+  return fetchUppPackage({
+    url,
+    username: process.env.UPP_PULL_USER,
+    password: process.env.UPP_PULL_PASSWORD,
+    period: ''
+  });
+}
+
 function prevMonth(ym) {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 2, 1));
@@ -147,30 +160,24 @@ async function buildCustomersRetention(fromYM, toYM) {
 }
 
 // ─── 2) Sales-kg ────────────────────────────────────────────────────────────
-// Тянет /catalog?name=Номенклатура, ищет реквизит с весом (ЭталонныйВес,
-// БазовыйВес, Вес — точное имя зависит от конфигурации Маши). Затем для
-// каждой записи sales БД умножает quantity на найденный вес. Группирует.
+// Тянет /products-detail — он отдаёт уже подготовленные {weight, unit, unitRatio,
+// group} из Справочник.Номенклатура. Затем для каждой записи sales БД умножает
+// quantity на weight. Группирует по категории.
 async function fetchNomenclatureWeights() {
-  const cat = await callCatalog('Номенклатура', 10000);
-  // Найти поле с весом: пробуем известные варианты в типовой УПП.
-  const candidates = ['ЭталонныйВес', 'БазовыйВес', 'Вес', 'ВесНоменклатуры'];
-  const fields = cat.fields || [];
-  const weightField = candidates.find(c => fields.includes(c)) || null;
-  // Базовая единица: показатель штучности (если штук, то вес = 0)
-  const unitField = fields.find(f => /Единица/i.test(f)) || null;
-
+  const data = await callProductsDetail(10000);
+  const rows = data.rows || [];
   const byName = new Map();
   const byCode = new Map();
-  for (const row of cat.rows || []) {
-    const name = (row['Наименование'] || '').trim();
-    const code = (row['Код'] || '').trim();
-    const weight = weightField ? parseRu(row[weightField]) : 0;
-    const unit = unitField ? String(row[unitField] || '').trim() : '';
+  for (const row of rows) {
+    const name = (row.name || '').trim();
+    const code = (row.code || '').trim();
+    const weight = Number(row.weight || 0);
+    const unit = (row.unit || '').trim();
     const entry = { name, code, weight, unit };
     if (name) byName.set(name, entry);
     if (code) byCode.set(code, entry);
   }
-  return { weightField, unitField, byName, byCode, totalProducts: cat.rowsCount || 0 };
+  return { weightField: 'weight', byName, byCode, totalProducts: rows.length };
 }
 
 async function buildSalesKg(db, fromISO, toISO) {
@@ -202,13 +209,6 @@ async function buildSalesKg(db, fromISO, toISO) {
     return {
       available: false,
       note: `Не удалось получить веса из 1С: ${e.message}`
-    };
-  }
-
-  if (!weights.weightField) {
-    return {
-      available: false,
-      note: `В справочнике Номенклатура нет реквизита веса (искали: ЭталонныйВес, БазовыйВес, Вес, ВесНоменклатуры). Доступные реквизиты: ${(await callCatalog('Номенклатура', 1)).fields?.join(', ').slice(0, 200)}…`
     };
   }
 
