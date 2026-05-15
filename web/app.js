@@ -318,6 +318,70 @@ function renderDailyChart(summary) {
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
+// ── Summary hero — главная карточка дня ───────────────────────────────────
+function renderSummaryHero(summary) {
+  const el = $('summaryHero');
+  if (!el || !summary) { el?.classList.add('hidden'); return; }
+
+  const t = summary.totals || {};
+  const pct = t.completion || 0;
+  const gap = (t.plan || 0) - (t.fact || 0);
+  const f = summary.forecast || {};
+
+  // Топ-3 отстающих магазина
+  const lagging = (summary.stores || [])
+    .filter(s => s.plan > 0)
+    .sort((a, b) => a.percent - b.percent)
+    .slice(0, 3);
+
+  // Топ-3 лидера
+  const leaders = (summary.stores || [])
+    .filter(s => s.plan > 0)
+    .sort((a, b) => b.percent - a.percent)
+    .slice(0, 3);
+
+  // Какой текст по состоянию плана
+  let mood = 'ok';
+  let moodLabel = 'идём в плане';
+  let moodIcon = '✓';
+  if (f.status && /угроз|разрыв|fail/i.test(f.status)) { mood = 'bad'; moodLabel = f.status; moodIcon = '⚠'; }
+  else if (pct < 60) { mood = 'warn'; moodLabel = 'отстаём от плана'; moodIcon = '↓'; }
+  else if (pct >= 100) { mood = 'great'; moodLabel = 'план перевыполнен'; moodIcon = '✓'; }
+
+  // Период «План май» — название месяца
+  const [yyyy, mm] = (summary.period || state.period || '').split('-');
+  const months = ['', 'январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  const monthName = months[+mm] || '';
+
+  el.innerHTML = `
+    <div class="hero-card hero-${mood}">
+      <div class="hero-icon">${moodIcon}</div>
+      <div class="hero-body">
+        <div class="hero-headline">
+          План ${escapeHtml(monthName)} ${escapeHtml(yyyy || '')} — <b>${pct}%</b>
+          <span class="hero-mood">${escapeHtml(moodLabel)}</span>
+        </div>
+        <div class="hero-sub">
+          Факт <b>${fmtMoneyShort(t.fact || 0)}</b> из ${fmtMoneyShort(t.plan || 0)}
+          ${gap > 0 ? `· до конца месяца нужно ещё <b class="hero-gap">${fmtMoneyShort(gap)}</b>` : ''}
+          ${f.runwayGap ? `· прогноз разрыва: <b>${fmtMoneyShort(f.runwayGap)}</b>` : ''}
+        </div>
+        ${lagging.length ? `<div class="hero-lists">
+          <div class="hero-list">
+            <div class="hero-list-title">⬇ Отстают</div>
+            ${lagging.map(s => `<div class="hero-store hero-store-bad">${escapeHtml(s.storeName)} <b>${s.percent}%</b></div>`).join('')}
+          </div>
+          <div class="hero-list">
+            <div class="hero-list-title">⬆ Лидеры</div>
+            ${leaders.map(s => `<div class="hero-store hero-store-good">${escapeHtml(s.storeName)} <b>${s.percent}%</b></div>`).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+  el.classList.remove('hidden');
+}
+
 function renderKpis(summary) {
   const f = summary.forecast;
   const c = summary.comparison;
@@ -950,6 +1014,7 @@ async function loadSummary() {
 
   applyMarginVisibility(summary);
   renderPlanHealth(summary);
+  renderSummaryHero(summary);
   renderKpis(summary);
   renderForecast(summary);
   renderTrendChart(summary);
