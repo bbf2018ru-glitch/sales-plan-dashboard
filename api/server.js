@@ -105,16 +105,25 @@ function parseCookies(req) {
 const SESSION_COOKIE = 'maria_session';
 const USER_TOKEN_COOKIE = 'maria_user_token';
 
-function setSessionCookie(res, token) {
+// Детектим HTTPS через X-Forwarded-Proto (nginx ставит) или прямую TLS-сессию
+function isSecureRequest(req) {
+  if (req.headers['x-forwarded-proto'] === 'https') return true;
+  if (req.connection && req.connection.encrypted) return true;
+  return false;
+}
+
+function setSessionCookie(res, token, req) {
   // 8 часов, httpOnly, SameSite=Strict — токен недоступен для JS и не утечёт через cross-site.
-  // Secure не ставим пока http — добавим автоматически когда поднимем HTTPS.
+  // Secure добавляется автоматически если запрос пришёл через HTTPS.
   const parts = [`${SESSION_COOKIE}=${encodeURIComponent(token)}`, 'Path=/', 'HttpOnly', 'SameSite=Strict', 'Max-Age=' + (8 * 3600)];
+  if (req && isSecureRequest(req)) parts.push('Secure');
   res.setHeader('Set-Cookie', parts.join('; '));
 }
 
-function setUserTokenCookie(res, userToken) {
+function setUserTokenCookie(res, userToken, req) {
   // 30 дней — для удобства, чтобы admin не вводил токен каждый день
   const parts = [`${USER_TOKEN_COOKIE}=${encodeURIComponent(userToken)}`, 'Path=/', 'HttpOnly', 'SameSite=Strict', 'Max-Age=' + (30 * 86400)];
+  if (req && isSecureRequest(req)) parts.push('Secure');
   // append к существующим Set-Cookie
   const prev = res.getHeader('Set-Cookie');
   const next = parts.join('; ');
@@ -321,7 +330,7 @@ const server = http.createServer(async (req, res) => {
         if (body.userToken) {
           try {
             const u = await store.getUserByToken(String(body.userToken));
-            if (u) setUserTokenCookie(res, body.userToken);
+            if (u) setUserTokenCookie(res, body.userToken, req);
           } catch (_) {}
         }
         sendJson(res, 200, { ok: true, token: null, pinRequired: false });
@@ -329,11 +338,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (body.pin === DASHBOARD_PIN) {
         const sessionToken = createSession();
-        setSessionCookie(res, sessionToken);
+        setSessionCookie(res, sessionToken, req);
         if (body.userToken) {
           try {
             const u = await store.getUserByToken(String(body.userToken));
-            if (u) setUserTokenCookie(res, body.userToken);
+            if (u) setUserTokenCookie(res, body.userToken, req);
           } catch (_) {}
         }
         // sessionToken в теле оставляем для legacy-клиентов, но новые версии используют cookie
