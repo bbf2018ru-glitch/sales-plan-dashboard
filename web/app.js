@@ -57,12 +57,24 @@ async function fetchJson(path, opts = {}) {
   if (state.sessionToken) headers['X-Session-Token'] = state.sessionToken;
   if (state.userToken) headers['X-User-Token'] = state.userToken;
   opts.headers = headers;
-  const res = await fetch(path, opts);
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({ error: 'Ошибка запроса' }));
-    throw new Error(b.error || 'Ошибка запроса');
+  // Жёсткий таймаут 90 сек чтобы fetch не висел вечно при сетевых заминках —
+  // иначе UI стопорится и кнопки не реагируют
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 90000);
+  opts.signal = ac.signal;
+  try {
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({ error: 'Ошибка запроса' }));
+      throw new Error(b.error || 'Ошибка запроса');
+    }
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Таймаут запроса (90 сек)');
+    throw e;
+  } finally {
+    clearTimeout(t);
   }
-  return res.json();
 }
 
 // ── PIN Auth ───────────────────────────────────────────────────────────────
@@ -1800,7 +1812,7 @@ async function applyDateRange(from, to) {
   analyticsState.range.to = to || null;
   if ($('drFrom')) $('drFrom').value = from || '';
   if ($('drTo')) $('drTo').value = to || '';
-  // Если from/to задан — синхронизируем period с месяцем from чтобы фильтр работал
+  // Если from/to задан — синхронизируем period с месяцем from
   if (from) {
     const newPeriod = from.slice(0, 7);
     if (newPeriod !== state.period) {
@@ -1808,14 +1820,25 @@ async function applyDateRange(from, to) {
       if ($('periodSelect')) $('periodSelect').value = newPeriod;
     }
   }
-  // Сбрасываем кеш клиентов и промо — они привязаны к диапазону дат и
-  // должны перезагрузиться. Иначе зависает старая ошибка/данные.
+  // Сбрасываем кеш клиентов и промо
   analyticsState.customersData = null;
   analyticsState.promoData = null;
-  await loadAnalytics();
-  // Если открыт таб Клиенты или Промо — перезагружаем сразу
-  if (analyticsState.currentTab === 'customers') await loadCustomers();
-  if (analyticsState.currentTab === 'promo') await loadPromo();
+  // Визуальная обратная связь — пользователь видит что клик дошёл
+  const applyBtn = $('drApply');
+  const status = $('drStatus');
+  const originalBtnText = applyBtn?.textContent;
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = 'Загружается…'; }
+  if (status) status.textContent = 'загружается…';
+  try {
+    await loadAnalytics();
+    if (analyticsState.currentTab === 'customers') await loadCustomers();
+    if (analyticsState.currentTab === 'promo') await loadPromo();
+  } catch (e) {
+    console.error('applyDateRange failed', e);
+    if (status) status.textContent = 'ошибка: ' + e.message;
+  } finally {
+    if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = originalBtnText || 'Применить'; }
+  }
 }
 
 function updateDateRangeStatus() {
