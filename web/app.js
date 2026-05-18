@@ -1302,6 +1302,68 @@ async function showDrillDownProduct(product) {
 
 function closeDrillDown() { $('drillDownOverlay')?.classList.add('hidden'); }
 
+// ─── URL state (deeplink) ─────────────────────────────────────────────────
+// При смене period/store/tab пишем в URL. При загрузке/back-forward читаем.
+let __urlUpdating = false;
+
+function urlStateApply(silent = false) {
+  const params = new URLSearchParams(window.location.search);
+  const period = params.get('period');
+  const storeId = params.get('store');
+  const page = params.get('page');
+  const tab = params.get('tab');
+
+  if (period && period !== state.period && (window.__metaPeriods__ || []).includes(period)) {
+    state.period = period;
+    const sel = $('periodSelect'); if (sel) sel.value = period;
+    if (!silent) loadSummary();
+  }
+  if (storeId && storeId !== state.selectedStoreId) {
+    state.selectedStoreId = storeId;
+    const found = state.summary?.stores?.find(s => s.storeId === storeId);
+    if (found) {
+      const title = $('storeDetailTitle'); if (title) title.textContent = found.storeName;
+      if (!silent) loadStoreDetails();
+    }
+  }
+  if (page && (page === 'dashboard' || page === 'analytics')) {
+    if (typeof switchPage === 'function') switchPage(page);
+  }
+  if (tab && page !== 'dashboard') {
+    if (typeof switchAnalyticsTab === 'function') switchAnalyticsTab(tab);
+  }
+}
+
+function urlStateWrite() {
+  if (__urlUpdating) return;
+  const params = new URLSearchParams();
+  if (state.period) params.set('period', state.period);
+  if (state.selectedStoreId) params.set('store', state.selectedStoreId);
+  if (analyticsState?.currentPage === 'analytics') {
+    params.set('page', 'analytics');
+    if (analyticsState.currentTab) params.set('tab', analyticsState.currentTab);
+  }
+  const newQs = params.toString();
+  const newUrl = window.location.pathname + (newQs ? '?' + newQs : '') + window.location.hash;
+  if (newUrl !== window.location.pathname + window.location.search + window.location.hash) {
+    history.replaceState({ urlState: true }, '', newUrl);
+  }
+}
+
+function initUrlState() {
+  // Применяем URL при загрузке — отложенно, после loadSummary
+  // (вызывается из loadSummary callback)
+  window.addEventListener('popstate', () => {
+    __urlUpdating = true;
+    urlStateApply(false);
+    __urlUpdating = false;
+  });
+
+  // Hook на смену периода
+  const sel = $('periodSelect');
+  if (sel) sel.addEventListener('change', () => setTimeout(urlStateWrite, 50));
+}
+
 function initDrillDown() {
   $('drillClose')?.addEventListener('click', closeDrillDown);
   $('drillDownOverlay')?.addEventListener('click', (e) => {
@@ -1902,6 +1964,7 @@ async function init() {
   initCmdK();
   initStickyMetrics();
   initDrillDown();
+  initUrlState();
   $('storeNoteForm')?.addEventListener('submit', submitStoreNote);
   // Дефолтная дата заметки — сегодня
   const today = new Date().toISOString().slice(0,10);
@@ -1938,13 +2001,23 @@ async function init() {
   try {
     const meta = await loadMetadata();
     initPin(meta.pinRequired);
+    // Если в URL есть period — применить ДО первой загрузки summary
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPeriod = urlParams.get('period');
+    if (urlPeriod && (window.__metaPeriods__ || []).includes(urlPeriod)) {
+      state.period = urlPeriod;
+      const sel = $('periodSelect'); if (sel) sel.value = urlPeriod;
+    }
     await loadSummary();
+    // После summary применяем остальной URL-state (store/tab/page)
+    urlStateApply(false);
     loadInsights();
     connectEvents();
     $('periodSelect').addEventListener('change', async e => {
       state.period = e.target.value;
       state.selectedStoreId = '';
       $('storeDetailTitle').textContent = 'Детализация точки';
+      urlStateWrite();
       await loadSummary();
       loadInsights();
       analyticsState.data = null;
@@ -2020,6 +2093,7 @@ function initAnalyticsTabs() {
 function switchAnalyticsTab(tab) {
   analyticsState.currentTab = tab;
   localStorage.setItem('maria_atab', tab);
+  setTimeout(() => urlStateWrite && urlStateWrite(), 0);
   document.querySelectorAll('#analyticsTabs .atab').forEach(b => b.classList.toggle('atab-active', b.dataset.tab === tab));
   document.querySelectorAll('.atab-section').forEach(s => s.classList.toggle('hidden', s.dataset.atab !== tab));
   // Закладки: добавляем pin-кнопки + применяем порядок в активной секции
@@ -2467,6 +2541,7 @@ function switchPage(page) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('nav-active', b.dataset.page === page));
   $('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
   $('page-analytics').classList.toggle('hidden', page !== 'analytics');
+  setTimeout(() => urlStateWrite && urlStateWrite(), 0);
 }
 
 async function loadAnalytics() {
