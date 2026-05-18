@@ -13,6 +13,7 @@ const {
   storeDetails
 } = require('./lib/analytics');
 const { buildInsights } = require('./lib/insights');
+const { askAiChat } = require('./lib/ai-chat');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -568,6 +569,27 @@ const server = http.createServer(async (req, res) => {
       const from = parsedUrl.searchParams.get('from');
       const to = parsedUrl.searchParams.get('to');
       sendJson(res, 200, buildSalesAnalytics(db, period, { from, to }));
+      return;
+    }
+
+    // ── AI-чат: вопрос → ответ Groq на контексте дашборда ─────────────────────
+    if (pathname === '/api/ai-chat' && req.method === 'POST') {
+      const { db } = await getScopedDb(req);
+      const body = await parseBody(req);
+      if (!groqConfig) { sendJson(res, 503, { error: 'GROQ_KEY не настроен на сервере' }); return; }
+      try {
+        const result = await askAiChat({
+          question: body.question,
+          history: body.history,
+          db,
+          period: body.period || monthKey(),
+          apiKey: groqConfig.apiKey,
+          model: groqConfig.model
+        });
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
       return;
     }
 

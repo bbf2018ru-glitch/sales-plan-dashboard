@@ -1037,6 +1037,35 @@
 
       </main>
     </div>
-    <script src="/app.js?v=30"></script>
+
+    <!-- AI-чат «Спроси у Маши» — плавающее окно справа снизу -->
+    <button id="aiChatToggle" class="ai-chat-fab" title="Спроси у Маши" aria-label="Открыть AI-чат">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    </button>
+    <div id="aiChatWidget" class="ai-chat-widget hidden">
+      <div class="ai-chat-header">
+        <div class="ai-chat-title">
+          <span class="ai-chat-avatar">М</span>
+          <div>
+            <div><b>Маша</b></div>
+            <div class="ai-chat-sub">AI-аналитик · спроси про продажи</div>
+          </div>
+        </div>
+        <button id="aiChatClose" class="ai-chat-x" title="Закрыть">×</button>
+      </div>
+      <div id="aiChatMessages" class="ai-chat-messages"></div>
+      <div class="ai-chat-suggest" id="aiChatSuggest">
+        <button class="ai-suggest" data-q="Кратко: как мы сегодня?">Как мы сегодня?</button>
+        <button class="ai-suggest" data-q="Какие 3 магазина самые проблемные и почему?">Кто отстаёт?</button>
+        <button class="ai-suggest" data-q="Что мне сделать чтобы выйти в план до конца месяца?">Что делать?</button>
+        <button class="ai-suggest" data-q="Топ-3 товаров по выручке за месяц?">Топ товаров</button>
+      </div>
+      <form id="aiChatForm" class="ai-chat-form">
+        <input id="aiChatInput" type="text" autocomplete="off" placeholder="Спроси что угодно про продажи..." />
+        <button type="submit" id="aiChatSend">↑</button>
+      </form>
+    </div>
+
+    <script src="/app.js?v=31"></script>
   </body>
 </html>

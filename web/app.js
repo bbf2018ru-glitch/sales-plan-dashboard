@@ -956,6 +956,103 @@ POST /api/ingest/sales   — только продажи</code>
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
+// ─── AI-чат «Спроси у Маши» ───────────────────────────────────────────────
+const AI_CHAT_KEY = 'maria_ai_chat_history_v1';
+let aiChatBusy = false;
+
+function loadAiChatHistory() {
+  try { return JSON.parse(localStorage.getItem(AI_CHAT_KEY) || '[]'); } catch { return []; }
+}
+function saveAiChatHistory(h) {
+  // Храним последние 20 сообщений, не больше
+  localStorage.setItem(AI_CHAT_KEY, JSON.stringify(h.slice(-20)));
+}
+
+function aiMarkdown(text) {
+  // Минимальный safe markdown: **bold**, переносы строк, escape HTML
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc(text)
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/\n/g, '<br>');
+}
+
+function renderAiChatMessages() {
+  const box = $('aiChatMessages');
+  if (!box) return;
+  const history = loadAiChatHistory();
+  if (!history.length) {
+    box.innerHTML = `<div class="ai-msg ai-msg-bot ai-msg-greet">Привет! Я Маша. Спроси меня про продажи, магазины, товары — отвечу из текущих данных дашборда.</div>`;
+    return;
+  }
+  box.innerHTML = history.map(m => `
+    <div class="ai-msg ai-msg-${m.role === 'user' ? 'user' : 'bot'}">${aiMarkdown(m.text)}</div>
+  `).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function askAi(question) {
+  if (!question || aiChatBusy) return;
+  const history = loadAiChatHistory();
+  history.push({ role: 'user', text: question, t: Date.now() });
+  saveAiChatHistory(history);
+  renderAiChatMessages();
+
+  // Спиннер
+  const box = $('aiChatMessages');
+  box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-bot ai-msg-loading" id="aiMsgLoading"><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></div>`);
+  box.scrollTop = box.scrollHeight;
+
+  aiChatBusy = true;
+  try {
+    const res = await fetchJson('/api/ai-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question,
+        period: state.period,
+        history: history.slice(-6).map(m => ({ role: m.role, text: m.text }))
+      })
+    });
+    history.push({ role: 'bot', text: res.answer || '(пустой ответ)', t: Date.now() });
+  } catch (e) {
+    history.push({ role: 'bot', text: `Ошибка: ${e.message}`, t: Date.now() });
+  } finally {
+    aiChatBusy = false;
+    saveAiChatHistory(history);
+    renderAiChatMessages();
+  }
+}
+
+function initAiChat() {
+  const toggle = $('aiChatToggle');
+  const widget = $('aiChatWidget');
+  const closeBtn = $('aiChatClose');
+  const form = $('aiChatForm');
+  const input = $('aiChatInput');
+  if (!toggle || !widget) return;
+
+  toggle.addEventListener('click', () => {
+    widget.classList.toggle('hidden');
+    if (!widget.classList.contains('hidden')) {
+      renderAiChatMessages();
+      setTimeout(() => input.focus(), 100);
+    }
+  });
+  closeBtn?.addEventListener('click', () => widget.classList.add('hidden'));
+
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (q) { input.value = ''; askAi(q); }
+  });
+
+  document.querySelectorAll('#aiChatSuggest .ai-suggest').forEach(btn => {
+    btn.addEventListener('click', () => askAi(btn.dataset.q));
+  });
+
+  renderAiChatMessages();
+}
+
 function exportCsv(rows, filename) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);
@@ -1282,6 +1379,7 @@ async function init() {
   $('printBtn').addEventListener('click', () => window.print());
   $('exportTabBtn')?.addEventListener('click', exportFullTab);
   $('logoutBtn')?.addEventListener('click', doLogout);
+  initAiChat();
 
   $('planSaveBtn').addEventListener('click', savePlanEdit);
   $('planCancelBtn').addEventListener('click', closePlanEdit);
