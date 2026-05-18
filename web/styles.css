@@ -3251,3 +3251,127 @@ body.plan-incomplete .spark-fill {
   font-size: 12.5px;
 }
 [data-theme=light] .ai-msg code { background: rgba(0,0,0,.06); }
+
+/* ─── Командная палитра Cmd+K ────────────────────────────────────────── */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+.cmdk-overlay.hidden { display: none; }
+
+.cmdk-box {
+  width: 640px;
+  max-width: calc(100vw - 32px);
+  max-height: 70vh;
+  background: #14101e;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #ecedf5;
+}
+[data-theme=light] .cmdk-box {
+  background: #ffffff;
+  border-color: rgba(0,0,0,.10);
+  box-shadow: 0 30px 80px rgba(70,30,50,.18);
+  color: #1a1530;
+}
+
+.cmdk-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  color: rgba(236,237,245,.55);
+}
+[data-theme=light] .cmdk-header {
+  border-bottom-color: rgba(0,0,0,.08);
+  color: rgba(26,21,48,.45);
+}
+.cmdk-header input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  outline: none;
+  padding: 0;
+}
+.cmdk-header input::placeholder { color: rgba(236,237,245,.45); }
+[data-theme=light] .cmdk-header input { color: #1a1530; }
+[data-theme=light] .cmdk-header input::placeholder { color: rgba(26,21,48,.40); }
+.cmdk-hint { font-size: 11px; }
+
+.cmdk-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 6px 8px;
+}
+.cmdk-group {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 12px 14px 4px;
+  color: rgba(236,237,245,.45);
+}
+[data-theme=light] .cmdk-group { color: rgba(26,21,48,.50); }
+
+.cmdk-item {
+  padding: 8px 14px;
+  margin: 1px 4px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmdk-item.active {
+  background: rgba(255,122,150,.15);
+}
+[data-theme=light] .cmdk-item.active { background: rgba(181,41,74,.10); }
+
+.cmdk-item-title { font-size: 14px; font-weight: 500; color: #ecedf5; }
+.cmdk-item-sub { font-size: 11.5px; color: rgba(236,237,245,.55); }
+[data-theme=light] .cmdk-item-title { color: #1a1530; }
+[data-theme=light] .cmdk-item-sub { color: rgba(26,21,48,.55); }
+.cmdk-empty {
+  padding: 30px 14px;
+  text-align: center;
+  color: rgba(236,237,245,.45);
+  font-size: 13px;
+}
+[data-theme=light] .cmdk-empty { color: rgba(26,21,48,.45); }
+
+.cmdk-footer {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-size: 11px;
+  color: rgba(236,237,245,.45);
+}
+[data-theme=light] .cmdk-footer { border-top-color: rgba(0,0,0,.08); color: rgba(26,21,48,.50); }
+.cmdk-footer kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.14);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  margin-right: 3px;
+}
+[data-theme=light] .cmdk-footer kbd {
+  background: rgba(0,0,0,.05);
+  border-color: rgba(0,0,0,.10);
+}

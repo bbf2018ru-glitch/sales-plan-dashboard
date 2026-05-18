@@ -1003,6 +1003,218 @@ POST /api/ingest/sales   — только продажи</code>
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
+// ─── Cmd/Ctrl+K Command palette ────────────────────────────────────────────
+let cmdkSelectedIdx = 0;
+let cmdkLastResults = [];
+
+function cmdkActionsList() {
+  const summary = state.summary;
+  const stores = summary?.stores || [];
+  const products = summary?.products || [];
+  const periods = (window.__metaPeriods__ || []).slice(0, 24);
+
+  const actions = [];
+  // Магазины
+  for (const s of stores) {
+    actions.push({
+      group: 'Магазин',
+      title: s.storeName,
+      sub: `${formatMoneyShort(s.fact)} / ${formatMoneyShort(s.plan)} · ${s.percent}%`,
+      score: 1,
+      run: () => {
+        state.selectedStoreId = s.storeId;
+        $('storeDetailTitle').textContent = s.storeName;
+        loadStoreDetails();
+        document.querySelectorAll('#storesTbl tbody tr').forEach(r => r.classList.toggle('active', r.dataset.storeId === s.storeId));
+        $('storeDetailTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+  // Товары (топ-300 по факту — иначе слишком много)
+  const topProducts = products.slice().sort((a, b) => (b.fact || 0) - (a.fact || 0)).slice(0, 300);
+  for (const p of topProducts) {
+    actions.push({
+      group: 'Товар',
+      title: p.productName || p.name,
+      sub: `${formatMoneyShort(p.fact || 0)} · ${p.quantity || 0} шт${p.category ? ' · ' + p.category : ''}`,
+      score: 1,
+      run: () => {
+        // Прокрутить к таблице товаров + временно подсветить
+        const el = $('productsList'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        showDrillDownProduct(p);
+      }
+    });
+  }
+  // Периоды
+  for (const period of periods) {
+    actions.push({
+      group: 'Период',
+      title: period,
+      sub: 'Сменить период дашборда',
+      score: 1,
+      run: () => {
+        state.period = period;
+        $('periodSelect').value = period;
+        loadSummary();
+      }
+    });
+  }
+  // Табы аналитики
+  const tabs = [
+    { id: 'network', title: 'Сеть' },
+    { id: 'products', title: 'Товары' },
+    { id: 'time', title: 'Время' },
+    { id: 'returns', title: 'Возвраты' },
+    { id: 'comparison', title: 'Сравнение' },
+    { id: 'customers', title: 'Клиенты' },
+    { id: 'promo', title: 'Промо' }
+  ];
+  for (const t of tabs) {
+    actions.push({
+      group: 'Раздел',
+      title: 'Аналитика · ' + t.title,
+      sub: 'Перейти на вкладку',
+      score: 1,
+      run: () => { switchPage('analytics'); switchAnalyticsTab(t.id); }
+    });
+  }
+  // Команды
+  const commands = [
+    { title: 'Открыть AI-чат «Маша»', sub: 'Спросить про продажи', run: () => openAiChat() },
+    { title: 'Скачать таб (TSV)', sub: 'Экспорт текущего таба в Excel-формат', run: () => exportFullTab() },
+    { title: 'Печать / PDF', sub: 'Окно печати браузера', run: () => window.print() },
+    { title: 'Обновить данные', sub: 'Перезагрузить дашборд', run: () => loadSummary() },
+    { title: 'Выйти', sub: 'Удалить сессию и cookies', run: () => doLogout() }
+  ];
+  for (const c of commands) actions.push({ group: 'Действие', ...c, score: 1 });
+  return actions;
+}
+
+function cmdkFilter(query) {
+  const q = query.trim().toLowerCase();
+  const all = cmdkActionsList();
+  if (!q) return all.slice(0, 80);
+  return all
+    .map((a) => {
+      const haystack = (a.title + ' ' + (a.sub || '')).toLowerCase();
+      let score = 0;
+      // Subsequence fuzzy match
+      let qi = 0;
+      for (let i = 0; i < haystack.length && qi < q.length; i++) {
+        if (haystack[i] === q[qi]) { score += (qi === 0 ? 3 : 1); qi++; }
+      }
+      const matched = qi === q.length;
+      if (!matched) return null;
+      // Бонус если первое слово совпадает
+      if (haystack.startsWith(q)) score += 10;
+      if (haystack.includes(q)) score += 5;
+      return { ...a, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 80);
+}
+
+function renderCmdkResults(query) {
+  const box = $('cmdkResults');
+  if (!box) return;
+  const results = cmdkFilter(query);
+  cmdkLastResults = results;
+  if (cmdkSelectedIdx >= results.length) cmdkSelectedIdx = Math.max(0, results.length - 1);
+  if (!results.length) {
+    box.innerHTML = `<div class="cmdk-empty">Ничего не найдено</div>`;
+    return;
+  }
+  // Группируем визуально по group
+  let lastGroup = '';
+  let html = '';
+  results.forEach((r, i) => {
+    if (r.group !== lastGroup) {
+      html += `<div class="cmdk-group">${escapeHtml(r.group)}</div>`;
+      lastGroup = r.group;
+    }
+    html += `<div class="cmdk-item ${i === cmdkSelectedIdx ? 'active' : ''}" data-idx="${i}">
+      <div class="cmdk-item-title">${escapeHtml(r.title)}</div>
+      <div class="cmdk-item-sub">${escapeHtml(r.sub || '')}</div>
+    </div>`;
+  });
+  box.innerHTML = html;
+  box.querySelectorAll('.cmdk-item').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      cmdkSelectedIdx = Number(el.dataset.idx);
+      box.querySelectorAll('.cmdk-item').forEach((x, i) => x.classList.toggle('active', i === cmdkSelectedIdx));
+    });
+    el.addEventListener('click', () => cmdkExecute(Number(el.dataset.idx)));
+  });
+  const active = box.querySelector('.cmdk-item.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
+}
+
+function cmdkExecute(idx) {
+  const r = cmdkLastResults[idx];
+  if (!r) return;
+  closeCmdK();
+  try { r.run(); } catch (e) { console.error('cmdk run failed', e); }
+}
+
+function openCmdK() {
+  cmdkSelectedIdx = 0;
+  $('cmdkOverlay')?.classList.remove('hidden');
+  const inp = $('cmdkInput');
+  if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 50); }
+  renderCmdkResults('');
+}
+function closeCmdK() { $('cmdkOverlay')?.classList.add('hidden'); }
+
+function initCmdK() {
+  const overlay = $('cmdkOverlay');
+  const input = $('cmdkInput');
+  if (!overlay || !input) return;
+
+  // Клик по фону = закрытие
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeCmdK(); });
+
+  input.addEventListener('input', () => { cmdkSelectedIdx = 0; renderCmdkResults(input.value); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      cmdkSelectedIdx = Math.min(cmdkLastResults.length - 1, cmdkSelectedIdx + 1);
+      renderCmdkResults(input.value);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      cmdkSelectedIdx = Math.max(0, cmdkSelectedIdx - 1);
+      renderCmdkResults(input.value);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      cmdkExecute(cmdkSelectedIdx);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeCmdK();
+    }
+  });
+
+  // Глобальный хоткей Cmd/Ctrl+K — открыть. (AI-чат Cmd+K заменим — у него
+  // конфликт. AI-чат теперь Cmd+J.)
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      // Если активный inputs где пользователь печатает — не перехватываем
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        if (document.activeElement?.id !== 'cmdkInput') return;
+      }
+      e.preventDefault();
+      if (overlay.classList.contains('hidden')) openCmdK();
+      else closeCmdK();
+    }
+  });
+}
+
+// Заглушка для drill-down товара (раскрою в следующем коммите)
+function showDrillDownProduct(product) {
+  // TODO: модалка с разбивкой по магазинам. Пока просто scroll к товару.
+  alert(`Drill-down для «${product.productName || product.name}» — в разработке`);
+}
+
 // ─── Mobile compact mode ──────────────────────────────────────────────────
 // На узких экранах (≤640px) при первом заходе включаем компактный режим:
 // показываем только summary-hero + 3 KPI + список магазинов. Кнопка
@@ -1239,7 +1451,8 @@ function initAiChat() {
         closeAiChat();
       }
     }
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    // Cmd/Ctrl+J — открыть/сфокусировать AI-чат (K зарезервирован под cmdk-палитру)
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
       e.preventDefault();
       if (widget.classList.contains('hidden')) openAiChat();
       else $('aiChatInput')?.focus();
@@ -1410,6 +1623,7 @@ function exportFullTab() {
 // ── Data loading ───────────────────────────────────────────────────────────
 async function loadMetadata() {
   const meta = await fetchJson('/api/metadata');
+  window.__metaPeriods__ = meta.periods || [];
   $('periodSelect').innerHTML = meta.periods.map(p => `<option value="${p}">${p}</option>`).join('');
   state.period = meta.periods[0] || '';
   $('periodSelect').value = state.period;
@@ -1587,6 +1801,7 @@ async function init() {
   initAiChat();
   initPwa();
   initMobileCompact();
+  initCmdK();
   $('storeNoteForm')?.addEventListener('submit', submitStoreNote);
   // Дефолтная дата заметки — сегодня
   const today = new Date().toISOString().slice(0,10);
