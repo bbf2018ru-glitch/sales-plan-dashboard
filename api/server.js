@@ -1052,6 +1052,31 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Управление UPP pull scheduler (без рестарта Node)
+    //   GET  /api/admin/pull-scheduler            — статус
+    //   POST /api/admin/pull-scheduler {intervalMin: 15} — старт/смена интервала
+    //   POST /api/admin/pull-scheduler {intervalMin: 0}  — стоп
+    if (pathname === '/api/admin/pull-scheduler' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      sendJson(res, 200, {
+        running: !!pullSchedulerStop,
+        intervalMin: pullSchedulerIntervalMin,
+        envIntervalMin: UPP_PULL_INTERVAL_MIN,
+        uppUrl: UPP_PULL_URL ? '(set)' : '(empty)'
+      });
+      return;
+    }
+    if (pathname === '/api/admin/pull-scheduler' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const body = await parseBody(req);
+      const intervalMin = Number(body.intervalMin || 0);
+      const ok = startPullSchedulerWithInterval(intervalMin);
+      sendJson(res, 200, { ok, running: !!pullSchedulerStop, intervalMin: pullSchedulerIntervalMin });
+      return;
+    }
+
     // Ручной запуск critical-alerts (для тестирования или принудительного дёргания)
     if (pathname === '/api/admin/alerts/run' && req.method === 'POST') {
       const user = await resolveUser(req);
@@ -1176,6 +1201,40 @@ const server = http.createServer(async (req, res) => {
 
 let morningReportHandle = null;
 let criticalAlertsHandle = null;
+let pullSchedulerStop = null;
+let pullSchedulerIntervalMin = 0;
+
+function startPullSchedulerWithInterval(intervalMin) {
+  const { startPullScheduler } = require('./lib/upp-pull');
+  if (pullSchedulerStop) { try { pullSchedulerStop(); } catch (_) {} pullSchedulerStop = null; }
+  if (!UPP_PULL_URL || !intervalMin || intervalMin <= 0) {
+    pullSchedulerIntervalMin = 0;
+    return false;
+  }
+  pullSchedulerStop = startPullScheduler({
+    config: uppPullConfig,
+    store,
+    intervalMs: intervalMin * 60 * 1000,
+    onResult: (run) => {
+      console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
+      if (run.status === 'success') {
+        (async () => {
+          const db = await store.getDb();
+          const summary = aggregateDashboard(db, run.period);
+          sendEvent('plans_updated', { period: run.period, totals: summary.totals });
+          sendEvent('sales_updated', { period: run.period, totals: summary.totals });
+        })().catch(() => {});
+      }
+    },
+    onError: (error) => {
+      console.error(`[upp-pull] ${error.message}`);
+      store.recordIngestFailure({ sourceSystem: '1c-upp', sourceObject: 'pull' }, error).catch(() => {});
+    }
+  });
+  pullSchedulerIntervalMin = intervalMin;
+  console.log(`[upp-pull] scheduler started: every ${intervalMin} min`);
+  return true;
+}
 
 server.listen(PORT, async () => {
   await store.init();
@@ -1199,26 +1258,6 @@ server.listen(PORT, async () => {
   });
 
   if (UPP_PULL_URL && UPP_PULL_INTERVAL_MIN > 0) {
-    const { startPullScheduler } = require('./lib/upp-pull');
-    startPullScheduler({
-      config: uppPullConfig,
-      store,
-      intervalMs: UPP_PULL_INTERVAL_MIN * 60 * 1000,
-      onResult: (run) => {
-        console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
-        if (run.status === 'success') {
-          (async () => {
-            const db = await store.getDb();
-            const summary = aggregateDashboard(db, run.period);
-            sendEvent('plans_updated', { period: run.period, totals: summary.totals });
-            sendEvent('sales_updated', { period: run.period, totals: summary.totals });
-          })().catch(() => {});
-        }
-      },
-      onError: (error) => {
-        console.error(`[upp-pull] ${error.message}`);
-        store.recordIngestFailure({ sourceSystem: '1c-upp', sourceObject: 'pull' }, error).catch(() => {});
-      }
-    });
+    startPullSchedulerWithInterval(UPP_PULL_INTERVAL_MIN);
   }
 });
