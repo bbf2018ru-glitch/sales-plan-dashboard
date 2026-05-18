@@ -1065,36 +1065,78 @@ function initPwa() {
 
 // ─── AI-чат «Спроси у Маши» ───────────────────────────────────────────────
 const AI_CHAT_KEY = 'maria_ai_chat_history_v1';
+const AI_CHAT_OPEN_KEY = 'maria_ai_chat_open_v1';
 let aiChatBusy = false;
 
 function loadAiChatHistory() {
   try { return JSON.parse(localStorage.getItem(AI_CHAT_KEY) || '[]'); } catch { return []; }
 }
 function saveAiChatHistory(h) {
-  // Храним последние 20 сообщений, не больше
-  localStorage.setItem(AI_CHAT_KEY, JSON.stringify(h.slice(-20)));
+  localStorage.setItem(AI_CHAT_KEY, JSON.stringify(h.slice(-30)));
 }
 
 function aiMarkdown(text) {
-  // Минимальный safe markdown: **bold**, переносы строк, escape HTML
+  // Minimal safe markdown: **bold**, *italic*, `code`, переносы строк, escape HTML
   const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return esc(text)
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n- (.+)/g, '<br>• $1')
+    .replace(/\n\d+\. (.+)/g, '<br>$&')
     .replace(/\n/g, '<br>');
 }
 
 function renderAiChatMessages() {
   const box = $('aiChatMessages');
+  const suggest = $('aiChatSuggest');
   if (!box) return;
   const history = loadAiChatHistory();
   if (!history.length) {
-    box.innerHTML = `<div class="ai-msg ai-msg-bot ai-msg-greet">Привет! Я Маша. Спроси меня про продажи, магазины, товары — отвечу из текущих данных дашборда.</div>`;
+    box.innerHTML = `<div class="ai-msg ai-msg-bot ai-msg-greet">Привет! Я <b>Маша</b>. Спроси меня про продажи, магазины, товары — отвечу из текущих данных дашборда.</div>`;
+    if (suggest) suggest.style.display = '';
     return;
   }
-  box.innerHTML = history.map(m => `
-    <div class="ai-msg ai-msg-${m.role === 'user' ? 'user' : 'bot'}">${aiMarkdown(m.text)}</div>
-  `).join('');
+  // Скрываем suggestions после первого вопроса
+  if (suggest) suggest.style.display = 'none';
+  box.innerHTML = history.map((m, i) => {
+    if (m.role === 'user') {
+      return `<div class="ai-msg ai-msg-user">${aiMarkdown(m.text)}</div>`;
+    }
+    return `<div class="ai-msg ai-msg-bot" data-idx="${i}">
+      ${aiMarkdown(m.text)}
+      <button class="ai-msg-copy" data-copy="${encodeURIComponent(m.text)}" title="Копировать">⎘</button>
+    </div>`;
+  }).join('');
   box.scrollTop = box.scrollHeight;
+  // Bind copy buttons
+  box.querySelectorAll('.ai-msg-copy').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const text = decodeURIComponent(btn.dataset.copy);
+      try { await navigator.clipboard.writeText(text); btn.textContent = '✓'; setTimeout(() => btn.textContent = '⎘', 1500); }
+      catch { btn.textContent = '✗'; setTimeout(() => btn.textContent = '⎘', 1500); }
+    });
+  });
+}
+
+// «Псевдо-стриминг»: ответ получаем целиком (Groq быстрый ~2 сек), а
+// в UI печатаем буква-за-буквой со скоростью ~600 chars/sec. Даёт ощущение
+// живого ответа без переделки бэкенда на честный SSE-stream.
+function streamTextInto(el, fullText, done) {
+  const total = fullText.length;
+  if (total === 0) { el.innerHTML = ''; done && done(); return; }
+  const stepMs = 12;
+  const charsPerStep = Math.max(1, Math.ceil(total / 80));
+  let i = 0;
+  const tick = () => {
+    i = Math.min(total, i + charsPerStep);
+    el.innerHTML = aiMarkdown(fullText.slice(0, i)) + (i < total ? '<span class="ai-typing">▍</span>' : '');
+    const box = $('aiChatMessages');
+    if (box) box.scrollTop = box.scrollHeight;
+    if (i < total) setTimeout(tick, stepMs);
+    else done && done();
+  };
+  tick();
 }
 
 async function askAi(question) {
@@ -1104,12 +1146,13 @@ async function askAi(question) {
   saveAiChatHistory(history);
   renderAiChatMessages();
 
-  // Спиннер
   const box = $('aiChatMessages');
+  // Спиннер
   box.insertAdjacentHTML('beforeend', `<div class="ai-msg ai-msg-bot ai-msg-loading" id="aiMsgLoading"><span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span></div>`);
   box.scrollTop = box.scrollHeight;
 
   aiChatBusy = true;
+  let answerText;
   try {
     const res = await fetchJson('/api/ai-chat', {
       method: 'POST',
@@ -1120,44 +1163,99 @@ async function askAi(question) {
         history: history.slice(-6).map(m => ({ role: m.role, text: m.text }))
       })
     });
-    history.push({ role: 'bot', text: res.answer || '(пустой ответ)', t: Date.now() });
+    answerText = res.answer || '(пустой ответ)';
   } catch (e) {
-    history.push({ role: 'bot', text: `Ошибка: ${e.message}`, t: Date.now() });
-  } finally {
+    answerText = `⚠ Ошибка: ${e.message}`;
+  }
+
+  // Убираем спиннер, добавляем bubble под streaming
+  $('aiMsgLoading')?.remove();
+  const streamDiv = document.createElement('div');
+  streamDiv.className = 'ai-msg ai-msg-bot';
+  box.appendChild(streamDiv);
+
+  streamTextInto(streamDiv, answerText, () => {
     aiChatBusy = false;
+    history.push({ role: 'bot', text: answerText, t: Date.now() });
     saveAiChatHistory(history);
     renderAiChatMessages();
-  }
+  });
+}
+
+function clearAiChatHistory() {
+  if (!confirm('Очистить историю чата?')) return;
+  localStorage.removeItem(AI_CHAT_KEY);
+  renderAiChatMessages();
+}
+
+function toggleAiChatFullscreen() {
+  const widget = $('aiChatWidget');
+  widget.classList.toggle('ai-chat-fullscreen');
+  // Scroll вниз чтобы был виден последний ответ
+  setTimeout(() => {
+    const box = $('aiChatMessages');
+    if (box) box.scrollTop = box.scrollHeight;
+  }, 50);
+}
+
+function openAiChat() {
+  $('aiChatWidget')?.classList.remove('hidden');
+  localStorage.setItem(AI_CHAT_OPEN_KEY, '1');
+  renderAiChatMessages();
+  setTimeout(() => $('aiChatInput')?.focus(), 100);
+}
+function closeAiChat() {
+  $('aiChatWidget')?.classList.add('hidden');
+  localStorage.removeItem(AI_CHAT_OPEN_KEY);
 }
 
 function initAiChat() {
   const toggle = $('aiChatToggle');
   const widget = $('aiChatWidget');
-  const closeBtn = $('aiChatClose');
-  const form = $('aiChatForm');
-  const input = $('aiChatInput');
   if (!toggle || !widget) return;
 
   toggle.addEventListener('click', () => {
-    widget.classList.toggle('hidden');
-    if (!widget.classList.contains('hidden')) {
-      renderAiChatMessages();
-      setTimeout(() => input.focus(), 100);
-    }
+    if (widget.classList.contains('hidden')) openAiChat();
+    else closeAiChat();
   });
-  closeBtn?.addEventListener('click', () => widget.classList.add('hidden'));
+  $('aiChatClose')?.addEventListener('click', closeAiChat);
+  $('aiChatNew')?.addEventListener('click', clearAiChatHistory);
+  $('aiChatExpand')?.addEventListener('click', toggleAiChatFullscreen);
 
-  form?.addEventListener('submit', (e) => {
+  $('aiChatForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
+    const input = $('aiChatInput');
     const q = input.value.trim();
     if (q) { input.value = ''; askAi(q); }
+  });
+
+  // Хоткеи: Esc — закрыть; Cmd/Ctrl+K — открыть/фокус
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !widget.classList.contains('hidden')) {
+      // Если fullscreen — сначала свернуть, повторный Esc — закрыть
+      if (widget.classList.contains('ai-chat-fullscreen')) {
+        toggleAiChatFullscreen();
+      } else {
+        closeAiChat();
+      }
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if (widget.classList.contains('hidden')) openAiChat();
+      else $('aiChatInput')?.focus();
+    }
   });
 
   document.querySelectorAll('#aiChatSuggest .ai-suggest').forEach(btn => {
     btn.addEventListener('click', () => askAi(btn.dataset.q));
   });
 
-  renderAiChatMessages();
+  // Восстанавливаем состояние «открыт» между перезагрузками
+  if (localStorage.getItem(AI_CHAT_OPEN_KEY) === '1') {
+    openAiChat();
+  } else {
+    renderAiChatMessages();
+  }
 }
 
 function exportCsv(rows, filename) {
