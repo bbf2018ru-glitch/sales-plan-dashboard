@@ -290,15 +290,21 @@ function serveStatic(res, pathname) {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
       '.webp': 'image/webp',
-      '.gif': 'image/gif'
+      '.gif': 'image/gif',
+      '.webmanifest': 'application/manifest+json; charset=utf-8'
     }[ext] || 'application/octet-stream';
     // HTML не кэшируем — иначе после деплоя пользователь видит старый
     // index.html с устаревшими ?v= параметрами для css/js.
     // Статика (js/css/svg) грузится по URL с ?v=, который меняется при
     // правках — она может кэшироваться браузером свободно.
+    // sw.js — без cache: при обновлении SW нужен fresh fetch, иначе
+    // зависнет старая версия.
     const headers = { 'Content-Type': contentType };
     if (ext === '.html' || pathname === '/') {
       headers['Cache-Control'] = 'no-cache, must-revalidate';
+    } else if (pathname === '/sw.js') {
+      headers['Cache-Control'] = 'no-cache, must-revalidate';
+      headers['Service-Worker-Allowed'] = '/';
     } else {
       headers['Cache-Control'] = 'public, max-age=300';
     }

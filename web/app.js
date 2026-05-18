@@ -956,6 +956,35 @@ POST /api/ingest/sales   — только продажи</code>
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
+// ─── PWA: service worker + install prompt ─────────────────────────────────
+let deferredInstallPrompt = null;
+function initPwa() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+  // beforeinstallprompt — Chrome/Edge/Android. iOS не поддерживает (там через Share → Add to Home Screen).
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = $('installPwaBtn');
+    if (btn) btn.classList.remove('hidden');
+  });
+  $('installPwaBtn')?.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice.outcome === 'accepted') {
+      $('installPwaBtn').classList.add('hidden');
+    }
+    deferredInstallPrompt = null;
+  });
+  window.addEventListener('appinstalled', () => {
+    $('installPwaBtn')?.classList.add('hidden');
+  });
+}
+
 // ─── AI-чат «Спроси у Маши» ───────────────────────────────────────────────
 const AI_CHAT_KEY = 'maria_ai_chat_history_v1';
 let aiChatBusy = false;
@@ -1380,6 +1409,7 @@ async function init() {
   $('exportTabBtn')?.addEventListener('click', exportFullTab);
   $('logoutBtn')?.addEventListener('click', doLogout);
   initAiChat();
+  initPwa();
 
   $('planSaveBtn').addEventListener('click', savePlanEdit);
   $('planCancelBtn').addEventListener('click', closePlanEdit);

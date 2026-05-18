@@ -4,11 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Мария — Продажи</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" href="/logo-girl.png" />
     <link rel="apple-touch-icon" href="/logo-girl.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
-    <link rel="stylesheet" href="/styles.css?v=30" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Мария" />
+    <link rel="stylesheet" href="/styles.css?v=31" />
   </head>
   <body>
 
@@ -87,6 +92,9 @@
             </button>
             <button id="exportTabBtn" class="tool-btn" title="Скачать таб (TSV для Excel)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+            <button id="installPwaBtn" class="tool-btn hidden" title="Установить как приложение">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </button>
             <button id="pinSettingsBtn" class="tool-btn" title="PIN-защита">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -1066,6 +1074,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=31"></script>
+    <script src="/app.js?v=32"></script>
   </body>
 </html>
