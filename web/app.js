@@ -783,7 +783,7 @@ function renderProducts(summary) {
   const items = visible.map(p => {
     const tone = pctTone(p.percent);
     return `
-    <div class="prod-item">
+    <div class="prod-item" data-product-id="${p.productId}" title="Клик — разбивка по магазинам">
       <div class="prod-head">
         <div>
           <div class="prod-name">${productDisplayName(p)}</div>
@@ -808,6 +808,15 @@ function renderProducts(summary) {
   }
 
   $('productsList').innerHTML = items + toggle;
+
+  // Bind click → drill-down модалка
+  $('productsList').querySelectorAll('.prod-item[data-product-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const pid = el.dataset.productId;
+      const p = sorted.find(x => x.productId === pid);
+      if (p) showDrillDownProduct(p);
+    });
+  });
 
   const btn = $('productsToggleBtn');
   if (btn) {
@@ -1243,10 +1252,64 @@ function initCmdK() {
   });
 }
 
-// Заглушка для drill-down товара (раскрою в следующем коммите)
-function showDrillDownProduct(product) {
-  // TODO: модалка с разбивкой по магазинам. Пока просто scroll к товару.
-  alert(`Drill-down для «${product.productName || product.name}» — в разработке`);
+// Drill-down: товар → разбивка по магазинам
+async function showDrillDownProduct(product) {
+  const overlay = $('drillDownOverlay');
+  const body = $('drillBody');
+  const title = $('drillTitle');
+  const sub = $('drillSub');
+  if (!overlay) return;
+  const pid = product.productId || product.id;
+  title.textContent = product.productName || product.name || pid;
+  sub.textContent = `Загрузка...`;
+  body.innerHTML = '<div class="drill-loading">Загружаем разбивку по магазинам...</div>';
+  overlay.classList.remove('hidden');
+  try {
+    const data = await fetchJson(`/api/dashboard/product?period=${encodeURIComponent(state.period)}&productId=${encodeURIComponent(pid)}`);
+    sub.textContent = `${data.product.category || ''} · ${fmtMoneyShort(data.totalFact)} за период · ${fmtNum(data.totalQuantity)} шт`;
+    if (!data.items.length) {
+      body.innerHTML = '<div class="drill-empty">За период этот товар не продавался ни в одной точке</div>';
+      return;
+    }
+    body.innerHTML = `<table class="drill-tbl">
+      <thead><tr>
+        <th>#</th>
+        <th>Магазин</th>
+        <th class="num">Выручка</th>
+        <th class="num">Кол-во</th>
+        <th class="num">Доля</th>
+        <th class="num"></th>
+      </tr></thead>
+      <tbody>
+        ${data.items.map((s, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><b>${escapeHtml(s.storeName)}</b></td>
+            <td class="num">${fmtNum(s.fact)} ₽</td>
+            <td class="num">${fmtNum(s.quantity)}</td>
+            <td class="num">${s.share}%</td>
+            <td class="num" style="width:100px">
+              <div class="drill-bar"><div class="drill-bar-fill" style="width:${Math.min(100, s.share)}%"></div></div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+  } catch (e) {
+    body.innerHTML = `<div class="drill-empty">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function closeDrillDown() { $('drillDownOverlay')?.classList.add('hidden'); }
+
+function initDrillDown() {
+  $('drillClose')?.addEventListener('click', closeDrillDown);
+  $('drillDownOverlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'drillDownOverlay') closeDrillDown();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('drillDownOverlay').classList.contains('hidden')) closeDrillDown();
+  });
 }
 
 // ─── Mobile compact mode ──────────────────────────────────────────────────
@@ -1838,6 +1901,7 @@ async function init() {
   initMobileCompact();
   initCmdK();
   initStickyMetrics();
+  initDrillDown();
   $('storeNoteForm')?.addEventListener('submit', submitStoreNote);
   // Дефолтная дата заметки — сегодня
   const today = new Date().toISOString().slice(0,10);

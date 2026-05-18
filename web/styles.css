@@ -3473,3 +3473,90 @@ body.plan-incomplete .spark-fill {
   .sm-value { font-size: 13px; }
   .sm-cmdk { display: none; }
 }
+
+/* ─── Drill-down модалка товара ──────────────────────────────────────── */
+.drill-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.drill-overlay.hidden { display: none; }
+.drill-box {
+  background: #14101e;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  width: 720px;
+  max-width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #ecedf5;
+}
+[data-theme=light] .drill-box {
+  background: #ffffff;
+  border-color: rgba(0,0,0,.10);
+  color: #1a1530;
+  box-shadow: 0 30px 80px rgba(70,30,50,.18);
+}
+.drill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+[data-theme=light] .drill-header { border-bottom-color: rgba(0,0,0,.08); }
+.drill-title { font-size: 18px; font-weight: 700; }
+.drill-sub { font-size: 12.5px; color: rgba(236,237,245,.55); margin-top: 4px; }
+[data-theme=light] .drill-sub { color: rgba(26,21,48,.55); }
+.drill-x {
+  background: transparent; border: none; font-size: 26px;
+  color: rgba(236,237,245,.55); cursor: pointer; line-height: 1; padding: 0 6px;
+}
+.drill-x:hover { color: #ff7a96; }
+[data-theme=light] .drill-x { color: rgba(26,21,48,.55); }
+[data-theme=light] .drill-x:hover { color: #b5294a; }
+.drill-body { flex: 1; overflow-y: auto; padding: 12px 20px 20px; }
+.drill-empty, .drill-loading {
+  padding: 30px 14px;
+  text-align: center;
+  color: rgba(236,237,245,.55);
+}
+[data-theme=light] .drill-empty, [data-theme=light] .drill-loading { color: rgba(26,21,48,.55); }
+
+.drill-tbl { width: 100%; border-collapse: collapse; }
+.drill-tbl th, .drill-tbl td {
+  padding: 8px 6px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+[data-theme=light] .drill-tbl th, [data-theme=light] .drill-tbl td { border-bottom-color: rgba(0,0,0,.05); }
+.drill-tbl th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(236,237,245,.55);
+}
+[data-theme=light] .drill-tbl th { color: rgba(26,21,48,.55); }
+.drill-tbl .num { text-align: right; }
+.drill-bar {
+  height: 6px;
+  background: rgba(255,255,255,.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+[data-theme=light] .drill-bar { background: rgba(0,0,0,.06); }
+.drill-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff7a96, #c14456);
+  border-radius: 3px;
+}

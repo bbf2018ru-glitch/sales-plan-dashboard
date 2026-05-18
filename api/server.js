@@ -433,6 +433,42 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Drill-down по товару: в каких магазинах продаётся за период
+    if (pathname === '/api/dashboard/product' && req.method === 'GET') {
+      const { db } = await getScopedDb(req);
+      const period = monthKey(parsedUrl.searchParams.get('period'));
+      const productId = String(parsedUrl.searchParams.get('productId') || '');
+      if (!productId) { sendJson(res, 400, { error: 'productId required' }); return; }
+      const product = (db.products || []).find(p => p.id === productId);
+      const storesById = new Map((db.stores || []).map(s => [s.id, s]));
+      const byStore = new Map();
+      for (const s of db.sales || []) {
+        if (s.period !== period) continue;
+        const pid = s.productId || s.product_id;
+        if (pid !== productId) continue;
+        const sid = s.storeId || s.store_id;
+        if (!byStore.has(sid)) byStore.set(sid, { storeId: sid, storeName: storesById.get(sid)?.name || sid, fact: 0, quantity: 0 });
+        const e = byStore.get(sid);
+        e.fact += Number(s.amount || 0);
+        e.quantity += Number(s.quantity || 0);
+      }
+      const items = Array.from(byStore.values()).sort((a, b) => b.fact - a.fact);
+      const totalFact = items.reduce((acc, x) => acc + x.fact, 0);
+      sendJson(res, 200, {
+        product: product || { id: productId, name: productId, category: '' },
+        period,
+        totalFact: Number(totalFact.toFixed(2)),
+        totalQuantity: items.reduce((acc, x) => acc + x.quantity, 0),
+        items: items.map(x => ({
+          ...x,
+          fact: Number(x.fact.toFixed(2)),
+          quantity: Number(x.quantity.toFixed(2)),
+          share: totalFact > 0 ? Number(((x.fact / totalFact) * 100).toFixed(1)) : 0
+        }))
+      });
+      return;
+    }
+
     // ── Утренний отчёт — ручной запуск (для проверки) ────────────────────────
     if (pathname === '/api/morning-report/preview' && req.method === 'GET') {
       const text = await buildReportText(store);
