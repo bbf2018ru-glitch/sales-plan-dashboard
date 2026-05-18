@@ -14,10 +14,14 @@ function callGroq({ apiKey, model, system, user, timeoutMs }) {
     response_format: { type: 'json_object' }
   });
 
+  const baseUrl = (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
+  const url = new URL(`${baseUrl}/chat/completions`);
+
   return new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: 'api.groq.com',
-      path: '/openai/v1/chat/completions',
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname + url.search,
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,

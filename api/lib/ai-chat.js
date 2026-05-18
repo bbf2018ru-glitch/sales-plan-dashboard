@@ -93,10 +93,17 @@ function callGroq({ apiKey, model, system, user, timeoutMs }) {
     max_tokens: 500
   });
 
+  // Если задан GROQ_BASE_URL — идём через прокси (например для регионально-
+  // заблокированных IP). Формат: https://host[/prefix] — путь /chat/completions
+  // мы достроим. Иначе — напрямую в api.groq.com/openai/v1/.
+  const baseUrl = (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
+  const url = new URL(`${baseUrl}/chat/completions`);
+
   return new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: 'api.groq.com',
-      path: '/openai/v1/chat/completions',
+      hostname: url.hostname,
+      port: url.port || 443,
+      path: url.pathname + url.search,
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
