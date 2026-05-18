@@ -318,6 +318,40 @@ function renderDailyChart(summary) {
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
+// ── Sticky metrics — компактная полоса при скролле ───────────────────────
+function renderStickyMetrics(summary) {
+  const bar = $('stickyMetrics');
+  if (!bar || !summary) return;
+  const t = summary.totals || {};
+  const f = summary.forecast || {};
+  const [yyyy, mm] = (summary.period || '').split('-');
+  const months = ['', 'янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  $('smPeriod').textContent = `${months[+mm] || mm}'${(yyyy || '').slice(-2)}`;
+  const pctEl = $('smPct');
+  pctEl.textContent = `${t.completion || 0}%`;
+  pctEl.className = 'sm-value ' + (t.completion >= 100 ? 'sm-good' : t.completion >= 60 ? 'sm-ok' : 'sm-bad');
+  $('smFact').textContent = fmtMoneyShort(t.fact || 0);
+  $('smForecast').textContent = `${f.projectedCompletion || 0}%`;
+  $('smRemain').textContent = `${f.remainingDays || 0} дн.`;
+}
+
+// Sticky показывается при скролле когда summary-hero ушёл выше viewport
+function initStickyMetrics() {
+  const bar = $('stickyMetrics');
+  const hero = $('summaryHero');
+  if (!bar || !hero) return;
+  const observer = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      // hero виден — sticky прячем; hero ушёл — показываем
+      bar.classList.toggle('hidden', e.isIntersecting);
+    }
+  }, { threshold: 0, rootMargin: '-60px 0px 0px 0px' });
+  observer.observe(hero);
+
+  // Клик на иконку поиска → открыть Cmd+K
+  $('smCmdkBtn')?.addEventListener('click', openCmdK);
+}
+
 // ── Summary hero — главная карточка дня ───────────────────────────────────
 function renderSummaryHero(summary) {
   const el = $('summaryHero');
@@ -1679,6 +1713,7 @@ async function loadSummary() {
   applyMarginVisibility(summary);
   renderPlanHealth(summary);
   renderSummaryHero(summary);
+  renderStickyMetrics(summary);
   renderKpis(summary);
   renderForecast(summary);
   renderTrendChart(summary);
@@ -1802,6 +1837,7 @@ async function init() {
   initPwa();
   initMobileCompact();
   initCmdK();
+  initStickyMetrics();
   $('storeNoteForm')?.addEventListener('submit', submitStoreNote);
   // Дефолтная дата заметки — сегодня
   const today = new Date().toISOString().slice(0,10);

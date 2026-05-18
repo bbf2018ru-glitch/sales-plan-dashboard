@@ -151,6 +151,31 @@
 
         <div id="planHealthBanner" class="plan-health-banner hidden"></div>
 
+        <!-- Sticky-полоса ключевых метрик. Появляется при скролле вниз -->
+        <div id="stickyMetrics" class="sticky-metrics hidden">
+          <div class="sm-period"><span id="smPeriod">—</span></div>
+          <div class="sm-item">
+            <div class="sm-label">План</div>
+            <div class="sm-value" id="smPct">—</div>
+          </div>
+          <div class="sm-item">
+            <div class="sm-label">Факт</div>
+            <div class="sm-value" id="smFact">—</div>
+          </div>
+          <div class="sm-item">
+            <div class="sm-label">Прогноз</div>
+            <div class="sm-value" id="smForecast">—</div>
+          </div>
+          <div class="sm-item">
+            <div class="sm-label">Осталось</div>
+            <div class="sm-value" id="smRemain">—</div>
+          </div>
+          <button id="smCmdkBtn" class="sm-cmdk" title="Поиск (Ctrl+K)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <kbd>K</kbd>
+          </button>
+        </div>
+
         <div id="mobileToggleBar" class="mobile-toggle-bar">
           <span><b>Краткий режим</b> · только главное</span>
           <button id="mobileToggleBtn">Развернуть</button>
