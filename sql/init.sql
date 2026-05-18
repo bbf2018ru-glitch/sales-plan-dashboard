@@ -110,16 +110,24 @@ create index if not exists idx_raw_upp_payloads_package_id on raw_upp_payloads(p
 -- Unique constraint on plans for upsert support
 create unique index if not exists idx_plans_unique on plans(period, store_id, product_id);
 
--- Comments per period
+-- Comments per period (с расширением: можно привязать к магазину и/или дате)
 create table if not exists comments (
   id uuid primary key default gen_random_uuid(),
   period text not null,
   text text not null,
   author text not null default 'Менеджер',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  store_id text,
+  event_date date
 );
 
+-- Идемпотентная миграция для существующих БД
+alter table comments add column if not exists store_id text;
+alter table comments add column if not exists event_date date;
+
 create index if not exists idx_comments_period on comments(period);
+create index if not exists idx_comments_store on comments(store_id) where store_id is not null;
+create index if not exists idx_comments_event_date on comments(event_date) where event_date is not null;
 create index if not exists idx_comments_created_at on comments(created_at desc);
 
 -- Roles and per-store access for managers

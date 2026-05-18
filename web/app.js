@@ -815,6 +815,52 @@ async function loadStoreDetails() {
       </div>`;
     }).join('')}
   </div>`;
+  loadStoreNotes();
+}
+
+// ── Store notes (события магазина) ────────────────────────────────────────
+async function loadStoreNotes() {
+  const block = $('storeNotesBlock');
+  const listEl = $('storeNotesList');
+  if (!block || !listEl || !state.selectedStoreId) { block?.classList.add('hidden'); return; }
+  block.classList.remove('hidden');
+  try {
+    const data = await fetchJson(`/api/comments?storeId=${encodeURIComponent(state.selectedStoreId)}`);
+    const notes = (data.comments || []).slice(0, 20);
+    listEl.innerHTML = notes.length
+      ? notes.map(n => `
+          <div class="store-note">
+            <div class="store-note-meta">${n.eventDate || ''}${n.author ? ' · ' + escapeHtml(n.author) : ''}</div>
+            <div class="store-note-text">${escapeHtml(n.text)}</div>
+          </div>`).join('')
+      : '<div class="empty-state" style="padding:8px;font-size:12px">Нет событий по этой точке</div>';
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty-state">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function submitStoreNote(e) {
+  e.preventDefault();
+  const dateEl = $('storeNoteDate');
+  const textEl = $('storeNoteText');
+  if (!dateEl || !textEl || !state.selectedStoreId) return;
+  try {
+    await fetchJson('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        period: state.period,
+        text: textEl.value.trim(),
+        storeId: state.selectedStoreId,
+        eventDate: dateEl.value || null,
+        author: state.currentUser?.name || 'Менеджер'
+      })
+    });
+    textEl.value = '';
+    loadStoreNotes();
+  } catch (err) {
+    alert('Ошибка: ' + err.message);
+  }
 }
 
 // ── Comments ───────────────────────────────────────────────────────────────
@@ -1443,6 +1489,10 @@ async function init() {
   initAiChat();
   initPwa();
   initMobileCompact();
+  $('storeNoteForm')?.addEventListener('submit', submitStoreNote);
+  // Дефолтная дата заметки — сегодня
+  const today = new Date().toISOString().slice(0,10);
+  const dn = $('storeNoteDate'); if (dn) dn.value = today;
 
   $('planSaveBtn').addEventListener('click', savePlanEdit);
   $('planCancelBtn').addEventListener('click', closePlanEdit);

@@ -133,13 +133,16 @@ class JsonStore {
     return db.ingestRuns.slice(0, limit);
   }
 
-  async getComments(period) {
+  async getComments(period, filters = {}) {
     const db = await this.getDb();
-    const all = db.comments || [];
-    return period ? all.filter(c => c.period === period) : all;
+    let all = db.comments || [];
+    if (period) all = all.filter(c => c.period === period);
+    if (filters.storeId) all = all.filter(c => c.storeId === filters.storeId);
+    if (filters.eventDate) all = all.filter(c => c.eventDate === filters.eventDate);
+    return all.slice(0, 200);
   }
 
-  async addComment(period, text, author) {
+  async addComment(period, text, author, opts = {}) {
     const db = await this.getDb();
     if (!Array.isArray(db.comments)) db.comments = [];
     const comment = {
@@ -147,7 +150,9 @@ class JsonStore {
       period: String(period),
       text: String(text).slice(0, 2000),
       author: String(author || 'Менеджер').slice(0, 100),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      storeId: opts.storeId || null,
+      eventDate: opts.eventDate || null
     };
     db.comments.unshift(comment);
     await this.saveDb(db);

@@ -538,23 +538,36 @@ class PostgresStore {
     return result.rows;
   }
 
-  async getComments(period) {
+  async getComments(period, filters = {}) {
     await this.init();
-    const q = period
-      ? `select id::text, period, text, author, created_at as "createdAt"
-         from comments where period = $1 order by created_at desc`
-      : `select id::text, period, text, author, created_at as "createdAt"
-         from comments order by created_at desc`;
-    const result = await this.pool.query(q, period ? [period] : []);
+    const where = [];
+    const params = [];
+    if (period) { params.push(period); where.push(`period = $${params.length}`); }
+    if (filters.storeId) { params.push(filters.storeId); where.push(`store_id = $${params.length}`); }
+    if (filters.eventDate) { params.push(filters.eventDate); where.push(`event_date = $${params.length}`); }
+    const q = `select id::text, period, text, author, created_at as "createdAt",
+                      store_id as "storeId", event_date as "eventDate"
+               from comments
+               ${where.length ? 'where ' + where.join(' and ') : ''}
+               order by created_at desc limit 200`;
+    const result = await this.pool.query(q, params);
     return result.rows;
   }
 
-  async addComment(period, text, author) {
+  async addComment(period, text, author, opts = {}) {
     await this.init();
     const result = await this.pool.query(
-      `insert into comments (period, text, author) values ($1, $2, $3)
-       returning id::text, period, text, author, created_at as "createdAt"`,
-      [String(period), String(text).slice(0, 2000), String(author || 'Менеджер').slice(0, 100)]
+      `insert into comments (period, text, author, store_id, event_date)
+       values ($1, $2, $3, $4, $5)
+       returning id::text, period, text, author, created_at as "createdAt",
+                 store_id as "storeId", event_date as "eventDate"`,
+      [
+        String(period),
+        String(text).slice(0, 2000),
+        String(author || 'Менеджер').slice(0, 100),
+        opts.storeId || null,
+        opts.eventDate || null
+      ]
     );
     return result.rows[0];
   }

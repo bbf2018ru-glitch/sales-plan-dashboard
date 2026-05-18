@@ -590,7 +590,8 @@ const server = http.createServer(async (req, res) => {
           db,
           period: body.period || monthKey(),
           apiKey: groqConfig.apiKey,
-          model: groqConfig.model
+          model: groqConfig.model,
+          getNotes: () => store.getComments('', {})
         });
         sendJson(res, 200, result);
       } catch (e) {
@@ -773,7 +774,9 @@ const server = http.createServer(async (req, res) => {
     // ── Comments ──────────────────────────────────────────────────────────────
     if (pathname === '/api/comments' && req.method === 'GET') {
       const period = parsedUrl.searchParams.get('period') || '';
-      const comments = await store.getComments(period);
+      const storeId = parsedUrl.searchParams.get('storeId') || null;
+      const eventDate = parsedUrl.searchParams.get('eventDate') || null;
+      const comments = await store.getComments(period, { storeId, eventDate });
       sendJson(res, 200, { comments });
       return;
     }
@@ -785,7 +788,18 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: 'period and text are required' });
         return;
       }
-      const comment = await store.addComment(body.period, body.text.trim(), body.author);
+      // Валидация event_date — формат YYYY-MM-DD
+      let eventDate = null;
+      if (body.eventDate) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(body.eventDate)) {
+          sendJson(res, 400, { error: 'eventDate должен быть YYYY-MM-DD' }); return;
+        }
+        eventDate = body.eventDate;
+      }
+      const comment = await store.addComment(body.period, body.text.trim(), body.author, {
+        storeId: body.storeId || null,
+        eventDate
+      });
       sendEvent('comment_added', { period: body.period, comment });
       sendJson(res, 200, { ok: true, comment });
       return;

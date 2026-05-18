@@ -3028,3 +3028,65 @@ body.plan-incomplete .spark-fill {
     font-size: 10px;
   }
 }
+
+/* ─── Заметки магазина (события) ──────────────────────────────────────── */
+.store-notes-block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.store-notes-block.hidden { display: none; }
+.store-notes-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.store-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.store-note {
+  padding: 6px 10px;
+  background: rgba(0,0,0,.04);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.store-note-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.store-note-form {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 6px;
+}
+.store-note-form input[type="date"],
+.store-note-form input[type="text"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--panel);
+  color: var(--ink);
+}
+.store-note-form button {
+  background: rgb(193,68,86);
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .store-note-form { grid-template-columns: 1fr; }
+}

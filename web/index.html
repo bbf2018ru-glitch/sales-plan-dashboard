@@ -268,6 +268,15 @@
               <div class="panel-subtitle">выберите строку в таблице</div>
             </div>
             <div id="storeDetails" class="empty-state">Нажмите на строку таблицы, чтобы увидеть детализацию по товарам</div>
+            <div id="storeNotesBlock" class="store-notes-block hidden">
+              <div class="store-notes-title">События магазина</div>
+              <div id="storeNotesList" class="store-notes-list"></div>
+              <form id="storeNoteForm" class="store-note-form">
+                <input type="date" id="storeNoteDate" required />
+                <input type="text" id="storeNoteText" placeholder="напр.: 14.05 закрыт на ремонт" maxlength="400" required />
+                <button type="submit">Добавить</button>
+              </form>
+            </div>
           </article>
           <article class="panel panel-narrow">
             <div class="panel-header">

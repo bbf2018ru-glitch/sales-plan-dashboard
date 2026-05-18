@@ -128,15 +128,28 @@ function callGroq({ apiKey, model, system, user, timeoutMs }) {
   });
 }
 
-async function askAiChat({ question, db, period, history, apiKey, model }) {
+async function askAiChat({ question, db, period, history, apiKey, model, getNotes }) {
   if (!apiKey) throw new Error('GROQ_API_KEY не задан в env');
   if (!question) throw new Error('Вопрос пустой');
 
   const ctx = buildContext(db, monthKey(period));
+
+  // Заметки магазинов (события) — даём AI знать про ремонты/закрытия
+  let notesBlock = '';
+  if (typeof getNotes === 'function') {
+    try {
+      const notes = await getNotes();
+      if (notes && notes.length) {
+        notesBlock = '\n=== ЗАМЕТКИ ПО МАГАЗИНАМ (события) ===\n' +
+          notes.slice(0, 20).map(n => `- ${n.eventDate || n.period}: ${n.storeId || 'сеть'} — ${n.text}`).join('\n');
+      }
+    } catch {}
+  }
+
   // Историю последних 4 сообщений тоже даём, для контекста разговора
   const histMsg = (history || []).slice(-4).map(h => `${h.role}: ${h.text}`).join('\n');
 
-  const userMsg = `${ctx}\n\n${histMsg ? '=== ИСТОРИЯ ЧАТА ===\n' + histMsg + '\n' : ''}=== ВОПРОС ===\n${question}`;
+  const userMsg = `${ctx}${notesBlock}\n\n${histMsg ? '=== ИСТОРИЯ ЧАТА ===\n' + histMsg + '\n' : ''}=== ВОПРОС ===\n${question}`;
 
   const answer = await callGroq({ apiKey, model, system: SYSTEM_PROMPT, user: userMsg });
   return { answer: answer.trim(), period };
