@@ -395,7 +395,8 @@ function renderKpis(summary) {
   const completionSub  = planIncomplete ? 'план неполный' : '';
 
   const projectedVal  = planIncomplete ? '—' : formatMoney(f.projectedFact);
-  const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану`;
+  const seasonalTag = f.projectionMethod === 'seasonal-dow' ? ' · с учётом дней недели' : '';
+  const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану${seasonalTag}`;
   const projectedTone = planIncomplete ? 'neutral' : f.tone;
 
   const requiredVal  = planIncomplete ? '—' : formatMoney(f.requiredPerDayToPlan);

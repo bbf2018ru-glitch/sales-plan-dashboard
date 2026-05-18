@@ -200,12 +200,81 @@ function forecastTone(value) {
   return 'bad';
 }
 
-function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt) {
+// Считает коэффициенты по дням недели из истории продаж (последние ~120 дней).
+// Возвращает массив [7] где индекс — день недели (0=вс, 1=пн, ..., 6=сб),
+// значение = относительная активность к "среднему дню" (1.0 = средний).
+// Если истории мало или дисперсия низкая — возвращает null (вызов использует
+// fallback на равномерный прогноз).
+function computeDayOfWeekFactors(sales) {
+  if (!sales || sales.length < 100) return null;
+  const cutoff = Date.now() - 120 * 86400 * 1000;
+  const byDay = new Map(); // dateKey → total
+  for (const s of sales) {
+    const at = s.soldAt || s.sold_at;
+    if (!at) continue;
+    const t = new Date(at).getTime();
+    if (!t || t < cutoff) continue;
+    const d = new Date(t);
+    const dateKey = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+    byDay.set(dateKey, (byDay.get(dateKey) || 0) + Number(s.amount || 0));
+  }
+  if (byDay.size < 30) return null;
+  // Группируем по DoW
+  const dowSum = [0,0,0,0,0,0,0];
+  const dowCount = [0,0,0,0,0,0,0];
+  for (const [k, v] of byDay) {
+    const [y, m, d] = k.split('-').map(Number);
+    const dow = new Date(Date.UTC(y, m, d)).getUTCDay();
+    dowSum[dow] += v;
+    dowCount[dow] += 1;
+  }
+  const dowAvg = dowSum.map((s, i) => dowCount[i] > 0 ? s / dowCount[i] : 0);
+  // Все DoW должны иметь хотя бы один день, иначе прогноз будет искажен
+  if (dowCount.some((c) => c === 0)) return null;
+  const overall = dowAvg.reduce((s, v) => s + v, 0) / 7;
+  if (overall <= 0) return null;
+  return dowAvg.map((v) => v / overall);
+}
+
+function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
   const totalDays = daysInPeriod(period);
   const elapsedDays = effectiveElapsedDays(period, lastSaleAt);
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
   const averagePerDay = elapsedDays > 0 ? totalFact / elapsedDays : 0;
-  const projectedFact = roundMetric(averagePerDay * totalDays);
+
+  // Сезонный прогноз через коэффициенты дня недели — точнее линейного,
+  // если оставшиеся дни содержат больше/меньше "сильных" дней (выходные).
+  const dowFactors = computeDayOfWeekFactors(sales);
+  let projectedFact;
+  let projectionMethod = 'linear';
+  if (dowFactors && elapsedDays > 0 && remainingDays > 0) {
+    const parsedPeriod = parsePeriod(period);
+    if (parsedPeriod) {
+      // Сумма факторов прошедших дней (что мы УЖЕ "съели")
+      let elapsedFactorSum = 0;
+      for (let day = 1; day <= elapsedDays; day++) {
+        const dow = new Date(Date.UTC(parsedPeriod.year, parsedPeriod.month - 1, day)).getUTCDay();
+        elapsedFactorSum += dowFactors[dow];
+      }
+      // Сумма факторов оставшихся дней
+      let remainingFactorSum = 0;
+      for (let day = elapsedDays + 1; day <= totalDays; day++) {
+        const dow = new Date(Date.UTC(parsedPeriod.year, parsedPeriod.month - 1, day)).getUTCDay();
+        remainingFactorSum += dowFactors[dow];
+      }
+      // Денормализуем averagePerDay → "нейтральный" дневной факт
+      // averagePerDay = elapsedFact / elapsedDays = neutralDaily × (elapsedFactorSum/elapsedDays)
+      const neutralDaily = elapsedFactorSum > 0 ? totalFact / elapsedFactorSum : averagePerDay;
+      const remainingProjection = neutralDaily * remainingFactorSum;
+      projectedFact = roundMetric(totalFact + remainingProjection);
+      projectionMethod = 'seasonal-dow';
+    } else {
+      projectedFact = roundMetric(averagePerDay * totalDays);
+    }
+  } else {
+    projectedFact = roundMetric(averagePerDay * totalDays);
+  }
+
   const projectedCompletion = totalPlan > 0 ? percent(projectedFact / totalPlan) : 0;
   const requiredPerDayToPlan = remainingDays > 0 ? roundMetric(Math.max(totalPlan - totalFact, 0) / remainingDays) : 0;
   const planPerDay = totalDays > 0 ? totalPlan / totalDays : 0;
@@ -223,6 +292,7 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt) {
     planPerDay: roundMetric(planPerDay),
     paceVsPlan,
     runwayGap,
+    projectionMethod,
     tone: forecastTone(projectedCompletion),
     status:
       projectedCompletion >= 100
@@ -581,7 +651,10 @@ function aggregatePeriodCore(db, period, opts = {}) {
   const leader = storesList[0] || null;
   const lagger = [...storesList].sort((a, b) => a.percent - b.percent)[0] || null;
   const lastSaleAt = sales.map((item) => item.soldAt).filter(Boolean).sort().at(-1) || null;
-  const forecast = buildSalesForecast(period, totalPlan, totalFact, lastSaleAt);
+  // Для DoW-сезонности передаём все продажи (не только за текущий period) —
+  // тогда последние 120 дней попадают в расчёт независимо от того где они
+  // (текущий или прошлый месяц).
+  const forecast = buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, db.sales);
   const daily = buildDailySeries(period, plans, sales);
 
   return {
