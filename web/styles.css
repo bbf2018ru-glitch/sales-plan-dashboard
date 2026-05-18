@@ -2965,3 +2965,66 @@ body.plan-incomplete .spark-fill {
   }
   .ai-chat-fab { bottom: 16px; right: 16px; }
 }
+
+/* ─── Mobile compact mode — упрощённый дашборд на узких экранах ──────── */
+.mobile-toggle-bar {
+  display: none;
+  padding: 10px 14px;
+  background: var(--bg-soft, rgba(0,0,0,.04));
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mobile-toggle-bar b { color: var(--ink); }
+.mobile-toggle-bar button {
+  background: rgb(193,68,86);
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .mobile-toggle-bar { display: flex; }
+
+  /* В компактном режиме показываем ТОЛЬКО summary-hero + 3 главные KPI
+     + sticky-баннер о неполном плане + список магазинов */
+  body.mobile-compact .insights-panel,
+  body.mobile-compact #forecastPanel,
+  body.mobile-compact .panel-grid,
+  body.mobile-compact #commentsSection,
+  body.mobile-compact #storeDetailSection,
+  body.mobile-compact #page-analytics,
+  body.mobile-compact .nav-btn[data-page="analytics"] {
+    display: none !important;
+  }
+
+  /* В компактном режиме в KPI оставляем только Факт, Выполнение, Прогноз */
+  body.mobile-compact .kpi-grid > .kpi:nth-child(1),
+  body.mobile-compact .kpi-grid > .kpi:nth-child(4),
+  body.mobile-compact .kpi-grid > .kpi:nth-child(6) {
+    display: none;
+  }
+  body.mobile-compact .kpi-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px;
+  }
+  body.mobile-compact .kpi {
+    padding: 10px 8px;
+  }
+  body.mobile-compact .kpi-value {
+    font-size: 16px !important;
+  }
+  body.mobile-compact .kpi-label {
+    font-size: 10px;
+  }
+  body.mobile-compact .kpi-sub {
+    font-size: 10px;
+  }
+}

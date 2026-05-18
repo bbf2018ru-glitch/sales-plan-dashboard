@@ -957,6 +957,37 @@ POST /api/ingest/sales   — только продажи</code>
 }
 
 // ── CSV export ─────────────────────────────────────────────────────────────
+// ─── Mobile compact mode ──────────────────────────────────────────────────
+// На узких экранах (≤640px) при первом заходе включаем компактный режим:
+// показываем только summary-hero + 3 KPI + список магазинов. Кнопка
+// «Развернуть»/«Свернуть» переключает.
+const MOBILE_KEY = 'maria_mobile_compact_v1';
+function initMobileCompact() {
+  const btn = $('mobileToggleBtn');
+  const bar = $('mobileToggleBar');
+  if (!btn || !bar) return;
+
+  const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
+  const apply = (compact) => {
+    document.body.classList.toggle('mobile-compact', compact);
+    btn.textContent = compact ? 'Развернуть' : 'Свернуть';
+    bar.querySelector('span').innerHTML = compact
+      ? '<b>Краткий режим</b> · только главное'
+      : '<b>Полный режим</b> · все блоки';
+  };
+
+  // Дефолт на мобильном: compact. На десктопе: full.
+  const stored = localStorage.getItem(MOBILE_KEY);
+  const initial = stored === null ? isMobile() : stored === '1';
+  apply(initial);
+
+  btn.addEventListener('click', () => {
+    const next = !document.body.classList.contains('mobile-compact');
+    apply(next);
+    localStorage.setItem(MOBILE_KEY, next ? '1' : '0');
+  });
+}
+
 // ─── PWA: service worker + install prompt ─────────────────────────────────
 let deferredInstallPrompt = null;
 function initPwa() {
@@ -1411,6 +1442,7 @@ async function init() {
   $('logoutBtn')?.addEventListener('click', doLogout);
   initAiChat();
   initPwa();
+  initMobileCompact();
 
   $('planSaveBtn').addEventListener('click', savePlanEdit);
   $('planCancelBtn').addEventListener('click', closePlanEdit);
