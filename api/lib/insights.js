@@ -14,6 +14,18 @@ const ACTIVITY_SHARE_MIN = 0.02;       // 2% от выручки сети — к
 const ACTIVITY_STORE_FACT_MIN = 50000; // ₽ за период — магазин «в работе»
 const ACTIVITY_CAT_FACT_MIN = 100000;  // ₽ за период — категория «в работе» (даже если доля норм)
 
+// Лидер показывается только для «нормальных» магазинов — иначе точка с
+// заниженным планом (Солнечный 11/4: план 100К, факт 660К → 660%) забивает
+// слот лидерства, а реальные крупные магазины не видны.
+const LEADER_PLAN_MIN = 500000;        // ₽ — план должен быть «настоящим»
+const LEADER_PERCENT_MAX = 200;        // % — выше — это уже не лидер, а план-аномалия
+
+// Plan-anomaly: явный признак ошибки в планировании 1С. Выносим отдельным
+// сигналом, чтобы пользователь поправил план или убедился что точка не
+// тестовая/новая/закрытая.
+const PLAN_ANOMALY_PERCENT = 300;      // % — выше — почти наверняка ошибка плана
+const PLAN_ANOMALY_PLAN_MAX = 200000;  // ₽ — план явно занижен относительно сети
+
 // Категории которые НЕ показываем в инсайтах. По фидбеку пользователя:
 //   «Хлеб»          — направление закрыто
 //   «Торты на заказ» — и в прошлом году не было полноценной работы
@@ -66,11 +78,14 @@ function detectAnomalies(summary, db, period) {
     return findings;
   }
 
-  // 1. Точки в риске — выполнение < 80% при оставшихся днях ≤ 7.
-  //    Фильтр: только активные за последнюю неделю + значимый объём,
-  //    чтобы не алертить про закрытые/служебные точки.
+  // 1. Точки в риске — выполнение < 80%, начиная с середины месяца.
+  //    Раньше показывали только когда оставалось ≤10 дней — слишком поздно:
+  //    при 12 днях до конца месяца руководитель уже хочет видеть провисающие
+  //    точки чтобы успеть среагировать. Теперь алертим с elapsedDays ≥ 10.
+  //    Фильтр: только активные за последнюю неделю + значимый объём.
   const remainingDays = summary.forecast.remainingDays;
-  if (remainingDays > 0 && remainingDays <= 10) {
+  const elapsedDays = summary.forecast.elapsedDays || 0;
+  if (remainingDays > 0 && elapsedDays >= 10) {
     const risky = summary.stores
       .filter((s) => s.plan > 0 && s.percent < 80)
       .filter((s) => s.fact >= ACTIVITY_STORE_FACT_MIN)
@@ -84,9 +99,29 @@ function detectAnomalies(summary, db, period) {
         kind: 'lagging-store',
         store: s.storeName,
         headline: `${s.storeName}: выполнение ${s.percent}%, осталось ${remainingDays} дн.`,
-        detail: `Чтобы выйти в план, нужно ${formatRu(reqPerDay)} ₽/день. Сейчас в среднем ${formatRu(s.fact / Math.max(summary.forecast.elapsedDays, 1))} ₽/день.`,
+        detail: `Чтобы выйти в план, нужно ${formatRu(reqPerDay)} ₽/день. Сейчас в среднем ${formatRu(s.fact / Math.max(elapsedDays, 1))} ₽/день.`,
       });
     }
+  }
+
+  // 1а. План-аномалии — магазины с явно заниженным планом (percent > 300%
+  //     или план < 200К при значимом факте). Отдельный сигнал «проверьте план в 1С»:
+  //     это НЕ лидерство, а ошибка в данных.
+  const planAnomalies = summary.stores
+    .filter((s) => s.fact >= ACTIVITY_STORE_FACT_MIN)
+    .filter((s) => s.plan > 0)
+    .filter((s) => s.percent > PLAN_ANOMALY_PERCENT || s.plan < PLAN_ANOMALY_PLAN_MAX)
+    .filter((s) => storeActiveRecently(s.storeId, db, period))
+    .sort((a, b) => b.percent - a.percent)
+    .slice(0, 2);
+  for (const s of planAnomalies) {
+    findings.push({
+      severity: 'medium',
+      kind: 'plan-anomaly',
+      store: s.storeName,
+      headline: `${s.storeName}: ${s.percent}% — вероятно ошибка плана`,
+      detail: `План ${formatRu(s.plan)} ₽, факт ${formatRu(s.fact)} ₽. Проверьте план в 1С — точка может быть тестовой, новой или с заниженным значением.`,
+    });
   }
 
   // 2. Прогноз сети ниже плана
@@ -169,19 +204,25 @@ function detectAnomalies(summary, db, period) {
 
   // ── ПОЗИТИВНЫЕ СИГНАЛЫ (показываем когда нет критики, чтобы блок не пустовал) ──
 
-  // 5а. Магазины-лидеры (выполнение ≥ 100%)
+  // 5а. Магазины-лидеры (выполнение 100-200%). Top-3 чтобы дать reference.
+  //     Жёсткий нижний порог по плану: точки с планом <500К отсекаем,
+  //     иначе аномалии вроде «Солнечный 11/4: план 100К → 660%» забивают
+  //     слот вместо реального лидера. Верхний порог 200% — выше это уже
+  //     plan-anomaly (см. блок 1а), не лидерство.
   const leaders = summary.stores
-    .filter((s) => s.plan > 0 && s.percent >= 100 && s.fact >= ACTIVITY_STORE_FACT_MIN)
+    .filter((s) => s.plan >= LEADER_PLAN_MIN)
+    .filter((s) => s.percent >= 100 && s.percent <= LEADER_PERCENT_MAX)
+    .filter((s) => s.fact >= ACTIVITY_STORE_FACT_MIN)
     .filter((s) => storeActiveRecently(s.storeId, db, period))
     .sort((a, b) => b.percent - a.percent)
-    .slice(0, 1);
+    .slice(0, 3);
   for (const s of leaders) {
     findings.push({
       severity: 'low',
       kind: 'leader-store',
       store: s.storeName,
       headline: `✓ ${s.storeName}: выполнение ${s.percent}%`,
-      detail: `Лидер по темпу — факт ${formatRu(s.fact)} ₽ при плане ${formatRu(s.plan)} ₽. Полезно изучить что они делают и масштабировать.`
+      detail: `Факт ${formatRu(s.fact)} ₽ при плане ${formatRu(s.plan)} ₽. Полезно изучить что они делают и масштабировать.`
     });
   }
 
