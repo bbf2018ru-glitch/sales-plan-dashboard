@@ -358,9 +358,12 @@ function renderSummaryHero(summary) {
   if (!el || !summary) { el?.classList.add('hidden'); return; }
 
   const t = summary.totals || {};
-  const pct = t.completion || 0;
-  const gap = (t.plan || 0) - (t.fact || 0);
   const f = summary.forecast || {};
+  // % к плану-на-сегодня (а не к концу месяца)
+  const planToDate = f.planPerDay && f.elapsedDays ? f.planPerDay * f.elapsedDays : 0;
+  const pct = planToDate > 0 ? Math.round(((t.fact || 0) / planToDate) * 100) : (t.completion || 0);
+  const gapToday = planToDate - (t.fact || 0); // > 0 = отстаём, < 0 = опережаем
+  const gapEom = (t.plan || 0) - (t.fact || 0); // до конца месяца
 
   // Топ-3 отстающих магазина
   const lagging = (summary.stores || [])
@@ -374,31 +377,39 @@ function renderSummaryHero(summary) {
     .sort((a, b) => b.percent - a.percent)
     .slice(0, 3);
 
-  // Какой текст по состоянию плана
+  // Какой текст по состоянию плана (pct = % к плану-на-сегодня, не на конец месяца)
   let mood = 'ok';
-  let moodLabel = 'идём в плане';
+  let moodLabel = 'идём в темпе';
   let moodIcon = '✓';
   if (f.status && /угроз|разрыв|fail/i.test(f.status)) { mood = 'bad'; moodLabel = f.status; moodIcon = '⚠'; }
-  else if (pct < 60) { mood = 'warn'; moodLabel = 'отстаём от плана'; moodIcon = '↓'; }
-  else if (pct >= 100) { mood = 'great'; moodLabel = 'план перевыполнен'; moodIcon = '✓'; }
+  else if (pct < 80) { mood = 'bad'; moodLabel = 'сильно отстаём от темпа'; moodIcon = '↓'; }
+  else if (pct < 95) { mood = 'warn'; moodLabel = 'немного отстаём от темпа'; moodIcon = '↓'; }
+  else if (pct >= 110) { mood = 'great'; moodLabel = 'опережаем темп'; moodIcon = '✓'; }
 
   // Период «План май» — название месяца
   const [yyyy, mm] = (summary.period || state.period || '').split('-');
   const months = ['', 'январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   const monthName = months[+mm] || '';
 
+  const todayGapTxt = gapToday > 0
+    ? `<b class="hero-gap">отстаём на сегодня: ${fmtMoneyShort(gapToday)}</b>`
+    : `<b style="color:rgb(34,197,94)">опережаем на сегодня: ${fmtMoneyShort(-gapToday)}</b>`;
+
   el.innerHTML = `
     <div class="hero-card hero-${mood}">
       <div class="hero-icon">${moodIcon}</div>
       <div class="hero-body">
         <div class="hero-headline">
-          План ${escapeHtml(monthName)} ${escapeHtml(yyyy || '')} — <b>${pct}%</b>
+          ${escapeHtml(monthName)} ${escapeHtml(yyyy || '')} · к сегодня — <b>${pct}%</b>
           <span class="hero-mood">${escapeHtml(moodLabel)}</span>
         </div>
         <div class="hero-sub">
-          Факт <b>${fmtMoneyShort(t.fact || 0)}</b> из ${fmtMoneyShort(t.plan || 0)}
-          ${gap > 0 ? `· до конца месяца нужно ещё <b class="hero-gap">${fmtMoneyShort(gap)}</b>` : ''}
-          ${f.runwayGap ? `· прогноз разрыва: <b>${fmtMoneyShort(f.runwayGap)}</b>` : ''}
+          Факт <b>${fmtMoneyShort(t.fact || 0)}</b> из плана-на-сегодня ${fmtMoneyShort(planToDate)}
+          · ${todayGapTxt}
+        </div>
+        <div class="hero-sub" style="font-size:12px;opacity:.7">
+          План месяца ${fmtMoneyShort(t.plan || 0)} · до конца месяца нужно ${gapEom > 0 ? fmtMoneyShort(gapEom) : '— план выполнен'}
+          ${f.runwayGap ? `· прогноз разрыва: ${fmtMoneyShort(f.runwayGap)}` : ''}
         </div>
         ${lagging.length ? `<div class="hero-lists">
           <div class="hero-list">
@@ -418,15 +429,30 @@ function renderSummaryHero(summary) {
 
 function renderKpis(summary) {
   const f = summary.forecast;
+  const t = summary.totals;
   const c = summary.comparison;
   const planIncomplete = summary?.planHealth && summary.planHealth.ok === false;
   const deltaArrow = c?.hasData && c.factDelta > 0 ? '↑' : c?.hasData && c.factDelta < 0 ? '↓' : '';
   const deltaTxt = c?.hasData ? ` ${deltaArrow}${c.factDeltaPercent > 0 ? '+' : ''}${c.factDeltaPercent}%` : '';
 
-  // При неполном плане искажённые KPI прячем за «—», чтобы не вводить в заблуждение
-  const completionVal = planIncomplete ? '—' : `${summary.totals.completion}%`;
-  const completionTone = planIncomplete ? 'neutral' : pctTone(summary.totals.completion);
-  const completionSub  = planIncomplete ? 'план неполный' : '';
+  // ── Расчёты «на сегодня» ────────────────────────────────────────────────
+  // План на сегодня (накопленный к этой дате) = planPerDay × elapsedDays.
+  // Это даёт справедливое сравнение «сколько должны были сделать к сегодня».
+  const planToDate = f.planPerDay && f.elapsedDays ? f.planPerDay * f.elapsedDays : 0;
+  const factToDate = t.fact || 0;
+  const gapToDate = planToDate - factToDate; // > 0 = отстаём, < 0 = опережаем
+  const todayPct = planToDate > 0 ? Math.round((factToDate / planToDate) * 100) : 0;
+  const todayTone = todayPct >= 100 ? 'good' : todayPct >= 90 ? 'warn' : 'bad';
+
+  // «Выполнение к сегодня» = % факта от плана на эту дату (= f.paceVsPlan)
+  const completionVal = planIncomplete ? '—' : `${todayPct}%`;
+  const completionTone = planIncomplete ? 'neutral' : todayTone;
+  let completionSub;
+  if (planIncomplete) completionSub = 'план неполный';
+  else if (gapToDate > 0) completionSub = `отстаём на ${fmtMoneyShort(gapToDate)}`;
+  else completionSub = `опережаем на ${fmtMoneyShort(-gapToDate)}`;
+  // Дополним: общий % от месячного плана (мелкой строкой ниже)
+  if (!planIncomplete) completionSub += ` · ${t.completion || 0}% к месяцу`;
 
   const projectedVal  = planIncomplete ? '—' : formatMoney(f.projectedFact);
   const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану`;
@@ -449,12 +475,18 @@ function renderKpis(summary) {
   };
 
   const cards = [
-    { label: 'План сети',  value: formatMoney(summary.totals.plan),   sub: (planIncomplete ? 'возможно неполный' : '') + vsPrev('plan'), tone: 'neutral' },
-    { label: 'Факт сети',  value: formatMoney(summary.totals.fact),   sub: deltaTxt + vsPrev('fact'), tone: 'neutral' },
-    { label: 'Выполнение', value: completionVal,                       sub: completionSub + vsPrev('completion'), tone: completionTone },
-    { label: 'Маржа',      value: formatMoney(summary.totals.margin), sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'), tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
-    { label: 'Прогноз',    value: projectedVal,                       sub: projectedSub,  tone: projectedTone },
-    { label: 'Нужно/день', value: requiredVal,                        sub: requiredSub,   tone: requiredTone }
+    { label: 'План на месяц', value: formatMoney(summary.totals.plan),
+      sub: (planIncomplete ? 'возможно неполный · ' : '') + `план на сегодня: ${fmtMoneyShort(planToDate)}` + vsPrev('plan'),
+      tone: 'neutral' },
+    { label: 'Факт', value: formatMoney(summary.totals.fact),
+      sub: `на ${f.elapsedDays || '?'}-й день` + deltaTxt + vsPrev('fact'), tone: 'neutral' },
+    { label: 'Выполнение к сегодня', value: completionVal,
+      sub: completionSub, tone: completionTone },
+    { label: 'Маржа', value: formatMoney(summary.totals.margin),
+      sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
+      tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
+    { label: 'Прогноз', value: projectedVal, sub: projectedSub, tone: projectedTone },
+    { label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone }
   ];
   $('kpis').innerHTML = cards.map(c => `
     <article class="kpi ${c.tone} ${c.cls || ''}">
