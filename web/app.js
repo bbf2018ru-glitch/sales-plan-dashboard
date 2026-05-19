@@ -514,24 +514,233 @@ function renderKpis(summary) {
   }
 
   const cards = [
-    { label: 'План на месяц', value: formatMoney(summary.totals.plan),
+    { id: 'plan', label: 'План на месяц', value: formatMoney(summary.totals.plan),
       sub: planSub, tone: 'neutral' },
-    { label: 'Факт', value: formatMoney(summary.totals.fact),
+    { id: 'fact', label: 'Факт', value: formatMoney(summary.totals.fact),
       sub: factSub, tone: 'neutral' },
-    { label: 'Выполнение к сегодня', value: completionVal,
+    { id: 'completion', label: 'Выполнение к сегодня', value: completionVal,
       sub: completionSubV2, tone: completionTone },
-    { label: 'Маржа', value: formatMoney(summary.totals.margin),
+    { id: 'margin', label: 'Маржа', value: formatMoney(summary.totals.margin),
       sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
-    { label: 'Прогноз', value: projectedVal, sub: projectedSubV2, tone: projectedTone },
-    { label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone }
+    { id: 'projected', label: 'Прогноз', value: projectedVal, sub: projectedSubV2, tone: projectedTone },
+    { id: 'required', label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone }
   ];
   $('kpis').innerHTML = cards.map(c => `
-    <article class="kpi ${c.tone} ${c.cls || ''}">
-      <div class="kpi-label">${c.label}</div>
+    <article class="kpi ${c.tone} ${c.cls || ''}" data-kpi-id="${c.id}" tabindex="0">
+      <div class="kpi-label">
+        <span>${c.label}</span>
+        <button class="kpi-expand" title="Подробнее">▾</button>
+      </div>
       <div class="kpi-value">${c.value}</div>
       ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
     </article>`).join('');
+
+  // Bind click → expand/collapse
+  $('kpis').querySelectorAll('[data-kpi-id]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Игнорим клик по ссылкам/кнопкам внутри подписи (sub)
+      if (e.target.closest('a')) return;
+      toggleKpiExpanded(card.dataset.kpiId);
+    });
+  });
+}
+
+// ── Развёртывание KPI-карточек ────────────────────────────────────────────
+let kpiExpandedId = null;
+
+function toggleKpiExpanded(id) {
+  if (!state.summary) return;
+  if (kpiExpandedId === id) { closeKpiDetail(); return; }
+  kpiExpandedId = id;
+  document.querySelectorAll('#kpis [data-kpi-id]').forEach(c => c.classList.toggle('kpi-active', c.dataset.kpiId === id));
+  let detail = $('kpiDetailPanel');
+  if (!detail) {
+    detail = document.createElement('div');
+    detail.id = 'kpiDetailPanel';
+    detail.className = 'kpi-detail';
+    $('kpis').after(detail);
+  }
+  detail.innerHTML = buildKpiDetail(id, state.summary);
+  detail.classList.remove('hidden');
+  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeKpiDetail() {
+  kpiExpandedId = null;
+  document.querySelectorAll('#kpis [data-kpi-id]').forEach(c => c.classList.remove('kpi-active'));
+  $('kpiDetailPanel')?.classList.add('hidden');
+}
+
+function buildKpiDetail(id, summary) {
+  const t = summary.totals || {};
+  const f = summary.forecast || {};
+  const today = summary.today || {};
+  const stores = summary.stores || [];
+  const products = (summary.products || []).filter(p => p.productId !== '_total');
+  const closeBtn = `<button class="kpi-detail-close" onclick="closeKpiDetail()">✕</button>`;
+  const titles = { plan: 'План на месяц', fact: 'Факт', completion: 'Выполнение к сегодня', margin: 'Маржа', projected: 'Прогноз', required: 'Нужно/день' };
+  const header = `<div class="kpi-detail-header"><b>${titles[id] || ''}</b> · подробно ${closeBtn}</div>`;
+
+  if (id === 'plan') {
+    const topStores = stores.slice().sort((a, b) => b.plan - a.plan).slice(0, 10);
+    const totalPlan = stores.reduce((s, x) => s + (x.plan || 0), 0);
+    return header + `
+      <div class="kpi-detail-cols">
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Структура плана</div>
+          <table class="kpi-detail-tbl">
+            <tr><td>План/день</td><td class="num">${formatMoney(f.planPerDay || 0)}</td></tr>
+            <tr><td>План на сегодня</td><td class="num">${formatMoney(today.planToDate || 0)}</td></tr>
+            <tr><td>Осталось до плана-месяца</td><td class="num">${formatMoney(Math.max(0, t.plan - t.fact))}</td></tr>
+            <tr><td>Точек с планом &gt; 0</td><td class="num">${stores.filter(s => s.plan > 0).length} из ${stores.length}</td></tr>
+          </table>
+        </div>
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Топ-10 точек по плану</div>
+          ${topStores.map(s => `
+            <div class="kpi-detail-row">
+              <span class="ki-name">${escapeHtml(s.storeName)}</span>
+              <span class="ki-bar"><span class="ki-bar-fill" style="width:${totalPlan > 0 ? Math.min(100, s.plan / topStores[0].plan * 100) : 0}%"></span></span>
+              <span class="ki-val">${fmtMoneyShort(s.plan)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (id === 'fact') {
+    const topStores = stores.slice().sort((a, b) => b.fact - a.fact).slice(0, 10);
+    const max = topStores[0]?.fact || 1;
+    const topProducts = products.slice().sort((a, b) => (b.fact || 0) - (a.fact || 0)).slice(0, 10);
+    const maxP = topProducts[0]?.fact || 1;
+    return header + `
+      <div class="kpi-detail-cols">
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Топ-10 точек по выручке</div>
+          ${topStores.map(s => `
+            <div class="kpi-detail-row">
+              <span class="ki-name">${escapeHtml(s.storeName)}</span>
+              <span class="ki-bar"><span class="ki-bar-fill" style="width:${s.fact / max * 100}%"></span></span>
+              <span class="ki-val">${fmtMoneyShort(s.fact)}</span>
+            </div>`).join('')}
+        </div>
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Топ-10 товаров по выручке</div>
+          ${topProducts.map(p => `
+            <div class="kpi-detail-row">
+              <span class="ki-name">${escapeHtml(p.productName || p.name)}</span>
+              <span class="ki-bar"><span class="ki-bar-fill" style="width:${(p.fact || 0) / maxP * 100}%"></span></span>
+              <span class="ki-val">${fmtMoneyShort(p.fact || 0)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (id === 'completion') {
+    const withPlan = stores.filter(s => s.plan > 0);
+    const above = withPlan.filter(s => s.percent >= 100).length;
+    const ok = withPlan.filter(s => s.percent >= 80 && s.percent < 100).length;
+    const below = withPlan.filter(s => s.percent < 80).length;
+    const lagging = withPlan.slice().sort((a, b) => a.percent - b.percent).slice(0, 5);
+    const leaders = withPlan.slice().sort((a, b) => b.percent - a.percent).slice(0, 5);
+    return header + `
+      <div class="kpi-detail-cols">
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Распределение точек</div>
+          <table class="kpi-detail-tbl">
+            <tr><td><span class="good">●</span> ≥ 100%</td><td class="num">${above} из ${withPlan.length}</td></tr>
+            <tr><td><span class="warn">●</span> 80–99%</td><td class="num">${ok}</td></tr>
+            <tr><td><span class="bad">●</span> &lt; 80%</td><td class="num">${below}</td></tr>
+            <tr><td>Средний %</td><td class="num">${withPlan.length ? Math.round(withPlan.reduce((s, x) => s + x.percent, 0) / withPlan.length) : 0}%</td></tr>
+          </table>
+        </div>
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">⬇ Отстающие</div>
+          ${lagging.map(s => `<div class="kpi-detail-row"><span class="ki-name">${escapeHtml(s.storeName)}</span><span class="ki-val bad">${s.percent}%</span></div>`).join('')}
+        </div>
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">⬆ Лидеры</div>
+          ${leaders.map(s => `<div class="kpi-detail-row"><span class="ki-name">${escapeHtml(s.storeName)}</span><span class="ki-val good">${s.percent}%</span></div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (id === 'margin') {
+    if (!isNum(t.margin)) return header + `<div class="empty-state" style="padding:14px">Нет данных о марже от 1С</div>`;
+    const topStores = stores.filter(s => isNum(s.margin)).slice().sort((a, b) => (b.marginPct || 0) - (a.marginPct || 0)).slice(0, 10);
+    const topProducts = products.filter(p => isNum(p.margin)).slice().sort((a, b) => b.margin - a.margin).slice(0, 10);
+    return header + `
+      <div class="kpi-detail-cols">
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Топ-10 точек по марж.%</div>
+          ${topStores.map(s => `
+            <div class="kpi-detail-row">
+              <span class="ki-name">${escapeHtml(s.storeName)}</span>
+              <span class="ki-val">${s.marginPct}% · ${fmtMoneyShort(s.margin)}</span>
+            </div>`).join('') || '<div class="empty-state">нет данных</div>'}
+        </div>
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Топ-10 товаров по марже</div>
+          ${topProducts.map(p => `
+            <div class="kpi-detail-row">
+              <span class="ki-name">${escapeHtml(p.productName || p.name)}</span>
+              <span class="ki-val">${fmtMoneyShort(p.margin)}</span>
+            </div>`).join('') || '<div class="empty-state">нет данных</div>'}
+        </div>
+      </div>`;
+  }
+
+  if (id === 'projected') {
+    const lines = [
+      `Прогноз = факт на сегодня + ожидаемые продажи за оставшиеся ${f.remainingDays || 0} дней`,
+      f.projectionMethod === 'seasonal-dow'
+        ? `Метод: <b>сезонный</b> — учёт коэффициентов дней недели из истории 120 дней (выходные обычно +50%, понедельник -20% и т.п.)`
+        : `Метод: <b>линейный</b> — текущий средний темп × оставшиеся дни (нет истории для сезонной модели)`,
+      `Средний темп факта: ${formatMoney(f.averagePerDay || 0)} / день`,
+      `Темп плана: ${formatMoney(f.planPerDay || 0)} / день`,
+      `Разрыв с планом: ${formatMoney(f.runwayGap || 0)} (отрицательный = опередим план)`
+    ];
+    return header + `
+      <div class="kpi-detail-section">
+        <div class="kpi-detail-title">Как считается прогноз</div>
+        <ul class="kpi-detail-list">${lines.map(x => `<li>${x}</li>`).join('')}</ul>
+      </div>`;
+  }
+
+  if (id === 'required') {
+    const withPlan = stores.filter(s => s.plan > 0);
+    const perStore = withPlan.map(s => ({
+      name: s.storeName,
+      gap: Math.max(0, s.plan - s.fact),
+      perDay: f.remainingDays > 0 ? Math.max(0, (s.plan - s.fact) / f.remainingDays) : 0,
+      pct: s.percent
+    })).sort((a, b) => b.perDay - a.perDay);
+    const top10 = perStore.slice(0, 10);
+    const max = top10[0]?.perDay || 1;
+    return header + `
+      <div class="kpi-detail-cols">
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Сводка</div>
+          <table class="kpi-detail-tbl">
+            <tr><td>Осталось дней</td><td class="num">${f.remainingDays || 0}</td></tr>
+            <tr><td>Текущий темп/день</td><td class="num">${formatMoney(f.averagePerDay || 0)}</td></tr>
+            <tr><td>Нужный темп/день</td><td class="num">${formatMoney(f.requiredPerDayToPlan || 0)}</td></tr>
+            <tr><td>Точек на цели</td><td class="num">${withPlan.filter(s => s.percent >= 100).length} из ${withPlan.length}</td></tr>
+          </table>
+        </div>
+        <div class="kpi-detail-section">
+          <div class="kpi-detail-title">Кому больше всего нужно/день</div>
+          ${top10.map(s => `
+            <div class="kpi-detail-row">
+              <span class="ki-name">${escapeHtml(s.name)} <small class="muted">(${s.pct}%)</small></span>
+              <span class="ki-bar"><span class="ki-bar-fill" style="width:${s.perDay / max * 100}%"></span></span>
+              <span class="ki-val">${fmtMoneyShort(s.perDay)}/день</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  return header + `<div class="empty-state">—</div>`;
 }
 
 // ── Авто-определение «маржа недоступна» — скрывает margin-колонки/карточки ────
