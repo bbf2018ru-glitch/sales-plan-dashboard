@@ -31,11 +31,36 @@ function pickTopProducts(summary) {
     .map(p => p.productName || p.name);
 }
 
-function seasonHint(monthNum) {
-  if ([12, 1, 2].includes(monthNum)) return 'Зима (Новый год, Сагаалган, 23 февраля, 8 марта)';
-  if ([3, 4, 5].includes(monthNum)) return 'Весна (8 марта, Пасха, 9 мая, выпускные)';
-  if ([6, 7, 8].includes(monthNum)) return 'Лето (День защиты детей, свадьбы, ягодный сезон, День Байкала)';
-  return 'Осень (1 сентября, День матери, корпоративы)';
+// Ближайшие праздники РФ + Восточной Сибири на которые имеет смысл готовить
+// ассортимент. AI берёт только те что ВПЕРЕДИ — прошедшие исключены.
+const HOLIDAYS_2026 = [
+  { date: '2026-02-14', name: 'День святого Валентина' },
+  { date: '2026-02-19', name: 'Сагаалган (Новый год по лунному календарю)' },
+  { date: '2026-02-23', name: '23 февраля (День защитника Отечества)' },
+  { date: '2026-03-08', name: '8 марта' },
+  { date: '2026-04-12', name: 'Пасха' },
+  { date: '2026-05-01', name: '1 мая' },
+  { date: '2026-05-09', name: '9 мая (День Победы)' },
+  { date: '2026-06-01', name: 'День защиты детей' },
+  { date: '2026-06-12', name: 'День России' },
+  { date: '2026-07-08', name: 'День семьи, любви и верности' },
+  { date: '2026-08-01', name: 'День города Иркутска' },
+  { date: '2026-09-01', name: 'Первое сентября / День знаний' },
+  { date: '2026-09-13', name: 'День Байкала' },
+  { date: '2026-10-05', name: 'День учителя' },
+  { date: '2026-11-29', name: 'День матери' },
+  { date: '2026-12-31', name: 'Новый год' },
+];
+
+function upcomingHolidays(now, windowDays = 60) {
+  const todayMs = now.getTime();
+  const result = [];
+  for (const h of HOLIDAYS_2026) {
+    const d = new Date(h.date + 'T00:00:00+08:00'); // Иркутск
+    const days = Math.round((d.getTime() - todayMs) / 86400000);
+    if (days >= 0 && days <= windowDays) result.push({ ...h, daysAhead: days });
+  }
+  return result;
 }
 
 function buildSystemPrompt() {
@@ -51,6 +76,7 @@ function buildSystemPrompt() {
 - Бренд НЕ массмаркет-вычурный, домашний — не предлагай эффекты ради эффектов.
 - Каждый тренд должен иметь КОНКРЕТНОЕ действие (рецепт/категория/формат), а не общее «развивать SMM».
 - Отвечай СТРОГО валидным JSON без пояснений до или после.
+- ВАЖНО: смотри на текущую дату из user-промпта. Не предлагай праздники которые УЖЕ прошли в этом году. Фокус на ближайшие 30-60 дней + устойчивые тренды.
 
 Формат ответа:
 {
@@ -69,17 +95,25 @@ function buildSystemPrompt() {
 Выдай ровно 6 трендов. trend='rising' если категория растёт сейчас (фокусировать), 'stable' если устойчивая база (не упустить), 'niche' если для узкой ЦА но с маржой.`;
 }
 
-function buildUserPrompt({ topCategories, topProducts, monthName, monthNum, year }) {
+function buildUserPrompt({ topCategories, topProducts, today, holidays }) {
   const lines = [];
-  lines.push(`Сегодня: ${monthName} ${year}. Сезон: ${seasonHint(monthNum)}.`);
+  lines.push(`Сегодняшняя дата: ${today.toISOString().slice(0, 10)} (${today.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).`);
   lines.push('');
+  if (holidays.length) {
+    lines.push('Ближайшие праздники (только впереди, в течение 60 дней):');
+    for (const h of holidays) lines.push(`- ${h.date} (через ${h.daysAhead} дн.) — ${h.name}`);
+    lines.push('');
+  } else {
+    lines.push('Ближайшие 60 дней без крупных праздников — фокус на устойчивые тренды и сезон.');
+    lines.push('');
+  }
   if (topCategories.length) {
     lines.push('Наши топ-категории по выручке:');
     for (const c of topCategories) lines.push(`- ${c.name}: ${c.share}% выручки`);
     lines.push('');
   }
   if (topProducts.length) {
-    lines.push('Наш топ-10 товаров (что уже хорошо продаётся):');
+    lines.push('Наш топ-10 товаров (что уже хорошо продаётся, не предлагай повтор):');
     for (const p of topProducts) lines.push(`- ${p}`);
     lines.push('');
   }
@@ -112,14 +146,11 @@ function safeParseTrends(text) {
 async function generateTrends({ apiKey, model, summary }) {
   if (!apiKey) throw new Error('GROQ_KEY не задан');
   const now = new Date();
-  const monthNames = ['', 'январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
-  const monthNum = now.getMonth() + 1;
   const ctx = {
     topCategories: pickTopCategories(summary),
     topProducts: pickTopProducts(summary),
-    monthName: monthNames[monthNum],
-    monthNum,
-    year: now.getFullYear(),
+    today: now,
+    holidays: upcomingHolidays(now, 60),
   };
   const system = buildSystemPrompt();
   const user = buildUserPrompt(ctx);
