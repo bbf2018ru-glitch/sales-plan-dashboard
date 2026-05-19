@@ -635,9 +635,23 @@ function renderStores(summary) {
     th.textContent = (sortLabels[k] || k) + (k === key ? (dir === -1 ? ' ↓' : ' ↑') : '');
   });
 
+  // Тренд = текущий % vs % того же магазина в прошлом месяце (из prevPeriod.storesPercent)
+  const prevPct = summary.prevPeriod?.storesPercent || {};
+
   $('storesTable').innerHTML = sorted.map((s, idx) => {
     const avgCheck = s.quantity > 0 ? s.fact / s.quantity : 0;
     const tone = pctTone(s.percent);
+    // Тренд-индикатор
+    const prev = prevPct[s.storeId];
+    let trendHtml;
+    if (typeof prev === 'number' && prev > 0) {
+      const delta = (s.percent || 0) - prev;
+      const arr = delta > 1 ? '↑' : delta < -1 ? '↓' : '→';
+      const trTone = delta > 1 ? 'good' : delta < -1 ? 'bad' : 'neutral';
+      trendHtml = `<span class="trend-cell ${trTone}" title="vs прошлый месяц: ${prev}% → ${s.percent}%">${arr} ${delta > 0 ? '+' : ''}${delta.toFixed(0)} п.п.</span>`;
+    } else {
+      trendHtml = `<span class="trend-cell neutral" title="Нет данных за прошлый месяц">—</span>`;
+    }
     return `
     <tr data-store-id="${s.storeId}" class="${state.selectedStoreId === s.storeId ? 'active' : ''}">
       <td class="col-num">${idx + 1}</td>
@@ -654,7 +668,7 @@ function renderStores(summary) {
       <td class="num col-margin ${!isNum(s.marginPct) ? '' : s.marginPct >= 20 ? 'good' : s.marginPct >= 10 ? 'warn' : 'bad'}">${formatPct(s.marginPct)}</td>
       <td class="num">${avgCheck > 0 ? formatMoney(avgCheck) : '—'}</td>
       <td class="num">${formatNum(s.quantity)}</td>
-      <td class="num"><span class="spark"><span class="spark-fill ${tone}" style="width:${Math.min(s.percent, 100)}%"></span></span></td>
+      <td class="num">${trendHtml}</td>
       <td class="col-edit no-print">
         <button class="edit-plan-btn" data-store-id="${s.storeId}" title="Редактировать план">✎</button>
       </td>

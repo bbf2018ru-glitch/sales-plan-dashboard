@@ -3560,3 +3560,19 @@ body.plan-incomplete .spark-fill {
   background: linear-gradient(90deg, #ff7a96, #c14456);
   border-radius: 3px;
 }
+
+/* ─── Тренд в таблице точек ──────────────────────────────────────────── */
+.trend-cell {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.trend-cell.good    { background: rgba(52,211,153,.15);  color: rgb(52,211,153); }
+.trend-cell.bad     { background: rgba(251,113,133,.15); color: rgb(251,113,133); }
+.trend-cell.neutral { background: rgba(255,255,255,.06); color: rgba(236,237,245,.55); }
+[data-theme=light] .trend-cell.good    { background: rgba(22,163,74,.10);  color: rgb(22,163,74); }
+[data-theme=light] .trend-cell.bad     { background: rgba(220,38,38,.10);  color: rgb(220,38,38); }
+[data-theme=light] .trend-cell.neutral { background: rgba(0,0,0,.04);      color: rgba(26,21,48,.55); }
