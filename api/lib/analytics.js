@@ -387,13 +387,24 @@ function buildPeriodComparison(db, period, currentTotals) {
 }
 
 function buildYoYComparison(db, period, currentTotals) {
-  const yoyPeriod = shiftPeriod(period, -12);
-  if (!yoyPeriod) return null;
-
-  const previous = aggregatePeriodCore(db, yoyPeriod);
-  const hasPreviousData = previous.totals.plan > 0 || previous.totals.fact > 0;
-  if (!hasPreviousData) {
-    return { previousPeriod: yoyPeriod, hasData: false };
+  // Ищем тот же месяц год назад, потом 2 года назад (если нет данных за прошлый
+  // год — частая ситуация у нас, есть май 2024 но нет мая 2025).
+  let yoyPeriod = null;
+  let previous = null;
+  let yearsBack = 0;
+  for (const back of [12, 24, 36]) {
+    const candidate = shiftPeriod(period, -back);
+    if (!candidate) continue;
+    const agg = aggregatePeriodCore(db, candidate);
+    if (agg.totals.plan > 0 || agg.totals.fact > 0) {
+      yoyPeriod = candidate;
+      previous = agg;
+      yearsBack = back / 12;
+      break;
+    }
+  }
+  if (!previous) {
+    return { previousPeriod: shiftPeriod(period, -12), hasData: false };
   }
 
   const factDelta = roundMetric(currentTotals.fact - previous.totals.fact);
@@ -404,6 +415,7 @@ function buildYoYComparison(db, period, currentTotals) {
 
   return {
     previousPeriod: yoyPeriod,
+    yearsBack,
     hasData: true,
     factDelta,
     factDeltaPercent: previous.totals.fact > 0 ? percent(factDelta / previous.totals.fact) : 0,

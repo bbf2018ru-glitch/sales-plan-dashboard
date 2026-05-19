@@ -183,11 +183,24 @@
 
         <section id="summaryHero" class="summary-hero hidden"></section>
 
+        <!-- 1. Итоги периода (KPI) -->
+        <section class="section">
+          <div class="section-label">Итоги периода</div>
+          <div id="kpis" class="kpi-grid"></div>
+        </section>
+
+        <!-- 2. Прогноз и ритм -->
+        <section class="section">
+          <div class="section-label">Прогноз и ритм</div>
+          <div id="forecastPanel" class="forecast-grid"></div>
+        </section>
+
+        <!-- 3. AI · что посмотреть -->
         <section class="section">
           <div class="section-header">
             <div>
               <div class="section-label">AI · что посмотреть в первую очередь</div>
-              <div class="section-hint">алгоритмическое выделение аномалий + советы с учётом сибирского календаря</div>
+              <div class="section-hint">аномалии и советы с учётом календаря Восточной Сибири</div>
             </div>
             <div style="display:flex;align-items:center;gap:10px">
               <span id="insightsEngine" class="muted" style="font-size:11px"></span>
@@ -200,22 +213,44 @@
           <div id="insightsPanel" class="insights-panel"></div>
         </section>
 
-        <section class="section">
-          <div class="section-label">Итоги периода</div>
-          <div id="kpis" class="kpi-grid"></div>
-        </section>
-
-        <section class="section">
-          <div class="section-label">Прогноз и ритм</div>
-          <div id="forecastPanel" class="forecast-grid"></div>
-        </section>
-
+        <!-- 4. Лидер / Риск + Сравнение к прошлым периодам -->
         <section class="section panel-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Лидер и точки в зоне риска</div>
+              <div class="panel-subtitle">кто идёт лучше всех и кому нужна помощь</div>
+            </div>
+            <div id="spotlight" class="spotlight"></div>
+          </article>
+          <article class="panel panel-narrow">
+            <div class="panel-header">
+              <div class="panel-title">Сравнение</div>
+              <div class="panel-subtitle">прошлый месяц и год назад</div>
+            </div>
+            <div id="comparisonPanel"></div>
+          </article>
+        </section>
+
+        <!-- 5. График план/факт по дням (на всю ширину) -->
+        <section class="section">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">План и факт по дням месяца</div>
+                <div class="panel-subtitle">линия плана — равномерное распределение к концу периода; линия факта — накопленная выручка</div>
+              </div>
+            </div>
+            <div id="dailyChart" class="chart-wrap"></div>
+          </article>
+        </section>
+
+        <!-- 6. Тренд по месяцам (внизу — историческая динамика) -->
+        <section class="section">
           <article class="panel">
             <div class="panel-header">
               <div>
                 <div class="panel-title">Тренд по месяцам</div>
-                <div class="panel-subtitle" id="trendSubtitle">план и факт</div>
+                <div class="panel-subtitle" id="trendSubtitle">историческая динамика — план и факт</div>
               </div>
               <div class="btn-group" id="trendWindowBtns">
                 <button class="btn-xs" data-tw="3">3М</button>
@@ -225,29 +260,6 @@
               </div>
             </div>
             <div id="trendChart" class="chart-wrap"></div>
-          </article>
-          <article class="panel panel-narrow">
-            <div class="panel-header">
-              <div class="panel-title">Сравнения</div>
-              <div class="panel-subtitle">прошлый месяц и год назад</div>
-            </div>
-            <div id="comparisonPanel"></div>
-          </article>
-        </section>
-
-        <section class="section panel-grid">
-          <article class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Дневной план-факт</div>
-              <div class="panel-subtitle">накопительный ритм по дням</div>
-            </div>
-            <div id="dailyChart" class="chart-wrap"></div>
-          </article>
-          <article class="panel panel-narrow">
-            <div class="panel-header">
-              <div class="panel-title">Лидер / Риск</div>
-            </div>
-            <div id="spotlight" class="spotlight"></div>
           </article>
         </section>
 
@@ -1153,6 +1165,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=35"></script>
+    <script src="/app.js?v=36"></script>
   </body>
 </html>

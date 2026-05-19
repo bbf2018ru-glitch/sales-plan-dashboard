@@ -429,8 +429,7 @@ function renderKpis(summary) {
   const completionSub  = planIncomplete ? 'план неполный' : '';
 
   const projectedVal  = planIncomplete ? '—' : formatMoney(f.projectedFact);
-  const seasonalTag = f.projectionMethod === 'seasonal-dow' ? ' · с учётом дней недели' : '';
-  const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану${seasonalTag}`;
+  const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану`;
   const projectedTone = planIncomplete ? 'neutral' : f.tone;
 
   const requiredVal  = planIncomplete ? '—' : formatMoney(f.requiredPerDayToPlan);
@@ -578,9 +577,12 @@ function renderCmpCard(label, c) {
 }
 
 function renderComparison(summary) {
+  const yoyLabel = summary.yoy?.yearsBack > 1
+    ? `vs. тот же месяц ${summary.yoy.yearsBack} года назад`
+    : 'vs. тот же месяц год назад';
   $('comparisonPanel').innerHTML =
     renderCmpCard('vs. прошлый месяц', summary.comparison) +
-    renderCmpCard('vs. тот же месяц год назад', summary.yoy);
+    renderCmpCard(yoyLabel, summary.yoy);
 }
 
 // ── Spotlight ──────────────────────────────────────────────────────────────
