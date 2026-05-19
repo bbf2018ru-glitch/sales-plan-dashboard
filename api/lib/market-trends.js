@@ -3,7 +3,7 @@
 // кондитерская 33 года) + наши топ-категории и товары — чтобы AI не
 // предлагал ровно то, что уже есть в ассортименте.
 
-const { chatCompletion } = require('./groq');
+const { callGroqWithFallback } = require('./groq');
 
 const TTL_MS = 24 * 60 * 60 * 1000; // сутки
 
@@ -154,15 +154,19 @@ async function generateTrends({ apiKey, model, summary }) {
   };
   const system = buildSystemPrompt();
   const user = buildUserPrompt(ctx);
-  const raw = await chatCompletion({
+  // При 429 на 70b — fallback на 8b-instant с большим дневным лимитом.
+  const { text: raw, model: usedModel } = await callGroqWithFallback({
     apiKey,
-    model,
-    system,
-    user,
+    models: [model || 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
     temperature: 0.5,
     maxTokens: 1500,
     timeoutMs: 30000,
   });
+  ctx.model = usedModel;
   const trends = safeParseTrends(raw);
   if (!trends || !trends.length) {
     throw new Error('LLM вернул не-JSON или пустой массив');

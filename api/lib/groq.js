@@ -70,4 +70,22 @@ function chatCompletion({ apiKey, model, system, user, temperature, maxTokens, t
   });
 }
 
-module.exports = { callGroq, chatCompletion, DEFAULT_MODEL };
+// Пробует модели по списку, при 429 (квота исчерпана) переключается
+// на следующую. Полезно для Free tier где у моделей разные дневные лимиты:
+//   llama-3.3-70b-versatile: ~100K TPD
+//   llama-3.1-8b-instant:    ~500K TPD (резерв когда 70b кончилась)
+async function callGroqWithFallback({ apiKey, models, ...rest }) {
+  let lastErr;
+  for (const model of models) {
+    try {
+      return { text: await callGroq({ apiKey, model, ...rest }), model };
+    } catch (err) {
+      lastErr = err;
+      if (/Groq 429/.test(err.message)) continue;
+      throw err;
+    }
+  }
+  throw lastErr || new Error('All Groq models rate-limited');
+}
+
+module.exports = { callGroq, chatCompletion, callGroqWithFallback, DEFAULT_MODEL };
