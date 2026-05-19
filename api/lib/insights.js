@@ -8,8 +8,28 @@ const { getUpcomingEvents, seasonalContext, holidayDaysInPeriod } = require('./c
 // Возвращает массив [{ severity, kind, store?, product?, headline, detail }]
 // severity: 'high' | 'medium' | 'low'
 
+// Какую долю от выручки сети нужно иметь категория/магазин, чтобы считаться
+// «в работе». Меньше = из инсайтов исключаются.
+const ACTIVITY_SHARE_MIN = 0.02;       // 2% от выручки сети — категория «в работе»
+const ACTIVITY_STORE_FACT_MIN = 50000; // ₽ за период — магазин «в работе»
+
+// Был ли магазин активен последние N дней (есть продажи).
+// Защищает от алертов по точкам которые закрыты/выходят из сети.
+function storeActiveRecently(storeId, db, period, daysBack = 7) {
+  const cutoff = Date.now() - daysBack * 86400 * 1000;
+  for (const s of db.sales || []) {
+    if (s.period !== period) continue;
+    if ((s.storeId || s.store_id) !== storeId) continue;
+    const at = s.soldAt || s.sold_at;
+    if (!at) continue;
+    if (new Date(at).getTime() >= cutoff) return true;
+  }
+  return false;
+}
+
 function detectAnomalies(summary, db, period) {
   const findings = [];
+  const networkFact = summary.totals.fact || 1;
 
   // Если в периоде нет ни планов, ни фактов — это просто будущий или ещё
   // не загруженный месяц. Не показываем «прогноз 0%», «-100% YoY» и пр.
@@ -35,11 +55,15 @@ function detectAnomalies(summary, db, period) {
     return findings;
   }
 
-  // 1. Точки в риске — выполнение < 80% при оставшихся днях ≤ 7
+  // 1. Точки в риске — выполнение < 80% при оставшихся днях ≤ 7.
+  //    Фильтр: только активные за последнюю неделю + значимый объём,
+  //    чтобы не алертить про закрытые/служебные точки.
   const remainingDays = summary.forecast.remainingDays;
   if (remainingDays > 0 && remainingDays <= 10) {
     const risky = summary.stores
       .filter((s) => s.plan > 0 && s.percent < 80)
+      .filter((s) => s.fact >= ACTIVITY_STORE_FACT_MIN)
+      .filter((s) => storeActiveRecently(s.storeId, db, period))
       .sort((a, b) => a.percent - b.percent)
       .slice(0, 3);
     for (const s of risky) {
@@ -75,9 +99,13 @@ function detectAnomalies(summary, db, period) {
         detail: `Прошлый ${summary.yoy.previousPeriod}: ${formatRu(summary.yoy.previousTotals.fact)} ₽. Сейчас: ${formatRu(summary.totals.fact)} ₽.`,
       });
     }
-    // Анализ категорий YoY — нужны исторические данные за тот же месяц
+    // Анализ категорий YoY. Фильтр: текущая доля категории ≥ 2% от выручки сети
+    // (иначе это «спящие» направления — не алертим про них).
     const yoyCategories = compareCategoriesYoY(db, period, summary.yoy.previousPeriod);
-    for (const c of yoyCategories.filter((c) => c.deltaPercent < -10).slice(0, 2)) {
+    const activeCatYoy = yoyCategories
+      .filter((c) => c.deltaPercent < -10)
+      .filter((c) => c.fact / networkFact >= ACTIVITY_SHARE_MIN);
+    for (const c of activeCatYoy.slice(0, 2)) {
       findings.push({
         severity: c.deltaPercent < -25 ? 'high' : 'medium',
         kind: 'category-yoy-decline',
@@ -87,9 +115,11 @@ function detectAnomalies(summary, db, period) {
     }
   }
 
-  // 4. Точки с провалом маржи
+  // 4. Точки с провалом маржи. Фильтр: только значимые по объёму магазины,
+  //    активные за последнюю неделю.
   const marginIssues = summary.stores
-    .filter((s) => s.fact > 0 && s.marginPct !== null && s.marginPct < 15)
+    .filter((s) => s.fact >= ACTIVITY_STORE_FACT_MIN && s.marginPct !== null && s.marginPct < 15)
+    .filter((s) => storeActiveRecently(s.storeId, db, period))
     .sort((a, b) => a.marginPct - b.marginPct)
     .slice(0, 2);
   for (const s of marginIssues) {
@@ -102,24 +132,9 @@ function detectAnomalies(summary, db, period) {
     });
   }
 
-  // 5. Категории-провалы внутри текущего месяца
-  const totalFact = summary.totals.fact || 1;
-  const lowCategories = aggregateByCategory(summary.products)
-    .filter((c) => c.fact > 0 && summary.products.length > 0)
-    .map((c) => ({ ...c, share: c.fact / totalFact }))
-    .sort((a, b) => a.share - b.share)
-    .slice(0, 1);
-  // Это слабый сигнал — добавляем только если действительно мало
-  for (const c of lowCategories) {
-    if (c.share < 0.02 && c.fact > 0) {
-      findings.push({
-        severity: 'low',
-        kind: 'tiny-category',
-        headline: `Категория «${c.name}» — всего ${(c.share * 100).toFixed(1)}% выручки`,
-        detail: `Возможно, кандидат на ревизию или продвижение. Факт: ${formatRu(c.fact)} ₽.`,
-      });
-    }
-  }
+  // 5. Категории с мизерной долей (< 2%) — НЕ показываем.
+  // По смыслу это «спящие» направления, по которым работа не ведётся,
+  // и пользователь явно просил их исключить из инсайтов.
 
   // 6. Праздники впереди
   const upcoming = getUpcomingEvents(35).filter((e) => e.impact !== 'low');
