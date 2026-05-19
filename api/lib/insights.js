@@ -243,7 +243,7 @@ function detectAnomalies(summary, db, period) {
       severity: 'low',
       kind: 'top-revenue-store',
       store: s.storeName,
-      headline: `★ Топ по выручке: ${s.storeName} — ${formatRu(s.fact)} ₽${pct}`,
+      headline: `Топ по выручке: ${s.storeName} — ${formatRu(s.fact)} ₽${pct}`,
       detail: `Самый большой оборот в сети за период. План ${formatRu(s.plan)} ₽. Даже если процент не лидерский — это объёмная точка, на её динамику стоит обращать внимание первой.`
     });
   }

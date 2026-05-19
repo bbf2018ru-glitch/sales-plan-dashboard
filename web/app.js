@@ -382,7 +382,7 @@ function renderSummaryHero(summary) {
     .filter(s => s.fact > 0)
     .sort((a, b) => (b.fact || 0) - (a.fact || 0))
     .slice(0, 3);
-  const leadersTitle = realLeaders.length ? '⬆ Лидеры' : '★ Топ по выручке';
+  const leadersTitle = realLeaders.length ? '⬆ Лидеры' : 'Топ по выручке';
   const leaderValue = (s) => realLeaders.length ? `${s.percent}%` : fmtMoneyShort(s.fact || 0);
 
   // Какой текст по состоянию плана (pct = % к плану-на-сегодня, не на конец месяца)
