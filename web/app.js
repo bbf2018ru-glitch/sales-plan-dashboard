@@ -436,11 +436,11 @@ function renderKpis(summary) {
   const deltaTxt = c?.hasData ? ` ${deltaArrow}${c.factDeltaPercent > 0 ? '+' : ''}${c.factDeltaPercent}%` : '';
 
   // ── Расчёты «на сегодня» ────────────────────────────────────────────────
-  // План на сегодня (накопленный к этой дате) = planPerDay × elapsedDays.
-  // Это даёт справедливое сравнение «сколько должны были сделать к сегодня».
-  const planToDate = f.planPerDay && f.elapsedDays ? f.planPerDay * f.elapsedDays : 0;
-  const factToDate = t.fact || 0;
-  const gapToDate = planToDate - factToDate; // > 0 = отстаём, < 0 = опережаем
+  // Сервер уже посчитал план-на-сейчас с учётом часа в Иркутске (дробно).
+  const today = summary.today || {};
+  const planToDate = today.planToDate || 0;
+  const factToDate = today.factToDate ?? t.fact ?? 0;
+  const gapToDate = today.gapToDate ?? (planToDate - factToDate);
   const todayPct = planToDate > 0 ? Math.round((factToDate / planToDate) * 100) : 0;
   const todayTone = todayPct >= 100 ? 'good' : todayPct >= 90 ? 'warn' : 'bad';
 
@@ -482,7 +482,6 @@ function renderKpis(summary) {
   else planSub = `✓ план на сегодня выполнен (опережаем на ${fmtMoneyShort(-gapToDate)})`;
 
   // === Подпись «Факт»: сравнение с тем же днём прошлого года ===
-  const today = summary.today || {};
   const elapsed = f.elapsedDays || 0;
   let factSub = `на ${elapsed}-й день месяца`;
   if (typeof today.yoyTodayFact === 'number' && today.yoyTodayFact > 0 && elapsed > 0) {

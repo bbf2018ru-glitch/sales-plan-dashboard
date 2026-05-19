@@ -712,9 +712,21 @@ function aggregateDashboard(db, period, opts = {}) {
   const trendWindow = opts.trendWindow || 12;
   const f = summary.forecast || {};
 
-  // Метрики «на сегодня»: план-до-сегодня + факт прошлого года на тот же день
+  // Метрики «на сегодня»: план-до-сегодня + факт прошлого года на тот же день.
+  // Для ТЕКУЩЕГО месяца считаем план дробно — с учётом которая часть сегодняшнего
+  // дня прошла (по Иркутскому времени UTC+8). Иначе сравнение факта с планом
+  // на КОНЕЦ сегодняшнего дня вводит в заблуждение: к 13:00 факт сделал 50%
+  // дня, а план уже 100% — выходит, что выполнили план хотя на самом деле нет.
   const elapsedDays = f.elapsedDays || 0;
-  const planToDate = (f.planPerDay || 0) * elapsedDays;
+  const irkNow = new Date(Date.now() + 8 * 3600 * 1000);
+  const todayMonthKey = `${irkNow.getUTCFullYear()}-${String(irkNow.getUTCMonth() + 1).padStart(2, '0')}`;
+  const isCurrentMonth = period === todayMonthKey;
+  let elapsedDaysEffective = elapsedDays;
+  if (isCurrentMonth && elapsedDays > 0) {
+    const hoursToday = irkNow.getUTCHours() + irkNow.getUTCMinutes() / 60;
+    elapsedDaysEffective = Math.max(0, elapsedDays - 1 + hoursToday / 24);
+  }
+  const planToDate = (f.planPerDay || 0) * elapsedDaysEffective;
   let yoyTodayFact = null;
   let yoyTodayPeriod = null;
   let yoyTodayYearsBack = 0;
@@ -739,6 +751,8 @@ function aggregateDashboard(db, period, opts = {}) {
     ...summary,
     today: {
       elapsedDays,
+      elapsedDaysFractional: Number(elapsedDaysEffective.toFixed(3)),
+      isCurrentMonth,
       planToDate: Number(planToDate.toFixed(2)),
       factToDate: Number((summary.totals.fact || 0).toFixed(2)),
       gapToDate: Number((planToDate - (summary.totals.fact || 0)).toFixed(2)),
