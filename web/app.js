@@ -371,11 +371,19 @@ function renderSummaryHero(summary) {
     .sort((a, b) => a.percent - b.percent)
     .slice(0, 3);
 
-  // Топ-3 лидера
-  const leaders = (summary.stores || [])
-    .filter(s => s.plan > 0)
+  // Топ-3 лидера. Исключаем план-аномалии (точки с заниженным планом дают
+  // 600%+ и забивают слот лидерства). Если ни одного настоящего лидера нет —
+  // показываем топ-3 по абсолютной выручке как fallback с другим заголовком.
+  const realLeaders = (summary.stores || [])
+    .filter(s => s.plan >= 500000 && s.percent >= 100 && s.percent <= 200)
     .sort((a, b) => b.percent - a.percent)
     .slice(0, 3);
+  const leaders = realLeaders.length ? realLeaders : (summary.stores || [])
+    .filter(s => s.fact > 0)
+    .sort((a, b) => (b.fact || 0) - (a.fact || 0))
+    .slice(0, 3);
+  const leadersTitle = realLeaders.length ? '⬆ Лидеры' : '★ Топ по выручке';
+  const leaderValue = (s) => realLeaders.length ? `${s.percent}%` : fmtMoneyShort(s.fact || 0);
 
   // Какой текст по состоянию плана (pct = % к плану-на-сегодня, не на конец месяца)
   let mood = 'ok';
@@ -417,8 +425,8 @@ function renderSummaryHero(summary) {
             ${lagging.map(s => `<div class="hero-store hero-store-bad">${escapeHtml(s.storeName)} <b>${s.percent}%</b></div>`).join('')}
           </div>
           <div class="hero-list">
-            <div class="hero-list-title">⬆ Лидеры</div>
-            ${leaders.map(s => `<div class="hero-store hero-store-good">${escapeHtml(s.storeName)} <b>${s.percent}%</b></div>`).join('')}
+            <div class="hero-list-title">${leadersTitle}</div>
+            ${leaders.map(s => `<div class="hero-store hero-store-good">${escapeHtml(s.storeName)} <b>${leaderValue(s)}</b></div>`).join('')}
           </div>
         </div>` : ''}
       </div>
@@ -868,13 +876,26 @@ function renderComparison(summary) {
 function renderSpotlight(summary) {
   const l = summary.leader, lg = summary.lagger;
   const planIncomplete = summary?.planHealth && summary.planHealth.ok === false;
-  const lPctStr  = planIncomplete ? formatMoney(l?.fact || 0)  : `${l ? l.percent : 0}%`;
+  // Если backend нашёл настоящего лидера по проценту — показываем %.
+  // Если только топ по выручке (leaderKind=revenue) — показываем сумму
+  // и меняем заголовок, чтобы не вводить в заблуждение.
+  const leaderByRevenueOnly = l && l.leaderKind === 'revenue';
+  const leaderLabel = leaderByRevenueOnly ? 'Топ по выручке' : 'Лидер';
+  const lPctStr  = planIncomplete
+    ? formatMoney(l?.fact || 0)
+    : leaderByRevenueOnly
+      ? formatMoney(l?.fact || 0)
+      : `${l ? l.percent : 0}%`;
   const lgPctStr = planIncomplete ? formatMoney(lg?.fact || 0) : `${lg ? lg.percent : 0}%`;
-  const lMeta    = planIncomplete ? 'факт (% при неполном плане)' : (l ? formatMoney(l.fact) : '');
+  const lMeta    = planIncomplete
+    ? 'факт (% при неполном плане)'
+    : leaderByRevenueOnly
+      ? `${l.percent}% плана (нет лидеров ≥100%)`
+      : (l ? formatMoney(l.fact) : '');
   const lgMeta   = planIncomplete ? 'факт (% при неполном плане)' : (lg ? formatMoney(lg.gap) : '');
   $('spotlight').innerHTML = `
     <div class="spot-card leader">
-      <div class="spot-label">Лидер</div>
+      <div class="spot-label">${leaderLabel}</div>
       <div class="spot-name">${l ? l.storeName : '—'}</div>
       <div class="spot-value">${lPctStr}</div>
       <div class="spot-meta">${lMeta}</div>

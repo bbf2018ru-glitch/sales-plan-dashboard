@@ -666,8 +666,30 @@ function aggregatePeriodCore(db, period, opts = {}) {
   const totalMargin = computeMargin({ fact: totalFact, cost: totalCost, grossProfit: totalGrossProfit });
   const totalQuantity = storesList.reduce((sum, item) => sum + item.quantity, 0);
   const completion = totalPlan > 0 ? percent(totalFact / totalPlan) : 0;
-  const leader = storesList[0] || null;
-  const lagger = [...storesList].sort((a, b) => a.percent - b.percent)[0] || null;
+  // Лидер/Отстающий для карточек-героев на главной. Применяем те же фильтры
+  // что в insights.js (LEADER_PLAN_MIN, LEADER_PERCENT_MAX) и исключаем точки
+  // без плана из отстающих — иначе:
+  //   - лидером оказывается «Солнечный 11/4» с планом 100К и факт 660К (661%),
+  //     это план-аномалия а не лидерство;
+  //   - отстающим — «Пятая армия» с plan=0 и percent=0, что не информативно.
+  // Когда настоящего лидера по проценту нет (типично в середине месяца —
+  // все 50-70%), показываем топ по абсолютной выручке с пометкой leaderKind.
+  const LEADER_PLAN_MIN = 500000;
+  const LEADER_PERCENT_MAX = 200;
+  const leaderByPercent = storesList.find((s) =>
+    s.plan >= LEADER_PLAN_MIN &&
+    s.percent >= 100 &&
+    s.percent <= LEADER_PERCENT_MAX
+  );
+  const leaderByRevenue = [...storesList]
+    .filter((s) => s.fact > 0)
+    .sort((a, b) => (b.fact || 0) - (a.fact || 0))[0];
+  const leader = leaderByPercent
+    ? { ...leaderByPercent, leaderKind: 'percent' }
+    : (leaderByRevenue ? { ...leaderByRevenue, leaderKind: 'revenue' } : null);
+  const lagger = [...storesList]
+    .filter((s) => s.plan > 0)
+    .sort((a, b) => a.percent - b.percent)[0] || null;
   const lastSaleAt = sales.map((item) => item.soldAt).filter(Boolean).sort().at(-1) || null;
   // Для DoW-сезонности передаём все продажи (не только за текущий period) —
   // тогда последние 120 дней попадают в расчёт независимо от того где они
