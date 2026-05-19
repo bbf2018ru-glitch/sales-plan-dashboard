@@ -167,6 +167,75 @@ function detectAnomalies(summary, db, period) {
   // По смыслу это «спящие» направления, по которым работа не ведётся,
   // и пользователь явно просил их исключить из инсайтов.
 
+  // ── ПОЗИТИВНЫЕ СИГНАЛЫ (показываем когда нет критики, чтобы блок не пустовал) ──
+
+  // 5а. Магазины-лидеры (выполнение ≥ 100%)
+  const leaders = summary.stores
+    .filter((s) => s.plan > 0 && s.percent >= 100 && s.fact >= ACTIVITY_STORE_FACT_MIN)
+    .filter((s) => storeActiveRecently(s.storeId, db, period))
+    .sort((a, b) => b.percent - a.percent)
+    .slice(0, 1);
+  for (const s of leaders) {
+    findings.push({
+      severity: 'low',
+      kind: 'leader-store',
+      store: s.storeName,
+      headline: `✓ ${s.storeName}: выполнение ${s.percent}%`,
+      detail: `Лидер по темпу — факт ${formatRu(s.fact)} ₽ при плане ${formatRu(s.plan)} ₽. Полезно изучить что они делают и масштабировать.`
+    });
+  }
+
+  // 5б. Растущие категории vs прошлый год — позитив (с теми же фильтрами)
+  if (summary.yoy?.hasData) {
+    const untilDay = today.elapsedDays || summary.forecast?.elapsedDays || null;
+    const yoyCats = compareCategoriesYoY(db, period, summary.yoy.previousPeriod, untilDay);
+    const growing = yoyCats
+      .filter((c) => c.deltaPercent > 15)
+      .filter((c) => c.fact >= ACTIVITY_CAT_FACT_MIN)
+      .filter((c) => c.previousFact >= ACTIVITY_CAT_FACT_MIN)
+      .filter((c) => c.fact / networkFact >= ACTIVITY_SHARE_MIN)
+      .filter((c) => isCategoryRelevant(c.name))
+      .sort((a, b) => b.deltaPercent - a.deltaPercent)
+      .slice(0, 1);
+    for (const c of growing) {
+      findings.push({
+        severity: 'low',
+        kind: 'category-yoy-growth',
+        headline: `↗ «${c.name}» — +${c.deltaPercent.toFixed(0)}% к прошлому году`,
+        detail: `Прошлый год за этот период: ${formatRu(c.previousFact)} ₽. Сейчас: ${formatRu(c.fact)} ₽. Что работает — масштабировать.`
+      });
+    }
+  }
+
+  // 5в. Общая позитивная динамика (если сеть идёт лучше прошлого года)
+  if (today.yoyTodayFact != null && today.yoyTodayFact > 0 && today.elapsedDays > 0) {
+    const yoyDayDelta = ((today.factToDate - today.yoyTodayFact) / today.yoyTodayFact) * 100;
+    if (yoyDayDelta > 10) {
+      const yearLabel = today.yoyTodayYearsBack > 1 ? `${today.yoyTodayYearsBack} года` : 'год';
+      findings.push({
+        severity: 'low',
+        kind: 'yoy-today-growth',
+        headline: `↗ Сеть на +${yoyDayDelta.toFixed(1)}% выше того же дня ${yearLabel} назад`,
+        detail: `На ${today.elapsedDays}-й день месяца накопили ${formatRu(today.factToDate)} ₽. В прошлом ${today.yoyTodayPeriod}: ${formatRu(today.yoyTodayFact)} ₽.`
+      });
+    }
+  }
+
+  // 5г. Топ-категория недели — самая значимая по выручке
+  const topCat = aggregateByCategory(summary.products)
+    .filter((c) => c.fact > 0 && isCategoryRelevant(c.name))
+    .sort((a, b) => b.fact - a.fact)
+    .slice(0, 1);
+  for (const c of topCat) {
+    const share = (c.fact / networkFact) * 100;
+    findings.push({
+      severity: 'low',
+      kind: 'top-category',
+      headline: `Топ-категория: «${c.name}» — ${share.toFixed(0)}% выручки`,
+      detail: `Факт ${formatRu(c.fact)} ₽. Это основа выручки — следить за поставками и наличием.`
+    });
+  }
+
   // 6. Праздники впереди
   const upcoming = getUpcomingEvents(60).filter((e) => e.impact !== 'low');
   if (upcoming.length) {
