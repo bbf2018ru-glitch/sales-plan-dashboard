@@ -1129,6 +1129,7 @@ function cmdkActionsList() {
     { title: 'Скачать таб (TSV)', sub: 'Экспорт текущего таба в Excel-формат', run: () => exportFullTab() },
     { title: 'Печать / PDF', sub: 'Окно печати браузера', run: () => window.print() },
     { title: 'Обновить данные', sub: 'Перезагрузить дашборд', run: () => loadSummary() },
+    { title: 'Сбросить закреплённые блоки', sub: 'Вернуть исходный порядок секций', run: () => resetPinned() },
     { title: 'Выйти', sub: 'Удалить сессию и cookies', run: () => doLogout() }
   ];
   for (const c of commands) actions.push({ group: 'Действие', ...c, score: 1 });
@@ -1648,7 +1649,10 @@ function exportCsv(rows, filename) {
 // Сборка таблиц всего видимого таба в один TSV (Excel-friendly).
 // Каждая таблица отдельной секцией с заголовком.
 // ─── Закладки/избранное на панелях ────────────────────────────────────────
-const PINNED_KEY = 'maria_pinned_panels_v1';
+// v2: сбрасываем старые закладки (после перестройки порядка секций они могли
+// тащить блоки на верх и ломать новый порядок).
+const PINNED_KEY = 'maria_pinned_panels_v2';
+try { localStorage.removeItem('maria_pinned_panels_v1'); } catch {}
 function getPinned() {
   try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || '[]')); }
   catch { return new Set(); }
@@ -1700,6 +1704,10 @@ function applyPinnedOrder() {
     const btn = p.querySelector('.pin-btn');
     if (btn) btn.classList.toggle('pinned', isPinned);
   });
+  // КРИТИЧНО: если нет закреплённых — НЕ делаем appendChild. Иначе при каждом
+  // обновлении дашборда (каждые 15 мин через scheduler) DOM пересобирается,
+  // даже если результат идентичный — потенциальный source багов с порядком.
+  if (pinned.size === 0) return;
   // Перемещаем pinned в начало внутри каждого таба/страницы
   const roots = [
     ...document.querySelectorAll('.atab-section:not(.hidden)'),
@@ -1715,6 +1723,16 @@ function applyPinnedOrder() {
     });
     sorted.forEach(el => root.appendChild(el));
   }
+}
+
+function resetPinned() {
+  localStorage.removeItem(PINNED_KEY);
+  document.querySelectorAll('[data-pin-id]').forEach(p => {
+    p.classList.remove('panel-pinned');
+    p.querySelector('.pin-btn')?.classList.remove('pinned');
+  });
+  // Перезагрузка чтобы DOM-порядок вернулся к естественному из HTML
+  setTimeout(() => window.location.reload(), 100);
 }
 
 function exportFullTab() {
