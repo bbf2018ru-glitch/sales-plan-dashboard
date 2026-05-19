@@ -691,11 +691,61 @@ function aggregatePeriodCore(db, period, opts = {}) {
   };
 }
 
+// Накопленный факт за период до дня <=cutoffDay (включительно).
+// Используется чтобы сравнить «факт на N-й день этого месяца» с тем же N-м днём прошлого года.
+function factSumUntilDay(db, period, cutoffDay) {
+  let sum = 0;
+  for (const s of db.sales || []) {
+    if (s.period !== period) continue;
+    const at = s.soldAt || s.sold_at;
+    if (!at) continue;
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime())) continue;
+    if (d.getUTCDate() > cutoffDay) continue;
+    sum += Number(s.amount || 0);
+  }
+  return sum;
+}
+
 function aggregateDashboard(db, period, opts = {}) {
   const summary = aggregatePeriodCore(db, period, opts);
   const trendWindow = opts.trendWindow || 12;
+  const f = summary.forecast || {};
+
+  // Метрики «на сегодня»: план-до-сегодня + факт прошлого года на тот же день
+  const elapsedDays = f.elapsedDays || 0;
+  const planToDate = (f.planPerDay || 0) * elapsedDays;
+  let yoyTodayFact = null;
+  let yoyTodayPeriod = null;
+  let yoyTodayYearsBack = 0;
+  if (elapsedDays > 0) {
+    // Ищем тот же день за прошлый год, потом 2/3 года назад если нет
+    for (const back of [12, 24, 36]) {
+      const yp = shiftPeriod(period, -back);
+      if (!yp) continue;
+      const fact = factSumUntilDay(db, yp, elapsedDays);
+      // Проверяем что в этом периоде вообще есть какие-то sales (иначе пропускаем)
+      const hasAny = (db.sales || []).some(s => s.period === yp);
+      if (hasAny) {
+        yoyTodayFact = Number(fact.toFixed(2));
+        yoyTodayPeriod = yp;
+        yoyTodayYearsBack = back / 12;
+        break;
+      }
+    }
+  }
+
   return {
     ...summary,
+    today: {
+      elapsedDays,
+      planToDate: Number(planToDate.toFixed(2)),
+      factToDate: Number((summary.totals.fact || 0).toFixed(2)),
+      gapToDate: Number((planToDate - (summary.totals.fact || 0)).toFixed(2)),
+      yoyTodayFact,
+      yoyTodayPeriod,
+      yoyTodayYearsBack
+    },
     comparison: buildPeriodComparison(db, period, summary.totals),
     yoy: buildYoYComparison(db, period, summary.totals),
     trend: buildTrend(db, period, trendWindow),

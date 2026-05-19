@@ -474,18 +474,57 @@ function renderKpis(summary) {
     return ` <span class="kpi-delta ${cls}">${sign}${Math.abs(deltaPct).toFixed(0)}% vs прошл.мес</span>`;
   };
 
+  // === Подпись «План на месяц»: «осталось на сегодня» (до плана-на-сегодня) ===
+  const planRemainingToday = Math.max(0, planToDate - factToDate);
+  let planSub;
+  if (planIncomplete) planSub = 'возможно неполный';
+  else if (planRemainingToday > 0) planSub = `осталось на сегодня: ${fmtMoneyShort(planRemainingToday)}`;
+  else planSub = `✓ план на сегодня выполнен (опережаем на ${fmtMoneyShort(-gapToDate)})`;
+
+  // === Подпись «Факт»: сравнение с тем же днём прошлого года ===
+  const today = summary.today || {};
+  const elapsed = f.elapsedDays || 0;
+  let factSub = `на ${elapsed}-й день месяца`;
+  if (typeof today.yoyTodayFact === 'number' && today.yoyTodayFact > 0 && elapsed > 0) {
+    const delta = factToDate - today.yoyTodayFact;
+    const deltaPct = (delta / today.yoyTodayFact) * 100;
+    const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
+    const cls = delta > 0 ? 'kpi-delta-up' : delta < 0 ? 'kpi-delta-down' : '';
+    const ymd = `${elapsed}.${(today.yoyTodayPeriod || '').slice(5,7)}.${(today.yoyTodayPeriod || '').slice(0,4)}`;
+    const label = today.yoyTodayYearsBack > 1
+      ? `vs ${ymd} (${today.yoyTodayYearsBack} года назад)`
+      : `vs ${ymd}`;
+    factSub += ` · <span class="kpi-delta ${cls}">${arrow}${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(0)}% ${label}</span>`;
+  } else if (elapsed > 0) {
+    factSub += ' · vs прошл.год: нет данных';
+  }
+
+  // === «Выполнение к сегодня»: явная подпись «X% от плана на DD.MM» ===
+  const dateStr = elapsed > 0 ? `${elapsed}.${(summary.period || '').slice(5,7)}` : '';
+  let completionSubV2;
+  if (planIncomplete) completionSubV2 = 'план неполный';
+  else completionSubV2 = `от плана на ${dateStr} (${fmtMoneyShort(planToDate)})`
+    + (gapToDate > 0 ? ` · не хватает ${fmtMoneyShort(gapToDate)}` : ` · опережаем на ${fmtMoneyShort(-gapToDate)}`);
+
+  // === «Прогноз»: явно про конец месяца + метод расчёта ===
+  let projectedSubV2;
+  if (planIncomplete) projectedSubV2 = 'план неполный';
+  else {
+    const methodTag = f.projectionMethod === 'seasonal-dow' ? ' · учёт дней недели' : '';
+    projectedSubV2 = `${f.projectedCompletion}% к плану на конец месяца${methodTag}`;
+  }
+
   const cards = [
     { label: 'План на месяц', value: formatMoney(summary.totals.plan),
-      sub: (planIncomplete ? 'возможно неполный · ' : '') + `план на сегодня: ${fmtMoneyShort(planToDate)}` + vsPrev('plan'),
-      tone: 'neutral' },
+      sub: planSub, tone: 'neutral' },
     { label: 'Факт', value: formatMoney(summary.totals.fact),
-      sub: `на ${f.elapsedDays || '?'}-й день` + deltaTxt + vsPrev('fact'), tone: 'neutral' },
+      sub: factSub, tone: 'neutral' },
     { label: 'Выполнение к сегодня', value: completionVal,
-      sub: completionSub, tone: completionTone },
+      sub: completionSubV2, tone: completionTone },
     { label: 'Маржа', value: formatMoney(summary.totals.margin),
       sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
-    { label: 'Прогноз', value: projectedVal, sub: projectedSub, tone: projectedTone },
+    { label: 'Прогноз', value: projectedVal, sub: projectedSubV2, tone: projectedTone },
     { label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone }
   ];
   $('kpis').innerHTML = cards.map(c => `
