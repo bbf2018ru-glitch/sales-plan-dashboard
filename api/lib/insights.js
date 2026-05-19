@@ -226,6 +226,28 @@ function detectAnomalies(summary, db, period) {
     });
   }
 
+  // 5а-bis. Топ по абсолютной выручке — независимо от %. Даёт positive reference
+  //         когда нет лидеров по проценту (типичная картина в середине месяца:
+  //         все на 50-70% плана, но кто-то всё равно тянет больше всех в деньгах).
+  //         Дедуп: если магазин уже в leaders — не дублируем.
+  const leaderIds = new Set(leaders.map((s) => s.storeId));
+  const topByRevenue = summary.stores
+    .filter((s) => s.fact >= ACTIVITY_STORE_FACT_MIN)
+    .filter((s) => !leaderIds.has(s.storeId))
+    .filter((s) => storeActiveRecently(s.storeId, db, period))
+    .sort((a, b) => (b.fact || 0) - (a.fact || 0))
+    .slice(0, 1);
+  for (const s of topByRevenue) {
+    const pct = s.plan > 0 ? ` (${s.percent}% плана)` : '';
+    findings.push({
+      severity: 'low',
+      kind: 'top-revenue-store',
+      store: s.storeName,
+      headline: `★ Топ по выручке: ${s.storeName} — ${formatRu(s.fact)} ₽${pct}`,
+      detail: `Самый большой оборот в сети за период. План ${formatRu(s.plan)} ₽. Даже если процент не лидерский — это объёмная точка, на её динамику стоит обращать внимание первой.`
+    });
+  }
+
   // 5б. Растущие категории vs прошлый год — позитив (с теми же фильтрами)
   if (summary.yoy?.hasData) {
     const untilDay = today.elapsedDays || summary.forecast?.elapsedDays || null;
