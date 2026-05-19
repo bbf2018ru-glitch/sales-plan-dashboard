@@ -657,16 +657,14 @@ function aggregatePeriodCore(db, period, opts = {}) {
     }))
     .sort((a, b) => b.fact - a.fact);
 
-  // totals.fact = вся выручка сети (включая Склад готовой продукции, Сайты —
-  // нестандартные точки), потому что это РЕАЛЬНЫЕ деньги сети.
-  // totals.plan = сумма ВСЕХ планов (включая виртуальный __extra_directions__
-  // куда мы сложили план Сайта/Опта/Заказной/Агрегатора — BSL отдаёт только СТС).
-  const totalPlan = allStoresList.reduce((sum, item) => sum + item.plan, 0);
-  const totalFact = allStoresList.reduce((sum, item) => sum + item.fact, 0);
-  const totalCost = allStoresList.reduce((sum, item) => sum + item.cost, 0);
-  const totalGrossProfit = allStoresList.reduce((sum, item) => sum + Number(item.grossProfit || 0), 0);
+  // totals = только настоящие магазины (без виртуальных __* записей).
+  // План = сумма планов 1С (СТС, как было раньше).
+  const totalPlan = storesList.reduce((sum, item) => sum + item.plan, 0);
+  const totalFact = storesList.reduce((sum, item) => sum + item.fact, 0);
+  const totalCost = storesList.reduce((sum, item) => sum + item.cost, 0);
+  const totalGrossProfit = storesList.reduce((sum, item) => sum + Number(item.grossProfit || 0), 0);
   const totalMargin = computeMargin({ fact: totalFact, cost: totalCost, grossProfit: totalGrossProfit });
-  const totalQuantity = allStoresList.reduce((sum, item) => sum + item.quantity, 0);
+  const totalQuantity = storesList.reduce((sum, item) => sum + item.quantity, 0);
   const completion = totalPlan > 0 ? percent(totalFact / totalPlan) : 0;
   const leader = storesList[0] || null;
   const lagger = [...storesList].sort((a, b) => a.percent - b.percent)[0] || null;

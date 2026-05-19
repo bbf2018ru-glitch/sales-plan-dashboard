@@ -1314,15 +1314,6 @@ function startPullSchedulerWithInterval(intervalMin) {
       console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
       if (run.status === 'success') {
         (async () => {
-          // Дополнительно тянем план Сайт/Опт/Заказная (BSL даёт только СТС)
-          try {
-            const { computeExtraNetworkPlan } = require('./lib/plan-enrich');
-            const r = await computeExtraNetworkPlan(run.period);
-            await store.upsertExtraDirectionsPlan(run.period, r.extraPlan, r.breakdown);
-            console.log(`[plan-enrich] ${run.period}: +${r.extraPlan.toLocaleString('ru-RU')} ₽ (${r.breakdown.length} направлений)`);
-          } catch (e) {
-            console.warn(`[plan-enrich] ${run.period} failed: ${e.message}`);
-          }
           const db = await store.getDb();
           const summary = aggregateDashboard(db, run.period);
           sendEvent('plans_updated', { period: run.period, totals: summary.totals });
