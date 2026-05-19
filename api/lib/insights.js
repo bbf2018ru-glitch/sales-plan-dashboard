@@ -377,8 +377,25 @@ function rankAndTrim(findings, limit = 5) {
 
 // ─── LLM-обёртка через Groq ───────────────────────────────────────────────
 
+// Кэш LLM-резюме: ключ = period + хэш состава finding'ов. Если данные не
+// поменялись (тот же набор аномалий) — переиспользуем результат, не дёргаем
+// Groq. TTL 30 мин: при ухудшении ситуации (новые finding'и) ключ изменится
+// и кэш промахнётся автоматически. До этого фикса каждый dashboard load
+// тратил ~2.5К Groq токенов — дневной лимит Free tier (100К) выедался
+// за ~40 загрузок дашборда + ai-chat.
+const LLM_CACHE_TTL_MS = 30 * 60 * 1000;
+const llmCache = new Map();
+
+function llmCacheKey(period, findings) {
+  const sig = findings.map((f) => `${f.kind}:${f.headline}`).join('|');
+  return `${period}::${sig}`;
+}
+
 async function llmRefineInsights(findings, summary, period, groqConfig) {
   if (!groqConfig?.apiKey) return null;
+  const key = llmCacheKey(period, findings);
+  const hit = llmCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) return hit.text;
 
   const ctx = {
     period,
@@ -398,7 +415,7 @@ async function llmRefineInsights(findings, summary, period, groqConfig) {
   const user = `Период: ${period}\nДанные:\n${JSON.stringify(ctx, null, 2)}\n\nВыдай ровно 5 буллетов в формате:\n1. <текст>\n2. <текст>\n...`;
 
   try {
-    return await callGroq({
+    const text = await callGroq({
       apiKey: groqConfig.apiKey,
       model: groqConfig.model,
       messages: [
@@ -409,6 +426,17 @@ async function llmRefineInsights(findings, summary, period, groqConfig) {
       maxTokens: 700,
       timeoutMs: 15000,
     });
+    if (text) {
+      llmCache.set(key, { text, expiresAt: Date.now() + LLM_CACHE_TTL_MS });
+      // Чистка осиротевших ключей при превышении 50 записей.
+      if (llmCache.size > 50) {
+        const now = Date.now();
+        for (const [k, v] of llmCache) {
+          if (v.expiresAt < now) llmCache.delete(k);
+        }
+      }
+    }
+    return text;
   } catch (err) {
     console.warn('[insights] Groq failed:', err.message);
     return null;
