@@ -127,7 +127,9 @@ function detectAnomalies(summary, db, period) {
     //   - текущий fact ≥ 100К (значимый объём, не эфемера)
     //   - прошлый fact ≥ 100К (категория реально работала, не разовая активность)
     //   - не в blacklist (хлеб/торты-на-заказ/служебные)
-    const yoyCategories = compareCategoriesYoY(db, period, summary.yoy.previousPeriod);
+    // Сравниваем только за пройденные дни (untilDay = elapsedDays из today)
+    const untilDay = today.elapsedDays || summary.forecast?.elapsedDays || null;
+    const yoyCategories = compareCategoriesYoY(db, period, summary.yoy.previousPeriod, untilDay);
     const activeCatYoy = yoyCategories
       .filter((c) => c.deltaPercent < -10)
       .filter((c) => c.fact >= ACTIVITY_CAT_FACT_MIN)
@@ -191,9 +193,12 @@ function detectAnomalies(summary, db, period) {
   return findings;
 }
 
-function compareCategoriesYoY(db, period, yoyPeriod) {
-  const cur = aggregateCategoryFromDb(db, period);
-  const prev = aggregateCategoryFromDb(db, yoyPeriod);
+// Сравнение категорий «факт-на-сегодня vs факт-на-этот-же-день-год-назад».
+// untilDay — до какого дня месяца включительно считать (чтобы текущий
+// неполный месяц справедливо сравнивался с тем же отрезком прошлого).
+function compareCategoriesYoY(db, period, yoyPeriod, untilDay) {
+  const cur = aggregateCategoryFromDb(db, period, untilDay);
+  const prev = aggregateCategoryFromDb(db, yoyPeriod, untilDay);
   const result = [];
   for (const [name, fact] of cur.entries()) {
     const previousFact = prev.get(name) || 0;
@@ -205,11 +210,19 @@ function compareCategoriesYoY(db, period, yoyPeriod) {
   return result.sort((a, b) => a.deltaPercent - b.deltaPercent);
 }
 
-function aggregateCategoryFromDb(db, period) {
+function aggregateCategoryFromDb(db, period, untilDay) {
   const productCat = new Map(db.products.map((p) => [p.id, p.category || 'Прочее']));
   const totals = new Map();
   for (const s of db.sales) {
     if (s.period !== period) continue;
+    // Если задан untilDay — берём только продажи до этого дня месяца включительно
+    if (untilDay) {
+      const at = s.soldAt || s.sold_at;
+      if (!at) continue;
+      const d = new Date(at);
+      if (Number.isNaN(d.getTime())) continue;
+      if (d.getUTCDate() > untilDay) continue;
+    }
     const cat = productCat.get(s.productId) || 'Прочее';
     totals.set(cat, (totals.get(cat) || 0) + Number(s.amount || 0));
   }
