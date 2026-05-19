@@ -1,11 +1,24 @@
 // AI-чат «Спроси у Маши» — Groq + контекст текущих данных дашборда.
 // Без function-calling: контекст собираем заранее и упаковываем в промпт.
 
-const https = require('node:https');
 const { aggregateDashboard, monthKey } = require('./analytics');
+const { chatCompletion } = require('./groq');
 
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
-const DEFAULT_TIMEOUT_MS = 30000;
+// Кэш агрегации дашборда на period. aggregateDashboard тяжёлый
+// (12-мес trend, все продажи), а в активной беседе пользователь шлёт
+// несколько вопросов подряд про один и тот же период — пересчёт каждый
+// раз тратит CPU зря. TTL 30 сек: данные за период не меняются часто,
+// pull-scheduler тянет 1С раз в 15 мин, plans/sales обновляются ингестом.
+const CONTEXT_TTL_MS = 30000;
+const contextCache = new Map(); // period -> { context, expiresAt }
+
+function getContext(db, period) {
+  const cached = contextCache.get(period);
+  if (cached && cached.expiresAt > Date.now()) return cached.context;
+  const ctx = buildContext(db, period);
+  contextCache.set(period, { context: ctx, expiresAt: Date.now() + CONTEXT_TTL_MS });
+  return ctx;
+}
 
 function buildContext(db, period) {
   const summary = aggregateDashboard(db, period, { trendWindow: 12 });
@@ -82,57 +95,11 @@ const SYSTEM_PROMPT = `Ты — Маша, AI-аналитик кондитерс
 - Если вопрос про действие («что делать?») — давай 1-2 конкретные рекомендации
 - Контекст содержит данные ТОЛЬКО за текущий период — если спрашивают про другой, скажи что нужно сменить период в дашборде`;
 
-function callGroq({ apiKey, model, system, user, timeoutMs }) {
-  const body = JSON.stringify({
-    model: model || DEFAULT_MODEL,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user }
-    ],
-    temperature: 0.2,
-    max_tokens: 500
-  });
-
-  // Если задан GROQ_BASE_URL — идём через прокси (например для регионально-
-  // заблокированных IP). Формат: https://host[/prefix] — путь /chat/completions
-  // мы достроим. Иначе — напрямую в api.groq.com/openai/v1/.
-  const baseUrl = (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
-  const url = new URL(`${baseUrl}/chat/completions`);
-
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: url.hostname,
-      port: url.port || 443,
-      path: url.pathname + url.search,
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    }, (res) => {
-      let raw = '';
-      res.on('data', (c) => raw += c);
-      res.on('end', () => {
-        if (res.statusCode >= 400) return reject(new Error(`Groq ${res.statusCode}: ${raw.slice(0, 300)}`));
-        try {
-          const p = JSON.parse(raw);
-          resolve(p.choices?.[0]?.message?.content || '');
-        } catch (e) { reject(new Error('Groq parse failed: ' + e.message)); }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(timeoutMs || DEFAULT_TIMEOUT_MS, () => req.destroy(new Error('LLM timeout')));
-    req.write(body);
-    req.end();
-  });
-}
-
 async function askAiChat({ question, db, period, history, apiKey, model, getNotes }) {
   if (!apiKey) throw new Error('GROQ_API_KEY не задан в env');
   if (!question) throw new Error('Вопрос пустой');
 
-  const ctx = buildContext(db, monthKey(period));
+  const ctx = getContext(db, monthKey(period));
 
   // Заметки магазинов (события) — даём AI знать про ремонты/закрытия
   let notesBlock = '';
@@ -151,7 +118,7 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
 
   const userMsg = `${ctx}${notesBlock}\n\n${histMsg ? '=== ИСТОРИЯ ЧАТА ===\n' + histMsg + '\n' : ''}=== ВОПРОС ===\n${question}`;
 
-  const answer = await callGroq({ apiKey, model, system: SYSTEM_PROMPT, user: userMsg });
+  const answer = await chatCompletion({ apiKey, model, system: SYSTEM_PROMPT, user: userMsg });
   return { answer: answer.trim(), period };
 }
 

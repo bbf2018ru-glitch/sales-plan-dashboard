@@ -514,7 +514,13 @@ function aggregatePeriodCore(db, period, opts = {}) {
   // приводящий суммарный cost магазина к целевому (fact / (1 + markup/100)).
   // Это даёт точное совпадение тоталов по магазину с отчётом «Валовая прибыль»,
   // сохраняя распределение cost между товарами.
+  //
+  // Fallback на storeMarkupFallback: если BSL /pull не передал себестоимость
+  // (cost=0 на всех строках), а markup для магазина задан — считаем cost
+  // прямо из факта в per-row loop. Иначе marginPct=null и блок «Маржа»
+  // на дашборде показывает «—», что неинформативно.
   const storeCostScale = new Map();
+  const storeMarkupFallback = new Map();
   if (Object.keys(storeMarkups).length > 0) {
     const rawByStore = new Map();
     for (const row of sales) {
@@ -525,11 +531,15 @@ function aggregatePeriodCore(db, period, opts = {}) {
     }
     for (const [sid, { fact, cost }] of rawByStore) {
       const markup = storeMarkups[sid];
-      if (!markup || cost <= 0) continue;
-      const targetCost = fact / (1 + markup / 100);
-      // Применяем scale только если он уменьшает cost (никогда не наращиваем).
-      const scale = targetCost / cost;
-      storeCostScale.set(sid, scale < 1 ? scale : 1);
+      if (!markup) continue;
+      if (cost > 0) {
+        const targetCost = fact / (1 + markup / 100);
+        // Применяем scale только если он уменьшает cost (никогда не наращиваем).
+        const scale = targetCost / cost;
+        storeCostScale.set(sid, scale < 1 ? scale : 1);
+      } else if (fact > 0) {
+        storeMarkupFallback.set(sid, markup);
+      }
     }
   }
 
@@ -620,9 +630,16 @@ function aggregatePeriodCore(db, period, opts = {}) {
       });
     }
     const scale = storeCostScale.get(row.storeId);
-    const cappedRowCost = scale !== undefined
-      ? toNumber(row.cost) * scale
-      : capCost(row.amount, row.cost, costCapRatio);
+    const markupFallback = storeMarkupFallback.get(row.storeId);
+    let cappedRowCost;
+    if (scale !== undefined) {
+      cappedRowCost = toNumber(row.cost) * scale;
+    } else if (markupFallback !== undefined && toNumber(row.cost) === 0) {
+      // 1С не передал себестоимость — реконструируем через markup магазина
+      cappedRowCost = toNumber(row.amount) / (1 + markupFallback / 100);
+    } else {
+      cappedRowCost = capCost(row.amount, row.cost, costCapRatio);
+    }
     byStore.get(row.storeId).fact += toNumber(row.amount);
     byStore.get(row.storeId).cost += cappedRowCost;
     byStore.get(row.storeId).grossProfit += toNumber(row.grossProfit);
@@ -844,8 +861,11 @@ function storeDetails(db, period, storeId, opts = {}) {
   const plans = db.plans.filter((item) => item.period === period && item.storeId === storeId);
   const sales = db.sales.filter((item) => item.period === period && item.storeId === storeId);
 
-  // Pre-pass scale (как в aggregatePeriodCore) — для того же магазина
+  // Pre-pass scale (как в aggregatePeriodCore) — для того же магазина.
+  // Если cost=0 на всех строках (1С не передал себестоимость), но markup
+  // задан — fallback на расчёт через markup в per-row loop ниже.
   let storeCostScale;
+  let storeMarkupFallback;
   const markup = storeMarkups[storeId];
   if (markup) {
     let rawFact = 0, rawCost = 0;
@@ -854,6 +874,8 @@ function storeDetails(db, period, storeId, opts = {}) {
       const targetCost = rawFact / (1 + markup / 100);
       const sc = targetCost / rawCost;
       if (sc < 1) storeCostScale = sc;
+    } else if (rawFact > 0) {
+      storeMarkupFallback = markup;
     }
   }
   const rows = new Map();
@@ -888,9 +910,13 @@ function storeDetails(db, period, storeId, opts = {}) {
     }
     const item = rows.get(row.productId);
     item.fact += toNumber(row.amount);
-    item.cost += storeCostScale !== undefined
-      ? toNumber(row.cost) * storeCostScale
-      : capCost(row.amount, row.cost, costCapRatio);
+    if (storeCostScale !== undefined) {
+      item.cost += toNumber(row.cost) * storeCostScale;
+    } else if (storeMarkupFallback !== undefined && toNumber(row.cost) === 0) {
+      item.cost += toNumber(row.amount) / (1 + storeMarkupFallback / 100);
+    } else {
+      item.cost += capCost(row.amount, row.cost, costCapRatio);
+    }
     item.grossProfit += toNumber(row.grossProfit);
     item.quantity += toNumber(row.quantity);
   }

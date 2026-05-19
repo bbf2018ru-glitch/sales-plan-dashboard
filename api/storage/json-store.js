@@ -133,11 +133,6 @@ class JsonStore {
     return db.ingestRuns.slice(0, limit);
   }
 
-  async upsertExtraDirectionsPlan(period, extraAmount, breakdown) {
-    // В json-store пока no-op (dev-режим)
-    return { ok: true, period, extraAmount, breakdown, note: 'json-store: no-op' };
-  }
-
   async getComments(period, filters = {}) {
     const db = await this.getDb();
     let all = db.comments || [];

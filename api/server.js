@@ -1169,23 +1169,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Обогащение плана из ф_ПланФактПоПродавцам (доп-направления кроме СТС)
-    if (pathname === '/api/admin/enrich-plan' && req.method === 'POST') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
-      const body = await parseBody(req);
-      const period = monthKey(body.period || parsedUrl.searchParams.get('period') || undefined);
-      try {
-        const { computeExtraNetworkPlan } = require('./lib/plan-enrich');
-        const r = await computeExtraNetworkPlan(period);
-        await store.upsertExtraDirectionsPlan(period, r.extraPlan, r.breakdown);
-        sendJson(res, 200, { ok: true, ...r });
-      } catch (e) {
-        sendJson(res, 500, { error: e.message });
-      }
-      return;
-    }
-
     // Ручной запуск critical-alerts (для тестирования или принудительного дёргания)
     if (pathname === '/api/admin/alerts/run' && req.method === 'POST') {
       const user = await resolveUser(req);

@@ -1,8 +1,8 @@
 // Топ-5 «что посмотреть» — детектор аномалий на правилах + опциональная
 // LLM-обёртка через Groq. Без LLM возвращает rule-based буллеты.
 
-const https = require('https');
 const { getUpcomingEvents, seasonalContext, holidayDaysInPeriod } = require('./calendar-irk');
+const { callGroq } = require('./groq');
 
 // ─── Детектор аномалий ────────────────────────────────────────────────────
 // Возвращает массив [{ severity, kind, store?, product?, headline, detail }]
@@ -377,42 +377,6 @@ function rankAndTrim(findings, limit = 5) {
 
 // ─── LLM-обёртка через Groq ───────────────────────────────────────────────
 
-async function callGroq(apiKey, model, messages, timeoutMs = 15000) {
-  const body = JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 700 });
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'api.groq.com',
-      path: '/openai/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Length': Buffer.byteLength(body),
-      },
-      timeout: timeoutMs,
-    }, (res) => {
-      let raw = '';
-      res.on('data', (c) => { raw += c; });
-      res.on('end', () => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`Groq HTTP ${res.statusCode}: ${raw.slice(0, 200)}`));
-          return;
-        }
-        try {
-          const parsed = JSON.parse(raw);
-          resolve(parsed.choices?.[0]?.message?.content || '');
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(new Error('Groq timeout')); });
-    req.write(body);
-    req.end();
-  });
-}
-
 async function llmRefineInsights(findings, summary, period, groqConfig) {
   if (!groqConfig?.apiKey) return null;
 
@@ -434,11 +398,17 @@ async function llmRefineInsights(findings, summary, period, groqConfig) {
   const user = `Период: ${period}\nДанные:\n${JSON.stringify(ctx, null, 2)}\n\nВыдай ровно 5 буллетов в формате:\n1. <текст>\n2. <текст>\n...`;
 
   try {
-    const text = await callGroq(groqConfig.apiKey, groqConfig.model || 'llama-3.3-70b-versatile', [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ]);
-    return text;
+    return await callGroq({
+      apiKey: groqConfig.apiKey,
+      model: groqConfig.model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.4,
+      maxTokens: 700,
+      timeoutMs: 15000,
+    });
   } catch (err) {
     console.warn('[insights] Groq failed:', err.message);
     return null;
