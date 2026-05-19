@@ -554,6 +554,46 @@ class PostgresStore {
     return result.rows;
   }
 
+  // Upsert виртуального плана «Прочие направления» (Сайт/Опт/Заказная/Агрегатор/Корпорат).
+  // BSL /pull берёт только СТС → у нас на сети недо-план. Этим методом
+  // ежеминутно дозаписываем недостающий план в БД для расчёта правильных totals.
+  async upsertExtraDirectionsPlan(period, extraAmount, breakdown) {
+    await this.init();
+    const STORE_ID = '__extra_directions__';
+    const PRODUCT_ID = '__extra_directions__';
+    const client = await this.pool.connect();
+    try {
+      await client.query('begin');
+      // 1. Виртуальный store
+      await client.query(
+        `insert into stores (id, name, region, source, format) values ($1, $2, '', 'virtual', '')
+         on conflict (id) do update set name = excluded.name`,
+        [STORE_ID, 'Прочие направления (Сайт/Опт/Заказная/Агрегатор)']
+      );
+      // 2. Виртуальный product
+      await client.query(
+        `insert into products (id, name, category) values ($1, $2, '')
+         on conflict (id) do update set name = excluded.name`,
+        [PRODUCT_ID, 'Прочие направления']
+      );
+      // 3. Удаляем старый plan-row и вставляем новый
+      await client.query('delete from plans where period = $1 and store_id = $2', [period, STORE_ID]);
+      if (extraAmount > 0) {
+        await client.query(
+          `insert into plans (period, store_id, product_id, amount) values ($1, $2, $3, $4)`,
+          [period, STORE_ID, PRODUCT_ID, extraAmount]
+        );
+      }
+      await client.query('commit');
+      return { ok: true, period, extraAmount, breakdown };
+    } catch (e) {
+      await client.query('rollback');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
   async addComment(period, text, author, opts = {}) {
     await this.init();
     const result = await this.pool.query(

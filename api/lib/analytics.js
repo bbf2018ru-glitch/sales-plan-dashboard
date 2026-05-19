@@ -633,7 +633,7 @@ function aggregatePeriodCore(db, period, opts = {}) {
     byProduct.get(row.productId).quantity += toNumber(row.quantity);
   }
 
-  const storesList = Array.from(byStore.values())
+  const allStoresList = Array.from(byStore.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
     .map((item) => ({
       ...item,
@@ -642,6 +642,10 @@ function aggregatePeriodCore(db, period, opts = {}) {
       gap: item.fact - item.plan
     }))
     .sort((a, b) => b.percent - a.percent);
+
+  // Виртуальные store-id (например __extra_directions__) скрываем из таблицы
+  // магазинов, но их план учитывается в totals.plan через allStoresList.
+  const storesList = allStoresList.filter((s) => !String(s.storeId).startsWith('__'));
 
   const productsList = Array.from(byProduct.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
@@ -655,14 +659,14 @@ function aggregatePeriodCore(db, period, opts = {}) {
 
   // totals.fact = вся выручка сети (включая Склад готовой продукции, Сайты —
   // нестандартные точки), потому что это РЕАЛЬНЫЕ деньги сети.
-  // totals.plan = сумма выставленных планов (у тех точек где они есть).
-  // completion = fact / plan — справедливая метрика «насколько мы прошли план».
-  const totalPlan = storesList.reduce((sum, item) => sum + item.plan, 0);
-  const totalFact = storesList.reduce((sum, item) => sum + item.fact, 0);
-  const totalCost = storesList.reduce((sum, item) => sum + item.cost, 0);
-  const totalGrossProfit = storesList.reduce((sum, item) => sum + Number(item.grossProfit || 0), 0);
+  // totals.plan = сумма ВСЕХ планов (включая виртуальный __extra_directions__
+  // куда мы сложили план Сайта/Опта/Заказной/Агрегатора — BSL отдаёт только СТС).
+  const totalPlan = allStoresList.reduce((sum, item) => sum + item.plan, 0);
+  const totalFact = allStoresList.reduce((sum, item) => sum + item.fact, 0);
+  const totalCost = allStoresList.reduce((sum, item) => sum + item.cost, 0);
+  const totalGrossProfit = allStoresList.reduce((sum, item) => sum + Number(item.grossProfit || 0), 0);
   const totalMargin = computeMargin({ fact: totalFact, cost: totalCost, grossProfit: totalGrossProfit });
-  const totalQuantity = storesList.reduce((sum, item) => sum + item.quantity, 0);
+  const totalQuantity = allStoresList.reduce((sum, item) => sum + item.quantity, 0);
   const completion = totalPlan > 0 ? percent(totalFact / totalPlan) : 0;
   const leader = storesList[0] || null;
   const lagger = [...storesList].sort((a, b) => a.percent - b.percent)[0] || null;

@@ -1155,6 +1155,23 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Обогащение плана из ф_ПланФактПоПродавцам (доп-направления кроме СТС)
+    if (pathname === '/api/admin/enrich-plan' && req.method === 'POST') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const body = await parseBody(req);
+      const period = monthKey(body.period || parsedUrl.searchParams.get('period') || undefined);
+      try {
+        const { computeExtraNetworkPlan } = require('./lib/plan-enrich');
+        const r = await computeExtraNetworkPlan(period);
+        await store.upsertExtraDirectionsPlan(period, r.extraPlan, r.breakdown);
+        sendJson(res, 200, { ok: true, ...r });
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+
     // Ручной запуск critical-alerts (для тестирования или принудительного дёргания)
     if (pathname === '/api/admin/alerts/run' && req.method === 'POST') {
       const user = await resolveUser(req);
@@ -1297,6 +1314,15 @@ function startPullSchedulerWithInterval(intervalMin) {
       console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
       if (run.status === 'success') {
         (async () => {
+          // Дополнительно тянем план Сайт/Опт/Заказная (BSL даёт только СТС)
+          try {
+            const { computeExtraNetworkPlan } = require('./lib/plan-enrich');
+            const r = await computeExtraNetworkPlan(run.period);
+            await store.upsertExtraDirectionsPlan(run.period, r.extraPlan, r.breakdown);
+            console.log(`[plan-enrich] ${run.period}: +${r.extraPlan.toLocaleString('ru-RU')} ₽ (${r.breakdown.length} направлений)`);
+          } catch (e) {
+            console.warn(`[plan-enrich] ${run.period} failed: ${e.message}`);
+          }
           const db = await store.getDb();
           const summary = aggregateDashboard(db, run.period);
           sendEvent('plans_updated', { period: run.period, totals: summary.totals });
