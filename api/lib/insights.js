@@ -12,6 +12,17 @@ const { getUpcomingEvents, seasonalContext, holidayDaysInPeriod } = require('./c
 // «в работе». Меньше = из инсайтов исключаются.
 const ACTIVITY_SHARE_MIN = 0.02;       // 2% от выручки сети — категория «в работе»
 const ACTIVITY_STORE_FACT_MIN = 50000; // ₽ за период — магазин «в работе»
+const ACTIVITY_CAT_FACT_MIN = 100000;  // ₽ за период — категория «в работе» (даже если доля норм)
+
+// Категории которые НЕ показываем в инсайтах. По фидбеку пользователя:
+//   «Хлеб»          — направление закрыто
+//   «Торты на заказ» — и в прошлом году не было полноценной работы
+//   «Прочее», «Сырьё*», «Тара», «Добавки», «Акция» — служебные/не-розничные
+const CATEGORY_BLACKLIST = /(^Хлеб$|Торты на заказ|^Прочее$|^Сырь[её]|^Тара|^Добавки|^Акция|^Сертификат|^Товары для праздника)/i;
+function isCategoryRelevant(name) {
+  if (!name) return false;
+  return !CATEGORY_BLACKLIST.test(String(name).trim());
+}
 
 // Был ли магазин активен последние N дней (есть продажи).
 // Защищает от алертов по точкам которые закрыты/выходят из сети.
@@ -36,7 +47,7 @@ function detectAnomalies(summary, db, period) {
   // Возвращаем только upcoming holidays.
   const hasAnyData = (summary.totals.plan || 0) > 0 || (summary.totals.fact || 0) > 0;
   if (!hasAnyData) {
-    const upcoming = getUpcomingEvents(35).filter((e) => e.impact !== 'low');
+    const upcoming = getUpcomingEvents(60).filter((e) => e.impact !== 'low');
     if (upcoming.length) {
       const e = upcoming[0];
       findings.push({
@@ -88,23 +99,41 @@ function detectAnomalies(summary, db, period) {
     });
   }
 
-  // 3. YoY-просадки по категориям
-  if (summary.yoy?.hasData) {
-    const yoyDelta = summary.yoy.factDeltaPercent;
-    if (yoyDelta < -5) {
+  // 3. YoY-просадки. ВАЖНО: сравниваем «факт на сегодня» с «факт на тот же
+  //    день того же месяца год назад» — а не весь месяц с месяцем (это
+  //    некорректно когда текущий месяц ещё не закончился).
+  const today = summary.today || {};
+  if (today.yoyTodayFact != null && today.yoyTodayFact > 0 && today.elapsedDays > 0) {
+    const curFact = today.factToDate || 0;
+    const prevFact = today.yoyTodayFact;
+    const yoyDayDelta = ((curFact - prevFact) / prevFact) * 100;
+    if (yoyDayDelta < -5) {
+      const yearLabel = today.yoyTodayYearsBack > 1
+        ? `тот же день ${today.yoyTodayYearsBack} года назад (${today.yoyTodayPeriod})`
+        : `тот же день год назад (${today.yoyTodayPeriod})`;
       findings.push({
-        severity: yoyDelta < -15 ? 'high' : 'medium',
-        kind: 'yoy-decline',
-        headline: `Сеть на ${yoyDelta.toFixed(1)}% ниже того же месяца год назад`,
-        detail: `Прошлый ${summary.yoy.previousPeriod}: ${formatRu(summary.yoy.previousTotals.fact)} ₽. Сейчас: ${formatRu(summary.totals.fact)} ₽.`,
+        severity: yoyDayDelta < -15 ? 'high' : 'medium',
+        kind: 'yoy-today-decline',
+        headline: `За ${today.elapsedDays} дн. на ${yoyDayDelta.toFixed(1)}% ниже ${yearLabel}`,
+        detail: `На этот день прошлого года накопили: ${formatRu(prevFact)} ₽. Сейчас: ${formatRu(curFact)} ₽.`,
       });
     }
-    // Анализ категорий YoY. Фильтр: текущая доля категории ≥ 2% от выручки сети
-    // (иначе это «спящие» направления — не алертим про них).
+  }
+
+  // YoY-просадки по категориям
+  if (summary.yoy?.hasData) {
+    // Анализ категорий YoY с тройным фильтром:
+    //   - доля ≥ 2% от выручки сети (категория активна сейчас)
+    //   - текущий fact ≥ 100К (значимый объём, не эфемера)
+    //   - прошлый fact ≥ 100К (категория реально работала, не разовая активность)
+    //   - не в blacklist (хлеб/торты-на-заказ/служебные)
     const yoyCategories = compareCategoriesYoY(db, period, summary.yoy.previousPeriod);
     const activeCatYoy = yoyCategories
       .filter((c) => c.deltaPercent < -10)
-      .filter((c) => c.fact / networkFact >= ACTIVITY_SHARE_MIN);
+      .filter((c) => c.fact >= ACTIVITY_CAT_FACT_MIN)
+      .filter((c) => c.previousFact >= ACTIVITY_CAT_FACT_MIN)
+      .filter((c) => c.fact / networkFact >= ACTIVITY_SHARE_MIN)
+      .filter((c) => isCategoryRelevant(c.name));
     for (const c of activeCatYoy.slice(0, 2)) {
       findings.push({
         severity: c.deltaPercent < -25 ? 'high' : 'medium',
@@ -137,7 +166,7 @@ function detectAnomalies(summary, db, period) {
   // и пользователь явно просил их исключить из инсайтов.
 
   // 6. Праздники впереди
-  const upcoming = getUpcomingEvents(35).filter((e) => e.impact !== 'low');
+  const upcoming = getUpcomingEvents(60).filter((e) => e.impact !== 'low');
   if (upcoming.length) {
     const e = upcoming[0];
     const tone = e.daysFromNow <= 7 ? 'high' : 'medium';
@@ -261,7 +290,7 @@ async function llmRefineInsights(findings, summary, period, groqConfig) {
       previousPeriod: summary.yoy.previousPeriod,
     } : null,
     findings: findings.map((f) => ({ kind: f.kind, severity: f.severity, headline: f.headline, detail: f.detail })),
-    upcoming: getUpcomingEvents(45).slice(0, 4),
+    upcoming: getUpcomingEvents(60).slice(0, 4),
     seasonal: seasonalContext(),
   };
 
@@ -286,7 +315,7 @@ async function llmRefineInsights(findings, summary, period, groqConfig) {
 async function buildInsights(summary, db, period, options = {}) {
   const findings = detectAnomalies(summary, db, period);
   const top = rankAndTrim(findings, 5);
-  const upcoming = getUpcomingEvents(45).slice(0, 5);
+  const upcoming = getUpcomingEvents(60).slice(0, 5);
   const seasonal = seasonalContext();
 
   let llmText = null;

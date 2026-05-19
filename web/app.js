@@ -2220,7 +2220,7 @@ function renderInsights(data) {
         ${findingsHtml || '<div class="empty-state" style="padding:12px">Аномалий не найдено — сеть в норме.</div>'}
       </div>
       <div class="ins-col">
-        <div class="ins-col-label">Календарь — ближайшие 45 дн.</div>
+        <div class="ins-col-label">Календарь — ближайшие 60 дн.</div>
         ${eventsHtml || '<div class="empty-state" style="padding:12px">Праздников впереди нет.</div>'}
       </div>
     </div>`;
