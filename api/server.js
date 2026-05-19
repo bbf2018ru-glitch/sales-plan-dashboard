@@ -142,6 +142,14 @@ function clearAuthCookies(res) {
 
 function checkSession(req) {
   if (!DASHBOARD_PIN) return true;
+  return hasActiveSession(req);
+}
+
+// Строгая проверка PIN-сессии: возвращает true ТОЛЬКО при наличии валидного
+// токена в sessions Map. В отличие от checkSession не считает «PIN не задан»
+// эквивалентом «авторизован» — нужно для платных эндпоинтов (Groq), которые
+// нельзя открывать в анонимный режим даже когда DASHBOARD_PIN пуст.
+function hasActiveSession(req) {
   const cookies = parseCookies(req);
   const token = cookies[SESSION_COOKIE] || req.headers['x-session-token'] || '';
   const expiry = sessions.get(token);
@@ -616,7 +624,10 @@ const server = http.createServer(async (req, res) => {
 
     // ── AI-чат: вопрос → ответ Groq на контексте дашборда ─────────────────────
     if (pathname === '/api/ai-chat' && req.method === 'POST') {
-      const { db } = await getScopedDb(req);
+      // Groq биллится за токены — на анонимный запрос отвечать нельзя:
+      // открытый эндпоинт жгёт деньги. Требуем валидный X-User-Token либо PIN-сессию.
+      const { db, user } = await getScopedDb(req);
+      if (!user && !hasActiveSession(req)) { sendJson(res, 401, { error: 'Auth required' }); return; }
       const body = await parseBody(req);
       if (!groqConfig) { sendJson(res, 503, { error: 'GROQ_KEY не настроен на сервере' }); return; }
       try {
@@ -638,12 +649,15 @@ const server = http.createServer(async (req, res) => {
 
     // ── Insights ──────────────────────────────────────────────────────────────
     if (pathname === '/api/insights' && req.method === 'GET') {
-      const { db } = await getScopedDb(req);
+      const { db, user } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       const summary = aggregateDashboard(db, period);
-      const useLlm = parsedUrl.searchParams.get('llm') !== '0';
+      // LLM-обёртка платная (Groq). Открываем её только авторизованным;
+      // правила (rule-based finding'и) — остаются доступны как раньше.
+      const requestedLlm = parsedUrl.searchParams.get('llm') !== '0';
+      const allowLlm = requestedLlm && (user || hasActiveSession(req));
       const result = await buildInsights(summary, db, period, {
-        groq: useLlm ? groqConfig : null,
+        groq: allowLlm ? groqConfig : null,
       });
       sendJson(res, 200, result);
       return;

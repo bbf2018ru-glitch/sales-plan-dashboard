@@ -249,16 +249,6 @@ function detectAnomalies(summary, db, period) {
     });
   }
 
-  // 7. Дни с праздниками в текущем периоде — простой счётчик
-  const hd = holidayDaysInPeriod(period);
-  if (hd.length > 0 && remainingDays > 0) {
-    const upcomingHd = hd.filter((h) => h.day > (summary.forecast.elapsedDays || 0));
-    if (upcomingHd.length > 0) {
-      const e = upcomingHd[0];
-      // не дублировать с пунктом 6 — пропустим, если уже добавлено
-    }
-  }
-
   return findings;
 }
 
