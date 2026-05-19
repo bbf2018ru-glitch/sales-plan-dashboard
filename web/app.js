@@ -483,11 +483,7 @@ function renderKpis(summary) {
 
   // === Подпись «Факт»: сравнение с тем же днём прошлого года ===
   const elapsed = f.elapsedDays || 0;
-  const unplanned = summary.unplanned || { count: 0, fact: 0 };
   let factSub = `на ${elapsed}-й день месяца`;
-  if (unplanned.count > 0) {
-    factSub += ` <span class="kpi-note" title="Точки без выставленного плана — не учтены в % выполнения">+${unplanned.count} б/плана: ${fmtMoneyShort(unplanned.fact)}</span>`;
-  }
   if (typeof today.yoyTodayFact === 'number' && today.yoyTodayFact > 0 && elapsed > 0) {
     const delta = factToDate - today.yoyTodayFact;
     const deltaPct = (delta / today.yoyTodayFact) * 100;
@@ -617,17 +613,6 @@ function buildKpiDetail(id, summary) {
     const max = topStores[0]?.fact || 1;
     const topProducts = products.slice().sort((a, b) => (b.fact || 0) - (a.fact || 0)).slice(0, 10);
     const maxP = topProducts[0]?.fact || 1;
-    const unp = summary.unplanned || {};
-    const unplannedHtml = (unp.count > 0) ? `
-      <div class="kpi-detail-section">
-        <div class="kpi-detail-title">⚠ Без плана (не в общем %)</div>
-        ${(unp.stores || []).map(s => `
-          <div class="kpi-detail-row">
-            <span class="ki-name">${escapeHtml(s.storeName)}</span>
-            <span class="ki-val">${fmtMoneyShort(s.fact)}</span>
-          </div>`).join('')}
-        <div class="muted" style="font-size:11px;margin-top:8px">Это служебные точки (склад, сайт) или магазины с невыставленным планом. Их выручка показана отдельно, чтобы не искажать % выполнения сети.</div>
-      </div>` : '';
     return header + `
       <div class="kpi-detail-cols">
         <div class="kpi-detail-section">
@@ -648,7 +633,6 @@ function buildKpiDetail(id, summary) {
               <span class="ki-val">${fmtMoneyShort(p.fact || 0)}</span>
             </div>`).join('')}
         </div>
-        ${unplannedHtml}
       </div>`;
   }
 

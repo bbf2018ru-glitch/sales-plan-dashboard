@@ -633,7 +633,7 @@ function aggregatePeriodCore(db, period, opts = {}) {
     byProduct.get(row.productId).quantity += toNumber(row.quantity);
   }
 
-  const allStores = Array.from(byStore.values())
+  const storesList = Array.from(byStore.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
     .map((item) => ({
       ...item,
@@ -642,12 +642,6 @@ function aggregatePeriodCore(db, period, opts = {}) {
       gap: item.fact - item.plan
     }))
     .sort((a, b) => b.percent - a.percent);
-
-  // Точки БЕЗ плана (склады, служебные, новые точки без выставленного плана).
-  // Их выручка не идёт в общие totals для расчёта % выполнения — иначе сетевой
-  // факт включает «Склад готовой продукции» (1.35М) и завышает выполнение.
-  const storesList = allStores.filter((s) => s.plan > 0);
-  const unplannedStores = allStores.filter((s) => s.plan <= 0 && s.fact > 0);
 
   const productsList = Array.from(byProduct.values())
     .filter((item) => item.plan > 0 || item.fact > 0)
@@ -659,6 +653,10 @@ function aggregatePeriodCore(db, period, opts = {}) {
     }))
     .sort((a, b) => b.fact - a.fact);
 
+  // totals.fact = вся выручка сети (включая Склад готовой продукции, Сайты —
+  // нестандартные точки), потому что это РЕАЛЬНЫЕ деньги сети.
+  // totals.plan = сумма выставленных планов (у тех точек где они есть).
+  // completion = fact / plan — справедливая метрика «насколько мы прошли план».
   const totalPlan = storesList.reduce((sum, item) => sum + item.plan, 0);
   const totalFact = storesList.reduce((sum, item) => sum + item.fact, 0);
   const totalCost = storesList.reduce((sum, item) => sum + item.cost, 0);
@@ -666,13 +664,6 @@ function aggregatePeriodCore(db, period, opts = {}) {
   const totalMargin = computeMargin({ fact: totalFact, cost: totalCost, grossProfit: totalGrossProfit });
   const totalQuantity = storesList.reduce((sum, item) => sum + item.quantity, 0);
   const completion = totalPlan > 0 ? percent(totalFact / totalPlan) : 0;
-
-  const unplannedFact = unplannedStores.reduce((s, x) => s + x.fact, 0);
-  const unplannedSummary = {
-    count: unplannedStores.length,
-    fact: roundMetric(unplannedFact),
-    stores: unplannedStores.map((s) => ({ storeId: s.storeId, storeName: s.storeName, fact: roundMetric(s.fact) }))
-  };
   const leader = storesList[0] || null;
   const lagger = [...storesList].sort((a, b) => a.percent - b.percent)[0] || null;
   const lastSaleAt = sales.map((item) => item.soldAt).filter(Boolean).sort().at(-1) || null;
@@ -696,7 +687,6 @@ function aggregatePeriodCore(db, period, opts = {}) {
     },
     stores: storesList,
     products: productsList,
-    unplanned: unplannedSummary,
     forecast,
     daily,
     leader,
