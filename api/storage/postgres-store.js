@@ -554,6 +554,31 @@ class PostgresStore {
     return result.rows;
   }
 
+  async getLastMarketTrends(maxAgeMs) {
+    await this.init();
+    const result = await this.pool.query(
+      `select generated_at as "generatedAt", trends, context
+         from market_trends
+        order by generated_at desc
+        limit 1`
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    if (maxAgeMs && Date.now() - new Date(row.generatedAt).getTime() > maxAgeMs) return null;
+    return row;
+  }
+
+  async saveMarketTrends(trends, context) {
+    await this.init();
+    const result = await this.pool.query(
+      `insert into market_trends (trends, context)
+       values ($1::jsonb, $2::jsonb)
+       returning generated_at as "generatedAt", trends, context`,
+      [JSON.stringify(trends), JSON.stringify(context || {})]
+    );
+    return result.rows[0];
+  }
+
   async addComment(period, text, author, opts = {}) {
     await this.init();
     const result = await this.pool.query(

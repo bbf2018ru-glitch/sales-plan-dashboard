@@ -133,6 +133,25 @@ class JsonStore {
     return db.ingestRuns.slice(0, limit);
   }
 
+  async getLastMarketTrends(maxAgeMs) {
+    const db = await this.getDb();
+    const arr = db.marketTrends || [];
+    const last = arr[0];
+    if (!last) return null;
+    if (maxAgeMs && Date.now() - new Date(last.generatedAt).getTime() > maxAgeMs) return null;
+    return last;
+  }
+
+  async saveMarketTrends(trends, context) {
+    const db = await this.getDb();
+    if (!Array.isArray(db.marketTrends)) db.marketTrends = [];
+    const row = { generatedAt: new Date().toISOString(), trends, context };
+    db.marketTrends.unshift(row);
+    db.marketTrends = db.marketTrends.slice(0, 30);
+    await this.saveDb(db);
+    return row;
+  }
+
   async getComments(period, filters = {}) {
     const db = await this.getDb();
     let all = db.comments || [];

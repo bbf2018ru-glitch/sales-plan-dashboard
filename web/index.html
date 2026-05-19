@@ -231,16 +231,19 @@
           </article>
         </section>
 
-        <!-- 5. График план/факт по дням (на всю ширину) -->
+        <!-- 5. Тенденции кондитерского рынка (AI-генерация через Groq, кэш 24ч) -->
         <section class="section">
-          <article class="panel">
+          <article class="panel" data-pin-id="market-trends">
             <div class="panel-header">
               <div>
-                <div class="panel-title">План и факт по дням месяца</div>
-                <div class="panel-subtitle">линия плана — равномерное распределение к концу периода; линия факта — накопленная выручка</div>
+                <div class="panel-title">Тенденции рынка</div>
+                <div class="panel-subtitle" id="marketTrendsSub">тренды кондитерки и что внедрить — AI-обзор</div>
+              </div>
+              <div class="panel-actions">
+                <button class="btn-mini" id="marketTrendsRefresh" title="Запросить свежие тренды">🔄 Обновить</button>
               </div>
             </div>
-            <div id="dailyChart" class="chart-wrap"></div>
+            <div id="marketTrends" class="market-trends"></div>
           </article>
         </section>
 

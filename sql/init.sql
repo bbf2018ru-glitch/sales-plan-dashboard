@@ -163,3 +163,13 @@ create table if not exists user_stores (
 );
 
 create index if not exists idx_users_token on users(token);
+
+-- Тренды кондитерского рынка — кэш генераций от Groq. Раз в сутки админ
+-- (или auto-cron) запрашивает свежие, в остальное время отдаём кэшированные.
+create table if not exists market_trends (
+  id bigserial primary key,
+  generated_at timestamptz not null default now(),
+  trends jsonb not null,
+  context jsonb not null default '{}'::jsonb
+);
+create index if not exists idx_market_trends_generated_at on market_trends(generated_at desc);

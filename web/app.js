@@ -281,40 +281,58 @@ function renderTrendChart(summary) {
   </svg>`;
 }
 
-// ── SVG: daily bar chart ───────────────────────────────────────────────────
-function renderDailyChart(summary) {
-  const el = $('dailyChart');
-  const rows = summary.daily || [];
-  const elapsed = summary.forecast.elapsedDays || rows.length;
-  const vis = rows.slice(0, Math.max(elapsed, 5));
-  if (!vis.length) { el.innerHTML = '<div class="empty-state">Нет дневных данных.</div>'; return; }
+// ── Market trends — AI-обзор кондитерских трендов и рекомендации ────────────
+function renderMarketTrends(data) {
+  const el = $('marketTrends');
+  const subEl = $('marketTrendsSub');
+  if (!el) return;
+  if (!data || !Array.isArray(data.trends) || !data.trends.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:16px">Тренды пока не сгенерированы. Нажмите «Обновить».</div>';
+    return;
+  }
+  const ageH = data.generatedAt
+    ? Math.round((Date.now() - new Date(data.generatedAt).getTime()) / 36e5)
+    : null;
+  if (subEl) {
+    const ago = ageH === null ? '' : (ageH === 0 ? 'обновлено только что' : `обновлено ${ageH} ч назад`);
+    subEl.textContent = `тренды кондитерки и что внедрить — AI-обзор · ${ago}`;
+  }
+  const trendBadge = (t) => {
+    if (t === 'rising') return '<span class="mt-badge mt-rising">↗ растёт</span>';
+    if (t === 'niche') return '<span class="mt-badge mt-niche">◆ нишевой</span>';
+    return '<span class="mt-badge mt-stable">— устойчивый</span>';
+  };
+  el.innerHTML = data.trends.map((t) => `
+    <div class="mt-card ${t.have_already ? 'mt-have' : ''}">
+      <div class="mt-head">
+        <span class="mt-cat">${escapeHtml(t.category)}</span>
+        ${trendBadge(t.trend)}
+        ${t.have_already ? '<span class="mt-badge mt-have-tag">✓ уже есть</span>' : ''}
+      </div>
+      <div class="mt-title">${escapeHtml(t.title)}</div>
+      <div class="mt-summary">${escapeHtml(t.summary)}</div>
+      <div class="mt-rec"><span class="mt-rec-label">Внедрить:</span> ${escapeHtml(t.recommendation)}</div>
+    </div>`).join('');
+}
 
-  const W = 560, H = 220, pad = { t: 16, r: 20, b: 34, l: 68 };
-  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b, n = vis.length;
-  const maxVal = Math.max(...vis.flatMap(r => [r.plan, r.fact]), 1);
-  const slot = pw / n, barW = Math.max(slot * 0.5, 3);
-  const yp = v => pad.t + ph - (v / maxVal) * ph;
-  const bh = v => Math.max((v / maxVal) * ph, 0);
-
-  const grids = Array.from({ length: 4 }, (_, i) => {
-    const v = maxVal / 3 * i, y = yp(v);
-    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
-    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="11">${fmtAxis(v)}</text>`;
-  }).join('');
-
-  const bars = vis.map((row, i) => {
-    const cx = pad.l + i * slot + slot / 2;
-    const clr = row.percent >= 100 ? '#16a34a' : row.percent >= 80 ? '#f59e0b' : '#ef4444';
-    const showLabel = i === 0 || (i + 1) % 5 === 0 || i === n - 1;
-    return `<rect x="${(cx - barW / 2 - 1).toFixed(1)}" y="${yp(row.plan).toFixed(1)}" width="${(barW + 2).toFixed(1)}" height="${bh(row.plan).toFixed(1)}" rx="2" fill="var(--line)"/>
-    <rect x="${(cx - barW / 2).toFixed(1)}" y="${yp(row.fact).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh(row.fact).toFixed(1)}" rx="2" fill="${clr}" opacity="0.88"/>
-    ${showLabel ? `<text x="${cx.toFixed(1)}" y="${(pad.t + ph + 14).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${row.day}</text>` : ''}`;
-  }).join('');
-
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
-    ${grids}${bars}
-    <text x="${pad.l}" y="${H - 2}" fill="var(--hint)" font-size="10">▭ план   ▮ факт</text>
-  </svg>`;
+let marketTrendsBusy = false;
+async function loadMarketTrends({ force = false } = {}) {
+  if (marketTrendsBusy) return;
+  marketTrendsBusy = true;
+  const el = $('marketTrends');
+  const btn = $('marketTrendsRefresh');
+  if (btn) btn.disabled = true;
+  try {
+    if (el && force) el.innerHTML = '<div class="empty-state" style="padding:16px">Запрашиваю свежие тренды у Маши…</div>';
+    const path = force ? '/api/market-trends/refresh' : '/api/market-trends';
+    const data = await fetchJson(path, force ? { method: 'POST' } : {});
+    renderMarketTrends(data);
+  } catch (e) {
+    if (el) el.innerHTML = `<div class="empty-state" style="padding:16px;color:var(--bad)">Не удалось загрузить: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    marketTrendsBusy = false;
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
@@ -2176,7 +2194,6 @@ async function loadSummary() {
   renderKpis(summary);
   renderForecast(summary);
   renderTrendChart(summary);
-  renderDailyChart(summary);
   renderComparison(summary);
   renderSpotlight(summary);
   renderStores(summary);
@@ -2326,6 +2343,7 @@ async function init() {
   $('exportSalesBtnH')?.addEventListener('click', exportSales);
 
   $('insightsRefresh')?.addEventListener('click', () => loadInsights());
+  $('marketTrendsRefresh')?.addEventListener('click', () => loadMarketTrends({ force: true }));
 
   // Навигация сайдбара и список pending-отчётов работают независимо
   // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
@@ -2346,6 +2364,7 @@ async function init() {
     // После summary применяем остальной URL-state (store/tab/page)
     urlStateApply(false);
     loadInsights();
+    loadMarketTrends();
     connectEvents();
     $('periodSelect').addEventListener('change', async e => {
       state.period = e.target.value;

@@ -14,6 +14,7 @@ const {
 } = require('./lib/analytics');
 const { buildInsights } = require('./lib/insights');
 const { askAiChat } = require('./lib/ai-chat');
+const { getMarketTrends } = require('./lib/market-trends');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -640,6 +641,41 @@ const server = http.createServer(async (req, res) => {
           model: groqConfig.model,
           getNotes: () => store.getComments('', {})
         });
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+
+    // ── Market trends — тренды кондитерского рынка от Groq, кэш 24ч ──────────
+    if (pathname === '/api/market-trends' && req.method === 'GET') {
+      try {
+        if (!groqConfig) {
+          // Без Groq отдадим последний кэшированный без принудительной генерации.
+          const cached = await store.getLastMarketTrends(0);
+          if (!cached) { sendJson(res, 503, { error: 'GROQ_KEY не настроен и кэша нет' }); return; }
+          sendJson(res, 200, { ...cached, cached: true });
+          return;
+        }
+        const { db } = await getScopedDb(req);
+        const summary = aggregateDashboard(db, monthKey());
+        const result = await getMarketTrends({ store, apiKey: groqConfig.apiKey, model: groqConfig.model, summary, force: false });
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
+      return;
+    }
+    if (pathname === '/api/market-trends/refresh' && req.method === 'POST') {
+      // Принудительная регенерация — только аутентифицированным
+      // (Groq биллится, не открываем анонимам).
+      const { db, user } = await getScopedDb(req);
+      if (!user && !hasActiveSession(req)) { sendJson(res, 401, { error: 'Auth required' }); return; }
+      if (!groqConfig) { sendJson(res, 503, { error: 'GROQ_KEY не настроен' }); return; }
+      try {
+        const summary = aggregateDashboard(db, monthKey());
+        const result = await getMarketTrends({ store, apiKey: groqConfig.apiKey, model: groqConfig.model, summary, force: true });
         sendJson(res, 200, result);
       } catch (e) {
         sendJson(res, 500, { error: e.message });
