@@ -613,14 +613,14 @@ function renderKpis(summary) {
   }
 
   // Для KPI 6-карточек на типичных экранах не помещаются 8-значные числа.
-  // Используем короткий формат «27.4 млн ₽» вместо «27 379 000 ₽».
+  // Очень короткий формат: «27.4 М ₽» / «945 К ₽» / «120 ₽».
   const moneyShort = (v) => {
     if (v === null || v === undefined || !Number.isFinite(v)) return '—';
     if (Math.abs(v) >= 1_000_000) {
       const m = v / 1_000_000;
-      return (m >= 10 ? m.toFixed(1) : m.toFixed(2)).replace(/\.?0+$/, '') + ' млн ₽';
+      return (m >= 10 ? m.toFixed(1) : m.toFixed(2)).replace(/\.?0+$/, '') + ' М ₽';
     }
-    if (Math.abs(v) >= 1000) return Math.round(v / 1000) + ' тыс ₽';
+    if (Math.abs(v) >= 1000) return Math.round(v / 1000) + ' К ₽';
     return Math.round(v).toLocaleString('ru-RU') + ' ₽';
   };
   const cards = [
