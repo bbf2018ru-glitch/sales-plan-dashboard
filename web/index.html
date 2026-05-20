@@ -242,15 +242,13 @@
           </article>
         </section>
 
-        <!-- Ритм недели — heatmap по дням -->
-        <section id="weekdaySection" class="section">
+        <!-- Ритм недели по дням недели временно скрыт.
+             sales.sold_at в БД = время pull'а из 1С, а не реальная дата
+             продажи — любая агрегация по дню недели даёт искажение
+             (см. session_log 2026-05-20). Включить после правки BSL
+             на стороне Hellstaff, где появится настоящая дата продажи. -->
+        <section id="weekdySectionHidden" class="section hidden">
           <article class="panel">
-            <div class="panel-header">
-              <div>
-                <div class="panel-title">Ритм недели</div>
-                <div class="panel-subtitle">средняя выручка по дням недели за период — видны сильные и слабые дни</div>
-              </div>
-            </div>
             <div id="weekdayHeatmap" class="weekday-heatmap"></div>
           </article>
         </section>
