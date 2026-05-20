@@ -76,10 +76,11 @@
   --overlay-bg:  rgba(20, 21, 26, 0.45);
 }
 
-/* Доп-правила: убираем блюр/прозрачность в светлой теме */
+/* Доп-правила: убираем блюр/прозрачность в светлой теме.
+   .section НЕ включаем — это просто margin-wrapper, ему фон не нужен.
+   Иначе получается двойной фон: белая .section поверх белой .panel внутри. */
 [data-theme=light] .panel,
-[data-theme=light] .kpi,
-[data-theme=light] .section {
+[data-theme=light] .kpi {
   background: #ffffff;
   backdrop-filter: none;
 }
