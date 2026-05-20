@@ -2698,8 +2698,8 @@ body.plan-incomplete .spark-fill {
   gap: 18px;
   padding: 18px 22px;
   border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  border: 1px solid var(--line);
+  background: var(--paper);
   box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
 .hero-ok    { border-left: 4px solid rgb(59,130,246); }
@@ -3124,7 +3124,7 @@ body.plan-incomplete .spark-fill {
 .store-notes-block {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
 }
 .store-notes-block.hidden { display: none; }
 .store-notes-title {
@@ -3162,10 +3162,10 @@ body.plan-incomplete .spark-fill {
 .store-note-form input[type="date"],
 .store-note-form input[type="text"] {
   padding: 6px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 12px;
-  background: var(--panel);
+  background: var(--paper);
   color: var(--ink);
 }
 .store-note-form button {
