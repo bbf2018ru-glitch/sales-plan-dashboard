@@ -1261,7 +1261,11 @@ td.col-edit { text-align: center; }
 .prod-foot  { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
 
 /* ── Charts ───────────────────────────────────────────────────────── */
-.chart-wrap { min-height: 200px; }
+/* SVG-графики имеют viewBox 560x240 и width:100% — при широком контейнере
+   растягиваются непропорционально вверх. Ограничиваем максимальной высотой,
+   чтобы тренд по месяцам не занимал пол-экрана. */
+.chart-wrap { min-height: 200px; max-height: 320px; overflow: hidden; }
+.chart-wrap > svg { max-height: 320px; }
 
 /* ── Sort select ──────────────────────────────────────────────────── */
 .sort-select {
