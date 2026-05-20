@@ -1461,7 +1461,6 @@ function cmdkActionsList() {
     { title: 'Скачать таб (TSV)', sub: 'Экспорт текущего таба в Excel-формат', run: () => exportFullTab() },
     { title: 'Печать / PDF', sub: 'Окно печати браузера', run: () => window.print() },
     { title: 'Обновить данные', sub: 'Перезагрузить дашборд', run: () => loadSummary() },
-    { title: 'Сбросить закреплённые блоки', sub: 'Вернуть исходный порядок секций', run: () => resetPinned() },
     { title: 'Выйти', sub: 'Удалить сессию и cookies', run: () => doLogout() }
   ];
   for (const c of commands) actions.push({ group: 'Действие', ...c, score: 1 });
@@ -1978,94 +1977,12 @@ function exportCsv(rows, filename) {
   a.click();
 }
 
-// Сборка таблиц всего видимого таба в один TSV (Excel-friendly).
-// Каждая таблица отдельной секцией с заголовком.
-// ─── Закладки/избранное на панелях ────────────────────────────────────────
-// v2: сбрасываем старые закладки (после перестройки порядка секций они могли
-// тащить блоки на верх и ломать новый порядок).
-const PINNED_KEY = 'maria_pinned_panels_v2';
+// Закладки/пиннер панелей удалены по запросу пользователя. Чистим LS чтобы
+// не оставлять болтающихся ключей у тех у кого было закреплено.
+try { localStorage.removeItem('maria_pinned_panels_v2'); } catch {}
 try { localStorage.removeItem('maria_pinned_panels_v1'); } catch {}
-function getPinned() {
-  try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-function setPinned(set) {
-  localStorage.setItem(PINNED_KEY, JSON.stringify([...set]));
-}
-function slugifyPanel(text) {
-  return String(text || '').toLowerCase()
-    .replace(/[^а-яёa-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
-}
-function enhancePinningInSection(rootEl) {
-  if (!rootEl) return;
-  const pinned = getPinned();
-  const panels = Array.from(rootEl.querySelectorAll('.panel, .section'));
-  // Карта: panel → wrapper (.section если есть, иначе .panel)
-  for (const panel of panels) {
-    // Берём только панели с заголовком — без заголовка пиновать нечего
-    const titleEl = panel.querySelector(':scope > .panel-header .panel-title, :scope > .section-header .section-label, :scope > .section-label');
-    if (!titleEl) continue;
-    const id = slugifyPanel(titleEl.textContent);
-    if (!id) continue;
-    panel.dataset.pinId = id;
-    // Добавляем кнопку если её ещё нет
-    if (!panel.querySelector(':scope > .pin-btn-host > .pin-btn')) {
-      const host = document.createElement('span');
-      host.className = 'pin-btn-host';
-      host.innerHTML = `<button class="pin-btn ${pinned.has(id) ? 'pinned' : ''}" title="Закрепить наверху" aria-label="Закрепить">★</button>`;
-      // Вставляем рядом с заголовком
-      titleEl.appendChild(host);
-      host.querySelector('.pin-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        const pset = getPinned();
-        if (pset.has(id)) pset.delete(id); else pset.add(id);
-        setPinned(pset);
-        applyPinnedOrder();
-      });
-    }
-  }
-  applyPinnedOrder();
-}
-function applyPinnedOrder() {
-  const pinned = getPinned();
-  document.querySelectorAll('[data-pin-id]').forEach(p => {
-    const isPinned = pinned.has(p.dataset.pinId);
-    p.classList.toggle('panel-pinned', isPinned);
-    const btn = p.querySelector('.pin-btn');
-    if (btn) btn.classList.toggle('pinned', isPinned);
-  });
-  // КРИТИЧНО: если нет закреплённых — НЕ делаем appendChild. Иначе при каждом
-  // обновлении дашборда (каждые 15 мин через scheduler) DOM пересобирается,
-  // даже если результат идентичный — потенциальный source багов с порядком.
-  if (pinned.size === 0) return;
-  // Перемещаем pinned в начало внутри каждого таба/страницы
-  const roots = [
-    ...document.querySelectorAll('.atab-section:not(.hidden)'),
-    document.querySelector('#page-dashboard:not(.hidden)')
-  ].filter(Boolean);
-  for (const root of roots) {
-    const panels = Array.from(root.querySelectorAll(':scope > .panel[data-pin-id], :scope > .section[data-pin-id]'));
-    // Stable sort: pinned первыми, остальные сохраняют порядок
-    const sorted = panels.slice().sort((a, b) => {
-      const pa = pinned.has(a.dataset.pinId) ? 0 : 1;
-      const pb = pinned.has(b.dataset.pinId) ? 0 : 1;
-      return pa - pb;
-    });
-    sorted.forEach(el => root.appendChild(el));
-  }
-}
-
-function resetPinned() {
-  localStorage.removeItem(PINNED_KEY);
-  document.querySelectorAll('[data-pin-id]').forEach(p => {
-    p.classList.remove('panel-pinned');
-    p.querySelector('.pin-btn')?.classList.remove('pinned');
-  });
-  // Перезагрузка чтобы DOM-порядок вернулся к естественному из HTML
-  setTimeout(() => window.location.reload(), 100);
-}
+function enhancePinningInSection() {}
+function enhancePinningOnPage() {}
 
 function exportFullTab() {
   const lines = [];
@@ -2881,12 +2798,6 @@ function renderCustomersFuture(d) {
     '<br>• Когортный анализ возвратов клиентов через год' +
     '<br>• Гео-карта по микрорайонам Иркутска' +
     '<br>• Дни рождения сегодня/неделя → push в Telegram-бот maria-bot';
-}
-
-function enhancePinningOnPage() {
-  // Вызывается после каждой загрузки данных — на случай новых динамических панелей
-  enhancePinningInSection($('page-dashboard'));
-  document.querySelectorAll('.atab-section:not(.hidden)').forEach(s => enhancePinningInSection(s));
 }
 
 function switchPage(page) {
