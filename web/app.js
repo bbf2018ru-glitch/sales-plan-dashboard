@@ -312,7 +312,16 @@ function renderWeekdayHeatmap(summary) {
     const dow = (d.getUTCDay() + 6) % 7;
     buckets[dow].push(row.fact);
   }
-  const avg = buckets.map(arr => arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : 0);
+  // Медиана устойчивее к выбросу одного дня (например когда в один вторник
+  // пробили продажи за несколько дней — среднее по 2-3 вторникам сильно
+  // искажается; медиана покажет реальный «типичный» день).
+  const median = (arr) => {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  };
+  const avg = buckets.map(median);
   const countsByDow = buckets.map(arr => arr.length);
   const maxV = Math.max(...avg, 1);
   if (maxV <= 1) { el.innerHTML = '<div class="empty-state">Пока мало данных за этот месяц</div>'; return; }
@@ -333,7 +342,7 @@ function renderWeekdayHeatmap(summary) {
     const cls = `weekday-cell ${isWeekend ? 'weekend' : ''} ${isBest ? 'is-best' : ''} ${isWorst ? 'is-worst' : ''}`;
     const subline = v > 0 ? `${fmtMoneyShort(v)}/день` : '—';
     const days = countsByDow[i];
-    return `<div class="${cls}" style="background: rgba(193, 68, 86, ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, средняя выручка ${formatMoney(v)} ₽">
+    return `<div class="${cls}" style="background: rgba(193, 68, 86, ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, медианная выручка ${formatMoney(v)} ₽">
       <div class="wc-day">${labels[i]}</div>
       <div class="wc-val">${subline}</div>
     </div>`;
@@ -603,23 +612,34 @@ function renderKpis(summary) {
     projectedSubV2 = `${f.projectedCompletion}% к плану на конец месяца${methodTag}`;
   }
 
+  // Для KPI 6-карточек на типичных экранах не помещаются 8-значные числа.
+  // Используем короткий формат «27.4 млн ₽» вместо «27 379 000 ₽».
+  const moneyShort = (v) => {
+    if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+    if (Math.abs(v) >= 1_000_000) {
+      const m = v / 1_000_000;
+      return (m >= 10 ? m.toFixed(1) : m.toFixed(2)).replace(/\.?0+$/, '') + ' млн ₽';
+    }
+    if (Math.abs(v) >= 1000) return Math.round(v / 1000) + ' тыс ₽';
+    return Math.round(v).toLocaleString('ru-RU') + ' ₽';
+  };
   const cards = [
-    { id: 'plan', label: 'План на месяц', value: formatMoney(summary.totals.plan),
+    { id: 'plan', label: 'План на месяц', value: moneyShort(summary.totals.plan),
       sub: planSub, tone: 'neutral',
       tip: 'Целевая сумма выручки сети к концу месяца (только СТС-точки из 1С УПП).' },
-    { id: 'fact', label: 'Факт', value: formatMoney(summary.totals.fact),
+    { id: 'fact', label: 'Факт', value: moneyShort(summary.totals.fact),
       sub: factSub, tone: 'neutral',
       tip: 'Фактическая выручка сети с начала месяца на текущий момент. Сравнение «vs прошл.год» — с тем же днём (а не месяц целиком), чтобы было справедливо для незавершённого периода.' },
     { id: 'completion', label: 'Выполнение к сегодня', value: completionVal,
       sub: completionSubV2, tone: completionTone,
       tip: 'Процент факта от плана-на-сегодня (план месяца, пропорционально пройденным дням с учётом часа в Иркутске). 100% = идём ровно в темпе.' },
-    { id: 'margin', label: 'Маржа', value: formatMoney(summary.totals.margin),
+    { id: 'margin', label: 'Маржа', value: moneyShort(summary.totals.margin),
       sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
       tip: 'Валовая прибыль = факт − себестоимость. Когда 1С не передаёт себестоимость напрямую, считается через STORE_MARKUPS_JSON env (per-store markup% из отчёта «Валовая прибыль»).' },
-    { id: 'projected', label: 'Прогноз', value: projectedVal, sub: projectedSubV2, tone: projectedTone,
+    { id: 'projected', label: 'Прогноз', value: planIncomplete ? '—' : moneyShort(f.projectedFact), sub: projectedSubV2, tone: projectedTone,
       tip: 'Экстраполяция: средний фактический темп × оставшиеся дни + текущий факт. С учётом дней недели (seasonal-dow) если за последние 120 дней есть данные — иначе линейно.' },
-    { id: 'required', label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone,
+    { id: 'required', label: 'Нужно/день', value: planIncomplete ? '—' : moneyShort(f.requiredPerDayToPlan), sub: requiredSub, tone: requiredTone,
       tip: 'Сколько нужно делать выручки каждый оставшийся день, чтобы выйти ровно в план месяца. Если средний факт/день меньше этой цифры — план рискует.' }
   ];
   $('kpis').innerHTML = cards.map(c => `
