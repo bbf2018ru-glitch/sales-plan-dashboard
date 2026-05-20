@@ -15,6 +15,7 @@ const {
 const { buildInsights } = require('./lib/insights');
 const { askAiChat } = require('./lib/ai-chat');
 const { getMarketTrends } = require('./lib/market-trends');
+const marketing = require('./lib/marketing-analytics');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -645,6 +646,68 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         sendJson(res, 500, { error: e.message });
       }
+      return;
+    }
+
+    // ── Маркетинговая аналитика — pack 1 (zombie/cannibalization/rfm/holiday-yoy) ──
+    if (pathname === '/api/marketing/zombie-products' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const { db } = await getScopedDb(req);
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        const threshold = Number(parsedUrl.searchParams.get('threshold') || 0.10);
+        sendJson(res, 200, await marketing.getZombieProducts(db, period, { threshold }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    if (pathname === '/api/marketing/discount-cannibalization' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const from = parsedUrl.searchParams.get('from') || monthKey();
+        const to = parsedUrl.searchParams.get('to') || from;
+        sendJson(res, 200, await marketing.getDiscountCannibalization(from, to));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    if (pathname === '/api/marketing/rfm' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const from = parsedUrl.searchParams.get('from') || monthKey();
+        const to = parsedUrl.searchParams.get('to') || from;
+        sendJson(res, 200, await marketing.getRfmSimple(from, to));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    if (pathname === '/api/marketing/holiday-yoy' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const { db } = await getScopedDb(req);
+        const window = Number(parsedUrl.searchParams.get('window') || 60);
+        sendJson(res, 200, marketing.getHolidayYoy(db, window));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    // Pending-эндпоинты (отдают { available: false, pending: true, reason })
+    if (pathname === '/api/marketing/birthdays' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      sendJson(res, 200, marketing.getBirthdays());
+      return;
+    }
+    if (pathname === '/api/marketing/geo-districts' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      sendJson(res, 200, marketing.getGeoDistricts());
+      return;
+    }
+    if (pathname === '/api/marketing/family-segment' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      sendJson(res, 200, marketing.getFamilySegment());
       return;
     }
 

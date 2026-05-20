@@ -2360,6 +2360,9 @@ async function init() {
 
   $('insightsRefresh')?.addEventListener('click', () => loadInsights());
   $('marketTrendsRefresh')?.addEventListener('click', () => loadMarketTrends({ force: true }));
+  $('mkZombieRefresh')?.addEventListener('click', loadMkZombie);
+  $('mkCannibaRefresh')?.addEventListener('click', loadMkCannibalization);
+  $('mkRfmRefresh')?.addEventListener('click', loadMkRfm);
 
   // Навигация сайдбара и список pending-отчётов работают независимо
   // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
@@ -2470,6 +2473,7 @@ function switchAnalyticsTab(tab) {
   // Лениво грузим клиентскую и промо аналитику при первом открытии таба
   if (tab === 'customers' && !analyticsState.customersData) loadCustomers();
   if (tab === 'promo' && !analyticsState.promoData) loadPromo();
+  if (tab === 'marketing' && !analyticsState.marketingLoaded) loadMarketing();
   const pageEl = $('page-analytics');
   if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -2536,6 +2540,173 @@ function renderCustomersTop(d) {
       <td class="num">${fmtNum(r.movements)}</td>
     </tr>
   `).join('');
+}
+
+// ── Маркетинговая аналитика (под-таб «Маркетинг») ──────────────────────────
+async function loadMarketing() {
+  analyticsState.marketingLoaded = true;
+  loadMkZombie();
+  loadMkCannibalization();
+  loadMkRfm();
+  loadMkHolidayYoy();
+  renderMkPending();
+}
+
+async function loadMkZombie() {
+  const el = $('mkZombie');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю…</div>';
+  try {
+    const data = await fetchJson(`/api/marketing/zombie-products?period=${encodeURIComponent(state.period)}`);
+    if (!data.items?.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:14px;color:var(--good)">Зомби-товаров нет — все товары с планом &gt;1К продаются на &gt;10%.</div>';
+      return;
+    }
+    const rows = data.items.slice(0, 25).map(it => `
+      <tr>
+        <td>${escapeHtml(it.productName)}<br><small class="muted">${escapeHtml(it.category)}</small></td>
+        <td class="num">${formatMoney(it.plan)}</td>
+        <td class="num">${formatMoney(it.fact)}</td>
+        <td class="num"><b style="color:var(--bad)">${it.percent}%</b></td>
+        <td class="num">${formatMoney(it.gap)}</td>
+      </tr>`).join('');
+    el.innerHTML = `
+      <div style="padding:8px 16px;font-size:13px">Всего <b>${data.total}</b> зомби-товаров · суммарный недобор <b>${formatMoney(data.totalGap)}</b></div>
+      <div class="table-wrap"><table class="num-table">
+        <thead><tr><th>Товар</th><th class="num">План</th><th class="num">Факт</th><th class="num">%</th><th class="num">Недобор</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadMkCannibalization() {
+  const el = $('mkCanniba');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Тяну из ПредоставленныеСкидки в 1С…</div>';
+  try {
+    const params = new URLSearchParams();
+    params.set('from', analyticsState.range?.from?.slice(0,7) || state.period);
+    params.set('to', analyticsState.range?.to?.slice(0,7) || state.period);
+    const data = await fetchJson(`/api/marketing/discount-cannibalization?${params}`);
+    const totalFact = state.summary?.totals?.fact || 0;
+    const ratioPct = totalFact > 0 ? ((data.totals.totalDiscount / totalFact) * 100).toFixed(1) : '—';
+    const condRows = data.byCondition.map(c => `
+      <tr>
+        <td>${escapeHtml(c.condition)}</td>
+        <td class="num">${formatMoney(c.amount)}</td>
+        <td class="num">${data.totals.totalDiscount > 0 ? ((c.amount / data.totals.totalDiscount) * 100).toFixed(1) : 0}%</td>
+      </tr>`).join('');
+    el.innerHTML = `
+      <div style="padding:8px 16px;font-size:13px">
+        Сумма скидок за период: <b>${formatMoney(data.totals.totalDiscount)}</b> · это <b style="color:var(--warn)">${ratioPct}%</b> от выручки <small class="muted">(${data.totals.totalRows} записей, ${data.totals.months} мес.)</small>
+        ${data.truncationWarning ? `<div style="color:var(--warn);font-size:12px;margin-top:4px">⚠ ${escapeHtml(data.truncationWarning)}</div>` : ''}
+      </div>
+      <div class="table-wrap"><table class="num-table">
+        <thead><tr><th>Условие скидки</th><th class="num">Сумма</th><th class="num">Доля</th></tr></thead>
+        <tbody>${condRows}</tbody>
+      </table></div>
+      ${data.topReceivers?.length ? `<div style="padding:8px 16px;font-size:12px;color:var(--muted)">Топ-5 получателей: ${data.topReceivers.slice(0,5).map(r => `<span style="margin-right:14px">${escapeHtml(r.name)} — <b>${formatMoney(r.amount)}</b></span>`).join('')}</div>` : ''}`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadMkRfm() {
+  const el = $('mkRfm');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю RFM по дисконтным картам…</div>';
+  try {
+    // Берём 6 мес назад
+    const [yy, mm] = state.period.split('-').map(Number);
+    const from = new Date(Date.UTC(yy, mm - 6, 1));
+    const fromYM = `${from.getUTCFullYear()}-${String(from.getUTCMonth() + 1).padStart(2, '0')}`;
+    const data = await fetchJson(`/api/marketing/rfm?from=${fromYM}&to=${state.period}`);
+    if (!data.total) {
+      el.innerHTML = `<div class="empty-state" style="padding:14px">${escapeHtml(data.note || 'Нет данных')}</div>`;
+      return;
+    }
+    const segColors = { 'VIP': 'good', 'Постоянные': 'good', 'Новые': 'neutral', 'Уходящие VIP': 'warn', 'Спящие': 'bad', 'Прочие': 'neutral' };
+    const segs = data.segments.map(s => `
+      <div class="mk-seg mk-seg-${segColors[s.segment] || 'neutral'}">
+        <div class="mk-seg-name">${escapeHtml(s.segment)}</div>
+        <div class="mk-seg-count">${s.count} клиентов</div>
+        <div class="mk-seg-money">${formatMoney(s.monetary)}</div>
+        <div class="mk-seg-avg">средний ${formatMoney(s.avgMonetary)}</div>
+      </div>`).join('');
+    const vipRows = (data.topVIP || []).map(v => `<tr><td>${escapeHtml(v.name)}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.frequency}</td></tr>`).join('');
+    const sleepingRows = (data.topSleeping || []).map(v => `<tr><td>${escapeHtml(v.name)}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.recencyMonths} мес.</td></tr>`).join('');
+    el.innerHTML = `
+      <div style="padding:8px 16px;font-size:13px">
+        Всего активных клиентов за 6 мес: <b>${data.total}</b>
+      </div>
+      <div class="mk-segs">${segs}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 16px">
+        <div>
+          <div style="font-weight:600;margin-bottom:6px;color:var(--good)">👑 Топ-20 VIP (предложить премиум)</div>
+          ${vipRows ? `<table class="num-table"><thead><tr><th>Имя</th><th class="num">Сумма</th><th class="num">Покупок</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
+        </div>
+        <div>
+          <div style="font-weight:600;margin-bottom:6px;color:var(--bad)">💤 Топ-20 спящих (реактивировать)</div>
+          ${sleepingRows ? `<table class="num-table"><thead><tr><th>Имя</th><th class="num">Сумма</th><th class="num">Recency</th></tr></thead><tbody>${sleepingRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
+        </div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadMkHolidayYoy() {
+  const el = $('mkHolidays');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю YoY по календарю…</div>';
+  try {
+    const data = await fetchJson('/api/marketing/holiday-yoy?window=60');
+    if (!data.events?.length) { el.innerHTML = '<div class="empty-state" style="padding:14px">Нет ближайших праздников</div>'; return; }
+    const baseline = data.baseline.avgRevenuePerDay;
+    const rows = data.events.map(e => {
+      const lift = e.liftPct;
+      const liftHtml = lift === null ? '<span class="muted">нет данных за прошлый год</span>'
+        : `<span style="color:${lift > 50 ? 'var(--good)' : lift > 0 ? 'var(--warn)' : 'var(--muted)'};font-weight:600">${lift > 0 ? '+' : ''}${lift}%</span>`;
+      return `<tr>
+        <td><b>${escapeHtml(e.name)}</b><br><small class="muted">${e.date} · через ${e.daysFromNow} дн.</small></td>
+        <td class="num">${e.lastYearAvgRevenue !== null ? formatMoney(e.lastYearAvgRevenue) : '—'}</td>
+        <td class="num">${liftHtml}</td>
+        <td>${escapeHtml(e.note || '')}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML = `
+      <div style="padding:8px 16px;font-size:13px">Baseline средняя выручка/день за период: <b>${formatMoney(baseline)}</b> <small class="muted">(${data.baseline.daysObserved} дней в БД)</small></div>
+      <div class="table-wrap"><table class="num-table">
+        <thead><tr><th>Праздник</th><th class="num">Год назад (среднее по 7 дн.)</th><th class="num">Lift к baseline</th><th>Заметки</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderMkPending() {
+  const el = $('mkPending');
+  if (!el) return;
+  const pending = [
+    { name: 'Дни рождения клиентов (7/30 дн)', need: 'Endpoint /catalog?name=ИнформационныеКарты с фильтром по ДатаРождения BETWEEN now AND now+N' },
+    { name: 'Гео-карта микрорайонов', need: 'Полный доступ к ИнформационныеКарты.МикрорайонПроживания' },
+    { name: 'Сегмент «семьи с детьми»', need: 'Полный доступ к ИнформационныеКарты.Дети' },
+    { name: 'Эффективность ДР-скидки', need: 'Совмещение ИнформационныеКарты + ПредоставленныеСкидки.УсловиеСкидки = «ДР»' },
+    { name: 'Маржинальный/Заказные торты/Здоровое', need: 'Атрибуты Номенклатуры в payload /pull (Маржинальный, ЗаказнойТорт, Аллерген)' },
+    { name: 'Бренд-анализ', need: 'НоменклатурныеГруппы.Бренд в /object или включение в /pull' },
+    { name: 'Market Basket (что покупают вместе)', need: 'Состав ЧекККМ — табличная часть Товары. Сейчас /document отдаёт шапку чека без позиций' },
+    { name: 'Когортный анализ retention', need: 'Длинная история карт за 6-12 мес (доступно через Бонусы по месяцам, нужна оптимизация запросов)' },
+    { name: 'Кластеризация магазинов', need: 'Можно сделать на наших данных, добавлю в Pack 4' }
+  ];
+  el.innerHTML = `
+    <div style="padding:8px 16px;font-size:12px;color:var(--muted)">9 отчётов готовы к реализации — ждут расширения BSL HTTP-сервиса 1С (см. Hellstaff TODO).</div>
+    <div class="table-wrap"><table class="num-table">
+      <thead><tr><th>Отчёт</th><th>Что нужно от 1С/Hellstaff</th></tr></thead>
+      <tbody>${pending.map(p => `<tr><td><b>⏳ ${escapeHtml(p.name)}</b></td><td><small class="muted">${escapeHtml(p.need)}</small></td></tr>`).join('')}</tbody>
+    </table></div>`;
 }
 
 async function loadPromo() {

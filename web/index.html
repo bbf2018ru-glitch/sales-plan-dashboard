@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="stylesheet" href="/styles.css?v=41" />
+    <link rel="stylesheet" href="/styles.css?v=42" />
   </head>
   <body>
 
@@ -419,6 +419,7 @@
               <button class="atab" data-tab="comparison">Сравнение</button>
               <button class="atab" data-tab="customers">Клиенты</button>
               <button class="atab" data-tab="promo">Промо</button>
+              <button class="atab" data-tab="marketing">Маркетинг</button>
               <button class="atab" data-tab="pending">Roadmap</button>
             </div>
           </section>
@@ -1111,6 +1112,55 @@
             </div>
           </section>
 
+          <!-- Маркетинг: новые отчёты на 1С + наших данных -->
+          <section class="section atab-section hidden" data-atab="marketing">
+            <div class="section-label">Маркетинговая аналитика</div>
+            <div class="section-hint">Отчёты для CRM и ассортимента. Часть пунктов помечена «⏳ нужен BSL» — ждут расширения HTTP-сервиса 1С.</div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div><div class="panel-title">🧟 Зомби-ассортимент</div>
+                <div class="panel-subtitle">товары с планом > 1 000 ₽, факт &lt; 10% — либо снять, либо продвигать</div></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkZombieRefresh">Обновить</button></div>
+              </div>
+              <div id="mkZombie" class="mk-block"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div><div class="panel-title">💸 Каннибализация скидок</div>
+                <div class="panel-subtitle">сколько маржи съели скидки, разбивка по типам и месяцам</div></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkCannibaRefresh">Обновить</button></div>
+              </div>
+              <div id="mkCanniba" class="mk-block"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div><div class="panel-title">👑 RFM-сегментация клиентов</div>
+                <div class="panel-subtitle">VIP / Постоянные / Новые / Уходящие VIP / Спящие — по картам за 6 мес</div></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkRfmRefresh">Обновить</button></div>
+              </div>
+              <div id="mkRfm" class="mk-block"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div><div class="panel-title">🎉 Праздники YoY — пик спроса</div>
+                <div class="panel-subtitle">для каждого ближайшего праздника — выручка той же недели в прошлом году vs средний день</div></div>
+              </div>
+              <div id="mkHolidays" class="mk-block"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div><div class="panel-title">⏳ Что нужно от Hellstaff'а для остальных отчётов</div>
+                <div class="panel-subtitle">эти отчёты технически готовы — ждут расширения BSL HTTP-сервиса</div></div>
+              </div>
+              <div id="mkPending" class="mk-block"></div>
+            </div>
+          </section>
+
           <!-- Roadmap -->
           <section class="section atab-section" data-atab="pending">
             <div class="section-label">Roadmap отчётов</div>
@@ -1191,6 +1241,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=45"></script>
+    <script src="/app.js?v=46"></script>
   </body>
 </html>
