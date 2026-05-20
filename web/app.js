@@ -281,6 +281,70 @@ function renderTrendChart(summary) {
   </svg>`;
 }
 
+// ── AI-нарратив «Маша рассказывает» — приоритетная плашка над KPI ───────────
+function renderAiNarrative(text) {
+  const section = $('aiNarrativeSection');
+  const textEl = $('aiNarrativeText');
+  if (!section || !textEl) return;
+  if (!text || !String(text).trim()) {
+    section.classList.add('hidden');
+    return;
+  }
+  textEl.innerHTML = escapeHtml(String(text)).replace(/\n/g, '<br>');
+  section.classList.remove('hidden');
+}
+
+// ── Ритм недели — heatmap средней выручки по дням недели ────────────────────
+function renderWeekdayHeatmap(summary) {
+  const el = $('weekdayHeatmap');
+  if (!el) return;
+  const period = summary.period || '';
+  const [yy, mm] = period.split('-').map(Number);
+  if (!yy || !mm) { el.innerHTML = '<div class="empty-state">Нет данных</div>'; return; }
+
+  // Группируем факт по дням недели (Пн..Вс)
+  const buckets = [[], [], [], [], [], [], []];
+  for (const row of summary.daily || []) {
+    if (!row || !row.day) continue;
+    if (!(row.fact > 0)) continue;
+    const d = new Date(Date.UTC(yy, mm - 1, row.day));
+    // getUTCDay: 0=Вс,1=Пн..6=Сб → перенумеруем в 0=Пн..6=Вс
+    const dow = (d.getUTCDay() + 6) % 7;
+    buckets[dow].push(row.fact);
+  }
+  const avg = buckets.map(arr => arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : 0);
+  const countsByDow = buckets.map(arr => arr.length);
+  const maxV = Math.max(...avg, 1);
+  if (maxV <= 1) { el.innerHTML = '<div class="empty-state">Пока мало данных за этот месяц</div>'; return; }
+
+  const labels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  // Найдём лучший и худший день для подписи
+  const ranked = avg.map((v, i) => ({ i, v })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+  const best = ranked[0];
+  const worst = ranked[ranked.length - 1];
+
+  const cells = avg.map((v, i) => {
+    const intensity = maxV > 0 ? v / maxV : 0; // 0..1
+    // Цвет: при 0 — почти прозрачный, при max — насыщенный accent
+    const alpha = 0.08 + intensity * 0.85;
+    const isWeekend = i >= 5;
+    const isBest = best && best.i === i && v > 0;
+    const isWorst = worst && worst.i === i && v > 0 && ranked.length > 1;
+    const cls = `weekday-cell ${isWeekend ? 'weekend' : ''} ${isBest ? 'is-best' : ''} ${isWorst ? 'is-worst' : ''}`;
+    const subline = v > 0 ? `${fmtMoneyShort(v)}/день` : '—';
+    const days = countsByDow[i];
+    return `<div class="${cls}" style="background: rgba(193, 68, 86, ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, средняя выручка ${formatMoney(v)} ₽">
+      <div class="wc-day">${labels[i]}</div>
+      <div class="wc-val">${subline}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="weekday-grid">${cells}</div>
+    ${best && worst && best.i !== worst.i ? `<div class="weekday-hint">
+      Самый сильный — <b>${labels[best.i]}</b> (${fmtMoneyShort(best.v)}/день), слабый — <b>${labels[worst.i]}</b> (${fmtMoneyShort(worst.v)}/день).
+    </div>` : ''}`;
+}
+
 // ── Market trends — AI-обзор кондитерских трендов и рекомендации ────────────
 function renderMarketTrends(data) {
   const el = $('marketTrends');
@@ -541,21 +605,28 @@ function renderKpis(summary) {
 
   const cards = [
     { id: 'plan', label: 'План на месяц', value: formatMoney(summary.totals.plan),
-      sub: planSub, tone: 'neutral' },
+      sub: planSub, tone: 'neutral',
+      tip: 'Целевая сумма выручки сети к концу месяца (только СТС-точки из 1С УПП).' },
     { id: 'fact', label: 'Факт', value: formatMoney(summary.totals.fact),
-      sub: factSub, tone: 'neutral' },
+      sub: factSub, tone: 'neutral',
+      tip: 'Фактическая выручка сети с начала месяца на текущий момент. Сравнение «vs прошл.год» — с тем же днём (а не месяц целиком), чтобы было справедливо для незавершённого периода.' },
     { id: 'completion', label: 'Выполнение к сегодня', value: completionVal,
-      sub: completionSubV2, tone: completionTone },
+      sub: completionSubV2, tone: completionTone,
+      tip: 'Процент факта от плана-на-сегодня (план месяца, пропорционально пройденным дням с учётом часа в Иркутске). 100% = идём ровно в темпе.' },
     { id: 'margin', label: 'Маржа', value: formatMoney(summary.totals.margin),
       sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
-      tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin' },
-    { id: 'projected', label: 'Прогноз', value: projectedVal, sub: projectedSubV2, tone: projectedTone },
-    { id: 'required', label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone }
+      tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
+      tip: 'Валовая прибыль = факт − себестоимость. Когда 1С не передаёт себестоимость напрямую, считается через STORE_MARKUPS_JSON env (per-store markup% из отчёта «Валовая прибыль»).' },
+    { id: 'projected', label: 'Прогноз', value: projectedVal, sub: projectedSubV2, tone: projectedTone,
+      tip: 'Экстраполяция: средний фактический темп × оставшиеся дни + текущий факт. С учётом дней недели (seasonal-dow) если за последние 120 дней есть данные — иначе линейно.' },
+    { id: 'required', label: 'Нужно/день', value: requiredVal, sub: requiredSub, tone: requiredTone,
+      tip: 'Сколько нужно делать выручки каждый оставшийся день, чтобы выйти ровно в план месяца. Если средний факт/день меньше этой цифры — план рискует.' }
   ];
   $('kpis').innerHTML = cards.map(c => `
-    <article class="kpi ${c.tone} ${c.cls || ''}" data-kpi-id="${c.id}" tabindex="0">
+    <article class="kpi ${c.tone} ${c.cls || ''}" data-kpi-id="${c.id}" tabindex="0" title="${escapeHtml(c.tip || '')}">
       <div class="kpi-label">
         <span>${c.label}</span>
+        <span class="kpi-tip-icon" aria-label="Подсказка">ⓘ</span>
         <button class="kpi-expand" title="Подробнее">▾</button>
       </div>
       <div class="kpi-value">${c.value}</div>
@@ -955,21 +1026,27 @@ function renderStores(summary) {
 
   // Тренд = текущий % vs % того же магазина в прошлом месяце (из prevPeriod.storesPercent)
   const prevPct = summary.prevPeriod?.storesPercent || {};
+  // YoY = vs тот же магазин год назад (или 2 года, если за прошлый год пусто)
+  const yoyPct = summary.yoy?.storesPercent || {};
+  const yoyYearsBack = summary.yoy?.yearsBack || 1;
+
+  const buildDeltaCell = (cur, prev, prevLabel) => {
+    if (!(typeof prev === 'number' && prev > 0)) {
+      return `<span class="trend-cell neutral" title="${prevLabel}: нет данных">—</span>`;
+    }
+    const delta = (cur || 0) - prev;
+    const arr = delta > 1 ? '↑' : delta < -1 ? '↓' : '→';
+    const trTone = delta > 1 ? 'good' : delta < -1 ? 'bad' : 'neutral';
+    const sign = delta > 0 ? '+' : '';
+    return `<span class="trend-cell ${trTone}" title="${prevLabel}: ${prev}% → ${cur}%">${arr} ${sign}${delta.toFixed(0)} п.п.</span>`;
+  };
 
   $('storesTable').innerHTML = sorted.map((s, idx) => {
     const avgCheck = s.quantity > 0 ? s.fact / s.quantity : 0;
     const tone = pctTone(s.percent);
-    // Тренд-индикатор
-    const prev = prevPct[s.storeId];
-    let trendHtml;
-    if (typeof prev === 'number' && prev > 0) {
-      const delta = (s.percent || 0) - prev;
-      const arr = delta > 1 ? '↑' : delta < -1 ? '↓' : '→';
-      const trTone = delta > 1 ? 'good' : delta < -1 ? 'bad' : 'neutral';
-      trendHtml = `<span class="trend-cell ${trTone}" title="vs прошлый месяц: ${prev}% → ${s.percent}%">${arr} ${delta > 0 ? '+' : ''}${delta.toFixed(0)} п.п.</span>`;
-    } else {
-      trendHtml = `<span class="trend-cell neutral" title="Нет данных за прошлый месяц">—</span>`;
-    }
+    const trendHtml = buildDeltaCell(s.percent, prevPct[s.storeId], 'vs прошлый месяц');
+    const yoyLabel = yoyYearsBack > 1 ? `vs ${yoyYearsBack} года назад` : 'vs тот же месяц год назад';
+    const yoyHtml = buildDeltaCell(s.percent, yoyPct[s.storeId], yoyLabel);
     return `
     <tr data-store-id="${s.storeId}" class="${state.selectedStoreId === s.storeId ? 'active' : ''}">
       <td class="col-num">${idx + 1}</td>
@@ -987,6 +1064,7 @@ function renderStores(summary) {
       <td class="num">${avgCheck > 0 ? formatMoney(avgCheck) : '—'}</td>
       <td class="num">${formatNum(s.quantity)}</td>
       <td class="num">${trendHtml}</td>
+      <td class="num col-hide-md">${yoyHtml}</td>
       <td class="col-edit no-print">
         <button class="edit-plan-btn" data-store-id="${s.storeId}" title="Редактировать план">✎</button>
       </td>
@@ -2111,6 +2189,7 @@ async function loadSummary() {
   renderKpis(summary);
   renderForecast(summary);
   renderTrendChart(summary);
+  renderWeekdayHeatmap(summary);
   renderComparison(summary);
   renderSpotlight(summary);
   renderStores(summary);
@@ -2163,9 +2242,10 @@ function renderInsights(data) {
     </div>`;
   }).join('');
 
-  const llmHtml = data.llmSummary
-    ? `<div class="ins-llm"><div class="ins-llm-label">Резюме AI:</div><div class="ins-llm-text">${escapeHtml(data.llmSummary).replace(/\n/g, '<br>')}</div></div>`
-    : '';
+  // Резюме AI вынесено в отдельный верхний блок (aiNarrativeSection) над KPI.
+  // Здесь не дублируем — иначе один и тот же текст висит в двух местах.
+  renderAiNarrative(data.llmSummary);
+  const llmHtml = '';
 
   el.innerHTML = `
     ${llmHtml}

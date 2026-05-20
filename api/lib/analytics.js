@@ -413,6 +413,12 @@ function buildYoYComparison(db, period, currentTotals) {
   const haveBothMargins = currentTotals.margin !== null && previous.totals.margin !== null;
   const marginDelta = haveBothMargins ? roundMetric(currentTotals.margin - previous.totals.margin) : null;
 
+  // Per-store yoy: процент выполнения каждого магазина в YoY-периоде.
+  // Использует storeId как ключ, фронтенд накладывает на текущую таблицу
+  // магазинов для колонки «vs год назад».
+  const storesPercent = Object.fromEntries((previous.stores || []).map(s => [s.storeId, s.percent]));
+  const storesFact = Object.fromEntries((previous.stores || []).map(s => [s.storeId, s.fact]));
+
   return {
     previousPeriod: yoyPeriod,
     yearsBack,
@@ -423,6 +429,8 @@ function buildYoYComparison(db, period, currentTotals) {
     quantityDelta,
     marginDelta,
     previousTotals: previous.totals,
+    storesPercent,
+    storesFact,
     tone: factDelta >= 0 ? 'good' : 'bad'
   };
 }

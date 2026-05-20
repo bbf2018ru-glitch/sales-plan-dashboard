@@ -2401,6 +2401,77 @@ tfoot td { border-top: 1px solid var(--line); }
 .ins-headline { font-weight: 500; font-size: 13.5px; line-height: 1.4; }
 .ins-detail   { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
 
+/* ─── AI-нарратив «Маша рассказывает» ────────────────────────────────────── */
+.ai-narrative-section { margin-bottom: 18px; }
+.ai-narrative-section.hidden { display: none; }
+.ai-narrative-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(193,68,86,.07), rgba(193,68,86,.02));
+  border: 1px solid rgba(193,68,86,.18);
+}
+.ai-narrative-icon { font-size: 22px; line-height: 1; margin-top: 2px; }
+.ai-narrative-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: rgb(193,68,86);
+  margin-bottom: 4px;
+}
+.ai-narrative-text { font-size: 14px; line-height: 1.55; color: var(--ink); }
+.ai-narrative-text b { font-weight: 600; }
+
+/* Иконка-подсказка ⓘ в KPI labels */
+.kpi-tip-icon {
+  font-size: 11px;
+  opacity: .45;
+  margin-left: 4px;
+  cursor: help;
+  transition: opacity .15s;
+}
+.kpi:hover .kpi-tip-icon { opacity: .85; }
+
+/* ─── Ритм недели — heatmap по дням ──────────────────────────────────────── */
+.weekday-heatmap { display: flex; flex-direction: column; gap: 10px; }
+.weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.weekday-cell {
+  border-radius: 10px;
+  padding: 14px 10px;
+  text-align: center;
+  border: 1px solid var(--line);
+  transition: transform .12s;
+  cursor: default;
+}
+.weekday-cell:hover { transform: translateY(-1px); }
+.weekday-cell.weekend { border-color: rgba(193, 68, 86, .25); }
+.weekday-cell.is-best { box-shadow: 0 0 0 2px rgba(34, 197, 94, .35); }
+.weekday-cell.is-worst { box-shadow: 0 0 0 2px rgba(239, 68, 68, .25); }
+.wc-day {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.wc-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.weekday-hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+@media (max-width: 640px) {
+  .weekday-grid { gap: 4px; }
+  .weekday-cell { padding: 8px 4px; }
+  .wc-day { font-size: 10px; margin-bottom: 3px; }
+  .wc-val { font-size: 11px; }
+}
+
 /* ─── Market trends — карточки трендов рынка ──────────────────────────────── */
 .market-trends {
   display: grid;
@@ -3086,14 +3157,19 @@ body.plan-incomplete .spark-fill {
   .mobile-toggle-bar { display: flex; }
 
   /* В компактном режиме показываем ТОЛЬКО summary-hero + 3 главные KPI
-     + sticky-баннер о неполном плане + список магазинов */
+     + sticky-баннер о неполном плане + список магазинов.
+     Market-trends, ai-narrative, weekday-heatmap — не критичны на ходу,
+     скрываем чтобы не было длинной ленты. */
   body.mobile-compact .insights-panel,
   body.mobile-compact #forecastPanel,
   body.mobile-compact .panel-grid,
   body.mobile-compact #commentsSection,
   body.mobile-compact #storeDetailSection,
   body.mobile-compact #page-analytics,
-  body.mobile-compact .nav-btn[data-page="analytics"] {
+  body.mobile-compact .nav-btn[data-page="analytics"],
+  body.mobile-compact #aiNarrativeSection,
+  body.mobile-compact #weekdaySection,
+  body.mobile-compact #marketTrendsSection {
     display: none !important;
   }
 

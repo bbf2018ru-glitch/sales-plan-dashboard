@@ -183,6 +183,17 @@
 
         <section id="summaryHero" class="summary-hero hidden"></section>
 
+        <!-- AI-нарратив: краткое объяснение «что происходит» в 2-3 предложениях -->
+        <section id="aiNarrativeSection" class="ai-narrative-section hidden">
+          <div class="ai-narrative-card">
+            <div class="ai-narrative-icon">💬</div>
+            <div class="ai-narrative-body">
+              <div class="ai-narrative-label">Маша рассказывает</div>
+              <div id="aiNarrativeText" class="ai-narrative-text"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- 1. Итоги периода (KPI) -->
         <section class="section">
           <div class="section-label">Итоги периода</div>
@@ -231,8 +242,21 @@
           </article>
         </section>
 
+        <!-- Ритм недели — heatmap по дням -->
+        <section id="weekdaySection" class="section">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Ритм недели</div>
+                <div class="panel-subtitle">средняя выручка по дням недели за период — видны сильные и слабые дни</div>
+              </div>
+            </div>
+            <div id="weekdayHeatmap" class="weekday-heatmap"></div>
+          </article>
+        </section>
+
         <!-- 5. Тенденции кондитерского рынка (AI-генерация через Groq, кэш 24ч) -->
-        <section class="section">
+        <section id="marketTrendsSection" class="section">
           <article class="panel">
             <div class="panel-header">
               <div>
@@ -291,7 +315,8 @@
                     <th data-sort="marginPct" class="sortable num col-margin">Марж.%</th>
                     <th data-sort="avgCheck" class="sortable num">Ср. чек</th>
                     <th data-sort="quantity" class="sortable num">Шт</th>
-                    <th class="num">Тренд</th>
+                    <th class="num" title="Изменение % выполнения относительно того же магазина в прошлом месяце">Тренд</th>
+                    <th class="num col-hide-md" title="Изменение % выполнения относительно того же месяца год назад (или ранее, если данных за прошлый год нет)">YoY</th>
                     <th class="col-edit no-print"></th>
                   </tr>
                 </thead>

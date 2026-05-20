@@ -1388,4 +1388,26 @@ server.listen(PORT, async () => {
   if (UPP_PULL_URL && UPP_PULL_INTERVAL_MIN > 0) {
     startPullSchedulerWithInterval(UPP_PULL_INTERVAL_MIN);
   }
+
+  // Cron на market-trends: ежедневно в 9:00 Иркутск (UTC+8) тригерим refresh,
+  // если кэш старше 18 часов. К моменту захода руководителя утром тренды
+  // уже свежие, не приходится ждать ~30 сек на Groq при первом GET.
+  if (groqConfig) {
+    let lastTrendsRun = 0;
+    setInterval(async () => {
+      const irkHour = (new Date().getUTCHours() + 8) % 24;
+      if (irkHour !== 9) return;
+      if (Date.now() - lastTrendsRun < 18 * 3600 * 1000) return;
+      try {
+        const db = await store.getDb();
+        const summary = aggregateDashboard(db, monthKey());
+        await getMarketTrends({ store, apiKey: groqConfig.apiKey, model: groqConfig.model, summary, force: true });
+        lastTrendsRun = Date.now();
+        console.log('[market-trends] daily cron: refreshed at 09:00 Irkutsk');
+      } catch (e) {
+        console.warn('[market-trends] daily cron failed:', e.message);
+      }
+    }, 60 * 1000);
+    console.log('[market-trends] daily refresh scheduled for 09:00 Irkutsk');
+  }
 });
