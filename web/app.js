@@ -2197,10 +2197,9 @@ async function loadSummary() {
   if (!state.period) return;
   const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}&trend_window=24`);
   state.summary = summary;
-  if (!state.selectedStoreId && summary.stores[0]) {
-    state.selectedStoreId = summary.stores[0].storeId;
-    $('storeDetailTitle').textContent = summary.stores[0].storeName;
-  }
+  // Раньше автоматически выбирался первый магазин из списка — это разворачивало
+  // огромный блок «По товарам» (8000+ пикселей) на главной для случайного
+  // магазина. Теперь не выбираем — пользователь сам кликает на строку.
 
   applyMarginVisibility(summary);
   renderPlanHealth(summary);
