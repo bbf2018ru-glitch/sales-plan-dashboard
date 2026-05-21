@@ -4,7 +4,7 @@
 const { aggregateDashboard, monthKey } = require('./analytics');
 const { buildInsights } = require('./insights');
 const { getUpcomingEvents } = require('./calendar-irk');
-const { chatCompletion } = require('./groq');
+const { callGroqWithFallback } = require('./groq');
 
 // Кэш агрегации дашборда на period. aggregateDashboard тяжёлый
 // (12-мес trend, все продажи), а в активной беседе пользователь шлёт
@@ -234,8 +234,19 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
 
   const userMsg = `${ctx}${notesBlock}\n\n${histMsg ? '=== ИСТОРИЯ ЧАТА ===\n' + histMsg + '\n' : ''}=== ВОПРОС ===\n${question}`;
 
-  const answer = await chatCompletion({ apiKey, model, system: SYSTEM_PROMPT, user: userMsg });
-  return { answer: answer.trim(), period };
+  // При 429 на 70b — fallback на 8b-instant (отдельный TPD-лимит).
+  const { text, model: usedModel } = await callGroqWithFallback({
+    apiKey,
+    models: [model || 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userMsg }
+    ],
+    temperature: 0.2,
+    maxTokens: 500,
+    timeoutMs: 30000
+  });
+  return { answer: text.trim(), period, model: usedModel };
 }
 
 module.exports = { askAiChat, buildSuggestions };
