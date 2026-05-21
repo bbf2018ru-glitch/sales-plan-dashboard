@@ -86,6 +86,57 @@ setInterval(() => {
   }
 }, 3600 * 1000);
 
+// ── PIN brute-force protection ────────────────────────────────────────────
+// In-memory IP-based rate limit для /api/auth. 6-цифр PIN = 1М комбинаций,
+// без защиты бот переберёт за пару часов. Лимиты:
+//   - 5 неудачных попыток за 60 секунд → блок на 15 минут
+//   - Успешный PIN сбрасывает счётчик
+//   - cleanup: каждые 5 минут удаляем записи старше часа
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_WINDOW_MS = 60 * 1000;
+const PIN_BLOCK_MS = 15 * 60 * 1000;
+const pinAttempts = new Map(); // ip → { count, windowStart, blockedUntil }
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [ip, rec] of pinAttempts.entries()) {
+    if ((rec.blockedUntil || 0) < Date.now() && (rec.windowStart || 0) < cutoff) {
+      pinAttempts.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
+
+function getClientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function checkPinRateLimit(ip) {
+  const now = Date.now();
+  const rec = pinAttempts.get(ip);
+  if (rec?.blockedUntil && rec.blockedUntil > now) {
+    return { allowed: false, retryAfterSec: Math.ceil((rec.blockedUntil - now) / 1000) };
+  }
+  return { allowed: true };
+}
+
+function recordPinAttempt(ip, success) {
+  const now = Date.now();
+  if (success) { pinAttempts.delete(ip); return; }
+  const rec = pinAttempts.get(ip) || { count: 0, windowStart: now };
+  // Окно истекло → сбрасываем счётчик
+  if (now - rec.windowStart > PIN_WINDOW_MS) {
+    rec.count = 0;
+    rec.windowStart = now;
+  }
+  rec.count += 1;
+  if (rec.count >= PIN_MAX_ATTEMPTS) {
+    rec.blockedUntil = now + PIN_BLOCK_MS;
+    console.warn(`[auth] IP ${ip} blocked for ${PIN_BLOCK_MS / 60000} min after ${rec.count} failed PIN attempts`);
+  }
+  pinAttempts.set(ip, rec);
+}
+
 function createSession() {
   const token = crypto.randomUUID();
   sessions.set(token, Date.now() + 8 * 3600 * 1000);
@@ -342,6 +393,17 @@ const server = http.createServer(async (req, res) => {
 
     // ── Auth ──────────────────────────────────────────────────────────────────
     if (pathname === '/api/auth' && req.method === 'POST') {
+      const ip = getClientIp(req);
+      const limit = checkPinRateLimit(ip);
+      if (!limit.allowed) {
+        res.setHeader('Retry-After', String(limit.retryAfterSec));
+        sendJson(res, 429, {
+          ok: false,
+          error: `Слишком много попыток ввода PIN. Подождите ${Math.ceil(limit.retryAfterSec / 60)} мин.`,
+          retryAfterSec: limit.retryAfterSec
+        });
+        return;
+      }
       const body = await parseBody(req);
       if (!DASHBOARD_PIN) {
         // Если в body есть userToken — переложим его в cookie (упрощаем выход из ?userToken=… в URL)
@@ -355,6 +417,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (body.pin === DASHBOARD_PIN) {
+        recordPinAttempt(ip, true);
         const sessionToken = createSession();
         setSessionCookie(res, sessionToken, req);
         if (body.userToken) {
@@ -366,6 +429,7 @@ const server = http.createServer(async (req, res) => {
         // sessionToken в теле оставляем для legacy-клиентов, но новые версии используют cookie
         sendJson(res, 200, { ok: true, token: sessionToken, pinRequired: true });
       } else {
+        recordPinAttempt(ip, false);
         sendJson(res, 401, { ok: false, error: 'Неверный PIN' });
       }
       return;
