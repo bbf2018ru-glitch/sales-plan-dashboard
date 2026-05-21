@@ -2547,6 +2547,7 @@ function renderCustomersTop(d) {
 // ── Маркетинговая аналитика (под-таб «Маркетинг») ──────────────────────────
 async function loadMarketing() {
   analyticsState.marketingLoaded = true;
+  // Hero рендерится после того как нужные данные загрузились
   loadMkZombie();
   loadMkCannibalization();
   loadMkRfm();
@@ -2556,12 +2557,51 @@ async function loadMarketing() {
   renderMkPending();
 }
 
+function renderMkHero() {
+  const el = $('mkHeroSummary');
+  if (!el) return;
+  const cards = [];
+  const rfm = analyticsState.mkRfmData;
+  const canniba = analyticsState.mkCannibaData;
+  const clusters = analyticsState.mkClustersData;
+  const zombie = analyticsState.mkZombieData;
+
+  if (rfm?.total) {
+    const vip = (rfm.segments || []).find(s => s.segment === 'VIP');
+    const sleeping = (rfm.segments || []).find(s => s.segment === 'Спящие');
+    cards.push({ label: 'Активных клиентов (6 мес)', value: rfm.total.toLocaleString('ru-RU'), tone: 'neutral' });
+    if (vip) cards.push({ label: 'VIP-клиентов', value: vip.count.toLocaleString('ru-RU'), sub: formatMoney(vip.monetary), tone: 'good' });
+    if (sleeping) cards.push({ label: 'Спящих (реактивировать)', value: sleeping.count.toLocaleString('ru-RU'), sub: 'потенциал ' + formatMoney(sleeping.monetary), tone: 'bad' });
+  }
+  if (canniba?.totals) {
+    const totalFact = state.summary?.totals?.fact || 0;
+    const pct = totalFact > 0 ? ((canniba.totals.totalDiscount / totalFact) * 100).toFixed(1) : '—';
+    cards.push({ label: 'Скидок выдано', value: formatMoney(canniba.totals.totalDiscount), sub: `${pct}% от выручки`, tone: pct > 5 ? 'warn' : 'neutral' });
+  }
+  if (clusters?.total) {
+    cards.push({ label: 'Магазинов в кластерах', value: clusters.total.toLocaleString('ru-RU'), sub: `${clusters.clusters?.length || 0} групп`, tone: 'neutral' });
+  }
+  if (zombie?.total !== undefined) {
+    cards.push({ label: 'Зомби-товаров', value: zombie.total.toLocaleString('ru-RU'), sub: zombie.total > 0 ? 'недобор ' + formatMoney(zombie.totalGap) : 'все ОК', tone: zombie.total > 0 ? 'bad' : 'good' });
+  }
+
+  if (!cards.length) { el.innerHTML = ''; return; }
+  el.innerHTML = cards.map(c => `
+    <div class="mk-hero-card mk-hero-${c.tone}">
+      <div class="mk-hero-label">${escapeHtml(c.label)}</div>
+      <div class="mk-hero-value">${c.value}</div>
+      ${c.sub ? `<div class="mk-hero-sub">${escapeHtml(c.sub)}</div>` : ''}
+    </div>`).join('');
+}
+
 async function loadMkClusters() {
   const el = $('mkClusters');
   if (!el) return;
   el.innerHTML = '<div class="empty-state" style="padding:14px">Кластеризую…</div>';
   try {
     const data = await fetchJson(`/api/marketing/store-clusters?period=${encodeURIComponent(state.period)}`);
+    analyticsState.mkClustersData = data;
+    renderMkHero();
     if (!data.clusters?.length) {
       el.innerHTML = `<div class="empty-state" style="padding:14px">${escapeHtml(data.note || 'Недостаточно данных')}</div>`;
       return;
@@ -2580,7 +2620,10 @@ async function loadMkClusters() {
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--line)">${topStores}</div>
         </div>`;
     }).join('');
-    el.innerHTML = `<div style="padding:8px 16px;font-size:13px">Всего магазинов: <b>${data.total}</b></div><div class="mk-segs">${cards}</div>`;
+    el.innerHTML = `
+      <div class="mk-stat-line">Всего магазинов в кластерах: <b>${data.total}</b> · ${data.clusters.length} групп</div>
+      <div class="mk-segs">${cards}</div>
+      <div class="mk-action-hint">💡 <b>Что делать:</b> «Лидеры» — изучить их практики и масштабировать; «Отстающие» — внутренний обмен опытом с лидерами того же формата; высокий чек ≠ высокая маржа — следить за обоими показателями.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
@@ -2602,19 +2645,25 @@ async function loadMkCohorts() {
     const rows = data.cohorts.map(c => {
       const cells = headerOffsets.map(off => {
         const r = c.retention.find(x => x.offset === off);
-        if (!r) return '<td class="num muted">—</td>';
-        const intensity = r.pct / 100;
-        const bg = `rgba(34, 197, 94, ${(intensity * 0.5).toFixed(2)})`;
+        if (!r) return '<td class="num cohort-empty">—</td>';
+        // Цветная heatmap: M0 всегда 100% — нейтрально; дальше — intensity по retention pct
+        if (off === 0) {
+          return `<td class="num" style="background:rgba(110,130,200,.18)"><b>${r.pct}%</b><br><small class="muted">${r.count}</small></td>`;
+        }
+        // Для M+1+: 0-3% слабо, 3-7% средне, >7% сильно
+        const intensity = Math.min(r.pct / 12, 1);
+        const bg = `rgba(34, 197, 94, ${(0.1 + intensity * 0.6).toFixed(2)})`;
         return `<td class="num" style="background:${bg}"><b>${r.pct}%</b><br><small class="muted">${r.count}</small></td>`;
       }).join('');
       return `<tr><td><b>${c.firstMonth}</b><br><small class="muted">${c.total} карт</small></td>${cells}</tr>`;
     }).join('');
     el.innerHTML = `
-      <div style="padding:8px 16px;font-size:13px">Когорты по первому месяцу активности. % = доля карт когорты активных в этом offset-месяце.</div>
-      <div class="table-wrap"><table class="num-table">
+      <div class="mk-stat-line">Когорты по первому месяцу активности. % = доля карт когорты активных в этом offset-месяце.</div>
+      <div class="table-wrap"><table class="num-table mk-cohort-table">
         <thead><tr><th>Когорта</th>${headerOffsets.map(o => `<th class="num">${o === 0 ? 'M0' : 'M+' + o}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
-      </table></div>`;
+      </table></div>
+      <div class="mk-action-hint">💡 <b>Что делать:</b> сравнить retention новых когорт со старыми — если падает, проверить onboarding (как новый клиент узнаёт о бонусах). M+1 ниже 5% — сигнал что после первой покупки клиент не вернулся.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
@@ -2626,8 +2675,14 @@ async function loadMkZombie() {
   el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю…</div>';
   try {
     const data = await fetchJson(`/api/marketing/zombie-products?period=${encodeURIComponent(state.period)}`);
+    analyticsState.mkZombieData = data;
+    renderMkHero();
     if (!data.items?.length) {
-      el.innerHTML = '<div class="empty-state" style="padding:14px;color:var(--good)">Зомби-товаров нет — все товары с планом &gt;1К продаются на &gt;10%.</div>';
+      el.innerHTML = `
+        <div class="mk-empty-good">
+          <div class="mk-empty-emoji">✅</div>
+          <div>Зомби-товаров нет — все товары с планом &gt;1 000 ₽ продаются хотя бы на 10%.</div>
+        </div>`;
       return;
     }
     const rows = data.items.slice(0, 25).map(it => `
@@ -2639,11 +2694,12 @@ async function loadMkZombie() {
         <td class="num">${formatMoney(it.gap)}</td>
       </tr>`).join('');
     el.innerHTML = `
-      <div style="padding:8px 16px;font-size:13px">Всего <b>${data.total}</b> зомби-товаров · суммарный недобор <b>${formatMoney(data.totalGap)}</b></div>
+      <div class="mk-stat-line">Всего <b>${data.total}</b> зомби-товаров · суммарный недобор <b>${formatMoney(data.totalGap)}</b></div>
       <div class="table-wrap"><table class="num-table">
         <thead><tr><th>Товар</th><th class="num">План</th><th class="num">Факт</th><th class="num">%</th><th class="num">Недобор</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table></div>`;
+      </table></div>
+      <div class="mk-action-hint">💡 <b>Что делать:</b> либо запустить промо/выкладку на эти SKU, либо снять с ассортимента и перераспределить план на ходовые позиции.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
@@ -2658,24 +2714,36 @@ async function loadMkCannibalization() {
     params.set('from', analyticsState.range?.from?.slice(0,7) || state.period);
     params.set('to', analyticsState.range?.to?.slice(0,7) || state.period);
     const data = await fetchJson(`/api/marketing/discount-cannibalization?${params}`);
+    analyticsState.mkCannibaData = data;
+    renderMkHero();
     const totalFact = state.summary?.totals?.fact || 0;
-    const ratioPct = totalFact > 0 ? ((data.totals.totalDiscount / totalFact) * 100).toFixed(1) : '—';
-    const condRows = data.byCondition.map(c => `
-      <tr>
+    const ratioPct = totalFact > 0 ? ((data.totals.totalDiscount / totalFact) * 100).toFixed(1) : null;
+    const ratioBadge = ratioPct !== null
+      ? `<span class="mk-badge mk-badge-${ratioPct > 5 ? 'warn' : 'good'}">${ratioPct}% от выручки</span>`
+      : '<span class="muted">% от выручки считаем после загрузки summary</span>';
+    // Bar-визуализация: TR-background заливается пропорционально доле
+    const maxPct = Math.max(...data.byCondition.map(c => data.totals.totalDiscount > 0 ? (c.amount / data.totals.totalDiscount) * 100 : 0), 1);
+    const condRows = data.byCondition.map(c => {
+      const pct = data.totals.totalDiscount > 0 ? (c.amount / data.totals.totalDiscount) * 100 : 0;
+      const fill = (pct / maxPct) * 100; // в % от ширины ячейки
+      return `<tr style="background: linear-gradient(to right, rgba(193,68,86,${(fill/250).toFixed(3)}) ${fill.toFixed(1)}%, transparent ${fill.toFixed(1)}%)">
         <td>${escapeHtml(c.condition)}</td>
         <td class="num">${formatMoney(c.amount)}</td>
-        <td class="num">${data.totals.totalDiscount > 0 ? ((c.amount / data.totals.totalDiscount) * 100).toFixed(1) : 0}%</td>
-      </tr>`).join('');
+        <td class="num"><b>${pct.toFixed(1)}%</b></td>
+      </tr>`;
+    }).join('');
     el.innerHTML = `
-      <div style="padding:8px 16px;font-size:13px">
-        Сумма скидок за период: <b>${formatMoney(data.totals.totalDiscount)}</b> · это <b style="color:var(--warn)">${ratioPct}%</b> от выручки <small class="muted">(${data.totals.totalRows} записей, ${data.totals.months} мес.)</small>
-        ${data.truncationWarning ? `<div style="color:var(--warn);font-size:12px;margin-top:4px">⚠ ${escapeHtml(data.truncationWarning)}</div>` : ''}
+      <div class="mk-stat-line">
+        Сумма скидок за период: <b>${formatMoney(data.totals.totalDiscount)}</b> · ${ratioBadge}
+        <small class="muted" style="margin-left:8px">(${data.totals.totalRows} записей, ${data.totals.months} мес.)</small>
+        ${data.truncationWarning ? `<div class="mk-warn-line">⚠ ${escapeHtml(data.truncationWarning)}</div>` : ''}
       </div>
       <div class="table-wrap"><table class="num-table">
         <thead><tr><th>Условие скидки</th><th class="num">Сумма</th><th class="num">Доля</th></tr></thead>
         <tbody>${condRows}</tbody>
       </table></div>
-      ${data.topReceivers?.length ? `<div style="padding:8px 16px;font-size:12px;color:var(--muted)">Топ-5 получателей: ${data.topReceivers.slice(0,5).map(r => `<span style="margin-right:14px">${escapeHtml(r.name)} — <b>${formatMoney(r.amount)}</b></span>`).join('')}</div>` : ''}`;
+      ${data.topReceivers?.length ? `<div class="mk-substat">Топ-5 получателей: ${data.topReceivers.slice(0,5).map(r => `<span style="margin-right:14px">${escapeHtml(r.name)} — <b>${formatMoney(r.amount)}</b></span>`).join('')}</div>` : ''}
+      <div class="mk-action-hint">💡 <b>Что делать:</b> если &gt;5% выручки — пересмотреть условия акций. Топ-3 правила обычно дают 70% эффекта — на них и сосредоточиться.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
@@ -2691,6 +2759,8 @@ async function loadMkRfm() {
     const from = new Date(Date.UTC(yy, mm - 6, 1));
     const fromYM = `${from.getUTCFullYear()}-${String(from.getUTCMonth() + 1).padStart(2, '0')}`;
     const data = await fetchJson(`/api/marketing/rfm?from=${fromYM}&to=${state.period}`);
+    analyticsState.mkRfmData = data;
+    renderMkHero();
     if (!data.total) {
       el.innerHTML = `<div class="empty-state" style="padding:14px">${escapeHtml(data.note || 'Нет данных')}</div>`;
       return;
@@ -2710,16 +2780,17 @@ async function loadMkRfm() {
         Всего активных клиентов за 6 мес: <b>${data.total}</b>
       </div>
       <div class="mk-segs">${segs}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 16px">
-        <div>
-          <div style="font-weight:600;margin-bottom:6px;color:var(--good)">👑 Топ-20 VIP (предложить премиум)</div>
+      <div class="mk-rfm-cols">
+        <div class="mk-rfm-col">
+          <div class="mk-rfm-col-title good">👑 Топ-20 VIP <small class="muted">— предложить премиум, индивидуальный сервис</small></div>
           ${vipRows ? `<table class="num-table"><thead><tr><th>Имя</th><th class="num">Сумма</th><th class="num">Покупок</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
         </div>
-        <div>
-          <div style="font-weight:600;margin-bottom:6px;color:var(--bad)">💤 Топ-20 спящих (реактивировать)</div>
+        <div class="mk-rfm-col">
+          <div class="mk-rfm-col-title bad">💤 Топ-20 спящих <small class="muted">— реактивировать SMS/push с купоном</small></div>
           ${sleepingRows ? `<table class="num-table"><thead><tr><th>Имя</th><th class="num">Сумма</th><th class="num">Recency</th></tr></thead><tbody>${sleepingRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
         </div>
-      </div>`;
+      </div>
+      <div class="mk-action-hint">💡 <b>Что делать:</b> VIP — персональные предложения и поздравления; Спящим — точечный push «вернёмся за подарком» с купоном на 1 неделю; Новых — onboarding (карта/бонусы).</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
@@ -2745,11 +2816,12 @@ async function loadMkHolidayYoy() {
       </tr>`;
     }).join('');
     el.innerHTML = `
-      <div style="padding:8px 16px;font-size:13px">Baseline средняя выручка/день за период: <b>${formatMoney(baseline)}</b> <small class="muted">(${data.baseline.daysObserved} дней в БД)</small></div>
+      <div class="mk-stat-line">Baseline средняя выручка/день за период: <b>${formatMoney(baseline)}</b> <small class="muted">(${data.baseline.daysObserved} дней в БД)</small></div>
       <div class="table-wrap"><table class="num-table">
         <thead><tr><th>Праздник</th><th class="num">Год назад (среднее по 7 дн.)</th><th class="num">Lift к baseline</th><th>Заметки</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table></div>`;
+      </table></div>
+      <div class="mk-action-hint">💡 <b>Что делать:</b> для праздников с Lift &gt;30% — закладывать +N% производства за 2-3 дня до даты; «—» значит в БД нет данных год назад (нужны 24 мес истории через pull-history).</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
