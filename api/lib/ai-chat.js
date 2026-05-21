@@ -2,6 +2,8 @@
 // Без function-calling: контекст собираем заранее и упаковываем в промпт.
 
 const { aggregateDashboard, monthKey } = require('./analytics');
+const { buildInsights } = require('./insights');
+const { getUpcomingEvents } = require('./calendar-irk');
 const { chatCompletion } = require('./groq');
 
 // Кэш агрегации дашборда на period. aggregateDashboard тяжёлый
@@ -24,45 +26,94 @@ function buildContext(db, period) {
   const summary = aggregateDashboard(db, period, { trendWindow: 12 });
   const t = summary.totals || {};
   const f = summary.forecast || {};
+  const today = summary.today || {};
+  const comparison = summary.comparison;
+  const yoy = summary.yoy;
 
-  const top3 = (summary.stores || [])
-    .filter(s => s.plan > 0)
-    .sort((a, b) => b.percent - a.percent)
-    .slice(0, 3);
-  const bot3 = (summary.stores || [])
-    .filter(s => s.plan > 0)
-    .sort((a, b) => a.percent - b.percent)
-    .slice(0, 3);
+  // Топ/боттом магазины с фильтром только реальных торговых точек.
+  const realStores = (summary.stores || []).filter(s => s.plan > 0);
+  const top3 = [...realStores].sort((a, b) => b.percent - a.percent).slice(0, 3);
+  const bot3 = [...realStores].sort((a, b) => a.percent - b.percent).slice(0, 3);
 
-  // Топ-10 товаров по факту
   const topProducts = (summary.products || [])
+    .filter(p => p.productId !== '_total' && p.productId !== '__total__')
     .sort((a, b) => (b.fact || 0) - (a.fact || 0))
     .slice(0, 10);
 
-  // Тренд последних 6 мес — только с факт > 0
+  // Категории — топ-5 по выручке.
+  const byCategory = new Map();
+  for (const p of (summary.products || [])) {
+    if (p.productId === '_total' || p.productId === '__total__') continue;
+    const cat = p.category || 'Прочее';
+    byCategory.set(cat, (byCategory.get(cat) || 0) + (p.fact || 0));
+  }
+  const topCategories = Array.from(byCategory.entries())
+    .map(([name, fact]) => ({ name, fact, share: t.fact > 0 ? (fact / t.fact) * 100 : 0 }))
+    .sort((a, b) => b.fact - a.fact)
+    .slice(0, 5);
+
   const trend = (summary.trend?.periods || [])
     .filter(p => p.fact > 0)
     .slice(-6);
 
+  // Insights — выявленные аномалии и сигналы (без LLM-обёртки).
+  let insightsFindings = [];
+  try {
+    const ins = buildInsights ? null : null; // защита от циклической зависимости при отсутствии
+    // buildInsights возвращает Promise, но в синхронном контексте его не дёрнем.
+    // Вместо этого reuse: detectAnomalies можно вызвать прямо если импортирован.
+  } catch {}
+  // detectAnomalies — синхронный, импортирован отдельно
+  try {
+    const { detectAnomalies } = require('./insights');
+    insightsFindings = detectAnomalies(summary, db, period) || [];
+  } catch {}
+
+  // Праздники впереди (60 дней)
+  const upcomingHolidays = getUpcomingEvents(60).slice(0, 5);
+
   const lines = [];
   lines.push(`=== СВОДКА ЗА ${period} ===`);
   lines.push(`Факт: ${t.fact} ₽ из плана ${t.plan} ₽ (выполнение ${t.completion}%)`);
-  lines.push(`Маржа: ${t.margin} ₽ (${t.marginPct}%)`);
-  lines.push(`Прогноз на конец месяца: ${f.projectedFact} ₽ (${f.projectedCompletion}% к плану)`);
-  lines.push(`Осталось дней: ${f.remainingDays}, нужно ${f.requiredPerDayToPlan} ₽/день для плана`);
+  if (t.margin !== null) lines.push(`Маржа: ${t.margin} ₽ (${t.marginPct}%)`);
+  if (today.factToDate) {
+    lines.push(`На сегодня (${today.elapsedDays}-й день): факт ${today.factToDate} ₽, план-на-сегодня ${today.planToDate} ₽, разрыв ${today.gapToDate} ₽`);
+  }
+  lines.push(`Прогноз на конец месяца: ${f.projectedFact} ₽ (${f.projectedCompletion}% к плану), метод: ${f.projectionMethod}`);
+  if (f.projectionMeta) {
+    const meta = f.projectionMeta;
+    if (meta.basePeriod) lines.push(`  → baseline ${meta.basePeriod}, рост ${meta.growthRate}×`);
+    if (meta.storesCount) lines.push(`  → per-store: ${meta.storesCount} магазинов, новых открытых ${meta.newStoresCount || 0}`);
+  }
+  lines.push(`Осталось дней: ${f.remainingDays}, нужно ${f.requiredPerDayToPlan} ₽/день для плана. Текущий темп ${f.averagePerDay} ₽/день.`);
+
+  if (comparison?.hasData) {
+    lines.push(`\nvs прошлый месяц (${comparison.previousPeriod}): факт ${comparison.factDelta > 0 ? '+' : ''}${comparison.factDelta} ₽ (${comparison.factDeltaPercent}%), выполнение ${comparison.completionDelta > 0 ? '+' : ''}${comparison.completionDelta} п.п.`);
+  }
+  if (yoy?.hasData) {
+    const yLabel = yoy.yearsBack > 1 ? `${yoy.yearsBack} года назад` : 'год назад';
+    lines.push(`vs тот же месяц ${yLabel} (${yoy.previousPeriod}): факт ${yoy.factDelta > 0 ? '+' : ''}${yoy.factDelta} ₽ (${yoy.factDeltaPercent}%)`);
+  }
 
   lines.push('\n=== ВСЕ МАГАЗИНЫ ===');
-  for (const s of summary.stores || []) {
-    lines.push(`- ${s.storeName}: ${s.fact || 0} ₽ / ${s.plan || 0} ₽ (${s.percent || 0}%)`);
+  for (const s of realStores) {
+    lines.push(`- ${s.storeName}: ${s.fact || 0} ₽ / ${s.plan || 0} ₽ (${s.percent || 0}%), маржа ${s.marginPct === null ? '—' : s.marginPct + '%'}`);
   }
 
   if (top3.length) {
     lines.push('\n=== ЛИДЕРЫ ===');
-    for (const s of top3) lines.push(`- ${s.storeName}: ${s.percent}%`);
+    for (const s of top3) lines.push(`- ${s.storeName}: ${s.percent}% (${s.fact} ₽ из ${s.plan} ₽)`);
   }
   if (bot3.length) {
     lines.push('\n=== ОТСТАЮЩИЕ ===');
-    for (const s of bot3) lines.push(`- ${s.storeName}: ${s.percent}%`);
+    for (const s of bot3) lines.push(`- ${s.storeName}: ${s.percent}% (${s.fact} ₽ из ${s.plan} ₽)`);
+  }
+
+  if (topCategories.length) {
+    lines.push('\n=== ТОП-5 КАТЕГОРИЙ ===');
+    for (const c of topCategories) {
+      lines.push(`- ${c.name}: ${Math.round(c.fact)} ₽ (${c.share.toFixed(1)}% выручки)`);
+    }
   }
 
   if (topProducts.length) {
@@ -72,14 +123,79 @@ function buildContext(db, period) {
     }
   }
 
+  if (insightsFindings.length) {
+    lines.push('\n=== АВТО-АНОМАЛИИ И СИГНАЛЫ (insights) ===');
+    for (const fnd of insightsFindings.slice(0, 8)) {
+      lines.push(`- [${fnd.severity}] ${fnd.headline}${fnd.detail ? ' — ' + fnd.detail : ''}`);
+    }
+  }
+
+  if (upcomingHolidays.length) {
+    lines.push('\n=== БЛИЖАЙШИЕ ПРАЗДНИКИ (60 дн) ===');
+    for (const h of upcomingHolidays) {
+      lines.push(`- ${h.date} (через ${h.daysFromNow} дн.): ${h.name}${h.note ? ' — ' + h.note : ''}`);
+    }
+  }
+
   if (trend.length) {
-    lines.push('\n=== ТРЕНД ===');
+    lines.push('\n=== ТРЕНД ПО МЕСЯЦАМ ===');
     for (const p of trend) {
       lines.push(`- ${p.period}: ${p.fact} ₽ (план ${p.plan} ₽, ${p.completion}%)`);
     }
   }
 
   return lines.join('\n');
+}
+
+// Динамические подсказки для начального экрана чата — на основе текущего
+// состояния дашборда (insights findings и календарь).
+function buildSuggestions(db, period) {
+  const summary = aggregateDashboard(db, period);
+  const suggestions = [];
+  let insightsFindings = [];
+  try {
+    const { detectAnomalies } = require('./insights');
+    insightsFindings = detectAnomalies(summary, db, period) || [];
+  } catch {}
+
+  // 1. План-аномалия
+  const planAnomaly = insightsFindings.find(f => f.kind === 'plan-anomaly');
+  if (planAnomaly) {
+    suggestions.push({ short: `Что с планом «${planAnomaly.store}»?`, full: `Почему у магазина «${planAnomaly.store}» так сильно отличается выполнение от других? Это ошибка плана?` });
+  }
+  // 2. Lagging stores
+  const lagging = insightsFindings.filter(f => f.kind === 'lagging-store');
+  if (lagging.length >= 2) {
+    suggestions.push({ short: 'Что сделать с отстающими?', full: `${lagging.length} магазинов проседают. Что мне сделать чтобы поднять их до конца месяца?` });
+  }
+  // 3. Близкий праздник
+  const upcoming = getUpcomingEvents(14);
+  const nextHoliday = upcoming.find(e => e.impact !== 'low');
+  if (nextHoliday) {
+    suggestions.push({ short: `План на «${nextHoliday.name}»`, full: `Через ${nextHoliday.daysFromNow} дней — ${nextHoliday.name}. Что подготовить, какие категории качать, какой ассортимент?` });
+  }
+  // 4. Прогноз и риск
+  const f = summary.forecast || {};
+  if (f.projectedCompletion && f.projectedCompletion < 95 && f.remainingDays > 0) {
+    suggestions.push({ short: 'Успеем ли в план?', full: `Прогноз на конец месяца ${f.projectedCompletion}%. Что конкретно сделать чтобы догнать план?` });
+  }
+  // 5. YoY-просадка
+  const yoyDecline = insightsFindings.find(f => f.kind === 'category-yoy-decline');
+  if (yoyDecline) {
+    suggestions.push({ short: `Просадка «${yoyDecline.headline.match(/«(.+?)»/)?.[1] || 'категории'}»`, full: `${yoyDecline.headline}. Почему могло упасть и что сделать?` });
+  }
+  // Базовые fallback'и если активных сигналов мало
+  const fallback = [
+    { short: 'Как мы сегодня?', full: 'Кратко: как мы сегодня в плане выполнения и прогноза?' },
+    { short: 'Топ-3 товара', full: 'Топ-3 товаров по выручке и марже за период?' },
+    { short: 'Что в категориях?', full: 'Какие категории растут, какие падают? Что я не вижу?' },
+    { short: 'Лидер месяца', full: 'Какой магазин самый сильный и за счёт чего?' },
+  ];
+  for (const fb of fallback) {
+    if (suggestions.length >= 5) break;
+    if (!suggestions.some(s => s.short === fb.short)) suggestions.push(fb);
+  }
+  return suggestions.slice(0, 5);
 }
 
 const SYSTEM_PROMPT = `Ты — Маша, AI-аналитик кондитерской сети «Мария» в Иркутске (28 точек).
@@ -122,4 +238,4 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
   return { answer: answer.trim(), period };
 }
 
-module.exports = { askAiChat };
+module.exports = { askAiChat, buildSuggestions };

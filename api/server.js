@@ -13,7 +13,7 @@ const {
   storeDetails
 } = require('./lib/analytics');
 const { buildInsights } = require('./lib/insights');
-const { askAiChat } = require('./lib/ai-chat');
+const { askAiChat, buildSuggestions } = require('./lib/ai-chat');
 const { getMarketTrends } = require('./lib/market-trends');
 const marketing = require('./lib/marketing-analytics');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
@@ -685,6 +685,18 @@ const server = http.createServer(async (req, res) => {
       const from = parsedUrl.searchParams.get('from');
       const to = parsedUrl.searchParams.get('to');
       sendJson(res, 200, buildSalesAnalytics(db, period, { from, to }));
+      return;
+    }
+
+    // ── AI-чат: динамические suggestions для начального экрана ──────────────
+    if (pathname === '/api/ai-chat/suggestions' && req.method === 'GET') {
+      try {
+        const { db } = await getScopedDb(req);
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, { suggestions: buildSuggestions(db, period) });
+      } catch (e) {
+        sendJson(res, 500, { error: e.message });
+      }
       return;
     }
 

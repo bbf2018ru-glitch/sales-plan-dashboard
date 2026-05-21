@@ -2017,10 +2017,32 @@ function toggleAiChatFullscreen() {
   }, 50);
 }
 
+async function loadAiChatSuggestions() {
+  const suggestEl = $('aiChatSuggest');
+  if (!suggestEl) return;
+  try {
+    const data = await fetchJson(`/api/ai-chat/suggestions?period=${encodeURIComponent(state.period)}`);
+    const items = data.suggestions || [];
+    if (items.length === 0) return; // оставляем статические
+    suggestEl.innerHTML = items.map(s =>
+      `<button class="ai-suggest" data-q="${encodeURIComponent(s.full)}">${escapeHtml(s.short)}</button>`
+    ).join('');
+    // Перебиндим click — кнопки динамические
+    suggestEl.querySelectorAll('.ai-suggest').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const q = decodeURIComponent(btn.dataset.q || '');
+        if (q) askAi(q);
+      });
+    });
+  } catch (_) { /* keep static */ }
+}
+
 function openAiChat() {
   $('aiChatWidget')?.classList.remove('hidden');
   localStorage.setItem(AI_CHAT_OPEN_KEY, '1');
   renderAiChatMessages();
+  // Загружаем актуальные suggestions если истории пока нет
+  if (loadAiChatHistory().length === 0) loadAiChatSuggestions();
   setTimeout(() => $('aiChatInput')?.focus(), 100);
 }
 function closeAiChat() {
