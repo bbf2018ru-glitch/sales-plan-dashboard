@@ -86,6 +86,32 @@ setInterval(() => {
   }
 }, 3600 * 1000);
 
+// ── AI-chat rate limit (per IP, защита Groq billing) ─────────────────────
+// AI-чат открыт без auth (чтобы работал у любого зашедшего на дашборд),
+// но Groq биллится за токены — нужна защита от abuse. 20 запросов/час с
+// одного IP — нормальному руководителю с головой, ботнету мало.
+const AI_CHAT_LIMIT = 20;
+const AI_CHAT_WINDOW_MS = 60 * 60 * 1000; // 1 час
+const aiChatHits = new Map(); // ip → { count, windowStart }
+function checkAiChatLimit(ip) {
+  const now = Date.now();
+  const rec = aiChatHits.get(ip);
+  if (!rec || now - rec.windowStart > AI_CHAT_WINDOW_MS) {
+    aiChatHits.set(ip, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+  rec.count += 1;
+  if (rec.count > AI_CHAT_LIMIT) {
+    const retryAfterSec = Math.ceil((rec.windowStart + AI_CHAT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSec };
+  }
+  return { allowed: true };
+}
+setInterval(() => {
+  const cutoff = Date.now() - AI_CHAT_WINDOW_MS;
+  for (const [ip, rec] of aiChatHits.entries()) if (rec.windowStart < cutoff) aiChatHits.delete(ip);
+}, 10 * 60 * 1000);
+
 // ── PIN brute-force protection ────────────────────────────────────────────
 // In-memory IP-based rate limit для /api/auth. 6-цифр PIN = 1М комбинаций,
 // без защиты бот переберёт за пару часов. Лимиты:
@@ -702,10 +728,20 @@ const server = http.createServer(async (req, res) => {
 
     // ── AI-чат: вопрос → ответ Groq на контексте дашборда ─────────────────────
     if (pathname === '/api/ai-chat' && req.method === 'POST') {
-      // Groq биллится за токены — на анонимный запрос отвечать нельзя:
-      // открытый эндпоинт жгёт деньги. Требуем валидный X-User-Token либо PIN-сессию.
-      const { db, user } = await getScopedDb(req);
-      if (!user && !hasActiveSession(req)) { sendJson(res, 401, { error: 'Auth required' }); return; }
+      // Auth-guard убран по запросу пользователя — теперь чат доступен любому
+      // кто открыл дашборд (PIN-форма всё равно блокирует доступ к UI).
+      // Защита от abuse Groq billing — rate-limit 20 запросов/час с одного IP.
+      const ip = getClientIp(req);
+      const limit = checkAiChatLimit(ip);
+      if (!limit.allowed) {
+        res.setHeader('Retry-After', String(limit.retryAfterSec));
+        sendJson(res, 429, {
+          error: `Лимит AI-чата на этот час исчерпан. Подождите ${Math.ceil(limit.retryAfterSec / 60)} мин.`,
+          retryAfterSec: limit.retryAfterSec
+        });
+        return;
+      }
+      const { db } = await getScopedDb(req);
       const body = await parseBody(req);
       if (!groqConfig) { sendJson(res, 503, { error: 'GROQ_KEY не настроен на сервере' }); return; }
       try {
