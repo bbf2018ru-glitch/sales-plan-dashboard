@@ -4,7 +4,7 @@
 const { aggregateDashboard, monthKey } = require('./analytics');
 const { buildInsights } = require('./insights');
 const { getUpcomingEvents } = require('./calendar-irk');
-const { callGroqWithFallback } = require('./groq');
+const { callLlmCascade } = require('./groq');
 
 // Кэш агрегации дашборда на period. aggregateDashboard тяжёлый
 // (12-мес trend, все продажи), а в активной беседе пользователь шлёт
@@ -254,19 +254,17 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
 
   const userMsg = `${ctx}${notesBlock}\n\n${histMsg ? '=== ИСТОРИЯ ЧАТА ===\n' + histMsg + '\n' : ''}=== ВОПРОС ===\n${question}`;
 
-  // При 429 на 70b — fallback на 8b-instant (отдельный TPD-лимит).
-  const { text, model: usedModel } = await callGroqWithFallback({
-    apiKey,
-    models: [model || 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+  // Каскад: OpenAI gpt-4o-mini → Groq 70b → Groq 8b.
+  const { text, model: usedModel, provider } = await callLlmCascade({
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMsg }
     ],
-    temperature: 0.2,
-    maxTokens: 500,
+    temperature: 0.3,
+    maxTokens: 600,
     timeoutMs: 30000
   });
-  return { answer: text.trim(), period, model: usedModel };
+  return { answer: text.trim(), period, model: usedModel, provider };
 }
 
 module.exports = { askAiChat, buildSuggestions };
