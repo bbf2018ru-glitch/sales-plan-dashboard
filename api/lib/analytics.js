@@ -284,6 +284,14 @@ function buildYoyForecast(period, totalFact, elapsedDays, totalDays, allSales) {
   if (baseRemaining <= 0) return null;
 
   const growthRate = totalFact / baseElapsed;
+  // Sanity-check: если baseline очень старый (например 24 мес назад) и сеть
+  // с тех пор сильно выросла (новые точки, рост среднего чека), growthRate
+  // получается 5-8× — YoY становится бесполезным (сеть из 2024 не такая
+  // как из 2026). Реальный YoY-рост кондитерской ~1.1-1.5× в год; рост >3×
+  // означает что baseline не годится для прогноза.
+  if (growthRate < 0.3 || growthRate > 3.0) {
+    return null;
+  }
   const remainingProjection = baseRemaining * growthRate;
   return {
     projectedFact: roundMetric(totalFact + remainingProjection),
