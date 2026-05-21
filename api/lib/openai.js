@@ -22,17 +22,23 @@ function callOpenAI({ apiKey, model, messages, temperature, maxTokens, timeoutMs
   const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
   const url = new URL(`${baseUrl}/chat/completions`);
 
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(body)
+  };
+  // Если OPENAI_BASE_URL указывает на наш прокси (Hostinger Frankfurt) —
+  // добавляем shared secret. OpenAI блокирует РФ IP, поэтому VDS Timeweb
+  // ходит через прокси-relay в Frankfurt.
+  if (process.env.OPENAI_PROXY_AUTH) headers['X-Proxy-Auth'] = process.env.OPENAI_PROXY_AUTH;
+
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: url.hostname,
       port: url.port || 443,
       path: url.pathname + url.search,
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      }
+      headers
     }, (res) => {
       let raw = '';
       res.on('data', (c) => raw += c);
