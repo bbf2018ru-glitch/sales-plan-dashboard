@@ -32,17 +32,27 @@ function buildZombieProducts(db, period, opts = {}) {
   const productNames = new Map((db.products || []).map(p => [p.id, p.name || p.id]));
   const productCats = new Map((db.products || []).map(p => [p.id, p.category || '—']));
 
+  // Псевдо-товары/агрегаты в БД (план хранится агрегатом по магазину, а не SKU).
+  // Их надо исключить — иначе зомби-отчёт показывает один «ИТОГО по магазину».
+  const isAggregate = (pid) => {
+    if (!pid) return true;
+    const s = String(pid).toLowerCase();
+    if (s === '__total__' || s === 'undefined' || s === '_total' || s.startsWith('__extra_directions__')) return true;
+    const name = productNames.get(pid) || pid;
+    return /итого|^total$|^всего$|__/i.test(String(name));
+  };
+
   const planByProduct = new Map();
   const factByProduct = new Map();
   for (const row of db.plans || []) {
     if (row.period !== period) continue;
-    if (row.productId === '__total__' || row.productId === 'undefined') continue;
+    if (isAggregate(row.productId)) continue;
     planByProduct.set(row.productId, (planByProduct.get(row.productId) || 0) + Number(row.amount || 0));
   }
   for (const row of db.sales || []) {
     if (row.period !== period) continue;
     const pid = row.productId || row.product_id;
-    if (!pid || pid === '__total__') continue;
+    if (isAggregate(pid)) continue;
     factByProduct.set(pid, (factByProduct.get(pid) || 0) + Number(row.amount || 0));
   }
 
