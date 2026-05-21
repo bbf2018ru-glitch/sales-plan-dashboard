@@ -114,8 +114,10 @@ async function callLlmCascade({ messages, temperature, maxTokens, timeoutMs }) {
       return { text, model: a.model, provider: a.provider };
     } catch (err) {
       lastErr = err;
-      // 429 (rate limit) и 5xx — переходим на следующий
-      if (/\b(4(0[19]|29)|5\d\d|timeout)\b/i.test(err.message)) continue;
+      // 401/403/409/429/5xx/timeout — переходим на следующего провайдера.
+      // 403 особенно важно: OpenAI блокирует РФ IP-адреса, без fallback чат
+      // вообще не работает с VDS в РФ.
+      if (/\b(4(0[139]|29)|5\d\d|timeout)\b/i.test(err.message)) continue;
       throw err;
     }
   }
