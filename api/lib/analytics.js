@@ -315,10 +315,24 @@ function buildYoyForecast(period, totalFact, elapsedDays, totalDays, allSales) {
 // Для таких точек считаем averagePerDay за половину прошедших дней —
 // грубое приближение что они активны "вторую половину месяца".
 // Для старых точек — averagePerDay за все elapsedDays.
-function buildPerStoreForecast(period, totalDays, elapsedDays, allSales) {
+function buildPerStoreForecast(period, totalDays, elapsedDays, allSales, allPlans) {
   if (!allSales || allSales.length === 0 || elapsedDays <= 0) return null;
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
   if (remainingDays <= 0) return null;
+
+  // Только магазины с планом > 0 в текущем периоде — реальные торговые точки.
+  // Иначе попадают служебные каналы (склад/онлайн/корпоратив/UTF-8-битые id)
+  // которые не должны влиять на прогноз сети.
+  const storesWithPlan = new Map();
+  for (const p of allPlans || []) {
+    if (p.period !== period) continue;
+    const sid = p.storeId;
+    if (!sid || sid === 'undefined' || /^__/.test(sid)) continue;
+    storesWithPlan.set(sid, (storesWithPlan.get(sid) || 0) + Number(p.amount || 0));
+  }
+  // Магазины с реальным планом
+  const realStoreIds = new Set(Array.from(storesWithPlan.entries()).filter(([, plan]) => plan > 0).map(([id]) => id));
+  if (realStoreIds.size < 3) return null;
 
   // Предыдущий период для детекции новых точек.
   const [yy, mm] = period.split('-').map(Number);
@@ -329,15 +343,16 @@ function buildPerStoreForecast(period, totalDays, elapsedDays, allSales) {
   for (const s of allSales) {
     if (s.period !== prevPeriod) continue;
     if (Number(s.amount || 0) <= 0) continue;
-    storesInPrev.add(s.storeId || s.store_id);
+    const sid = s.storeId || s.store_id;
+    if (realStoreIds.has(sid)) storesInPrev.add(sid);
   }
 
-  // Группируем факт текущего периода по магазинам.
+  // Группируем факт текущего периода по магазинам (только реальные торговые).
   const byStore = new Map();
   for (const s of allSales) {
     if (s.period !== period) continue;
     const sid = s.storeId || s.store_id;
-    if (!sid) continue;
+    if (!realStoreIds.has(sid)) continue;
     if (!byStore.has(sid)) byStore.set(sid, { storeId: sid, fact: 0 });
     byStore.get(sid).fact += Number(s.amount || 0);
   }
@@ -367,7 +382,7 @@ function buildPerStoreForecast(period, totalDays, elapsedDays, allSales) {
   };
 }
 
-function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
+function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales, plans) {
   const totalDays = daysInPeriod(period);
   const elapsedDays = effectiveElapsedDays(period, lastSaleAt);
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
@@ -390,7 +405,7 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
   // Приоритет 2: per-store linear (учитывает новые точки открытые после
   // начала месяца). Лучше общего линейного прогноза для растущей сети.
   if (projectedFact === undefined && elapsedDays > 0 && remainingDays > 0) {
-    const perStore = buildPerStoreForecast(period, totalDays, elapsedDays, sales);
+    const perStore = buildPerStoreForecast(period, totalDays, elapsedDays, sales, plans);
     if (perStore) {
       projectedFact = perStore.projectedFact;
       projectionMethod = 'per-store-linear';
@@ -873,7 +888,7 @@ function aggregatePeriodCore(db, period, opts = {}) {
   // Для DoW-сезонности передаём все продажи (не только за текущий period) —
   // тогда последние 120 дней попадают в расчёт независимо от того где они
   // (текущий или прошлый месяц).
-  const forecast = buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, db.sales);
+  const forecast = buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, db.sales, db.plans);
   const daily = buildDailySeries(period, plans, sales);
 
   return {
