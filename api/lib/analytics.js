@@ -236,43 +236,113 @@ function computeDayOfWeekFactors(sales) {
   return dowAvg.map((v) => v / overall);
 }
 
+// YoY-прогноз: для каждого оставшегося дня берём факт того же дня в
+// прошлом году (или 2 года назад если за прошлый год пусто), масштабируем
+// на коэффициент роста (current_elapsed_fact / base_elapsed_fact).
+//
+// Автоматически учитывает:
+//   - Праздники: 8 марта 2024 был всплеск → 8 марта 2026 в baseRemaining
+//     уже содержит этот всплеск, прогноз поднимается.
+//   - Сезонность: майские/декабрьские пики отражаются.
+//
+// НЕ учитывает (TODO):
+//   - Новые точки (открытые после baseline) — их вклад занижается, т.к.
+//     в base их не было. Для них можно добавить linear-доля.
+//   - Сильные изменения ассортимента/тарифов (товар прошлого года уже снят).
+function buildYoyForecast(period, totalFact, elapsedDays, totalDays, allSales) {
+  // Ищем baseline — тот же месяц год назад, потом 2 года назад.
+  let basePeriod = null;
+  for (const back of [12, 24, 36]) {
+    const candidate = shiftPeriod(period, -back);
+    if (!candidate) continue;
+    const hasData = allSales.some(s => s.period === candidate);
+    if (hasData) { basePeriod = candidate; break; }
+  }
+  if (!basePeriod) return null;
+
+  // Считаем факт по дням месяца в baseline.
+  const baseDailyFact = new Map();
+  for (const s of allSales) {
+    if (s.period !== basePeriod) continue;
+    const at = s.soldAt || s.sold_at;
+    if (!at) continue;
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime())) continue;
+    const day = d.getUTCDate();
+    baseDailyFact.set(day, (baseDailyFact.get(day) || 0) + Number(s.amount || 0));
+  }
+  if (baseDailyFact.size < 5) return null; // слишком мало данных
+
+  // Факт baseline за прошедшие дни этого месяца
+  let baseElapsed = 0;
+  for (let day = 1; day <= elapsedDays; day++) baseElapsed += baseDailyFact.get(day) || 0;
+  if (baseElapsed <= 0) return null;
+
+  // Факт baseline за оставшиеся дни
+  let baseRemaining = 0;
+  for (let day = elapsedDays + 1; day <= totalDays; day++) baseRemaining += baseDailyFact.get(day) || 0;
+  if (baseRemaining <= 0) return null;
+
+  const growthRate = totalFact / baseElapsed;
+  const remainingProjection = baseRemaining * growthRate;
+  return {
+    projectedFact: roundMetric(totalFact + remainingProjection),
+    method: 'yoy',
+    basePeriod,
+    growthRate: Number(growthRate.toFixed(3)),
+    baseElapsed: roundMetric(baseElapsed),
+    baseRemaining: roundMetric(baseRemaining)
+  };
+}
+
 function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
   const totalDays = daysInPeriod(period);
   const elapsedDays = effectiveElapsedDays(period, lastSaleAt);
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
   const averagePerDay = elapsedDays > 0 ? totalFact / elapsedDays : 0;
 
-  // Сезонный прогноз через коэффициенты дня недели — точнее линейного,
-  // если оставшиеся дни содержат больше/меньше "сильных" дней (выходные).
-  const dowFactors = computeDayOfWeekFactors(sales);
   let projectedFact;
   let projectionMethod = 'linear';
-  if (dowFactors && elapsedDays > 0 && remainingDays > 0) {
-    const parsedPeriod = parsePeriod(period);
-    if (parsedPeriod) {
-      // Сумма факторов прошедших дней (что мы УЖЕ "съели")
-      let elapsedFactorSum = 0;
-      for (let day = 1; day <= elapsedDays; day++) {
-        const dow = new Date(Date.UTC(parsedPeriod.year, parsedPeriod.month - 1, day)).getUTCDay();
-        elapsedFactorSum += dowFactors[dow];
-      }
-      // Сумма факторов оставшихся дней
-      let remainingFactorSum = 0;
-      for (let day = elapsedDays + 1; day <= totalDays; day++) {
-        const dow = new Date(Date.UTC(parsedPeriod.year, parsedPeriod.month - 1, day)).getUTCDay();
-        remainingFactorSum += dowFactors[dow];
-      }
-      // Денормализуем averagePerDay → "нейтральный" дневной факт
-      // averagePerDay = elapsedFact / elapsedDays = neutralDaily × (elapsedFactorSum/elapsedDays)
-      const neutralDaily = elapsedFactorSum > 0 ? totalFact / elapsedFactorSum : averagePerDay;
-      const remainingProjection = neutralDaily * remainingFactorSum;
-      projectedFact = roundMetric(totalFact + remainingProjection);
-      projectionMethod = 'seasonal-dow';
-    } else {
-      projectedFact = roundMetric(averagePerDay * totalDays);
+  let projectionMeta = null;
+
+  // Приоритет 1: YoY (учитывает праздники и сезонность реального прошлого).
+  if (elapsedDays > 0 && remainingDays > 0) {
+    const yoy = buildYoyForecast(period, totalFact, elapsedDays, totalDays, sales);
+    if (yoy) {
+      projectedFact = yoy.projectedFact;
+      projectionMethod = 'yoy';
+      projectionMeta = { basePeriod: yoy.basePeriod, growthRate: yoy.growthRate };
     }
-  } else {
+  }
+
+  // Приоритет 2: seasonal-dow (если YoY нет, но есть >120 дней истории).
+  if (projectedFact === undefined) {
+    const dowFactors = computeDayOfWeekFactors(sales);
+    if (dowFactors && elapsedDays > 0 && remainingDays > 0) {
+      const parsedPeriod = parsePeriod(period);
+      if (parsedPeriod) {
+        let elapsedFactorSum = 0;
+        for (let day = 1; day <= elapsedDays; day++) {
+          const dow = new Date(Date.UTC(parsedPeriod.year, parsedPeriod.month - 1, day)).getUTCDay();
+          elapsedFactorSum += dowFactors[dow];
+        }
+        let remainingFactorSum = 0;
+        for (let day = elapsedDays + 1; day <= totalDays; day++) {
+          const dow = new Date(Date.UTC(parsedPeriod.year, parsedPeriod.month - 1, day)).getUTCDay();
+          remainingFactorSum += dowFactors[dow];
+        }
+        const neutralDaily = elapsedFactorSum > 0 ? totalFact / elapsedFactorSum : averagePerDay;
+        const remainingProjection = neutralDaily * remainingFactorSum;
+        projectedFact = roundMetric(totalFact + remainingProjection);
+        projectionMethod = 'seasonal-dow';
+      }
+    }
+  }
+
+  // Приоритет 3: линейный (fallback если нет ни YoY, ни DoW).
+  if (projectedFact === undefined) {
     projectedFact = roundMetric(averagePerDay * totalDays);
+    projectionMethod = 'linear';
   }
 
   const projectedCompletion = totalPlan > 0 ? percent(projectedFact / totalPlan) : 0;
@@ -293,6 +363,7 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
     paceVsPlan,
     runwayGap,
     projectionMethod,
+    projectionMeta,
     tone: forecastTone(projectedCompletion),
     status:
       projectedCompletion >= 100

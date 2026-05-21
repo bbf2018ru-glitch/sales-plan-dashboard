@@ -608,7 +608,9 @@ function renderKpis(summary) {
   let projectedSubV2;
   if (planIncomplete) projectedSubV2 = 'план неполный';
   else {
-    const methodTag = f.projectionMethod === 'seasonal-dow' ? ' · учёт дней недели' : '';
+    const methodTag = f.projectionMethod === 'yoy' ? ' · по прошлому году'
+      : f.projectionMethod === 'seasonal-dow' ? ' · учёт дней недели'
+      : ' · линейный';
     projectedSubV2 = `${f.projectedCompletion}% к плану на конец месяца${methodTag}`;
   }
 
@@ -638,7 +640,7 @@ function renderKpis(summary) {
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
       tip: 'Валовая прибыль = факт − себестоимость. Когда 1С не передаёт себестоимость напрямую, считается через STORE_MARKUPS_JSON env (per-store markup% из отчёта «Валовая прибыль»).' },
     { id: 'projected', label: 'Прогноз', value: planIncomplete ? '—' : moneyShort(f.projectedFact), sub: projectedSubV2, tone: projectedTone,
-      tip: 'Экстраполяция: средний фактический темп × оставшиеся дни + текущий факт. С учётом дней недели (seasonal-dow) если за последние 120 дней есть данные — иначе линейно.' },
+      tip: 'Экстраполяция выручки до конца месяца. Приоритет методов: 1) YoY — берём дни прошлого года × коэффициент роста (учитывает праздники и сезонность); 2) сезонный по дням недели (120 дн истории); 3) линейный fallback. Кликни ▾ для деталей метода.' },
     { id: 'required', label: 'Нужно/день', value: planIncomplete ? '—' : moneyShort(f.requiredPerDayToPlan), sub: requiredSub, tone: requiredTone,
       tip: 'Сколько нужно делать выручки каждый оставшийся день, чтобы выйти ровно в план месяца. Если средний факт/день меньше этой цифры — план рискует.' }
   ];
@@ -808,11 +810,18 @@ function buildKpiDetail(id, summary) {
   }
 
   if (id === 'projected') {
+    const meta = f.projectionMeta || {};
+    let methodLine;
+    if (f.projectionMethod === 'yoy') {
+      methodLine = `Метод: <b>по прошлому году (YoY)</b> — для каждого оставшегося дня берём факт того же дня в <b>${meta.basePeriod || 'baseline'}</b>, умножаем на коэффициент роста сети <b>${meta.growthRate || '?'}×</b>. <br><small style="color:var(--muted)">Автоматически учитывает праздники и сезонность реального прошлого года. НЕ учитывает новые точки открытые после ${meta.basePeriod || 'baseline'}.</small>`;
+    } else if (f.projectionMethod === 'seasonal-dow') {
+      methodLine = `Метод: <b>сезонный по дням недели</b> — коэффициенты из последних 120 дней (Сб обычно +50%, Пн -20%). <br><small style="color:var(--muted)">Использован потому что для YoY нет данных за тот же месяц год назад.</small>`;
+    } else {
+      methodLine = `Метод: <b>линейный</b> — средний темп × оставшиеся дни. <br><small style="color:var(--muted)">Fallback когда нет YoY и нет 120-дн истории для DoW.</small>`;
+    }
     const lines = [
       `Прогноз = факт на сегодня + ожидаемые продажи за оставшиеся ${f.remainingDays || 0} дней`,
-      f.projectionMethod === 'seasonal-dow'
-        ? `Метод: <b>сезонный</b> — учёт коэффициентов дней недели из истории 120 дней (выходные обычно +50%, понедельник -20% и т.п.)`
-        : `Метод: <b>линейный</b> — текущий средний темп × оставшиеся дни (нет истории для сезонной модели)`,
+      methodLine,
       `Средний темп факта: ${formatMoney(f.averagePerDay || 0)} / день`,
       `Темп плана: ${formatMoney(f.planPerDay || 0)} / день`,
       `Разрыв с планом: ${formatMoney(f.runwayGap || 0)} (отрицательный = опередим план)`
