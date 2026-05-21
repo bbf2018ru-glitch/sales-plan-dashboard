@@ -20,6 +20,7 @@
 
 const { callRegister, parseRu, parseRuDate, prevMonth, rangeMonths, nowYM, makeCache } = require('./upp-client');
 const { getUpcomingEvents } = require('./calendar-irk');
+const { aggregateDashboard } = require('./analytics');
 
 const cache = makeCache(5 * 60 * 1000);
 
@@ -327,39 +328,20 @@ function buildHolidayYoy(db, windowDays = 60) {
 // Без библиотеки — реализация k-means на ~50 строк. k=4 фиксировано
 // (Лидеры / Маржинальные / Массовые / Отстающие).
 function buildStoreClusters(db, period) {
-  // 1. Собираем фичи по каждому магазину
-  const stores = db.stores || [];
-  const plans = db.plans || [];
-  const sales = db.sales || [];
-  const byStore = new Map();
-  for (const s of stores) {
-    byStore.set(s.id, {
-      storeId: s.id,
-      storeName: s.name,
-      plan: 0, fact: 0, cost: 0, quantity: 0, chequeCount: 0
-    });
-  }
-  for (const p of plans) {
-    if (p.period !== period) continue;
-    if (byStore.has(p.storeId)) byStore.get(p.storeId).plan += Number(p.amount || 0);
-  }
-  for (const s of sales) {
-    if (s.period !== period) continue;
-    const sid = s.storeId || s.store_id;
-    if (!byStore.has(sid)) continue;
-    const x = byStore.get(sid);
-    x.fact += Number(s.amount || 0);
-    x.cost += Number(s.cost || 0);
-    x.quantity += Number(s.quantity || 0);
-  }
-  // Фильтр: только магазины с планом > 0 (без виртуальных и закрытых)
-  const points = Array.from(byStore.values())
-    .filter(x => x.plan > 0 && x.fact > 0)
-    .map(x => ({
-      ...x,
-      pctCompletion: (x.fact / x.plan) * 100,
-      marginPct: x.fact > 0 ? ((x.fact - x.cost) / x.fact) * 100 : 0,
-      avgCheck: x.quantity > 0 ? x.fact / x.quantity : 0
+  // 1. Берём агрегаты по магазинам через стандартный pipeline — он применяет
+  // markup-fallback из STORE_MARKUPS_JSON, поэтому marginPct корректный
+  // (а не везде 100% как было при использовании raw row.cost=0).
+  const summary = aggregateDashboard(db, period);
+  const points = (summary.stores || [])
+    .filter(s => s.plan > 0 && s.fact > 0)
+    .map(s => ({
+      storeId: s.storeId,
+      storeName: s.storeName,
+      fact: s.fact,
+      pctCompletion: s.percent,
+      marginPct: s.marginPct ?? 0,
+      avgCheck: s.quantity > 0 ? s.fact / s.quantity : 0,
+      quantity: s.quantity
     }));
   if (points.length < 4) return { period, total: points.length, clusters: [], note: 'Слишком мало точек для кластеризации' };
 
@@ -409,25 +391,41 @@ function buildStoreClusters(db, period) {
     if (delta < 1e-4) break;
   }
 
-  // 5. Семантические имена кластеров — по характеристикам центра
-  const labelFor = (c) => {
-    const [pct, margin, check] = c;
-    if (pct > 0.7 && margin > 0.6) return { name: 'Лидеры', tone: 'good' };
-    if (margin > 0.7) return { name: 'Маржинальные', tone: 'good' };
-    if (check < 0.4 && pct > 0.5) return { name: 'Массовые (низкий чек, высокий объём)', tone: 'neutral' };
-    if (pct < 0.5) return { name: 'Отстающие', tone: 'bad' };
-    return { name: 'Средние', tone: 'neutral' };
-  };
-
-  const clusters = centroids.map((c, i) => {
-    const label = labelFor(c);
+  // 5. Семантические имена кластеров — ранжируем кластеры по pctCompletion
+  // абсолютному (не нормализованному), уникально назначаем имена.
+  const avg = (arr, key) => arr.reduce((s, x) => s + x[key], 0) / arr.length;
+  const raw = centroids.map((c, i) => {
     const cps = points.filter(p => p._cluster === i);
     if (!cps.length) return null;
-    const avg = (arr, key) => arr.reduce((s, x) => s + x[key], 0) / arr.length;
     return {
       idx: i,
-      name: label.name,
-      tone: label.tone,
+      cps,
+      avgPct: avg(cps, 'pctCompletion'),
+      avgCheck: avg(cps, 'avgCheck')
+    };
+  }).filter(Boolean);
+
+  // Сортируем кластеры по avgPct убыванию и присваиваем уникальные имена
+  raw.sort((a, b) => b.avgPct - a.avgPct);
+  const labels = ['Лидеры', 'Средние верх', 'Средние низ', 'Отстающие'];
+  const tones = ['good', 'neutral', 'neutral', 'bad'];
+  // Если кластеров меньше 4 — урезаем
+  while (labels.length > raw.length) { labels.pop(); tones.pop(); }
+  // Если у двух кластеров близкий avgPct (разница <3 п.п.), но разный чек —
+  // помечаем по чеку, чтобы не было одинаковых имён
+  for (let i = 1; i < raw.length; i++) {
+    if (Math.abs(raw[i].avgPct - raw[i - 1].avgPct) < 3) {
+      labels[i] = raw[i].avgCheck > raw[i - 1].avgCheck ? `${labels[i - 1]} (высокий чек)` : `${labels[i - 1]} (низкий чек)`;
+      if (!labels[i - 1].includes('чек')) labels[i - 1] += raw[i - 1].avgCheck > raw[i].avgCheck ? ' (высокий чек)' : ' (низкий чек)';
+    }
+  }
+
+  const clusters = raw.map((r, sortedIdx) => {
+    const cps = r.cps;
+    return {
+      idx: r.idx,
+      name: labels[sortedIdx] || 'Прочие',
+      tone: tones[sortedIdx] || 'neutral',
       count: cps.length,
       avg: {
         pctCompletion: Number(avg(cps, 'pctCompletion').toFixed(1)),
@@ -443,7 +441,7 @@ function buildStoreClusters(db, period) {
         fact: Math.round(p.fact)
       })).sort((a, b) => b.fact - a.fact)
     };
-  }).filter(Boolean).sort((a, b) => b.count - a.count);
+  });
 
   return { period, total: points.length, clusters };
 }
