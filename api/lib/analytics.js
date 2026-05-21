@@ -303,54 +303,67 @@ function buildYoyForecast(period, totalFact, elapsedDays, totalDays, allSales) {
   };
 }
 
-// Per-store прогноз: каждому магазину собственный темп и прогноз остатка.
-// Главное преимущество — новые точки (открытые в текущем месяце) не "тянут"
-// средний темп сети вниз. Для каждого магазина определяем actualElapsed —
-// число дней с момента первой продажи в периоде (а не с начала месяца).
+// Per-store прогноз. Раньше "новые точки" детектировались через день первой
+// продажи в периоде — но sold_at в БД это время pull'а, а не реальная дата
+// продажи, поэтому детекция врала ("4 новых точек" когда на самом деле нет).
 //
-// На уровне сети это даёт более высокий прогноз чем общий linear, если
-// какие-то магазины открылись с задержкой — потому что для них averagePerDay
-// считается за реальные дни работы, а в проекции на оставшиеся дни они
-// работают всё это время.
-function buildPerStoreForecast(period, totalDays, elapsedDays, sales) {
-  if (!sales || sales.length === 0 || elapsedDays <= 0) return null;
+// Новая логика: "новый магазин = факт в ПРЕДЫДУЩЕМ периоде равен 0".
+// Это надёжный сигнал — если магазин в апреле не продавал, в мае он либо
+// открылся, либо закрыт и снова открыт. В обоих случаях его текущий темп
+// нельзя экстраполировать на 1-21 мая (он не работал с 1-го).
+//
+// Для таких точек считаем averagePerDay за половину прошедших дней —
+// грубое приближение что они активны "вторую половину месяца".
+// Для старых точек — averagePerDay за все elapsedDays.
+function buildPerStoreForecast(period, totalDays, elapsedDays, allSales) {
+  if (!allSales || allSales.length === 0 || elapsedDays <= 0) return null;
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
   if (remainingDays <= 0) return null;
-  // 1. Группируем продажи по магазинам, для каждого находим день первой
-  //    активности в периоде и сумму.
+
+  // Предыдущий период для детекции новых точек.
+  const [yy, mm] = period.split('-').map(Number);
+  const prevPeriod = mm === 1
+    ? `${yy - 1}-12`
+    : `${yy}-${String(mm - 1).padStart(2, '0')}`;
+  const storesInPrev = new Set();
+  for (const s of allSales) {
+    if (s.period !== prevPeriod) continue;
+    if (Number(s.amount || 0) <= 0) continue;
+    storesInPrev.add(s.storeId || s.store_id);
+  }
+
+  // Группируем факт текущего периода по магазинам.
   const byStore = new Map();
-  for (const s of sales) {
+  for (const s of allSales) {
     if (s.period !== period) continue;
     const sid = s.storeId || s.store_id;
     if (!sid) continue;
-    const at = s.soldAt || s.sold_at;
-    if (!at) continue;
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) continue;
-    const day = d.getUTCDate();
-    if (!byStore.has(sid)) byStore.set(sid, { fact: 0, firstDay: day });
-    const x = byStore.get(sid);
-    x.fact += Number(s.amount || 0);
-    if (day < x.firstDay) x.firstDay = day;
+    if (!byStore.has(sid)) byStore.set(sid, { storeId: sid, fact: 0 });
+    byStore.get(sid).fact += Number(s.amount || 0);
   }
   if (byStore.size < 3) return null;
 
-  // 2. Для каждого магазина считаем actualElapsed и прогноз остатка.
+  // Если в БД нет предыдущего периода — детекция новых невозможна,
+  // per-store linear даст результат равный общему linear → пользы нет.
+  if (storesInPrev.size === 0) return null;
+
   let projectedFact = 0;
   let newStoresCount = 0;
   for (const x of byStore.values()) {
-    const actualElapsed = Math.max(elapsedDays - x.firstDay + 1, 1);
+    const isNew = !storesInPrev.has(x.storeId);
+    // Для новых точек грубо считаем что они работали половину периода.
+    const actualElapsed = isNew ? Math.max(elapsedDays / 2, 1) : elapsedDays;
     const averagePerDay = x.fact / actualElapsed;
     const remainingProjection = averagePerDay * remainingDays;
     projectedFact += x.fact + remainingProjection;
-    // «Новый» — первая продажа после 7-го дня периода
-    if (x.firstDay > 7 && elapsedDays - x.firstDay > 1) newStoresCount += 1;
+    if (isNew) newStoresCount += 1;
   }
   return {
     projectedFact: roundMetric(projectedFact),
     method: 'per-store-linear',
     storesCount: byStore.size,
-    newStoresCount
+    newStoresCount,
+    prevPeriod
   };
 }
 

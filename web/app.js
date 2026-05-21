@@ -609,7 +609,8 @@ function renderKpis(summary) {
   if (planIncomplete) projectedSubV2 = 'план неполный';
   else {
     const methodTag = f.projectionMethod === 'yoy' ? ' · по прошлому году'
-      : f.projectionMethod === 'per-store-linear' ? ' · учёт открытий точек'
+      : f.projectionMethod === 'per-store-linear'
+        ? (f.projectionMeta?.newStoresCount > 0 ? ' · учёт новых точек' : ' · per-store')
       : f.projectionMethod === 'seasonal-dow' ? ' · учёт дней недели'
       : ' · линейный';
     projectedSubV2 = `${f.projectedCompletion}% к плану на конец месяца${methodTag}`;
@@ -816,7 +817,10 @@ function buildKpiDetail(id, summary) {
     if (f.projectionMethod === 'yoy') {
       methodLine = `Метод: <b>по прошлому году (YoY)</b> — для каждого оставшегося дня берём факт того же дня в <b>${meta.basePeriod || 'baseline'}</b>, умножаем на коэффициент роста сети <b>${meta.growthRate || '?'}×</b>. <br><small style="color:var(--muted)">Автоматически учитывает праздники и сезонность реального прошлого года. НЕ учитывает новые точки открытые после ${meta.basePeriod || 'baseline'}.</small>`;
     } else if (f.projectionMethod === 'per-store-linear') {
-      methodLine = `Метод: <b>per-store linear</b> — для каждого магазина (${meta.storesCount || '?'}) считаем темп от его первой продажи в этом месяце, не от 1-го числа. <br><small style="color:var(--muted)">Найдено <b>${meta.newStoresCount || 0}</b> точек открытых после 7-го числа — их вклад не занижается. Используется потому что YoY невозможен (нет адекватного baseline) либо его рост &gt;3×.</small>`;
+      const newPart = meta.newStoresCount > 0
+        ? `<b>${meta.newStoresCount}</b> магазинов без продаж в ${meta.prevPeriod || 'предыдущем месяце'} (новые/перезапуск) — их темп считаем за половину пройденных дней, не за весь месяц.`
+        : `Все ${meta.storesCount || '?'} магазинов работали в ${meta.prevPeriod || 'предыдущем месяце'} — каждому свой линейный темп.`;
+      methodLine = `Метод: <b>per-store linear</b> — каждому магазину собственный темп, сумма всех. <br><small style="color:var(--muted)">${newPart} Используется потому что YoY невозможен (нет адекватного baseline) либо его рост &gt;3×.</small>`;
     } else if (f.projectionMethod === 'seasonal-dow') {
       methodLine = `Метод: <b>сезонный по дням недели</b> — коэффициенты из последних 120 дней (Сб обычно +50%, Пн -20%). <br><small style="color:var(--muted)">Использован потому что для YoY нет данных за тот же месяц год назад.</small>`;
     } else {
