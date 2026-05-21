@@ -2363,6 +2363,8 @@ async function init() {
   $('mkZombieRefresh')?.addEventListener('click', loadMkZombie);
   $('mkCannibaRefresh')?.addEventListener('click', loadMkCannibalization);
   $('mkRfmRefresh')?.addEventListener('click', loadMkRfm);
+  $('mkClustersRefresh')?.addEventListener('click', loadMkClusters);
+  $('mkCohortsRefresh')?.addEventListener('click', loadMkCohorts);
 
   // Навигация сайдбара и список pending-отчётов работают независимо
   // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
@@ -2549,7 +2551,73 @@ async function loadMarketing() {
   loadMkCannibalization();
   loadMkRfm();
   loadMkHolidayYoy();
+  loadMkClusters();
+  loadMkCohorts();
   renderMkPending();
+}
+
+async function loadMkClusters() {
+  const el = $('mkClusters');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Кластеризую…</div>';
+  try {
+    const data = await fetchJson(`/api/marketing/store-clusters?period=${encodeURIComponent(state.period)}`);
+    if (!data.clusters?.length) {
+      el.innerHTML = `<div class="empty-state" style="padding:14px">${escapeHtml(data.note || 'Недостаточно данных')}</div>`;
+      return;
+    }
+    const cards = data.clusters.map(c => {
+      const toneCls = c.tone === 'good' ? 'mk-seg-good' : c.tone === 'bad' ? 'mk-seg-bad' : c.tone === 'warn' ? 'mk-seg-warn' : '';
+      const topStores = c.stores.slice(0, 5).map(s => `<div style="font-size:12px"><b>${escapeHtml(s.storeName)}</b> · ${s.pctCompletion}% · чек ${s.avgCheck}₽</div>`).join('');
+      return `
+        <div class="mk-seg ${toneCls}">
+          <div class="mk-seg-name">${escapeHtml(c.name)}</div>
+          <div class="mk-seg-count">${c.count} магазинов</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">средние:</div>
+          <div style="font-size:12px">% выполн.: <b>${c.avg.pctCompletion}%</b></div>
+          <div style="font-size:12px">маржа: <b>${c.avg.marginPct}%</b></div>
+          <div style="font-size:12px">ср.чек: <b>${c.avg.avgCheck}₽</b></div>
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--line)">${topStores}</div>
+        </div>`;
+    }).join('');
+    el.innerHTML = `<div style="padding:8px 16px;font-size:13px">Всего магазинов: <b>${data.total}</b></div><div class="mk-segs">${cards}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadMkCohorts() {
+  const el = $('mkCohorts');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Тяну Бонусы за 6 мес…</div>';
+  try {
+    const data = await fetchJson('/api/marketing/cohort-retention?months=6');
+    if (!data.cohorts?.length) {
+      el.innerHTML = '<div class="empty-state" style="padding:14px">Нет данных по картам за 6 мес</div>';
+      return;
+    }
+    // Строим таблицу когорта × offset
+    const maxOffset = Math.max(0, ...data.cohorts.flatMap(c => c.retention.map(r => r.offset)));
+    const headerOffsets = Array.from({ length: maxOffset + 1 }, (_, i) => i);
+    const rows = data.cohorts.map(c => {
+      const cells = headerOffsets.map(off => {
+        const r = c.retention.find(x => x.offset === off);
+        if (!r) return '<td class="num muted">—</td>';
+        const intensity = r.pct / 100;
+        const bg = `rgba(34, 197, 94, ${(intensity * 0.5).toFixed(2)})`;
+        return `<td class="num" style="background:${bg}"><b>${r.pct}%</b><br><small class="muted">${r.count}</small></td>`;
+      }).join('');
+      return `<tr><td><b>${c.firstMonth}</b><br><small class="muted">${c.total} карт</small></td>${cells}</tr>`;
+    }).join('');
+    el.innerHTML = `
+      <div style="padding:8px 16px;font-size:13px">Когорты по первому месяцу активности. % = доля карт когорты активных в этом offset-месяце.</div>
+      <div class="table-wrap"><table class="num-table">
+        <thead><tr><th>Когорта</th>${headerOffsets.map(o => `<th class="num">${o === 0 ? 'M0' : 'M+' + o}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
 }
 
 async function loadMkZombie() {

@@ -691,6 +691,25 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
+    if (pathname === '/api/marketing/store-clusters' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const { db } = await getScopedDb(req);
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await marketing.getStoreClusters(db, period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    if (pathname === '/api/marketing/cohort-retention' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const monthsBack = Number(parsedUrl.searchParams.get('months') || 6);
+        sendJson(res, 200, await marketing.getCohortRetention(monthsBack));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
     // Pending-эндпоинты (отдают { available: false, pending: true, reason })
     if (pathname === '/api/marketing/birthdays' && req.method === 'GET') {
       const user = await resolveUser(req);

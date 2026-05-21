@@ -312,6 +312,195 @@ function buildHolidayYoy(db, windowDays = 60) {
   };
 }
 
+// ─── 5) Store clusters ──────────────────────────────────────────────────────
+// k-means по 3 признакам (выполнение %, маржинальность %, средний чек).
+// Без библиотеки — реализация k-means на ~50 строк. k=4 фиксировано
+// (Лидеры / Маржинальные / Массовые / Отстающие).
+function buildStoreClusters(db, period) {
+  // 1. Собираем фичи по каждому магазину
+  const stores = db.stores || [];
+  const plans = db.plans || [];
+  const sales = db.sales || [];
+  const byStore = new Map();
+  for (const s of stores) {
+    byStore.set(s.id, {
+      storeId: s.id,
+      storeName: s.name,
+      plan: 0, fact: 0, cost: 0, quantity: 0, chequeCount: 0
+    });
+  }
+  for (const p of plans) {
+    if (p.period !== period) continue;
+    if (byStore.has(p.storeId)) byStore.get(p.storeId).plan += Number(p.amount || 0);
+  }
+  for (const s of sales) {
+    if (s.period !== period) continue;
+    const sid = s.storeId || s.store_id;
+    if (!byStore.has(sid)) continue;
+    const x = byStore.get(sid);
+    x.fact += Number(s.amount || 0);
+    x.cost += Number(s.cost || 0);
+    x.quantity += Number(s.quantity || 0);
+  }
+  // Фильтр: только магазины с планом > 0 (без виртуальных и закрытых)
+  const points = Array.from(byStore.values())
+    .filter(x => x.plan > 0 && x.fact > 0)
+    .map(x => ({
+      ...x,
+      pctCompletion: (x.fact / x.plan) * 100,
+      marginPct: x.fact > 0 ? ((x.fact - x.cost) / x.fact) * 100 : 0,
+      avgCheck: x.quantity > 0 ? x.fact / x.quantity : 0
+    }));
+  if (points.length < 4) return { period, total: points.length, clusters: [], note: 'Слишком мало точек для кластеризации' };
+
+  // 2. Нормализация: каждая фича в [0..1]
+  const featNames = ['pctCompletion', 'marginPct', 'avgCheck'];
+  const ranges = featNames.map(f => {
+    const vs = points.map(p => p[f]);
+    return { f, min: Math.min(...vs), max: Math.max(...vs) };
+  });
+  const normalize = (p) => featNames.map((f, i) => {
+    const r = ranges[i];
+    return r.max > r.min ? (p[f] - r.min) / (r.max - r.min) : 0.5;
+  });
+  for (const p of points) p._norm = normalize(p);
+
+  // 3. k-means++ init (k=4)
+  const k = Math.min(4, points.length);
+  const centroids = [points[0]._norm.slice()];
+  while (centroids.length < k) {
+    // Точка с максимальным минимальным расстоянием до существующих центров
+    let best = null, bestDist = -1;
+    for (const p of points) {
+      const minDist = Math.min(...centroids.map(c => Math.hypot(...c.map((v, i) => v - p._norm[i]))));
+      if (minDist > bestDist) { bestDist = minDist; best = p; }
+    }
+    centroids.push(best._norm.slice());
+  }
+
+  // 4. Итерации
+  for (let iter = 0; iter < 30; iter++) {
+    for (const p of points) {
+      let best = 0, bestDist = Infinity;
+      for (let i = 0; i < k; i++) {
+        const d = Math.hypot(...centroids[i].map((v, j) => v - p._norm[j]));
+        if (d < bestDist) { bestDist = d; best = i; }
+      }
+      p._cluster = best;
+    }
+    // Пересчёт центров
+    const changed = centroids.map((c, i) => {
+      const cps = points.filter(p => p._cluster === i);
+      if (!cps.length) return c;
+      return c.map((_, j) => cps.reduce((s, p) => s + p._norm[j], 0) / cps.length);
+    });
+    const delta = centroids.map((c, i) => Math.hypot(...c.map((v, j) => v - changed[i][j]))).reduce((s, x) => s + x, 0);
+    centroids.splice(0, k, ...changed);
+    if (delta < 1e-4) break;
+  }
+
+  // 5. Семантические имена кластеров — по характеристикам центра
+  const labelFor = (c) => {
+    const [pct, margin, check] = c;
+    if (pct > 0.7 && margin > 0.6) return { name: 'Лидеры', tone: 'good' };
+    if (margin > 0.7) return { name: 'Маржинальные', tone: 'good' };
+    if (check < 0.4 && pct > 0.5) return { name: 'Массовые (низкий чек, высокий объём)', tone: 'neutral' };
+    if (pct < 0.5) return { name: 'Отстающие', tone: 'bad' };
+    return { name: 'Средние', tone: 'neutral' };
+  };
+
+  const clusters = centroids.map((c, i) => {
+    const label = labelFor(c);
+    const cps = points.filter(p => p._cluster === i);
+    if (!cps.length) return null;
+    const avg = (arr, key) => arr.reduce((s, x) => s + x[key], 0) / arr.length;
+    return {
+      idx: i,
+      name: label.name,
+      tone: label.tone,
+      count: cps.length,
+      avg: {
+        pctCompletion: Number(avg(cps, 'pctCompletion').toFixed(1)),
+        marginPct: Number(avg(cps, 'marginPct').toFixed(1)),
+        avgCheck: Number(avg(cps, 'avgCheck').toFixed(0))
+      },
+      stores: cps.map(p => ({
+        storeId: p.storeId,
+        storeName: p.storeName,
+        pctCompletion: Number(p.pctCompletion.toFixed(1)),
+        marginPct: Number(p.marginPct.toFixed(1)),
+        avgCheck: Number(p.avgCheck.toFixed(0)),
+        fact: Math.round(p.fact)
+      })).sort((a, b) => b.fact - a.fact)
+    };
+  }).filter(Boolean).sort((a, b) => b.count - a.count);
+
+  return { period, total: points.length, clusters };
+}
+
+// ─── 6) Cohort retention ────────────────────────────────────────────────────
+// Когорта = клиенты которые впервые активировали карту в месяце N. Смотрим
+// какой % из них активен в N+1, N+2, ... мес. Используем РегистрНакопления.Бонусы
+// (как customers-retention, но split по first-month).
+async function buildCohortRetention(monthsBack = 6) {
+  // Берём N последних завершённых месяцев + текущий
+  const today = nowYM();
+  let from = today;
+  for (let i = 0; i < monthsBack; i++) from = prevMonth(from);
+  const months = rangeMonths(from, today);
+
+  // 1. Собираем card -> { firstMonth, activeMonths: Set }
+  const cards = new Map();
+  for (const ym of months) {
+    try {
+      const data = await callRegister('Бонусы', ym, ym, 999);
+      for (const r of data.rows || []) {
+        const card = (r['БонуснаяКарта'] || '').trim();
+        if (!card) continue;
+        if (!cards.has(card)) cards.set(card, { card, firstMonth: ym, activeMonths: new Set() });
+        const c = cards.get(card);
+        c.activeMonths.add(ym);
+        if (ym < c.firstMonth) c.firstMonth = ym;
+      }
+    } catch { /* skip month if 1C 5xx */ }
+  }
+
+  // 2. Группируем по firstMonth → строим retention curve
+  const cohorts = new Map();
+  for (const c of cards.values()) {
+    if (!cohorts.has(c.firstMonth)) cohorts.set(c.firstMonth, { firstMonth: c.firstMonth, total: 0, retained: new Map() });
+    const k = cohorts.get(c.firstMonth);
+    k.total += 1;
+    // По месяцам после first
+    const firstIdx = months.indexOf(c.firstMonth);
+    if (firstIdx < 0) continue;
+    for (let i = 0; i < months.length - firstIdx; i++) {
+      const ym = months[firstIdx + i];
+      if (c.activeMonths.has(ym)) {
+        k.retained.set(i, (k.retained.get(i) || 0) + 1);
+      }
+    }
+  }
+
+  return {
+    monthsBack,
+    months,
+    cohorts: Array.from(cohorts.values())
+      .map(k => ({
+        firstMonth: k.firstMonth,
+        total: k.total,
+        retention: Array.from(k.retained.entries())
+          .map(([offset, count]) => ({
+            offset,
+            count,
+            pct: Number(((count / k.total) * 100).toFixed(1))
+          }))
+          .sort((a, b) => a.offset - b.offset)
+      }))
+      .sort((a, b) => a.firstMonth.localeCompare(b.firstMonth))
+  };
+}
+
 // ─── Pending stubs (для прозрачности что в плане) ──────────────────────────
 function buildPendingStub(reason) {
   return { available: false, pending: true, reason };
@@ -343,12 +532,20 @@ async function getRfmSimple(fromYM, toYM) {
 function getHolidayYoy(db, windowDays) {
   return buildHolidayYoy(db, windowDays || 60);
 }
+function getStoreClusters(db, period) {
+  return cache.wrap(`clusters:${period}`, async () => buildStoreClusters(db, period));
+}
+async function getCohortRetention(monthsBack) {
+  return cache.wrap(`cohorts:${monthsBack || 6}`, async () => buildCohortRetention(monthsBack || 6));
+}
 
 module.exports = {
   getZombieProducts,
   getDiscountCannibalization,
   getRfmSimple,
   getHolidayYoy,
+  getStoreClusters,
+  getCohortRetention,
   // Pending — возвращают { available: false, pending: true, reason } для UI
   getBirthdays: PENDING_BIRTHDAYS,
   getGeoDistricts: PENDING_GEO,

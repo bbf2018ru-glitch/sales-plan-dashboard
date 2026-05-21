@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="stylesheet" href="/styles.css?v=42" />
+    <link rel="stylesheet" href="/styles.css?v=43" />
   </head>
   <body>
 
@@ -1154,6 +1154,24 @@
 
             <div class="panel">
               <div class="panel-header">
+                <div><div class="panel-title">🏬 Кластеризация магазинов</div>
+                <div class="panel-subtitle">k-means по % выполнения / маржинальности / среднему чеку — где сильные, где слабые группы</div></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkClustersRefresh">Обновить</button></div>
+              </div>
+              <div id="mkClusters" class="mk-block"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div><div class="panel-title">📈 Когортный retention (новые карты)</div>
+                <div class="panel-subtitle">сколько % карт активны в N+1, N+2, ... мес после первой активности (Бонусы 6 мес)</div></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkCohortsRefresh">Обновить</button></div>
+              </div>
+              <div id="mkCohorts" class="mk-block"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
                 <div><div class="panel-title">⏳ Что нужно от Hellstaff'а для остальных отчётов</div>
                 <div class="panel-subtitle">эти отчёты технически готовы — ждут расширения BSL HTTP-сервиса</div></div>
               </div>
@@ -1241,6 +1259,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=46"></script>
+    <script src="/app.js?v=47"></script>
   </body>
 </html>
