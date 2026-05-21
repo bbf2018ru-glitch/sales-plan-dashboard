@@ -303,6 +303,57 @@ function buildYoyForecast(period, totalFact, elapsedDays, totalDays, allSales) {
   };
 }
 
+// Per-store прогноз: каждому магазину собственный темп и прогноз остатка.
+// Главное преимущество — новые точки (открытые в текущем месяце) не "тянут"
+// средний темп сети вниз. Для каждого магазина определяем actualElapsed —
+// число дней с момента первой продажи в периоде (а не с начала месяца).
+//
+// На уровне сети это даёт более высокий прогноз чем общий linear, если
+// какие-то магазины открылись с задержкой — потому что для них averagePerDay
+// считается за реальные дни работы, а в проекции на оставшиеся дни они
+// работают всё это время.
+function buildPerStoreForecast(period, totalDays, elapsedDays, sales) {
+  if (!sales || sales.length === 0 || elapsedDays <= 0) return null;
+  const remainingDays = Math.max(totalDays - elapsedDays, 0);
+  if (remainingDays <= 0) return null;
+  // 1. Группируем продажи по магазинам, для каждого находим день первой
+  //    активности в периоде и сумму.
+  const byStore = new Map();
+  for (const s of sales) {
+    if (s.period !== period) continue;
+    const sid = s.storeId || s.store_id;
+    if (!sid) continue;
+    const at = s.soldAt || s.sold_at;
+    if (!at) continue;
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime())) continue;
+    const day = d.getUTCDate();
+    if (!byStore.has(sid)) byStore.set(sid, { fact: 0, firstDay: day });
+    const x = byStore.get(sid);
+    x.fact += Number(s.amount || 0);
+    if (day < x.firstDay) x.firstDay = day;
+  }
+  if (byStore.size < 3) return null;
+
+  // 2. Для каждого магазина считаем actualElapsed и прогноз остатка.
+  let projectedFact = 0;
+  let newStoresCount = 0;
+  for (const x of byStore.values()) {
+    const actualElapsed = Math.max(elapsedDays - x.firstDay + 1, 1);
+    const averagePerDay = x.fact / actualElapsed;
+    const remainingProjection = averagePerDay * remainingDays;
+    projectedFact += x.fact + remainingProjection;
+    // «Новый» — первая продажа после 7-го дня периода
+    if (x.firstDay > 7 && elapsedDays - x.firstDay > 1) newStoresCount += 1;
+  }
+  return {
+    projectedFact: roundMetric(projectedFact),
+    method: 'per-store-linear',
+    storesCount: byStore.size,
+    newStoresCount
+  };
+}
+
 function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
   const totalDays = daysInPeriod(period);
   const elapsedDays = effectiveElapsedDays(period, lastSaleAt);
@@ -323,7 +374,18 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
     }
   }
 
-  // Приоритет 2: seasonal-dow (если YoY нет, но есть >120 дней истории).
+  // Приоритет 2: per-store linear (учитывает новые точки открытые после
+  // начала месяца). Лучше общего линейного прогноза для растущей сети.
+  if (projectedFact === undefined && elapsedDays > 0 && remainingDays > 0) {
+    const perStore = buildPerStoreForecast(period, totalDays, elapsedDays, sales);
+    if (perStore) {
+      projectedFact = perStore.projectedFact;
+      projectionMethod = 'per-store-linear';
+      projectionMeta = { storesCount: perStore.storesCount, newStoresCount: perStore.newStoresCount };
+    }
+  }
+
+  // Приоритет 3: seasonal-dow (если YoY нет, но есть >120 дней истории).
   if (projectedFact === undefined) {
     const dowFactors = computeDayOfWeekFactors(sales);
     if (dowFactors && elapsedDays > 0 && remainingDays > 0) {
@@ -347,7 +409,7 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales) {
     }
   }
 
-  // Приоритет 3: линейный (fallback если нет ни YoY, ни DoW).
+  // Приоритет 4: линейный (последний fallback).
   if (projectedFact === undefined) {
     projectedFact = roundMetric(averagePerDay * totalDays);
     projectionMethod = 'linear';

@@ -609,6 +609,7 @@ function renderKpis(summary) {
   if (planIncomplete) projectedSubV2 = 'план неполный';
   else {
     const methodTag = f.projectionMethod === 'yoy' ? ' · по прошлому году'
+      : f.projectionMethod === 'per-store-linear' ? ' · учёт открытий точек'
       : f.projectionMethod === 'seasonal-dow' ? ' · учёт дней недели'
       : ' · линейный';
     projectedSubV2 = `${f.projectedCompletion}% к плану на конец месяца${methodTag}`;
@@ -640,7 +641,7 @@ function renderKpis(summary) {
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
       tip: 'Валовая прибыль = факт − себестоимость. Когда 1С не передаёт себестоимость напрямую, считается через STORE_MARKUPS_JSON env (per-store markup% из отчёта «Валовая прибыль»).' },
     { id: 'projected', label: 'Прогноз', value: planIncomplete ? '—' : moneyShort(f.projectedFact), sub: projectedSubV2, tone: projectedTone,
-      tip: 'Экстраполяция выручки до конца месяца. Приоритет методов: 1) YoY — берём дни прошлого года × коэффициент роста (учитывает праздники и сезонность); 2) сезонный по дням недели (120 дн истории); 3) линейный fallback. Кликни ▾ для деталей метода.' },
+      tip: 'Экстраполяция выручки до конца месяца. Приоритет методов: 1) YoY — дни прошлого года × коэффициент роста (учитывает праздники и сезонность); 2) Per-store — каждому магазину свой темп с учётом дня первой продажи (правильно для новых точек); 3) сезонный по дням недели; 4) линейный fallback. Кликни ▾ для деталей.' },
     { id: 'required', label: 'Нужно/день', value: planIncomplete ? '—' : moneyShort(f.requiredPerDayToPlan), sub: requiredSub, tone: requiredTone,
       tip: 'Сколько нужно делать выручки каждый оставшийся день, чтобы выйти ровно в план месяца. Если средний факт/день меньше этой цифры — план рискует.' }
   ];
@@ -814,6 +815,8 @@ function buildKpiDetail(id, summary) {
     let methodLine;
     if (f.projectionMethod === 'yoy') {
       methodLine = `Метод: <b>по прошлому году (YoY)</b> — для каждого оставшегося дня берём факт того же дня в <b>${meta.basePeriod || 'baseline'}</b>, умножаем на коэффициент роста сети <b>${meta.growthRate || '?'}×</b>. <br><small style="color:var(--muted)">Автоматически учитывает праздники и сезонность реального прошлого года. НЕ учитывает новые точки открытые после ${meta.basePeriod || 'baseline'}.</small>`;
+    } else if (f.projectionMethod === 'per-store-linear') {
+      methodLine = `Метод: <b>per-store linear</b> — для каждого магазина (${meta.storesCount || '?'}) считаем темп от его первой продажи в этом месяце, не от 1-го числа. <br><small style="color:var(--muted)">Найдено <b>${meta.newStoresCount || 0}</b> точек открытых после 7-го числа — их вклад не занижается. Используется потому что YoY невозможен (нет адекватного baseline) либо его рост &gt;3×.</small>`;
     } else if (f.projectionMethod === 'seasonal-dow') {
       methodLine = `Метод: <b>сезонный по дням недели</b> — коэффициенты из последних 120 дней (Сб обычно +50%, Пн -20%). <br><small style="color:var(--muted)">Использован потому что для YoY нет данных за тот же месяц год назад.</small>`;
     } else {
