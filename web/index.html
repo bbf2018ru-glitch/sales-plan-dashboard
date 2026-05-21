@@ -1124,7 +1124,7 @@
               <div class="panel-header">
                 <div><div class="panel-title">🧟 Зомби-ассортимент</div>
                 <div class="panel-subtitle">товары с планом > 1 000 ₽, факт &lt; 10% — либо снять, либо продвигать</div></div>
-                <div class="panel-actions"><button class="btn-mini" id="mkZombieRefresh">Обновить</button></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkZombieCsv">CSV</button> <button class="btn-mini" id="mkZombieRefresh">Обновить</button></div>
               </div>
               <div id="mkZombie" class="mk-block"></div>
             </div>
@@ -1133,7 +1133,7 @@
               <div class="panel-header">
                 <div><div class="panel-title">💸 Каннибализация скидок</div>
                 <div class="panel-subtitle">сколько маржи съели скидки, разбивка по типам и месяцам</div></div>
-                <div class="panel-actions"><button class="btn-mini" id="mkCannibaRefresh">Обновить</button></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkCannibaCsv">CSV</button> <button class="btn-mini" id="mkCannibaRefresh">Обновить</button></div>
               </div>
               <div id="mkCanniba" class="mk-block"></div>
             </div>
@@ -1142,7 +1142,7 @@
               <div class="panel-header">
                 <div><div class="panel-title">👑 RFM-сегментация клиентов</div>
                 <div class="panel-subtitle">VIP / Постоянные / Новые / Уходящие VIP / Спящие — по картам за 6 мес</div></div>
-                <div class="panel-actions"><button class="btn-mini" id="mkRfmRefresh">Обновить</button></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkRfmCsvVip" title="Экспорт VIP">CSV: VIP</button> <button class="btn-mini" id="mkRfmCsvSleep" title="Экспорт спящих">CSV: Спящие</button> <button class="btn-mini" id="mkRfmRefresh">Обновить</button></div>
               </div>
               <div id="mkRfm" class="mk-block"></div>
             </div>
@@ -1159,7 +1159,7 @@
               <div class="panel-header">
                 <div><div class="panel-title">🏬 Кластеризация магазинов</div>
                 <div class="panel-subtitle">k-means по % выполнения / маржинальности / среднему чеку — где сильные, где слабые группы</div></div>
-                <div class="panel-actions"><button class="btn-mini" id="mkClustersRefresh">Обновить</button></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkClustersCsv">CSV</button> <button class="btn-mini" id="mkClustersRefresh">Обновить</button></div>
               </div>
               <div id="mkClusters" class="mk-block"></div>
             </div>
@@ -1168,7 +1168,7 @@
               <div class="panel-header">
                 <div><div class="panel-title">📈 Когортный retention (новые карты)</div>
                 <div class="panel-subtitle">сколько % карт активны в N+1, N+2, ... мес после первой активности (Бонусы 6 мес)</div></div>
-                <div class="panel-actions"><button class="btn-mini" id="mkCohortsRefresh">Обновить</button></div>
+                <div class="panel-actions"><button class="btn-mini" id="mkCohortsCsv">CSV</button> <button class="btn-mini" id="mkCohortsRefresh">Обновить</button></div>
               </div>
               <div id="mkCohorts" class="mk-block"></div>
             </div>
@@ -1262,6 +1262,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=48"></script>
+    <script src="/app.js?v=49"></script>
   </body>
 </html>

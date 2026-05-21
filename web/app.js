@@ -2366,6 +2366,42 @@ async function init() {
   $('mkClustersRefresh')?.addEventListener('click', loadMkClusters);
   $('mkCohortsRefresh')?.addEventListener('click', loadMkCohorts);
 
+  // CSV-экспорт каждого блока (для отдела маркетинга / CRM-обзвонов)
+  $('mkZombieCsv')?.addEventListener('click', () => {
+    const d = analyticsState.mkZombieData?.items || [];
+    if (!d.length) return alert('Зомби-товаров нет — нечего экспортировать');
+    exportCsv(d.map(x => ({ 'Товар': x.productName, 'Категория': x.category, 'План': x.plan, 'Факт': x.fact, 'Выполнение_%': x.percent, 'Недобор': x.gap })), `zombie-${state.period}.csv`);
+  });
+  $('mkCannibaCsv')?.addEventListener('click', () => {
+    const d = analyticsState.mkCannibaData?.byCondition || [];
+    if (!d.length) return alert('Нет данных');
+    exportCsv(d.map(x => ({ 'Условие_скидки': x.condition, 'Сумма': x.amount })), `discount-cannibalization-${state.period}.csv`);
+  });
+  $('mkRfmCsvVip')?.addEventListener('click', () => {
+    const d = analyticsState.mkRfmData?.topVIP || [];
+    if (!d.length) return alert('Нет VIP-клиентов');
+    exportCsv(d.map(x => ({ 'Имя': x.name, 'Выручка': x.monetary, 'Покупок': x.frequency, 'R': x.R, 'F': x.F, 'M': x.M })), `rfm-vip-${state.period}.csv`);
+  });
+  $('mkRfmCsvSleep')?.addEventListener('click', () => {
+    const d = analyticsState.mkRfmData?.topSleeping || [];
+    if (!d.length) return alert('Нет спящих клиентов');
+    exportCsv(d.map(x => ({ 'Имя': x.name, 'Выручка': x.monetary, 'Recency_мес': x.recencyMonths, 'Сегмент': x.segment })), `rfm-sleeping-${state.period}.csv`);
+  });
+  $('mkClustersCsv')?.addEventListener('click', () => {
+    const d = analyticsState.mkClustersData?.clusters || [];
+    if (!d.length) return alert('Нет данных');
+    const rows = [];
+    for (const c of d) for (const s of c.stores) rows.push({ 'Кластер': c.name, 'Магазин': s.storeName, 'Выполнение_%': s.pctCompletion, 'Маржа_%': s.marginPct, 'Ср_чек': s.avgCheck, 'Факт': s.fact });
+    exportCsv(rows, `store-clusters-${state.period}.csv`);
+  });
+  $('mkCohortsCsv')?.addEventListener('click', () => {
+    const d = analyticsState.mkCohortsData?.cohorts || [];
+    if (!d.length) return alert('Нет данных');
+    const rows = [];
+    for (const c of d) for (const r of c.retention) rows.push({ 'Когорта': c.firstMonth, 'Total': c.total, 'Offset_M': r.offset, 'Активных': r.count, 'Retention_%': r.pct });
+    exportCsv(rows, `cohort-retention.csv`);
+  });
+
   // Навигация сайдбара и список pending-отчётов работают независимо
   // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
   initPageNav();
@@ -2635,6 +2671,7 @@ async function loadMkCohorts() {
   el.innerHTML = '<div class="empty-state" style="padding:14px">Тяну Бонусы за 6 мес…</div>';
   try {
     const data = await fetchJson('/api/marketing/cohort-retention?months=6');
+    analyticsState.mkCohortsData = data;
     if (!data.cohorts?.length) {
       el.innerHTML = '<div class="empty-state" style="padding:14px">Нет данных по картам за 6 мес</div>';
       return;
