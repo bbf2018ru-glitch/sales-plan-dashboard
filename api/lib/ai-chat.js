@@ -250,7 +250,17 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
   // Историю последних 4 сообщений тоже даём, для контекста разговора
   const histMsg = (history || []).slice(-4).map(h => `${h.role}: ${h.text}`).join('\n');
 
-  const userMsg = `${ctx}${notesBlock}\n\n${histMsg ? '=== ИСТОРИЯ ЧАТА ===\n' + histMsg + '\n' : ''}=== ВОПРОС ===\n${question}`;
+  // ВОПРОС идёт первым — иначе модель «залипает» в контексте и даёт overview
+  // на любой вопрос. После вопроса даём контекст и инструкцию.
+  const userMsg = [
+    `ВОПРОС: ${question}`,
+    '',
+    'Ответь ИМЕННО на этот вопрос (не overview, не общая сводка), используя сводку ниже как источник цифр и имён.',
+    '',
+    histMsg ? '=== ИСТОРИЯ РАЗГОВОРА ===\n' + histMsg + '\n' : '',
+    '=== СВОДКА ДАШБОРДА ===',
+    ctx + notesBlock
+  ].filter(Boolean).join('\n');
 
   // Каскад: OpenAI gpt-4o-mini → Groq 70b → Groq 8b.
   const { text, model: usedModel, provider } = await callLlmCascade({
@@ -258,7 +268,7 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMsg }
     ],
-    temperature: 0.3,
+    temperature: 0.5,
     maxTokens: 600,
     timeoutMs: 30000
   });
