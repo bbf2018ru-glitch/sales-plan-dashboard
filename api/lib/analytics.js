@@ -320,19 +320,11 @@ function buildPerStoreForecast(period, totalDays, elapsedDays, allSales, allPlan
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
   if (remainingDays <= 0) return null;
 
-  // Только магазины с планом > 0 в текущем периоде — реальные торговые точки.
-  // Иначе попадают служебные каналы (склад/онлайн/корпоратив/UTF-8-битые id)
-  // которые не должны влиять на прогноз сети.
-  const storesWithPlan = new Map();
-  for (const p of allPlans || []) {
-    if (p.period !== period) continue;
-    const sid = p.storeId;
-    if (!sid || sid === 'undefined' || /^__/.test(sid)) continue;
-    storesWithPlan.set(sid, (storesWithPlan.get(sid) || 0) + Number(p.amount || 0));
-  }
-  // Магазины с реальным планом
-  const realStoreIds = new Set(Array.from(storesWithPlan.entries()).filter(([, plan]) => plan > 0).map(([id]) => id));
-  if (realStoreIds.size < 3) return null;
+  // Берём ВСЕ магазины с реальным фактом сети — включая точки без плана
+  // (склад готовой продукции, недавно открытые точки, для которых план
+  // ещё не успели завести). Их выручка реально входит в totals.fact,
+  // поэтому должна попадать и в прогноз. Отсекаем только служебные/битые id.
+  const isRealId = (sid) => sid && sid !== 'undefined' && !/^__/.test(sid);
 
   // Предыдущий период для детекции новых точек.
   const [yy, mm] = period.split('-').map(Number);
@@ -344,15 +336,15 @@ function buildPerStoreForecast(period, totalDays, elapsedDays, allSales, allPlan
     if (s.period !== prevPeriod) continue;
     if (Number(s.amount || 0) <= 0) continue;
     const sid = s.storeId || s.store_id;
-    if (realStoreIds.has(sid)) storesInPrev.add(sid);
+    if (isRealId(sid)) storesInPrev.add(sid);
   }
 
-  // Группируем факт текущего периода по магазинам (только реальные торговые).
+  // Группируем факт текущего периода по всем реальным магазинам.
   const byStore = new Map();
   for (const s of allSales) {
     if (s.period !== period) continue;
     const sid = s.storeId || s.store_id;
-    if (!realStoreIds.has(sid)) continue;
+    if (!isRealId(sid)) continue;
     if (!byStore.has(sid)) byStore.set(sid, { storeId: sid, fact: 0 });
     byStore.get(sid).fact += Number(s.amount || 0);
   }
