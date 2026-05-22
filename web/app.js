@@ -543,15 +543,14 @@ function renderKpis(summary) {
   const todayPct = planToDate > 0 ? Math.round((factToDate / planToDate) * 100) : 0;
   const todayTone = todayPct >= 100 ? 'good' : todayPct >= 90 ? 'warn' : 'bad';
 
-  // «Выполнение к сегодня» = % факта от плана на эту дату (= f.paceVsPlan)
-  const completionVal = planIncomplete ? '—' : `${todayPct}%`;
+  // Карточка показывает % выполнения плана МЕСЯЦА (t.completion); темп vs плана-на-сегодня уходит в подпись.
+  const monthPct = t.completion || 0;
+  const completionVal = planIncomplete ? '—' : `${monthPct}%`;
   const completionTone = planIncomplete ? 'neutral' : todayTone;
   let completionSub;
   if (planIncomplete) completionSub = 'план неполный';
   else if (gapToDate > 0) completionSub = `отстаём на ${fmtMoneyShort(gapToDate)}`;
   else completionSub = `опережаем на ${fmtMoneyShort(-gapToDate)}`;
-  // Дополним: общий % от месячного плана (мелкой строкой ниже)
-  if (!planIncomplete) completionSub += ` · ${t.completion || 0}% к месяцу`;
 
   const projectedVal  = planIncomplete ? '—' : formatMoney(f.projectedFact);
   const projectedSub  = planIncomplete ? 'план неполный' : `${f.projectedCompletion}% к плану`;
@@ -597,11 +596,11 @@ function renderKpis(summary) {
     factSub += ' · vs прошл.год: нет данных';
   }
 
-  // === «Выполнение к сегодня»: явная подпись «X% от плана на DD.MM» ===
+  // === «Выполнение плана»: главная цифра = % от плана МЕСЯЦА, подпись — темп vs плана-на-сегодня ===
   const dateStr = elapsed > 0 ? `${elapsed}.${(summary.period || '').slice(5,7)}` : '';
   let completionSubV2;
   if (planIncomplete) completionSubV2 = 'план неполный';
-  else completionSubV2 = `от плана на ${dateStr} (${fmtMoneyShort(planToDate)})`
+  else completionSubV2 = `темп: ${todayPct}% от плана на ${dateStr}`
     + (gapToDate > 0 ? ` · не хватает ${fmtMoneyShort(gapToDate)}` : ` · опережаем на ${fmtMoneyShort(-gapToDate)}`);
 
   // === «Прогноз»: явно про конец месяца + метод расчёта ===
@@ -634,9 +633,9 @@ function renderKpis(summary) {
     { id: 'fact', label: 'Факт', value: moneyShort(summary.totals.fact),
       sub: factSub, tone: 'neutral',
       tip: 'Фактическая выручка сети с начала месяца на текущий момент. Сравнение «vs прошл.год» — с тем же днём (а не месяц целиком), чтобы было справедливо для незавершённого периода.' },
-    { id: 'completion', label: 'Выполнение к сегодня', value: completionVal,
+    { id: 'completion', label: 'Выполнение плана', value: completionVal,
       sub: completionSubV2, tone: completionTone,
-      tip: 'Процент факта от плана-на-сегодня (план месяца, пропорционально пройденным дням с учётом часа в Иркутске). 100% = идём ровно в темпе.' },
+      tip: 'Процент факта от плана МЕСЯЦА (до конца месяца). Подпись — темп: % факта от плана-на-сегодня (план месяца, пропорционально пройденным дням с учётом часа в Иркутске).' },
     { id: 'margin', label: 'Маржа', value: moneyShort(summary.totals.margin),
       sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
@@ -700,7 +699,7 @@ function buildKpiDetail(id, summary) {
   const stores = summary.stores || [];
   const products = (summary.products || []).filter(p => p.productId !== '_total');
   const closeBtn = `<button class="kpi-detail-close" onclick="closeKpiDetail()">✕</button>`;
-  const titles = { plan: 'План на месяц', fact: 'Факт', completion: 'Выполнение к сегодня', margin: 'Маржа', projected: 'Прогноз', required: 'Нужно/день' };
+  const titles = { plan: 'План на месяц', fact: 'Факт', completion: 'Выполнение плана', margin: 'Маржа', projected: 'Прогноз', required: 'Нужно/день' };
   const header = `<div class="kpi-detail-header"><b>${titles[id] || ''}</b> · подробно ${closeBtn}</div>`;
 
   if (id === 'plan') {
