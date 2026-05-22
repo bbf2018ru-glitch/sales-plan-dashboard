@@ -1435,6 +1435,29 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // M2M-прокси для maria-crew (Hostinger вне whitelist 1С).
+    // Auth — X-API-Key (INGEST_API_KEY), путь жёстко зафиксирован чтобы прокси
+    // не стал universal-reflector.
+    if (pathname === '/api/upp/proxy/products-detail' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
+      try {
+        const { fetchUppPackage } = require('./lib/upp-pull');
+        const base = UPP_PULL_URL.replace(/\/pull(\?.*)?$/, '');
+        const limit = String(parsedUrl.searchParams.get('limit') || '20000');
+        const result = await fetchUppPackage({
+          url: `${base}/products-detail?limit=${encodeURIComponent(limit)}`,
+          username: UPP_PULL_USER,
+          password: UPP_PULL_PASSWORD,
+          period: ''
+        });
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 502, { error: e.message || 'upstream 1C error' });
+      }
+      return;
+    }
+
     // ── 1С Diagnostic / Explorer ──────────────────────────────────────────────
     if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
