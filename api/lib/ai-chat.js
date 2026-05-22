@@ -250,25 +250,29 @@ async function askAiChat({ question, db, period, history, apiKey, model, getNote
   // Историю последних 4 сообщений тоже даём, для контекста разговора
   const histMsg = (history || []).slice(-4).map(h => `${h.role}: ${h.text}`).join('\n');
 
-  // ВОПРОС идёт первым — иначе модель «залипает» в контексте и даёт overview
-  // на любой вопрос. После вопроса даём контекст и инструкцию.
-  const userMsg = [
-    `ВОПРОС: ${question}`,
+  // Стратегия RAG: контекст (данные дашборда) идёт в system-message как
+  // "known facts", user-message содержит ТОЛЬКО вопрос + опционально историю.
+  // Это даёт модели чётко понять что ей надо отвечать на user-сообщение,
+  // а не пересказывать system-контекст. Раньше huge контекст в user-message
+  // заставлял gpt-4o-mini давать overview на любой вопрос.
+  const systemFull = [
+    SYSTEM_PROMPT,
     '',
-    'Ответь ИМЕННО на этот вопрос (не overview, не общая сводка), используя сводку ниже как источник цифр и имён.',
-    '',
-    histMsg ? '=== ИСТОРИЯ РАЗГОВОРА ===\n' + histMsg + '\n' : '',
-    '=== СВОДКА ДАШБОРДА ===',
+    '=== ТЕКУЩИЕ ДАННЫЕ ДАШБОРДА (используй для DATA-вопросов) ===',
     ctx + notesBlock
+  ].join('\n');
+
+  const userMsg = [
+    histMsg ? '(Контекст предыдущих сообщений:\n' + histMsg + '\n)\n' : '',
+    question
   ].filter(Boolean).join('\n');
 
-  // Каскад: OpenAI gpt-4o-mini → Groq 70b → Groq 8b.
   const { text, model: usedModel, provider } = await callLlmCascade({
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemFull },
       { role: 'user', content: userMsg }
     ],
-    temperature: 0.5,
+    temperature: 0.4,
     maxTokens: 600,
     timeoutMs: 30000
   });
