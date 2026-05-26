@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="stylesheet" href="/styles.css?v=45" />
+    <link rel="stylesheet" href="/styles.css?v=46" />
   </head>
   <body>
 
@@ -1198,88 +1198,51 @@
         <!-- ═══ МАРКЕТИНГ ═══ -->
         <div id="page-marketing" class="hidden">
           <section class="section">
-            <div class="section-label">Маркетинг — янв–май 2026</div>
-            <div class="section-hint">Все маркетинговые каналы по месяцам. Источники: 1С, Яндекс.Метрика/Директ, 2ГИС. *Май — неполный (до 26.05).</div>
-            <div class="mkt-kpis">
-              <div class="mkt-kpi"><div class="mkt-v">573 405 ₽</div><div class="mkt-l">Платный маркетинг (SMS+контекст)</div></div>
-              <div class="mkt-kpi"><div class="mkt-v">68 659</div><div class="mkt-l">SMS отправлено (430 891 ₽)</div></div>
-              <div class="mkt-kpi"><div class="mkt-v">173 700</div><div class="mkt-l">Визитов из поиска (SEO, ~70%)</div></div>
-              <div class="mkt-kpi"><div class="mkt-v">569</div><div class="mkt-l">Покупок с контекста (CPA 250 ₽)</div></div>
+            <div class="section-label">Маркетинг по каналам</div>
+            <div class="section-hint">Данные за янв–май 2026 (1С, Яндекс.Метрика/Директ, 2ГИС). Выбери период — таблицы и итоги пересчитаются. *Май — неполный (до 26.05).</div>
+            <div class="mkt-period">
+              <span>Период с</span>
+              <select id="mktFrom" class="mkt-sel"></select>
+              <span>по</span>
+              <select id="mktTo" class="mkt-sel"></select>
             </div>
+            <div class="mkt-kpis" id="mktKpis"></div>
           </section>
 
           <section class="section">
-            <div class="section-label">SMS-рассылки по месяцам</div>
-            <div class="section-hint">1С, отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. Атрибуция покупок — в работе (ждёт доработки выгрузки 1С).</div>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Месяц</th><th class="num">Рассылок</th><th class="num">SMS отправлено</th><th class="num">Стоимость, ₽</th><th class="num">Цена SMS, ₽</th></tr></thead>
-              <tbody>
-                <tr><td>Январь</td><td class="num">3</td><td class="num">6 060</td><td class="num">41 581</td><td class="num">6,86</td></tr>
-                <tr><td>Февраль</td><td class="num">10</td><td class="num">24 579</td><td class="num">119 938</td><td class="num">4,88</td></tr>
-                <tr><td>Март</td><td class="num">13</td><td class="num">28 464</td><td class="num">193 691</td><td class="num">6,80</td></tr>
-                <tr><td>Апрель</td><td class="num">5</td><td class="num">3 782</td><td class="num">29 937</td><td class="num">7,92</td></tr>
-                <tr><td>Май*</td><td class="num">7</td><td class="num">5 774</td><td class="num">45 745</td><td class="num">7,92</td></tr>
-                <tr class="mkt-total"><td>Итого</td><td class="num">38</td><td class="num">68 659</td><td class="num">430 891</td><td class="num">6,28</td></tr>
-              </tbody>
-            </table></div>
+            <div class="section-label">SMS-рассылки</div>
+            <div class="section-hint">1С, отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. Атрибуция покупок — ждёт доработки выгрузки 1С.</div>
+            <div id="mktSms" class="table-wrap"></div>
           </section>
 
           <section class="section">
-            <div class="section-label">Контекстная реклама (Яндекс.Директ) по месяцам</div>
-            <div class="section-hint">Агентский кабинет. CPA 250 ₽/покупка, CPC 12,9 ₽, отказы 14,8% (лучше среднего по сайту). Помесячный расход — добирается (показан итог за период).</div>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Период</th><th class="num">Расход, ₽</th><th class="num">Клики</th><th class="num">Показы</th><th class="num">Покупок</th><th class="num">CPA, ₽</th></tr></thead>
-              <tbody>
-                <tr class="mkt-total"><td>Янв–май (итого)</td><td class="num">142 514</td><td class="num">11 078</td><td class="num">429 577</td><td class="num">569</td><td class="num">250</td></tr>
-              </tbody>
-            </table></div>
+            <div class="section-label">Контекстная реклама (Яндекс.Директ)</div>
+            <div class="section-hint">Агентский кабинет. Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽, отказы 14,8% (лучше среднего по сайту).</div>
+            <div id="mktCtx" class="table-wrap"></div>
           </section>
 
           <section class="section">
-            <div class="section-label">SEO / источники трафика сайта (Метрика maria-irk.ru)</div>
-            <div class="section-hint">Органика — главный канал (~70%), драйвер — рецепты в блоге. Помесячная динамика органики — добирается (показан итог за период).</div>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Канал (янв–май)</th><th class="num">Визиты</th><th class="num">Доля</th></tr></thead>
-              <tbody>
-                <tr><td>Переходы из поиска (SEO)</td><td class="num">173 700</td><td class="num">~70%</td></tr>
-                <tr><td>Прямые заходы</td><td class="num">37 500</td><td class="num">15%</td></tr>
-                <tr><td>Реклама (контекст)</td><td class="num">21 859</td><td class="num">9%</td></tr>
-                <tr><td>Переходы по ссылкам</td><td class="num">7 794</td><td class="num">3%</td></tr>
-                <tr><td>Внутренние</td><td class="num">3 912</td><td class="num">1,5%</td></tr>
-              </tbody>
-            </table></div>
+            <div class="section-label">2ГИС — карточка компании</div>
+            <div class="section-hint">«Мария, кафе-кондитерская». 2ГИС ≫ Яндекс.Карты по маршрутам/звонкам (~1 578 vs ~221/мес).</div>
+            <div id="mktGis" class="table-wrap"></div>
           </section>
 
           <section class="section">
-            <div class="section-label">2ГИС по месяцам</div>
-            <div class="section-hint">Карточка «Мария, кафе-кондитерская». Обращения (посл. месяц): звонки 531, маршруты 1 578, переходы на сайт 664. 2ГИС ≫ Яндекс.Карты (маршруты ~1 578 vs ~221/мес).</div>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Месяц 2026</th><th class="num">Переходов на карточку</th><th class="num">Действий на странице</th></tr></thead>
-              <tbody>
-                <tr><td>Январь</td><td class="num">10 131</td><td class="num">11 386</td></tr>
-                <tr><td>Февраль</td><td class="num">10 633</td><td class="num">11 233</td></tr>
-                <tr><td>Март</td><td class="num">12 584</td><td class="num">12 725</td></tr>
-                <tr><td>Апрель</td><td class="num">12 412</td><td class="num">12 591</td></tr>
-                <tr><td>Май*</td><td class="num">8 662</td><td class="num">8 451</td></tr>
-                <tr class="mkt-total"><td>Итого</td><td class="num">54 422</td><td class="num">56 386</td></tr>
-              </tbody>
-            </table></div>
-          </section>
-
-          <section class="section">
-            <div class="section-label">Программа «Сладкий чек» по месяцам</div>
+            <div class="section-label">Программа «Сладкий чек»</div>
             <div class="section-hint">1С (РегистрНакопления.СладкийЧек). Новая программа, растёт. + 199 регистраций с сайта за период. Зазор регистрация→активность — точка роста.</div>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Месяц 2026</th><th class="num">Выполнений заданий</th><th class="num">Активных карт</th><th class="num">Баллов начислено</th></tr></thead>
-              <tbody>
-                <tr><td>Январь</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
-                <tr><td>Февраль</td><td class="num">1</td><td class="num">1</td><td class="num">3</td></tr>
-                <tr><td>Март</td><td class="num">26</td><td class="num">2</td><td class="num">0</td></tr>
-                <tr><td>Апрель</td><td class="num">80</td><td class="num">35</td><td class="num">147</td></tr>
-                <tr><td>Май*</td><td class="num">157</td><td class="num">54</td><td class="num">273</td></tr>
-                <tr class="mkt-total"><td>Итого</td><td class="num">264</td><td class="num">—</td><td class="num">423</td></tr>
-              </tbody>
-            </table></div>
+            <div id="mktSweet" class="table-wrap"></div>
+          </section>
+
+          <section class="section">
+            <div class="section-label">Продажи и лояльность</div>
+            <div class="section-hint">Розница, 1С. Тревога: доля чеков с картой лояльности падает (86 % → 74 %).</div>
+            <div id="mktSales" class="table-wrap"></div>
+          </section>
+
+          <section class="section">
+            <div class="section-label">SEO / источники трафика сайта — за весь период (янв–май)</div>
+            <div class="section-hint">Метрика maria-irk.ru. Органика — главный канал (~70 %), драйвер — рецепты в блоге. Помесячная органика — через Metrika API (в планах); сейчас показаны итоги за период (не зависят от выбора месяца).</div>
+            <div id="mktSeo" class="table-wrap"></div>
           </section>
 
           <section class="section">
@@ -1367,6 +1330,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=52"></script>
+    <script src="/app.js?v=53"></script>
   </body>
 </html>

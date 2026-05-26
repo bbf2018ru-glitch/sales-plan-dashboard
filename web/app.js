@@ -3290,6 +3290,7 @@ function switchPage(page) {
   $('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
   $('page-analytics').classList.toggle('hidden', page !== 'analytics');
   const mkt = $('page-marketing'); if (mkt) mkt.classList.toggle('hidden', page !== 'marketing');
+  if (page === 'marketing' && typeof mktInit === 'function') mktInit();
   setTimeout(() => urlStateWrite && urlStateWrite(), 0);
 }
 
@@ -4105,4 +4106,85 @@ function renderPendingReports() {
 }
 
 init();
+
+/* ── Маркетинг: помесячные данные + рендер с выбором периода ── */
+var MKT = {
+  months: ['Январь','Февраль','Март','Апрель','Май*'],
+  revenue:[27298107,27785955,34771425,31011451,24039792],
+  cheques:[23020,24716,28072,27806,25372],
+  cardPct:[86.3,83.2,79.5,76.8,74.1],
+  bonus:[788087,817449,1359668,1513728,1102186],
+  smsCnt:[3,10,13,5,7],
+  smsSent:[6060,24579,28464,3782,5774],
+  smsCost:[41581,119938,193691,29937,45745],
+  ctxCost:[1827,5177,46837,38673,50878],
+  ctxClicks:[244,869,3866,3197,2959],
+  ctxPurch:[10,13,296,147,106],
+  gis:[10131,10633,12584,12412,8662],
+  gisAct:[11386,11233,12725,12591,8451],
+  sweet:[0,1,26,80,157],
+  sweetCards:[0,1,2,35,54],
+  sweetPts:[0,3,0,147,273]
+};
+function mNum(n){ return Math.round(n).toLocaleString('ru-RU'); }
+function mNum1(n){ return (Math.round(n*10)/10).toLocaleString('ru-RU'); }
+function mKpi(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; }
+function mTbl(cols, rows, total){
+  var th = cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
+  var body = rows.map(function(r){ return '<tr>'+r.map(function(v,i){ return '<td'+(i?' class="num"':'')+'>'+v+'</td>'; }).join('')+'</tr>'; }).join('');
+  var tot = total ? '<tr class="mkt-total">'+total.map(function(v,i){ return '<td'+(i?' class="num"':'')+'>'+v+'</td>'; }).join('')+'</tr>' : '';
+  return '<table><thead><tr>'+th+'</tr></thead><tbody>'+body+tot+'</tbody></table>';
+}
+function mktRender(){
+  var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
+  if(!fromEl||!toEl) return;
+  var a=+fromEl.value, b=+toEl.value, lo=Math.min(a,b), hi=Math.max(a,b), idx=[];
+  for(var i=lo;i<=hi;i++) idx.push(i);
+  function sum(arr){ return idx.reduce(function(s,i){return s+arr[i];},0); }
+  var rev=sum(MKT.revenue), smsC=sum(MKT.smsCost), ctxC=sum(MKT.ctxCost), smsS=sum(MKT.smsSent), pur=sum(MKT.ctxPurch), chq=sum(MKT.cheques);
+  document.getElementById('mktKpis').innerHTML =
+    mKpi(mNum(rev)+' ₽','Выручка') +
+    mKpi(mNum(smsC+ctxC)+' ₽','Платный маркетинг (SMS+контекст)') +
+    mKpi(mNum(smsS),'SMS отправлено ('+mNum(smsC)+' ₽)') +
+    mKpi(mNum(pur),'Покупок с рекламы ('+mNum(ctxC)+' ₽)');
+  document.getElementById('mktSms').innerHTML = mTbl(
+    ['Месяц','Рассылок','SMS отправлено','Стоимость, ₽','Цена SMS, ₽'],
+    idx.map(function(i){ return [MKT.months[i], mNum(MKT.smsCnt[i]), mNum(MKT.smsSent[i]), mNum(MKT.smsCost[i]), MKT.smsSent[i]?mNum1(MKT.smsCost[i]/MKT.smsSent[i]):'—']; }),
+    ['Итого', mNum(sum(MKT.smsCnt)), mNum(smsS), mNum(smsC), smsS?mNum1(smsC/smsS):'—']);
+  document.getElementById('mktCtx').innerHTML = mTbl(
+    ['Месяц','Расход, ₽','Клики','Покупок','CPA, ₽'],
+    idx.map(function(i){ return [MKT.months[i], mNum(MKT.ctxCost[i]), mNum(MKT.ctxClicks[i]), mNum(MKT.ctxPurch[i]), MKT.ctxPurch[i]?mNum(MKT.ctxCost[i]/MKT.ctxPurch[i]):'—']; }),
+    ['Итого', mNum(ctxC), mNum(sum(MKT.ctxClicks)), mNum(pur), pur?mNum(ctxC/pur):'—']);
+  document.getElementById('mktGis').innerHTML = mTbl(
+    ['Месяц','Переходов на карточку','Действий на странице'],
+    idx.map(function(i){ return [MKT.months[i], mNum(MKT.gis[i]), mNum(MKT.gisAct[i])]; }),
+    ['Итого', mNum(sum(MKT.gis)), mNum(sum(MKT.gisAct))]);
+  document.getElementById('mktSweet').innerHTML = mTbl(
+    ['Месяц','Выполнений','Активных карт','Баллов'],
+    idx.map(function(i){ return [MKT.months[i], mNum(MKT.sweet[i]), mNum(MKT.sweetCards[i]), mNum(MKT.sweetPts[i])]; }),
+    ['Итого', mNum(sum(MKT.sweet)), '—', mNum(sum(MKT.sweetPts))]);
+  var wCard = chq ? idx.reduce(function(s,i){return s+MKT.cardPct[i]*MKT.cheques[i];},0)/chq : 0;
+  document.getElementById('mktSales').innerHTML = mTbl(
+    ['Месяц','Выручка, ₽','Чеков','Ср. чек, ₽','Карта лоял.','Бонусами, ₽'],
+    idx.map(function(i){ return [MKT.months[i], mNum(MKT.revenue[i]), mNum(MKT.cheques[i]), mNum(MKT.revenue[i]/MKT.cheques[i]), mNum1(MKT.cardPct[i])+' %', mNum(MKT.bonus[i])]; }),
+    ['Итого', mNum(rev), mNum(chq), mNum(rev/chq), mNum1(wCard)+' %', mNum(sum(MKT.bonus))]);
+}
+var _mktInited=false;
+function mktInit(){
+  var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
+  if(!fromEl||!toEl) return;
+  if(!_mktInited){
+    var opts = MKT.months.map(function(m,i){ return '<option value="'+i+'">'+m.replace('*','')+'</option>'; }).join('');
+    fromEl.innerHTML=opts; toEl.innerHTML=opts; fromEl.value='0'; toEl.value=String(MKT.months.length-1);
+    fromEl.addEventListener('change', mktRender);
+    toEl.addEventListener('change', mktRender);
+    var seo=document.getElementById('mktSeo');
+    if(seo) seo.innerHTML = mTbl(
+      ['Канал (янв–май)','Визиты','Доля'],
+      [['Переходы из поиска (SEO)','173 894','69,9 %'],['Прямые заходы','37 516','15,1 %'],['Переходы по рекламе','23 685','9,5 %'],['Переходы по ссылкам','7 809','3,1 %'],['Внутренние','3 918','1,6 %'],['Соцсети / рекоменд. / мессенджеры','1 886','0,8 %']],
+      ['Всего','248 708','100 %']);
+    _mktInited=true;
+  }
+  mktRender();
+}
 
