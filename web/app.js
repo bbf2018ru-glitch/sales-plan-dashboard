@@ -3289,6 +3289,7 @@ function switchPage(page) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('nav-active', b.dataset.page === page));
   $('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
   $('page-analytics').classList.toggle('hidden', page !== 'analytics');
+  const mkt = $('page-marketing'); if (mkt) mkt.classList.toggle('hidden', page !== 'marketing');
   setTimeout(() => urlStateWrite && urlStateWrite(), 0);
 }
 

@@ -3968,3 +3968,10 @@ body.plan-incomplete .spark-fill {
   cursor: help;
 }
 [data-theme=light] .kpi-note { background: rgba(180,83,9,.10); color: rgb(180,83,9); }
+
+/* ── Маркетинг (вкладка) ── */
+.mkt-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:12px}
+.mkt-kpi{background:rgba(184,134,11,.10);border:1px solid rgba(184,134,11,.28);border-radius:10px;padding:14px 16px}
+.mkt-kpi .mkt-v{font-size:22px;font-weight:700}
+.mkt-kpi .mkt-l{font-size:12px;opacity:.72;margin-top:3px}
+tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
