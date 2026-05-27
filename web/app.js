@@ -4290,19 +4290,19 @@ function renderCompetitors(){
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div><div class="mkt-comp-cards">'+cards+'</div>'+ins;
 }
 var SOCIAL = [
-  { name:'Мария', us:true, tg:'3 920', tgReach:'~200–440', ig:'~32 000', vk:'н/д' },
-  { name:'Стефания', tg:'73 871', tgReach:'~5 000–8 800', ig:'~45 000', vk:'н/д' },
-  { name:'Cake Home', tg:'5 340', tgReach:'~700–1 100', ig:'~38 000', vk:'н/д' },
-  { name:'Этика', tg:'2 070', tgReach:'~650–1 230 (выс. ER)', ig:'~22 000', vk:'н/д' },
-  { name:'ЯХОНТ', tg:'359', tgReach:'~80–390', ig:'н/д', vk:'н/д' }
+  { name:'Мария', us:true, tg:'3 920', tgReach:'~200–440', ig:'~32 000', igReels:'~3,8 тыс (0,6–10к)', vk:'н/д' },
+  { name:'Стефания', tg:'73 871', tgReach:'~5 000–8 800', ig:'~45 000', igReels:'~15 тыс (7–25к)', vk:'н/д' },
+  { name:'Cake Home', tg:'5 340', tgReach:'~700–1 100', ig:'~38 000', igReels:'~7,5 тыс (вир. до 107к)', vk:'н/д' },
+  { name:'Этика', tg:'2 070', tgReach:'~650–1 230 (выс. ER)', ig:'~22 000', igReels:'~4,6 тыс', vk:'н/д' },
+  { name:'ЯХОНТ', tg:'359', tgReach:'~80–390', ig:'н/д', igReels:'~0,6 тыс', vk:'н/д' }
 ];
 function renderSocial(){
   var el=document.getElementById('mktSocial'); if(!el) return;
-  var cols=['Компания','Telegram, подписчиков','TG охват, просмотров/пост','Instagram','VK'];
+  var cols=['Компания','Telegram, подп.','TG охват, просм./пост','Instagram, подп.','IG Reels, просм./рилс','VK'];
   var th=cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
-  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+s.tg+'</td><td class="num">'+s.tgReach+'</td><td class="num">'+s.ig+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
+  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+s.tg+'</td><td class="num">'+s.tgReach+'</td><td class="num">'+s.ig+'</td><td class="num">'+(s.igReels||'н/д')+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+
-    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> Telegram — самое сильное отставание «Марии»: подписчиков в ~19× и охвата поста в ~15–20× меньше, чем у Стефании; даже меньшие Cake Home и Этика обгоняют по охвату/вовлечённости. TG — самый недоиспользованный канал «Марии». Instagram — паритет (3-е место, 32к). VK-счётчики под анти-ботом — снять вручную с залогиненного VK (vk.com/mariairk, /stefanycake, /etikacakes, /mycakehome, /yahontcake).</div>';
+    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>IG Reels</b>: ~3,8 тыс просм./рилс vs ~15 тыс у Стефании (×4) и ~7,5 тыс у Cake Home (с виральными до 107к); сопоставимо с Этикой, выше ЯХОНТа. <b>Telegram</b>: подписчиков ×19 и охвата поста ×15–20 меньше Стефании — самый недоиспользованный канал. Instagram-подписчики — паритет (3-е место, 32к). VK-охваты приватны (счётчик подписчиков под анти-ботом — снять вручную с залогиненного VK). Просмотры IG Reels — публичные (счётчик на рилсе), по 12 последним.</div>';
 }
 var _mktInited=false;
 function mktInit(){
