@@ -3985,3 +3985,15 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
 .mkt-export{margin-left:auto;padding:7px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;font:inherit;cursor:pointer}
 .mkt-export:hover{filter:brightness(1.08)}
+.mkt-comp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px}
+.mkt-comp-card{background:rgba(127,127,127,.05);border:1px solid rgba(127,127,127,.16);border-radius:12px;padding:14px 16px}
+.mkt-comp-us{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.mkt-comp-h{font-size:16px;font-weight:700;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mkt-badge{font-size:11px;font-weight:600;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px}
+.mkt-comp-site{margin-top:2px}.mkt-comp-site a{font-size:13px}
+.mkt-comp-dl{margin:8px 0 0;font-size:13px}
+.mkt-comp-dl dt{font-weight:600;opacity:.7;margin-top:7px;font-size:12px}
+.mkt-comp-dl dd{margin:1px 0 0}
+.mkt-comp-dl dt.ok{color:var(--green,#2e7d4f);opacity:1}.mkt-comp-dl dt.bad{color:var(--red,#b4232f);opacity:1}
+.mkt-comp-ins{margin-top:16px;background:rgba(184,134,11,.08);border:1px solid rgba(184,134,11,.22);border-radius:12px;padding:12px 16px}
+.mkt-comp-ins ul{margin:6px 0 0;padding-left:20px;font-size:13px}.mkt-comp-ins li{margin:6px 0}

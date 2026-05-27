@@ -4229,6 +4229,66 @@ function mktExport(){
   el.download='maria-marketing-2026-m'+(lo+1)+'-m'+(hi+1)+'.csv';
   el.click();
 }
+var COMPETITORS = [
+  { name:'Мария', us:true, site:'maria-irk.ru', points:'~17–22 (Иркутск) + Ангарск',
+    social:'IG @fabrika_maria ~32 тыс.; VK, Telegram, ОК', followers:'~32 тыс. (IG)', rating:'2ГИС ~4,4 (разброс 4,1–4,7)',
+    loyalty:'«Любимый покупатель»: кэшбэк 5/7/10 %, оплата до 30 % бонусами, 600 приветств.; клуб «Мария для своих» (100к+); геймификация «Сладкий чек»',
+    online:'да + ЛК', products:'торты (флагман «Зебра»), бенто от 690 ₽, пирожные, пироги, выпечка, кофе, конфеты ручной работы',
+    promos:'торт месяца −20 %, комбо кофе+круассан 349 ₽, розыгрыш «Сладкий чек» (iPhone 17/MacBook), 1000 бонусов за отзыв',
+    strong:'лучшая на рынке программа лояльности (кэшбэк + клуб 100к+), сильное SEO/контент (~70 % трафика), TG Mini App',
+    weak:'часть точек проседает по рейтингу (4,1–4,3); охват и подписчики меньше, чем у Стефании' },
+  { name:'Стефания', site:'stefanycake.ru', points:'~31–39 (Иркутск, Ангарск, Шелехов, Усолье, Черемхово)',
+    social:'IG @stefanycake ~45 тыс. (2233 поста); VK, ОК, Telegram, Viber', followers:'~45 тыс. (IG)', rating:'2ГИС 4,7 (~1412 оценок) — топ рынка',
+    loyalty:'Накопительной программы публично НЕТ; «кофейная карта», −10 % на пироги от 5 кг',
+    online:'да + ЛК', products:'торты, бенто, десерты, пироги, выпечка, мороженое, вареники, меню кафе',
+    promos:'лотерея ДОБРОКАР (авто Jaecoo J7), «кофейная карта»',
+    strong:'лидер по числу точек и подписчикам, узнаваемость, премиум-эстетика, стабильно высокий рейтинг',
+    weak:'нет накопительной программы лояльности (отстаёт от «Марии»), акции разовые' },
+  { name:'Этика', site:'etikacakes.ru', points:'~7 (Иркутск) + суб-бренд etika.bakery',
+    social:'IG @etika.cakes ~22 тыс. + @etika.bakery ~5,4 тыс.', followers:'~27 тыс. (IG)', rating:'2ГИС 4,4 (~435); «Лучшая кондитерская 2023»',
+    loyalty:'Программы баллов публично не найдено',
+    online:'да', products:'торты на заказ от 2090 ₽, бенто от 1590 ₽, пирожные, макаронс, трайфлы, кофе',
+    promos:'н/д', strong:'молодёжный кофейня-формат, эстетика, премия «Лучшая кондитерская 2023»',
+    weak:'мало точек (~7), нет программы лояльности' },
+  { name:'Cake Home', site:'cakehome.ru', points:'~20–24 (Иркутск, Ангарск, Шелехов, Хомутово)',
+    social:'VK, Facebook* (счётчики н/д)', followers:'н/д', rating:'2ГИС 4,6 (~90)',
+    loyalty:'Бонусная программа (детали н/д)',
+    online:'да + ЛК + конструктор торта (кастомизация)', products:'торты (Медовик, Киевский), выпечка, пироги, макаронс, профитроли, зефир',
+    promos:'н/д', strong:'единственный с конструктором торта, семейный крафт-образ, широкая сеть',
+    weak:'мало отзывов (~90), слабое присутствие в соцсетях' },
+  { name:'ЯХОНТ', site:'', points:'~16–18 (Иркутск) + Хомутово, Братск, Улан-Удэ (28+ регион)',
+    social:'н/д', followers:'н/д', rating:'2ГИС нестабильно (2,8–4,7); жалобы на сроки',
+    loyalty:'Не найдено',
+    online:'да (партнёрство со «Сладким клубом» — фотопечать)', products:'торты (шоколадные/ягодные/детские/муссовые), макаронс, кейк-попсы, нарезка (Наполеон, Медовик), 675–1890 ₽/кг',
+    promos:'н/д', strong:'широкая региональная сеть, массовое производство, без выходных',
+    weak:'нестабильный рейтинг (до 2,8), жалобы на срыв сроков, нет лояльности' }
+];
+var COMP_INSIGHTS = [
+  '<b>Лояльность — главное преимущество «Марии»:</b> единственный игрок с прозрачным многоуровневым кэшбэком (5/7/10 %, оплата до 30 % бонусами) + клуб на 100к+. У Стефании, Этики, ЯХОНТа накопительных программ публично нет — это конкурентный ров, его стоит активно продвигать.',
+  '<b>Охват и рейтинг — отставание от Стефании:</b> у неё больше точек (~31–39 vs ~17–22), подписчиков (~45 vs ~32 тыс. IG) и стабильнее рейтинг 2ГИС (4,7 vs ~4,4, часть точек «Марии» 4,1–4,3). Приоритет — подтянуть слабые точки и работать с отзывами.',
+  '<b>Конструктор торта — свободная ниша:</b> онлайн-конструктор есть только у Cake Home. «Мария» может занять её первой как точку дифференциации.',
+  '<b>Позиционирование «посередине»:</b> Стефания — премиум, ЯХОНТ — эконом/масса. «Мария» с домашними рецептами и флагманом «Зебра» в выгодной середине, но без яркого премиум-образа — риск «застрять посередине».',
+  '<b>Битва в VK/Telegram:</b> Instagram в РФ ограничен; публичных счётчиков VK/TG нет ни у кого — это зона, где «Мария» может обойти конкурентов с меньшими затратами.'
+];
+function renderCompetitors(){
+  var el=document.getElementById('mktComp'); if(!el) return;
+  var cols=['Компания','Точки','Соцсети / подписчики','Рейтинг','Программа лояльности','Онлайн-заказ'];
+  var th=cols.map(function(c){ return '<th>'+c+'</th>'; }).join('');
+  var trs=COMPETITORS.map(function(c){
+    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+c.points+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+c.rating+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
+  }).join('');
+  function r(k,v){ return v?'<dt>'+k+'</dt><dd>'+v+'</dd>':''; }
+  var cards=COMPETITORS.map(function(c){
+    return '<div class="mkt-comp-card'+(c.us?' mkt-comp-us':'')+'">'+
+      '<div class="mkt-comp-h">'+c.name+(c.us?' <span class="mkt-badge">это мы</span>':'')+'</div>'+
+      (c.site?'<div class="mkt-comp-site"><a href="https://'+c.site+'" target="_blank" rel="noopener">'+c.site+'</a></div>':'')+
+      '<dl class="mkt-comp-dl">'+ r('Точки',c.points)+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',c.rating)+
+      (c.strong?'<dt class="ok">Сильные стороны</dt><dd>'+c.strong+'</dd>':'')+
+      (c.weak?'<dt class="bad">Слабые стороны</dt><dd>'+c.weak+'</dd>':'')+ '</dl></div>';
+  }).join('');
+  var ins='<div class="mkt-comp-ins"><div class="mkt-chart-t">Ключевые выводы</div><ul>'+COMP_INSIGHTS.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';
+  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div><div class="mkt-comp-cards">'+cards+'</div>'+ins;
+}
 var _mktInited=false;
 function mktInit(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
@@ -4239,6 +4299,7 @@ function mktInit(){
     fromEl.addEventListener('change', mktRender);
     toEl.addEventListener('change', mktRender);
     var eb=document.getElementById('mktExportBtn'); if(eb) eb.addEventListener('click', mktExport);
+    renderCompetitors();
     var seo=document.getElementById('mktSeo');
     if(seo) seo.innerHTML = mTbl(
       ['Канал (янв–май)','Визиты','Доля'],
