@@ -3983,3 +3983,5 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-legend{display:flex;gap:14px;margin-top:6px;font-size:12px;opacity:.85}
 .mkt-lg{display:inline-flex;align-items:center;gap:5px}
 .mkt-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.mkt-export{margin-left:auto;padding:7px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;font:inherit;cursor:pointer}
+.mkt-export:hover{filter:brightness(1.08)}
