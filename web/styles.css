@@ -3999,3 +3999,16 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-comp-ins ul{margin:6px 0 0;padding-left:20px;font-size:13px}.mkt-comp-ins li{margin:6px 0}
 .mkt-2col{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:8px}
 .mkt-priceus{font-weight:700;color:var(--accent)}
+.mkt-alerts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:8px}
+.mkt-alert{border-radius:10px;padding:12px 14px;font-size:13px;border-left:4px solid}
+.mkt-alert-t{font-weight:700;margin-bottom:3px}
+.mkt-alert-red{background:rgba(180,35,47,.08);border-color:#b4232f}
+.mkt-alert-amber{background:rgba(184,134,11,.10);border-color:#b8860b}
+.mkt-alert-green{background:rgba(46,125,79,.10);border-color:#2e7d4f}
+.mkt-funnel{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.mkt-fstep{display:flex;align-items:center;gap:10px}
+.mkt-fbar{background:var(--accent);color:#fff;border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;min-width:150px;font-size:13px}
+.mkt-fbar span{margin-right:12px}
+.mkt-fconv{font-size:12px;opacity:.7;white-space:nowrap}
+.mkt-ai-list{margin:8px 0 0;padding-left:22px;font-size:14px}
+.mkt-ai-list li{margin:8px 0}

@@ -4339,6 +4339,40 @@ function renderPrices(){
     PRICES.map(function(r){ return '<tr><td>'+r[0]+'</td><td class="mkt-priceus">'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[5]+'</td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по ценам:</b> «Мария» — в середине. Бенто от 690 ₽ — самый дешёвый старт на рынке (трафик-драйвер). Целые торты дороже эконом-сетей (Стефания от 525 ₽/кг, ЯХОНТ от 640 ₽/шт), но дешевле премиума (Этика от 2090 ₽/кг, Cake Home до 2990 ₽/кг). Кофе-меню — единственное публичное на рынке.</div>';
 }
+var FUNNEL = [['Визиты сайта',249208],['Добавили в корзину',16373],['Оформили заказ',5216],['Онлайн-оплата',414]];
+function renderFunnel(){
+  var el=document.getElementById('mktFunnel'); if(!el) return;
+  var max=FUNNEL[0][1];
+  el.innerHTML='<div class="mkt-funnel">'+FUNNEL.map(function(s,i){
+    var w=Math.max(s[1]/max*100,8), conv=i?(s[1]/FUNNEL[i-1][1]*100):100;
+    return '<div class="mkt-fstep"><div class="mkt-fbar" style="width:'+w.toFixed(1)+'%"><span>'+s[0]+'</span><b>'+mNum(s[1])+'</b></div><div class="mkt-fconv">'+(i?'→ '+conv.toFixed(1).replace('.',',')+' % от пред.':'')+'</div></div>';
+  }).join('')+'</div><div class="section-hint" style="margin-top:6px">Ecommerce-покупок (все способы оплаты) — 4 036. Узкие места: переход «корзина → заказ» и доля онлайн-оплаты.</div>';
+}
+function renderAlerts(){
+  var el=document.getElementById('mktAlerts'); if(!el) return;
+  var a=[], sum=function(arr){return arr.reduce(function(s,x){return s+x;},0);};
+  var lo=MKT.cardPct[0], hi=MKT.cardPct[MKT.cardPct.length-1];
+  if(hi<lo) a.push(['red','Лояльность падает','Карта лояльности в чеках: '+mNum1(lo)+' % → '+mNum1(hi)+' %. Теряется база для CRM и SMS.']);
+  a.push(['red','SMS вслепую','На SMS ушло '+mNum(sum(MKT.smsCost))+' ₽, но отдача в покупках не измеряется. Приоритет №1 — включить атрибуцию.']);
+  var cMar=MKT.ctxCost[2]/MKT.ctxPurch[2], cMay=MKT.ctxCost[4]/MKT.ctxPurch[4];
+  if(cMay>cMar) a.push(['amber','CPA контекста растёт','Стоимость покупки с рекламы: '+mNum(cMar)+' ₽ (март) → '+mNum(cMay)+' ₽ (май). Проверить кампании.']);
+  a.push(['amber','Отзывы: брак','Главная жалоба «Марии» — посторонние предметы/качество (2ГИС 4,4 vs Otzovik 2,0). Регламент рекламаций — дешёвый рычаг роста рейтинга.']);
+  a.push(['green','Сила: кофе и кафе','Капучино — №1 по штукам (11 390), единственное публичное кофе-меню на рынке. Зона роста, где эконом-сети слабы.']);
+  el.innerHTML=a.map(function(x){ return '<div class="mkt-alert mkt-alert-'+x[0]+'"><div class="mkt-alert-t">'+x[1]+'</div><div>'+x[2]+'</div></div>'; }).join('');
+}
+var AI_SUMMARY = [
+  ['Измерить отдачу SMS','75 % платного бюджета (431к ₽) уходит на SMS, а ROI не считается. Включить атрибуцию «карта-получатель ↔ чек» и отключить неокупаемые сегменты — самый быстрый рычаг экономии/роста.'],
+  ['Остановить отток лояльности','Карта в чеках упала 86 %→74 %. Вернуть привычку прикладывать карту — иначе деградируют и SMS-база, и кэшбэк-программа (наш главный ров против конкурентов).'],
+  ['Инвестировать в SEO/контент','Органика — ~70 % трафика почти бесплатно, тянут рецепты в блоге. Расширение контента дешевле любого платного канала.'],
+  ['Качество и работа с жалобами','Главная боль по отзывам — брак (посторонние предметы) и отсутствие реакции на претензии. Регламент рекламаций (извинение + компенсация) поднимет рейтинг дешевле рекламы.'],
+  ['Усилить Telegram','TG-охват в ~15–20× ниже Стефании — самый недоиспользованный канал. Брать вовлечённостью (по образцу Этики с высоким ER).'],
+  ['Развивать кофе и кафе-формат','Капучино — №1 по штукам, кофе-меню — уникальное преимущество (эконом-сети Стефания/ЯХОНТ тут слабы).'],
+  ['Занять конструктор торта','Онлайн-конструктор есть только у Cake Home — свободная ниша для дифференциации.'],
+  ['Держать CPA контекста','CPA вырос со 158 ₽ (март) до 480 ₽ (май). Оптимизировать кампании, ориентир — мартовская эффективность.']
+];
+function renderAI(){ var el=document.getElementById('mktAI'); if(!el) return;
+  el.innerHTML='<ol class="mkt-ai-list">'+AI_SUMMARY.map(function(x){return '<li><b>'+x[0]+'.</b> '+x[1]+'</li>';}).join('')+'</ol>';
+}
 var _mktInited=false;
 function mktInit(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
@@ -4353,6 +4387,9 @@ function mktInit(){
     renderSocial();
     renderProducts();
     renderPrices();
+    renderAlerts();
+    renderFunnel();
+    renderAI();
     var seo=document.getElementById('mktSeo');
     if(seo) seo.innerHTML = mTbl(
       ['Канал (янв–май)','Визиты','Доля'],
