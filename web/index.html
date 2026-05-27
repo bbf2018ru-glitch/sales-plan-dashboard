@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="stylesheet" href="/styles.css?v=46" />
+    <link rel="stylesheet" href="/styles.css?v=47" />
   </head>
   <body>
 
@@ -1210,6 +1210,16 @@
           </section>
 
           <section class="section">
+            <div class="section-label">Динамика по месяцам</div>
+            <div class="mkt-charts">
+              <div class="mkt-chart"><div class="mkt-chart-t">Выручка, ₽</div><div id="mktChartRev"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t">Платный маркетинг: SMS vs Контекст, ₽</div><div id="mktChartSpend"></div><div id="mktChartLegend" class="mkt-legend"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t">Покупки с рекламы (контекст), шт</div><div id="mktChartPurch"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t">2ГИС: переходы на карточку</div><div id="mktChartGis"></div></div>
+            </div>
+          </section>
+
+          <section class="section">
             <div class="section-label">SMS-рассылки</div>
             <div class="section-hint">1С, отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. Атрибуция покупок — ждёт доработки выгрузки 1С.</div>
             <div id="mktSms" class="table-wrap"></div>
@@ -1330,6 +1340,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=53"></script>
+    <script src="/app.js?v=54"></script>
   </body>
 </html>

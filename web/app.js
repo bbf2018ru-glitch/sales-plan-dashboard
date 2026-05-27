@@ -4135,6 +4135,23 @@ function mTbl(cols, rows, total){
   var tot = total ? '<tr class="mkt-total">'+total.map(function(v,i){ return '<td'+(i?' class="num"':'')+'>'+v+'</td>'; }).join('')+'</tr>' : '';
   return '<table><thead><tr>'+th+'</tr></thead><tbody>'+body+tot+'</tbody></table>';
 }
+function mAxisFmt(n){ n=Math.round(n); if(n>=1e6) return (Math.round(n/1e5)/10).toLocaleString('ru-RU')+' млн'; if(n>=1e3) return Math.round(n/1e3)+'к'; return ''+n; }
+function mBars(elId, labels, values, color, unit){
+  var el=document.getElementById(elId); if(!el) return;
+  var w=720,h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
+  var max=Math.max.apply(null, values.concat([1])), step=iw/labels.length, bw=step*0.6;
+  var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.08"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
+  var bars=labels.map(function(lb,i){ var bh=values[i]/max*ih, x=padL+step*i+(step-bw)/2, y=padT+ih-bh; return '<g><rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(bh,0).toFixed(1)+'" rx="3" fill="'+color+'" opacity="0.85"><title>'+lb+': '+mNum(values[i])+(unit||'')+'</title></rect><text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
+  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px">'+grid+bars+'</svg>';
+}
+function mGroup(elId, labels, a, b, ca, cb){
+  var el=document.getElementById(elId); if(!el) return;
+  var w=720,h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
+  var max=Math.max.apply(null, a.concat(b).concat([1])), step=iw/labels.length, bw=step*0.30;
+  var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.08"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
+  var bars=labels.map(function(lb,i){ var x0=padL+step*i+(step-bw*2-4)/2, ha=a[i]/max*ih, hb=b[i]/max*ih; return '<g><rect x="'+x0.toFixed(1)+'" y="'+(padT+ih-ha).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(ha,0).toFixed(1)+'" rx="2" fill="'+ca+'" opacity="0.85"><title>'+lb+' SMS: '+mNum(a[i])+' ₽</title></rect><rect x="'+(x0+bw+4).toFixed(1)+'" y="'+(padT+ih-hb).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(hb,0).toFixed(1)+'" rx="2" fill="'+cb+'" opacity="0.85"><title>'+lb+' Контекст: '+mNum(b[i])+' ₽</title></rect><text x="'+(x0+bw+2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
+  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px">'+grid+bars+'</svg>';
+}
 function mktRender(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
   if(!fromEl||!toEl) return;
@@ -4168,6 +4185,12 @@ function mktRender(){
     ['Месяц','Выручка, ₽','Чеков','Ср. чек, ₽','Карта лоял.','Бонусами, ₽'],
     idx.map(function(i){ return [MKT.months[i], mNum(MKT.revenue[i]), mNum(MKT.cheques[i]), mNum(MKT.revenue[i]/MKT.cheques[i]), mNum1(MKT.cardPct[i])+' %', mNum(MKT.bonus[i])]; }),
     ['Итого', mNum(rev), mNum(chq), mNum(rev/chq), mNum1(wCard)+' %', mNum(sum(MKT.bonus))]);
+  var lbls=idx.map(function(i){return MKT.months[i].slice(0,3);});
+  mBars('mktChartRev', lbls, idx.map(function(i){return MKT.revenue[i];}), 'var(--accent)', ' ₽');
+  mGroup('mktChartSpend', lbls, idx.map(function(i){return MKT.smsCost[i];}), idx.map(function(i){return MKT.ctxCost[i];}), '#b8860b', 'var(--accent)');
+  var lg=document.getElementById('mktChartLegend'); if(lg) lg.innerHTML='<span class="mkt-lg"><i style="background:#b8860b"></i>SMS</span><span class="mkt-lg"><i style="background:var(--accent)"></i>Контекст</span>';
+  mBars('mktChartPurch', lbls, idx.map(function(i){return MKT.ctxPurch[i];}), 'var(--accent)', ' шт');
+  mBars('mktChartGis', lbls, idx.map(function(i){return MKT.gis[i];}), '#b8860b', '');
 }
 var _mktInited=false;
 function mktInit(){

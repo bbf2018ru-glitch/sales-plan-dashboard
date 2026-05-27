@@ -3977,3 +3977,9 @@ body.plan-incomplete .spark-fill {
 tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-period{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 4px;font-size:14px}
 .mkt-sel{padding:6px 10px;border-radius:8px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.06);color:inherit;font:inherit}
+.mkt-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;margin-top:12px}
+.mkt-chart{background:rgba(127,127,127,.05);border:1px solid rgba(127,127,127,.14);border-radius:12px;padding:12px 14px}
+.mkt-chart-t{font-size:13px;opacity:.75;margin-bottom:4px}
+.mkt-legend{display:flex;gap:14px;margin-top:6px;font-size:12px;opacity:.85}
+.mkt-lg{display:inline-flex;align-items:center;gap:5px}
+.mkt-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
