@@ -1458,6 +1458,53 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // M2M-прокси POST для loyalty-gift maria-crew (Hostinger вне whitelist 1С).
+    // Auth — X-API-Key. Тело и статус ответа 1С передаются как есть, чтобы
+    // клиент мог различать 200/4xx/5xx и парсить ответ независимо.
+    if (pathname === '/api/upp/proxy/loyalty-gift' && req.method === 'POST') {
+      if (!requireApiKey(req, res)) return;
+      if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
+      try {
+        const body = await parseBody(req);
+        const base = UPP_PULL_URL.replace(/\/pull(\?.*)?$/, '');
+        const target = new (require('node:url').URL)(`${base}/loyalty-gift`);
+        const auth = Buffer.from(`${UPP_PULL_USER}:${UPP_PULL_PASSWORD || ''}`).toString('base64');
+        const bodyStr = JSON.stringify(body);
+        const http = require('node:http');
+        const upstream = await new Promise((resolve, reject) => {
+          const r = http.request({
+            hostname: target.hostname,
+            port: target.port || 80,
+            path: target.pathname + (target.search || ''),
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(bodyStr),
+              'Authorization': `Basic ${auth}`,
+              'Accept': 'application/json'
+            }
+          }, (resp) => {
+            let raw = '';
+            resp.on('data', c => raw += c);
+            resp.on('end', () => resolve({
+              status: resp.statusCode || 502,
+              body: raw,
+              contentType: resp.headers['content-type'] || 'application/json; charset=utf-8'
+            }));
+          });
+          r.on('error', reject);
+          r.setTimeout(30000, () => r.destroy(new Error('1С POST timeout')));
+          r.write(bodyStr);
+          r.end();
+        });
+        res.writeHead(upstream.status, { 'Content-Type': upstream.contentType });
+        res.end(upstream.body);
+      } catch (e) {
+        sendJson(res, 502, { error: e.message || 'upstream POST error' });
+      }
+      return;
+    }
+
     // ── 1С Diagnostic / Explorer ──────────────────────────────────────────────
     if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
