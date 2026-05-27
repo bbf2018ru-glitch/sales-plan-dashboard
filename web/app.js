@@ -4270,19 +4270,26 @@ var COMP_INSIGHTS = [
   '<b>Позиционирование «посередине»:</b> Стефания — премиум, ЯХОНТ — эконом/масса. «Мария» с домашними рецептами и флагманом «Зебра» в выгодной середине, но без яркого премиум-образа — риск «застрять посередине».',
   '<b>Битва в VK/Telegram:</b> Instagram в РФ ограничен; публичных счётчиков VK/TG нет ни у кого — это зона, где «Мария» может обойти конкурентов с меньшими затратами.'
 ];
+var REVIEWS = {
+  'Мария': { rating:'2ГИС 4,4 (748) · Otzovik 2,0', pros:'вкус, оформление тортов, кофе, ранний режим (7:30)', cons:'БРАК (посторонние предметы в продукции!), нет реакции на жалобы, срывы заказов, цена/качество' },
+  'Стефания': { rating:'2ГИС 4,8 (950) — топ рынка', pros:'свежесть, демократичные цены, персонал, выбор', cons:'волосы/грязь в кофемашине, менее пропитано, нехватка в час пик, сбои бонусов' },
+  'Этика': { rating:'2ГИС 4,6 (1286)', pros:'вкус, интерьер с видом на Ангару, официанты', cons:'«цены космос», маленькие порции, медленный сервис, нет в наличии' },
+  'Cake Home': { rating:'2ГИС 4,5 (335)', pros:'вкус, «лучший кофе в Иркутске», персонал, атмосфера', cons:'дорого/цены растут, суховато, неудобный вход и парковка, накладки с бронями' },
+  'ЯХОНТ': { rating:'2ГИС 4,5 (141)', pros:'низкие цены, свежесть, ассортимент классики, скидки на ДР', cons:'СРЫВЫ ЗАКАЗОВ к дате (главное), кофе и сервис' }
+};
 function renderCompetitors(){
   var el=document.getElementById('mktComp'); if(!el) return;
   var cols=['Компания','Точки','Соцсети / подписчики','Рейтинг','Программа лояльности','Онлайн-заказ'];
   var th=cols.map(function(c){ return '<th>'+c+'</th>'; }).join('');
   var trs=COMPETITORS.map(function(c){
-    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+c.points+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+c.rating+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
+    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+c.points+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+(((REVIEWS[c.name]||{}).rating)||c.rating)+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
   }).join('');
   function r(k,v){ return v?'<dt>'+k+'</dt><dd>'+v+'</dd>':''; }
   var cards=COMPETITORS.map(function(c){
     return '<div class="mkt-comp-card'+(c.us?' mkt-comp-us':'')+'">'+
       '<div class="mkt-comp-h">'+c.name+(c.us?' <span class="mkt-badge">это мы</span>':'')+'</div>'+
       (c.site?'<div class="mkt-comp-site"><a href="https://'+c.site+'" target="_blank" rel="noopener">'+c.site+'</a></div>':'')+
-      '<dl class="mkt-comp-dl">'+ r('Точки',c.points)+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',c.rating)+
+      '<dl class="mkt-comp-dl">'+ r('Точки',c.points)+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',((REVIEWS[c.name]||{}).rating)||c.rating)+r('Хвалят (отзывы)',(REVIEWS[c.name]||{}).pros)+r('Ругают (отзывы)',(REVIEWS[c.name]||{}).cons)+
       (c.strong?'<dt class="ok">Сильные стороны</dt><dd>'+c.strong+'</dd>':'')+
       (c.weak?'<dt class="bad">Слабые стороны</dt><dd>'+c.weak+'</dd>':'')+ '</dl></div>';
   }).join('');
@@ -4304,6 +4311,34 @@ function renderSocial(){
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>IG Reels</b>: ~3,8 тыс просм./рилс vs ~15 тыс у Стефании (×4) и ~7,5 тыс у Cake Home (с виральными до 107к); сопоставимо с Этикой, выше ЯХОНТа. <b>Telegram</b>: подписчиков ×19 и охвата поста ×15–20 меньше Стефании — самый недоиспользованный канал. Instagram-подписчики — паритет (3-е место, 32к). VK-охваты приватны (счётчик подписчиков под анти-ботом — снять вручную с залогиненного VK). Просмотры IG Reels — публичные (счётчик на рилсе), по 12 последним.</div>';
 }
+var TOP_PRODUCTS = [
+  ['Торт Шоколадно-вишнёвый',3555711,2930],['Торт Три шоколада',3546145,1737],['Торт Банан-солёная карамель',2935843,1814],['Кофе Большой Капучино',2879729,11390],['Торт Зебра ср.',2808533,1902],['Торт Лавандовый',2464113,1770],['Торт Медовик малиновый',2446459,1776],['Торт Домашний с брусникой мини',2345314,1504],['Торт Молочная девочка',2290454,1716],['Торт Ореум',2138496,1563],['Торт Молочная девочка с клубникой',2087554,1283],['Торт Графские развалины ср',1999805,1524],['Торт Медовик ср',1962977,1568],['Торт Карамельная девочка',1891129,1305],['Торт Королевский',1835230,1335]
+];
+var CATEGORIES = [
+  ['Торты целые',55135567],['Пирожные',21127701],['Стрит-фуд',8019151],['Кофе с собой',7989198],['Торты кусочки',7725087],['Выпечка сладкая',6913400],['Рулеты',6517416],['Пироги целые',5148008],['Блюда',4911741],['Пироги кусочки',1755024],['Кофе',1704047],['Хлеб',1631557],['Пироги заказные',1426635]
+];
+var PRICES = [
+  ['Торт на заказ','1350–2320 ₽/шт','525–1350 ₽/кг','от 2090 ₽/кг','1690–2990 ₽/кг','640–1700 ₽/шт'],
+  ['Бенто-торт','от 690 ₽','1000 ₽','от 1590 ₽','350–520 ₽','от 495 ₽'],
+  ['Кусочек / пирожное','н/д','89–199 ₽','95–460 ₽','н/д','н/д'],
+  ['Макаронс, ₽/шт','н/д','109 ₽','135 ₽','120 ₽','131 ₽'],
+  ['Капучино','210–360 ₽','н/д','н/д','н/д','н/д']
+];
+function renderProducts(){
+  var tp=document.getElementById('mktTopProd'), ct=document.getElementById('mktCats');
+  if(tp){ tp.innerHTML='<table><thead><tr><th>Товар</th><th class="num">Выручка ₽</th><th class="num">Шт</th></tr></thead><tbody>'+
+    TOP_PRODUCTS.map(function(r,i){ return '<tr><td>'+(i+1)+'. '+r[0]+'</td><td class="num">'+mNum(r[1])+'</td><td class="num">'+mNum(r[2])+'</td></tr>'; }).join('')+'</tbody></table>'; }
+  if(ct){ var tot=CATEGORIES.reduce(function(s,r){return s+r[1];},0);
+    ct.innerHTML='<table><thead><tr><th>Категория</th><th class="num">Выручка ₽</th><th class="num">Доля</th></tr></thead><tbody>'+
+    CATEGORIES.map(function(r){ return '<tr><td>'+r[0]+'</td><td class="num">'+mNum(r[1])+'</td><td class="num">'+(r[1]/tot*100).toFixed(1).replace('.',',')+' %</td></tr>'; }).join('')+'</tbody></table>'; }
+}
+function renderPrices(){
+  var el=document.getElementById('mktPrices'); if(!el) return;
+  var head=['Позиция','Мария','Стефания','Этика','Cake Home','ЯХОНТ'];
+  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+
+    PRICES.map(function(r){ return '<tr><td>'+r[0]+'</td><td class="mkt-priceus">'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[5]+'</td></tr>'; }).join('')+'</tbody></table></div>'+
+    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по ценам:</b> «Мария» — в середине. Бенто от 690 ₽ — самый дешёвый старт на рынке (трафик-драйвер). Целые торты дороже эконом-сетей (Стефания от 525 ₽/кг, ЯХОНТ от 640 ₽/шт), но дешевле премиума (Этика от 2090 ₽/кг, Cake Home до 2990 ₽/кг). Кофе-меню — единственное публичное на рынке.</div>';
+}
 var _mktInited=false;
 function mktInit(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
@@ -4316,6 +4351,8 @@ function mktInit(){
     var eb=document.getElementById('mktExportBtn'); if(eb) eb.addEventListener('click', mktExport);
     renderCompetitors();
     renderSocial();
+    renderProducts();
+    renderPrices();
     var seo=document.getElementById('mktSeo');
     if(seo) seo.innerHTML = mTbl(
       ['Канал (янв–май)','Визиты','Доля'],

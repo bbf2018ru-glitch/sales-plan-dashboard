@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="stylesheet" href="/styles.css?v=49" />
+    <link rel="stylesheet" href="/styles.css?v=50" />
   </head>
   <body>
 
@@ -1251,6 +1251,15 @@
           </section>
 
           <section class="section">
+            <div class="section-label">Товары и категории — за весь период (янв–май)</div>
+            <div class="section-hint">1С, розница. Ядро оборота — целые торты; кофе — лидер по штукам (кафе-формат). Не зависит от выбора месяца.</div>
+            <div class="mkt-2col">
+              <div><div class="mkt-chart-t">Топ-15 товаров по выручке</div><div id="mktTopProd" class="table-wrap"></div></div>
+              <div><div class="mkt-chart-t">Категории по выручке</div><div id="mktCats" class="table-wrap"></div></div>
+            </div>
+          </section>
+
+          <section class="section">
             <div class="section-label">SEO / источники трафика сайта — за весь период (янв–май)</div>
             <div class="section-hint">Метрика maria-irk.ru. Органика — главный канал (~70 %), драйвер — рецепты в блоге. Помесячная органика — через Metrika API (в планах); сейчас показаны итоги за период (не зависят от выбора месяца).</div>
             <div id="mktSeo" class="table-wrap"></div>
@@ -1276,6 +1285,9 @@
             <div class="section-label" style="margin-top:24px">Соцсети и охваты</div>
             <div class="section-hint">Telegram — подписчики и средний охват (просмотры/пост, сняты с t.me). Instagram — справочно (Meta запрещена в РФ). VK — счётчик под анти-ботом, снимается вручную с залогиненного VK.</div>
             <div id="mktSocial"></div>
+            <div class="section-label" style="margin-top:24px">Цены конкурентов</div>
+            <div class="section-hint">Сравнимые позиции, открытые источники (сайты/каталоги). «н/д» — цена не опубликована.</div>
+            <div id="mktPrices"></div>
           </section>
         </div><!-- /#page-marketing -->
 
@@ -1350,6 +1362,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=58"></script>
+    <script src="/app.js?v=59"></script>
   </body>
 </html>

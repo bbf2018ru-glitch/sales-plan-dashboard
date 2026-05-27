@@ -3997,3 +3997,5 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-comp-dl dt.ok{color:var(--green,#2e7d4f);opacity:1}.mkt-comp-dl dt.bad{color:var(--red,#b4232f);opacity:1}
 .mkt-comp-ins{margin-top:16px;background:rgba(184,134,11,.08);border:1px solid rgba(184,134,11,.22);border-radius:12px;padding:12px 16px}
 .mkt-comp-ins ul{margin:6px 0 0;padding-left:20px;font-size:13px}.mkt-comp-ins li{margin:6px 0}
+.mkt-2col{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:8px}
+.mkt-priceus{font-weight:700;color:var(--accent)}
