@@ -4012,3 +4012,4 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-fconv{font-size:12px;opacity:.7;white-space:nowrap}
 .mkt-ai-list{margin:8px 0 0;padding-left:22px;font-size:14px}
 .mkt-ai-list li{margin:8px 0}
+.mkt-dbar{height:8px;background:var(--accent);border-radius:4px;opacity:.7;min-width:4px}
