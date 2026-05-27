@@ -4289,6 +4289,21 @@ function renderCompetitors(){
   var ins='<div class="mkt-comp-ins"><div class="mkt-chart-t">Ключевые выводы</div><ul>'+COMP_INSIGHTS.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div><div class="mkt-comp-cards">'+cards+'</div>'+ins;
 }
+var SOCIAL = [
+  { name:'Мария', us:true, tg:'3 920', tgReach:'~200–440', ig:'~32 000', vk:'н/д' },
+  { name:'Стефания', tg:'73 871', tgReach:'~5 000–8 800', ig:'~45 000', vk:'н/д' },
+  { name:'Cake Home', tg:'5 340', tgReach:'~700–1 100', ig:'~38 000', vk:'н/д' },
+  { name:'Этика', tg:'2 070', tgReach:'~650–1 230 (выс. ER)', ig:'~22 000', vk:'н/д' },
+  { name:'ЯХОНТ', tg:'359', tgReach:'~80–390', ig:'н/д', vk:'н/д' }
+];
+function renderSocial(){
+  var el=document.getElementById('mktSocial'); if(!el) return;
+  var cols=['Компания','Telegram, подписчиков','TG охват, просмотров/пост','Instagram','VK'];
+  var th=cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
+  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+s.tg+'</td><td class="num">'+s.tgReach+'</td><td class="num">'+s.ig+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
+  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+
+    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> Telegram — самое сильное отставание «Марии»: подписчиков в ~19× и охвата поста в ~15–20× меньше, чем у Стефании; даже меньшие Cake Home и Этика обгоняют по охвату/вовлечённости. TG — самый недоиспользованный канал «Марии». Instagram — паритет (3-е место, 32к). VK-счётчики под анти-ботом — снять вручную с залогиненного VK (vk.com/mariairk, /stefanycake, /etikacakes, /mycakehome, /yahontcake).</div>';
+}
 var _mktInited=false;
 function mktInit(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
@@ -4300,6 +4315,7 @@ function mktInit(){
     toEl.addEventListener('change', mktRender);
     var eb=document.getElementById('mktExportBtn'); if(eb) eb.addEventListener('click', mktExport);
     renderCompetitors();
+    renderSocial();
     var seo=document.getElementById('mktSeo');
     if(seo) seo.innerHTML = mTbl(
       ['Канал (янв–май)','Визиты','Доля'],
