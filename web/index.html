@@ -1258,8 +1258,8 @@
           </section>
 
           <section class="section" id="mkt-s-charts">
-            <div class="section-label">Динамика по месяцам · текущий год vs прошлый (YoY) <span class="mkt-scope dyn" title="Помесячные ряды из 1С: текущий год vs тот же месяц год назад">live · YoY</span></div>
-            <div class="section-hint">Тёмная серия — текущий год, светлая — прошлый. Δ% YoY у каждого графика — над ним.</div>
+            <div class="section-label">Динамика по месяцам с янв прошлого года · YoY <span class="mkt-scope dyn" title="17 точек: с янв 2025 по выбранный месяц 2026. Светлая серия — тот же месяц годом ранее">live · 17 мес</span></div>
+            <div class="section-hint">Тёмная серия — факт каждого месяца, светлая — этот же месяц годом ранее (YoY-сравнение). Δ% YoY у каждого графика — над ним. Источник — 1С.</div>
             <div class="mkt-charts">
               <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartRevT">Выручка, ₽</div><div id="mktChartRev"></div><div id="mktChartRevLeg" class="mkt-legend"></div></div>
               <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartCheqT">Чеков, шт</div><div id="mktChartCheq"></div></div>
@@ -1283,7 +1283,7 @@
 
           <section class="section" id="mkt-s-ctx">
             <div class="section-label">Контекстная реклама (Яндекс.Директ) <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">Агентский кабинет. Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽ (период), отказы 14,8% (лучше среднего по сайту).</div>
+            <div class="section-hint">Агентский кабинет. Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽ (период), отказы 14,8% (лучше среднего по сайту). <b>«Сумма заказов» и «ДРР»</b> заполнятся после обновления скрейпа на колонку «Доход» (требует расширения vds-scrape-direct.js, в плане).</div>
             <div id="mktCtx" class="table-wrap"></div>
             <div id="mktDirectLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
@@ -1451,6 +1451,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=81"></script>
+    <script src="/app.js?v=82"></script>
   </body>
 </html>

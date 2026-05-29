@@ -163,11 +163,16 @@ async function activePromos(asOf) {
   } catch (e) { return [{ error: e.message }]; }
 }
 
-// Список месяцев от Январь до выбранного включительно (для трендового графика)
-function monthsYearToDate(period) {
+// Список месяцев от Январь прошлого года до выбранного включительно.
+// Для 2026-05 даёт 17 точек: 2025-01..2025-12 + 2026-01..2026-05.
+// Используется для трендового графика «полная динамика» c YoY-сериями.
+function monthsExtendedSeries(period) {
   const [y, m] = period.split('-').map(Number);
   const out = [];
-  for (let i = 1; i <= m; i++) out.push(`${y}-${String(i).padStart(2, '0')}`);
+  for (let yy = y - 1; yy <= y; yy++) {
+    const lastM = (yy === y) ? m : 12;
+    for (let mm = 1; mm <= lastM; mm++) out.push(`${yy}-${String(mm).padStart(2, '0')}`);
+  }
   return out;
 }
 
@@ -178,16 +183,37 @@ function headline(ym, agg) {
 
 async function compute(period) {
   const py = prevYearYM(period);
-  const curMonths = monthsYearToDate(period);
-  const prevMonths = curMonths.map(prevYearYM);
+  // Расширенное окно: с янв прошлого года по выбранный месяц. Для 2026-05 → 17 точек.
+  // YoY-серию фронт построит сам как cur[i-12] — это экономит 17 лишних запросов к 1С.
+  const curMonths = monthsExtendedSeries(period);
 
-  // Параллельно тянем cur+prev + ВСЕ месяцы текущего года и те же месяцы прошлого года.
-  // aggSales кэширован per-month (24ч), так что повторные computes практически бесплатны.
-  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, curSeries, prevSeries] = await Promise.all([
-    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(),
-    Promise.all(curMonths.map(async ym => headline(ym, await aggSales(ym)))),
-    Promise.all(prevMonths.map(async ym => headline(ym, await aggSales(ym))))
+  // 1С отдаёт один месяц за ~100с. Поэтому 17 точек тянуть синхронно нельзя — TTFB упадёт в 502.
+  // Вместо этого собираем серию из того что лежит в кэше СЕЙЧАС, а недостающие месяцы пинаем
+  // в фон без await (aggSales кэширован per-month с дедупом одновременных запросов).
+  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap] = await Promise.all([
+    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap()
   ]);
+  const curSeries = [];
+  for (const ym of curMonths) {
+    const cached = monthCache.getCached('agg:' + ym);
+    if (cached) {
+      curSeries.push(headline(ym, cached));
+    } else {
+      // плейсхолдер; фронт нарисует пробел/«н/д» в этой точке, при следующем обновлении она появится
+      curSeries.push({ ym, revenue: null, cheques: null, avgCheck: null, cardPct: null, bonus: null, _pending: true });
+      if (!monthCache.isPending('agg:' + ym)) {
+        // пинаем фоновый прогрев — не ждём; в логах увидим «warm agg:ym» через ~100с
+        aggSales(ym).then(() => console.log(`[marketing-channels] warm ${ym}`)).catch(e => console.log(`[marketing-channels] warm ${ym} fail: ${e.message}`));
+      }
+    }
+  }
+  // prevSeries = cur со сдвигом 12: для cur[12]..cur[N-1] это cur[0]..cur[N-13]; для остального — null.
+  const ymIndex = new Map(curSeries.map((m, i) => [m.ym, i]));
+  const prevSeries = curSeries.map(m => {
+    const py12 = prevYearYM(m.ym);
+    const i = ymIndex.get(py12);
+    return i != null ? curSeries[i] : null;
+  });
   const M = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
   const metric = (k) => ({ cur: cur[k], prev: prev[k], deltaPct: deltaPct(cur[k], prev[k]) });
 
@@ -268,4 +294,17 @@ async function warm(period) {
   try { await getChannels(period || nowYM()); return true; } catch (e) { return false; }
 }
 
-module.exports = { getChannels, warm, _compute: compute };
+// Прогрев расширенной серии: 17 месяцев с янв пред.года по выбранный включительно.
+// Запускается фоном при старте сервера + раз в сутки, чтобы при открытии дашборда
+// monthlySeries уже была наполнена. ~100с на месяц × 17 ≈ 30 минут, последовательно.
+async function warmExtendedSeries(period) {
+  const months = monthsExtendedSeries(period || nowYM());
+  let ok = 0, fail = 0;
+  for (const ym of months) {
+    try { await aggSales(ym); ok++; } catch (e) { fail++; console.log(`[marketing-channels] warm-ext ${ym} fail: ${e.message}`); }
+  }
+  console.log(`[marketing-channels] warm-ext done: ok=${ok} fail=${fail} months=${months.length}`);
+  return { ok, fail, total: months.length };
+}
+
+module.exports = { getChannels, warm, warmExtendedSeries, _compute: compute };

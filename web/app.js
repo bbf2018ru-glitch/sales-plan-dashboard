@@ -4168,7 +4168,8 @@ function mBars(elId, labels, values, color, unit){
 }
 function mGroup(elId, labels, a, b, ca, cb){
   var el=document.getElementById(elId); if(!el) return;
-  var w=720,h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
+  // Расширяем viewBox при ≥13 точек, чтобы 17 баров не слипались (mкритично для расширенной 17-мес серии)
+  var w=Math.max(720, labels.length*60),h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
   var max=Math.max.apply(null, a.concat(b).concat([1])), step=iw/labels.length, bw=step*0.30;
   var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.08"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
   var bars=labels.map(function(lb,i){ var x0=padL+step*i+(step-bw*2-4)/2, ha=a[i]/max*ih, hb=b[i]/max*ih; return '<g><rect x="'+x0.toFixed(1)+'" y="'+(padT+ih-ha).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(ha,0).toFixed(1)+'" rx="2" fill="'+ca+'" opacity="0.85"><title>'+lb+' SMS: '+mNum(a[i])+' ₽</title></rect><rect x="'+(x0+bw+4).toFixed(1)+'" y="'+(padT+ih-hb).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(hb,0).toFixed(1)+'" rx="2" fill="'+cb+'" opacity="0.85"><title>'+lb+' Контекст: '+mNum(b[i])+' ₽</title></rect><text x="'+(x0+bw+2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
@@ -4194,10 +4195,24 @@ function mktRender(){
     ['Месяц','Рассылок','SMS отправлено','Стоимость, ₽','Цена SMS, ₽'],
     idx.map(function(i){ return [MKT.months[i], mNum(MKT.smsCnt[i]), mNum(MKT.smsSent[i]), mNum(MKT.smsCost[i]), MKT.smsSent[i]?mNum1(MKT.smsCost[i]/MKT.smsSent[i]):'—']; }),
     ['Итого', mNum(sum(MKT.smsCnt)), mNum(smsS), mNum(smsC), smsS?mNum1(smsC/smsS):'—']);
+  // Я.Директ помесячно. «Сумма заказов» = доход с ecommerce-цели; пока скрейпер её не извлекает (см. external.direct.totals.revenue)
+  var ctxRevByMonth = (MKT.ctxRevenue || [null,null,null,null,null]);
+  var sumCtxRev = ctxRevByMonth.reduce(function(s,v,i){ return idx.indexOf(i)>=0 && v!=null ? s+v : s; }, 0);
+  var hasAnyRev = ctxRevByMonth.some(function(v,i){ return idx.indexOf(i)>=0 && v!=null; });
   document.getElementById('mktCtx').innerHTML = mTbl(
-    ['Месяц','Расход, ₽','Клики','Покупок','CPA, ₽'],
-    idx.map(function(i){ return [MKT.months[i], mNum(MKT.ctxCost[i]), mNum(MKT.ctxClicks[i]), mNum(MKT.ctxPurch[i]), MKT.ctxPurch[i]?mNum(MKT.ctxCost[i]/MKT.ctxPurch[i]):'—']; }),
-    ['Итого', mNum(ctxC), mNum(sum(MKT.ctxClicks)), mNum(pur), pur?mNum(ctxC/pur):'—']);
+    ['Месяц','Расход, ₽','Клики','Покупок','Сумма заказов, ₽','CPA, ₽','ДРР, %'],
+    idx.map(function(i){
+      var rv = ctxRevByMonth[i];
+      var drr = (rv!=null && rv>0) ? Math.round(MKT.ctxCost[i]/rv*1000)/10 : null;
+      return [MKT.months[i], mNum(MKT.ctxCost[i]), mNum(MKT.ctxClicks[i]), mNum(MKT.ctxPurch[i]),
+              rv!=null?mNum(rv):'<span style="color:var(--muted)">—</span>',
+              MKT.ctxPurch[i]?mNum(MKT.ctxCost[i]/MKT.ctxPurch[i]):'—',
+              drr!=null?mNum1(drr)+' %':'—'];
+    }),
+    ['Итого', mNum(ctxC), mNum(sum(MKT.ctxClicks)), mNum(pur),
+     hasAnyRev?mNum(sumCtxRev):'—',
+     pur?mNum(ctxC/pur):'—',
+     hasAnyRev&&sumCtxRev>0?mNum1(ctxC/sumCtxRev*100)+' %':'—']);
   document.getElementById('mktGis').innerHTML = mTbl(
     ['Месяц','Переходов на карточку','Действий на странице'],
     idx.map(function(i){ return [MKT.months[i], mNum(MKT.gis[i]), mNum(MKT.gisAct[i])]; }),
@@ -4497,11 +4512,33 @@ function mktLoadYoY(){
     var ct=document.getElementById('mktCats');
     if(ct && d.categories && d.categories.length){ ct.innerHTML='<table><thead><tr><th>Категория</th><th class="num">Выручка ₽</th><th class="num">Доля</th><th class="num">YoY</th></tr></thead><tbody>'+
       d.categories.map(function(r){ var dl=r.deltaPct; var ds=(dl==null?'—':(dl>0?'+':'')+mNum1(dl)+'%'); var dc=(dl==null?'':(dl>0?'color:#10a05a':(dl<0?'color:#e0466a':''))); return '<tr><td>'+r.group+'</td><td class="num">'+mNum(r.cur)+'</td><td class="num">'+mNum1(r.sharePct)+'%</td><td class="num" style="'+dc+'">'+ds+'</td></tr>'; }).join('')+'</tbody></table>'; }
-    // Помесячные ряды + YoY на графиках динамики (1С данные)
+    // Помесячные ряды + YoY на графиках динамики (1С данные).
+    // 17 точек: с янв прошлого года до выбранного месяца. ps — те же точки минус год (для YoY).
+    // Точки с _pending — 1С греется в фоне (~100с/мес). Их пока не рисуем, при следующем
+    // обновлении страницы они появятся.
     if(d.monthlySeries && d.monthlySeries.cur && d.monthlySeries.cur.length){
-      var cs=d.monthlySeries.cur, ps=d.monthlySeries.prev||[];
+      var rawCs=d.monthlySeries.cur, rawPs=d.monthlySeries.prev||[];
+      var cs=[], ps=[];
+      for(var ii=0;ii<rawCs.length;ii++){
+        if(rawCs[ii]._pending) continue;
+        cs.push(rawCs[ii]);
+        ps.push(rawPs[ii]&&!rawPs[ii]._pending ? rawPs[ii] : { revenue:0, cheques:0, avgCheck:0, cardPct:0 });
+      }
+      // Если все pending — рисуем плейсхолдер вместо пустоты
+      if(!cs.length){
+        ['mktChartRev','mktChartCheq','mktChartAvg','mktChartCard'].forEach(function(id){
+          var el=document.getElementById(id); if(el) el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Данные янв 2025–май 2026 прогреваются из 1С (~5 мин на месяц). Обнови страницу через несколько минут.</div>';
+        });
+        return;
+      }
+      var pendingCount=rawCs.filter(function(m){return m._pending;}).length;
+      if(pendingCount){
+        var hint=document.getElementById('mktYoYHint');
+        if(hint) hint.innerHTML+=' <span style="color:#b8860b">· '+pendingCount+' мес. ещё прогреваются из 1С</span>';
+      }
       var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-      var lbls=cs.map(function(m){ return MM[Number(m.ym.split('-')[1])]; });
+      // Метка: «25-Янв» (год'-месяц) — для расширенного окна 17 месяцев
+      var lbls=cs.map(function(m){ var p=m.ym.split('-'); return p[0].slice(2)+'-'+MM[Number(p[1])]; });
       function sumK(arr,k){ return arr.reduce(function(a,c){return a+(c[k]||0);},0); }
       function setT(id, label, cV, pV, isPp){
         var el=document.getElementById(id); if(!el) return;
@@ -4521,7 +4558,7 @@ function mktLoadYoY(){
       setT('mktChartAvgT','Средний чек, ₽', cAvg, pAvg);
       setT('mktChartCardT','Карта лояльности, %', cCardW, pCardW, true);
       var leg=document.getElementById('mktChartRevLeg');
-      if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>'+(cs[0]?cs[0].ym.slice(0,4):'')+'</span><span class="mkt-lg"><i style="background:#b8860b"></i>'+(ps[0]?ps[0].ym.slice(0,4):'')+'</span>'; }
+      if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>факт месяца</span><span class="mkt-lg"><i style="background:#b8860b"></i>год назад (YoY)</span>'; }
       mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m.revenue;}), 'var(--accent)', '#b8860b');
       mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m.cheques;}), 'var(--accent)', '#b8860b');
       mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');

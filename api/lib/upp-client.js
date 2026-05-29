@@ -112,14 +112,30 @@ async function callCatalog(name, limit = 999) {
 // ─── Простой in-memory cache с TTL ──────────────────────────────────────
 function makeCache(ttlMs = 5 * 60 * 1000) {
   const m = new Map();
+  const pending = new Map();
   return {
     async wrap(key, fn) {
       const c = m.get(key);
       if (c && Date.now() - c.at < ttlMs) return { ...c.data, fromCache: true };
-      const data = await fn();
-      if (data && !data.error) m.set(key, { data, at: Date.now() });
-      return data;
+      // дедуплицируем одновременные запросы одного ключа (важно при фоновом прогреве)
+      if (pending.has(key)) return pending.get(key);
+      const promise = (async () => {
+        try {
+          const data = await fn();
+          if (data && !data.error) m.set(key, { data, at: Date.now() });
+          return data;
+        } finally { pending.delete(key); }
+      })();
+      pending.set(key, promise);
+      return promise;
     },
+    // Синхронный доступ к кэшу — null если нет или TTL вышел.
+    // Используется для non-blocking compute (см. monthlySeries в marketing-channels.js).
+    getCached(key) {
+      const c = m.get(key);
+      return c && Date.now() - c.at < ttlMs ? c.data : null;
+    },
+    isPending(key) { return pending.has(key); },
     clear() { m.clear(); }
   };
 }

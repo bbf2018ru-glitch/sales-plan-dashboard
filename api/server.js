@@ -97,6 +97,16 @@ function warmMarketing() {
 setTimeout(warmMarketing, 15000);                 // через 15с после старта
 setInterval(warmMarketing, 6 * 60 * 60 * 1000);   // каждые 6 часов
 
+// Расширенная серия (17 месяцев) — прогревается медленно (~30 мин), запускается отдельно.
+// Один раз через минуту после старта, чтобы не блокировать главный warm. Затем — раз в сутки.
+function warmExtended() {
+  marketingChannels.warmExtendedSeries()
+    .then(r => console.log('[marketing-channels] warm-ext result', JSON.stringify(r)))
+    .catch(e => console.log('[marketing-channels] warm-ext error', e.message));
+}
+setTimeout(warmExtended, 60000);
+setInterval(warmExtended, 24 * 60 * 60 * 1000);
+
 // ── AI-chat rate limit (per IP, защита Groq billing) ─────────────────────
 // AI-чат открыт без auth (чтобы работал у любого зашедшего на дашборд),
 // но Groq биллится за токены — нужна защита от abuse. 20 запросов/час с
