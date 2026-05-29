@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="stylesheet" href="/styles.css?v=52" />
+    <link rel="stylesheet" href="/styles.css?v=59" />
   </head>
   <body>
 
@@ -74,6 +74,12 @@
     </div>
 
     <div class="shell">
+
+      <!-- Мобильное меню: гамбургер + затемнение -->
+      <button class="nav-hamburger no-print" id="navHamburger" aria-label="Открыть меню" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="nav-backdrop" id="navBackdrop"></div>
 
       <!-- ═══ SIDEBAR ═══ -->
       <aside class="sidebar" id="sidebar">
@@ -198,20 +204,31 @@
           </div>
         </section>
 
+        <nav class="mkt-nav" id="dashNav" aria-label="Разделы дашборда">
+          <a href="#dash-s-kpi">Итоги</a>
+          <a href="#dash-s-forecast">Прогноз</a>
+          <a href="#dash-s-ai">AI-приоритеты</a>
+          <a href="#dash-s-spotlight">Лидеры/риск</a>
+          <a href="#marketTrendsSection">Тренды рынка</a>
+          <a href="#dash-s-trend">Тренд по месяцам</a>
+          <a href="#dash-s-stores">По точкам</a>
+          <a href="#dash-s-notes">Заметки</a>
+        </nav>
+
         <!-- 1. Итоги периода (KPI) -->
-        <section class="section">
+        <section class="section" id="dash-s-kpi">
           <div class="section-label">Итоги периода</div>
           <div id="kpis" class="kpi-grid"></div>
         </section>
 
         <!-- 2. Прогноз и ритм -->
-        <section class="section">
+        <section class="section" id="dash-s-forecast">
           <div class="section-label">Прогноз и ритм</div>
           <div id="forecastPanel" class="forecast-grid"></div>
         </section>
 
         <!-- 3. AI · что посмотреть -->
-        <section class="section">
+        <section class="section" id="dash-s-ai">
           <div class="section-header">
             <div>
               <div class="section-label">AI · что посмотреть в первую очередь</div>
@@ -229,7 +246,7 @@
         </section>
 
         <!-- 4. Лидер / Риск + Сравнение к прошлым периодам -->
-        <section class="section panel-grid">
+        <section class="section panel-grid" id="dash-s-spotlight">
           <article class="panel">
             <div class="panel-header">
               <div class="panel-title">Лидер и точки в зоне риска</div>
@@ -274,7 +291,7 @@
         </section>
 
         <!-- 6. Тренд по месяцам (внизу — историческая динамика) -->
-        <section class="section">
+        <section class="section" id="dash-s-trend">
           <article class="panel">
             <div class="panel-header">
               <div>
@@ -292,7 +309,7 @@
           </article>
         </section>
 
-        <section class="section">
+        <section class="section" id="dash-s-stores">
           <div class="section-header">
             <div>
               <div class="section-label">По точкам</div>
@@ -360,7 +377,7 @@
         </section>
 
         <!-- Комментарии к периоду -->
-        <section class="section">
+        <section class="section" id="dash-s-notes">
           <div class="section-header">
             <div>
               <div class="section-label">Заметки к периоду</div>
@@ -423,7 +440,7 @@
               <button class="atab" data-tab="comparison">Сравнение</button>
               <button class="atab" data-tab="customers">Клиенты</button>
               <button class="atab" data-tab="promo">Промо</button>
-              <button class="atab" data-tab="marketing">Маркетинг</button>
+              <button class="atab" data-tab="marketing">CRM · ассортимент</button>
               <button class="atab" data-tab="pending">Roadmap</button>
             </div>
           </section>
@@ -1118,8 +1135,8 @@
 
           <!-- Маркетинг: новые отчёты на 1С + наших данных -->
           <section class="section atab-section hidden" data-atab="marketing">
-            <div class="section-label">Маркетинговая аналитика</div>
-            <div class="section-hint">Отчёты для CRM и ассортимента. Часть пунктов помечена «⏳ нужен BSL» — ждут расширения HTTP-сервиса 1С.</div>
+            <div class="section-label">CRM и ассортимент</div>
+            <div class="section-hint">Отчёты по клиентской базе и товарам (RFM, зомби-ассортимент, каннибализация, когорты). Каналы продвижения, конкуренты и SEO — в отдельном разделе «Маркетинг» слева. Часть пунктов помечена «⏳ нужен BSL» — ждут расширения HTTP-сервиса 1С.</div>
 
             <!-- Hero summary 4 основных показателя -->
             <div id="mkHeroSummary" class="mk-hero-summary"></div>
@@ -1197,8 +1214,30 @@
 
         <!-- ═══ МАРКЕТИНГ ═══ -->
         <div id="page-marketing" class="hidden">
-          <section class="section">
-            <div class="section-label">Маркетинг по каналам</div>
+          <nav class="mkt-nav" id="mktNav" aria-label="Разделы маркетинга">
+            <a href="#mkt-s-kpi">Обзор</a>
+            <a href="#mkt-s-alerts">Алерты</a>
+            <a href="#mkt-s-charts">Динамика</a>
+            <a href="#mkt-s-sms">SMS</a>
+            <a href="#mkt-s-ctx">Директ</a>
+            <a href="#mkt-s-gis">2ГИС</a>
+            <a href="#mkt-s-sweet">Сладкий чек</a>
+            <a href="#mkt-s-sales">Лояльность</a>
+            <a href="#mkt-s-stores">По точкам</a>
+            <a href="#mkt-s-prod">Товары</a>
+            <a href="#mkt-s-seo">SEO</a>
+            <a href="#mkt-s-demand">Запросы</a>
+            <a href="#mkt-s-other">Прочее</a>
+            <a href="#mkt-s-comp">Конкуренты</a>
+            <a href="#mkt-s-ai">AI-сводка</a>
+          </nav>
+
+          <div class="mkt-data-note">
+            🔒 <b>Только реальные данные.</b> Все цифры взяты напрямую из источников — 1С, 2ГИС, Яндекс.Директ, Яндекс.Метрика. Где данных нет — стоит «н/д». Прогнозные/расчётные значения явно помечены словом «оценка». Ничего не выдумывается.
+          </div>
+
+          <section class="section" id="mkt-s-kpi">
+            <div class="section-label">Маркетинг по каналам <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">Данные за янв–май 2026 (1С, Яндекс.Метрика/Директ, 2ГИС). Выбери период — таблицы и итоги пересчитаются. *Май — неполный (до 26.05).</div>
             <div class="mkt-period">
               <span>Период с</span>
@@ -1208,104 +1247,134 @@
               <button id="mktExportBtn" class="mkt-export" type="button">⬇ Экспорт в Excel</button>
             </div>
             <div class="mkt-kpis" id="mktKpis"></div>
+            <div class="section-label" style="margin-top:20px">За месяц · сравнение с прошлым годом (YoY) <span class="mkt-scope dyn" title="Живые данные из 1С, обновляются на сервере автоматически">live</span></div>
+            <div class="section-hint" id="mktYoYHint">Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК).</div>
+            <div id="mktYoY" class="mkt-yoy"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Алерты — на что обратить внимание</div>
+          <section class="section" id="mkt-s-alerts">
+            <div class="section-label">Алерты — на что обратить внимание <span class="mkt-scope fix" title="Считается по всему периоду янв–май">весь период</span></div>
             <div id="mktAlerts" class="mkt-alerts"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Динамика по месяцам</div>
+          <section class="section" id="mkt-s-charts">
+            <div class="section-label">Динамика по месяцам · текущий год vs прошлый (YoY) <span class="mkt-scope dyn" title="Помесячные ряды из 1С: текущий год vs тот же месяц год назад">live · YoY</span></div>
+            <div class="section-hint">Тёмная серия — текущий год, светлая — прошлый. Δ% YoY у каждого графика — над ним.</div>
             <div class="mkt-charts">
-              <div class="mkt-chart"><div class="mkt-chart-t">Выручка, ₽</div><div id="mktChartRev"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartRevT">Выручка, ₽</div><div id="mktChartRev"></div><div id="mktChartRevLeg" class="mkt-legend"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartCheqT">Чеков, шт</div><div id="mktChartCheq"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartAvgT">Средний чек, ₽</div><div id="mktChartAvg"></div></div>
+              <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartCardT">Карта лояльности, %</div><div id="mktChartCard"></div></div>
+            </div>
+            <div class="section-label" style="margin-top:24px">Платные каналы (пока статика — оживут в этапах 5.C/5.D)</div>
+            <div class="section-hint">Эти три графика заработают вживую, когда подключим помесячные ряды Я.Директа (5.C) и 2ГИС (5.D). SMS — после BSL-патча posted=0 в 1С.</div>
+            <div class="mkt-charts">
               <div class="mkt-chart"><div class="mkt-chart-t">Платный маркетинг: SMS vs Контекст, ₽</div><div id="mktChartSpend"></div><div id="mktChartLegend" class="mkt-legend"></div></div>
               <div class="mkt-chart"><div class="mkt-chart-t">Покупки с рекламы (контекст), шт</div><div id="mktChartPurch"></div></div>
               <div class="mkt-chart"><div class="mkt-chart-t">2ГИС: переходы на карточку</div><div id="mktChartGis"></div></div>
             </div>
           </section>
 
-          <section class="section">
-            <div class="section-label">SMS-рассылки</div>
+          <section class="section" id="mkt-s-sms">
+            <div class="section-label">SMS-рассылки <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">1С, отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. Атрибуция покупок — ждёт доработки выгрузки 1С.</div>
             <div id="mktSms" class="table-wrap"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Контекстная реклама (Яндекс.Директ)</div>
-            <div class="section-hint">Агентский кабинет. Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽, отказы 14,8% (лучше среднего по сайту).</div>
+          <section class="section" id="mkt-s-ctx">
+            <div class="section-label">Контекстная реклама (Яндекс.Директ) <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
+            <div class="section-hint">Агентский кабинет. Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽ (период), отказы 14,8% (лучше среднего по сайту).</div>
             <div id="mktCtx" class="table-wrap"></div>
+            <div id="mktDirectLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">2ГИС — карточка компании</div>
+          <section class="section" id="mkt-s-gis">
+            <div class="section-label">2ГИС — карточка компании <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">«Мария, кафе-кондитерская». 2ГИС ≫ Яндекс.Карты по маршрутам/звонкам (~1 578 vs ~221/мес).</div>
             <div id="mktGis" class="table-wrap"></div>
+            <div id="mktGisLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Программа «Сладкий чек»</div>
-            <div class="section-hint">1С (РегистрНакопления.СладкийЧек). Новая программа, растёт. + 199 регистраций с сайта за период. Зазор регистрация→активность — точка роста.</div>
+          <section class="section" id="mkt-s-sweet">
+            <div class="section-label">Программа «Сладкий чек» <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
+            <div class="section-hint">1С (РегистрНакопления.СладкийЧек) — геймификация: баллы за задания по картам лояльности. Новая программа, быстро растёт: 35 карт (апр) → 56 (май). Задания мая: «Покупка» 131× (1 балл), «Большой чек ≥1500 ₽» 15× (5 баллов), «Для двоих ≥1000 ₽» 13× (5 баллов). «Выполнений» = срабатываний заданий, «Баллов» — начислено всего.</div>
             <div id="mktSweet" class="table-wrap"></div>
+            <div class="mkt-comp-ins" style="margin-top:12px">
+              <div class="mkt-chart-t">Атрибуция: драйвер продаж или пассивная отметка?</div>
+              <ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">
+                <li><b>82% активности — пассивный штамп.</b> 131 из 160 событий мая — задание «Покупка» (1 балл за любой чек): купили бы и так.</li>
+                <li><b>Бандчинга у порогов нет.</b> Условные задания (≥1000/≥1500 ₽) срабатывают на чеках далеко выше порога: «≥1500» — лишь 2 из 15 у порога, остальные до 10 150 ₽; «≥1000» — все от 2080 ₽. Люди не доплачивают ради задания (тортовый чек и так ≥2000 ₽).</li>
+                <li><b>Средний чек участников ~3 000 ₽ (×3 к среднему 968 ₽)</b> — но это отбор (программа сидит на крупных покупателях), а не доказательство влияния.</li>
+                <li><b>Вывод:</b> пока «пришли и купили → попали в программу», а не «купили из-за программы». Чтобы стал драйвером — пороги выше типичного чека (напр. ≥3500 ₽) или награда за повторные визиты; для точного замера — холдаут-группа.</li>
+              </ul>
+            </div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Продажи и лояльность</div>
+          <section class="section" id="mkt-s-sales">
+            <div class="section-label">Продажи и лояльность <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">Розница, 1С. Тревога: доля чеков с картой лояльности падает (86 % → 74 %).</div>
             <div id="mktSales" class="table-wrap"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Товары и категории — за весь период (янв–май)</div>
-            <div class="section-hint">1С, розница. Ядро оборота — целые торты; кофе — лидер по штукам (кафе-формат). Не зависит от выбора месяца.</div>
+          <section class="section" id="mkt-s-stores">
+            <div class="section-label">По точкам — маркетинг <span class="mkt-scope dyn" title="Живые данные из 1С, YoY к тому же месяцу год назад">live · за месяц</span></div>
+            <div class="section-hint">Выручка / средний чек / % карты лояльности в разрезе каждой точки + Δ к маю прошлого года. Помогает увидеть, где маркетинг работает, где карта лояльности проседает, где рост или падение год-к-году.</div>
+            <div id="mktByStore" class="table-wrap"></div>
+          </section>
+
+          <section class="section" id="mkt-s-prod">
+            <div class="section-label">Товары и категории <span class="mkt-scope dyn" title="Живые данные из 1С за выбранный месяц, авто-обновление">live · за месяц</span></div>
+            <div class="section-hint">1С, розница, за выбранный месяц (тянется с сервера, обновляется само). Категории — с колонкой YoY (Δ к тому же месяцу год назад). Ядро оборота — целые торты; кофе — лидер по штукам.</div>
             <div class="mkt-2col">
               <div><div class="mkt-chart-t">Топ-15 товаров по выручке</div><div id="mktTopProd" class="table-wrap"></div></div>
               <div><div class="mkt-chart-t">Категории по выручке</div><div id="mktCats" class="table-wrap"></div></div>
             </div>
           </section>
 
-          <section class="section">
-            <div class="section-label">SEO / источники трафика сайта — за весь период (янв–май)</div>
-            <div class="section-hint">Метрика maria-irk.ru. Органика — главный канал (~70 %), драйвер — рецепты в блоге. Помесячная органика — через Metrika API (в планах); сейчас показаны итоги за период (не зависят от выбора месяца).</div>
+          <section class="section" id="mkt-s-seo">
+            <div class="section-label">SEO / источники трафика сайта <span class="mkt-scope fix" title="Не зависит от выбора месяца — весь период янв–май">весь период</span></div>
+            <div class="section-hint">Метрика maria-irk.ru. Органика — главный канал (~70 %), драйвер — рецепты в блоге. Канал НЕ бесплатный: SEO-ведение и контент стоят <b>46 тыс ₽/мес</b> (~230 тыс ₽ за янв–май 2026). Помесячная органика — через Metrika API (в планах); сейчас показаны итоги за период (не зависят от выбора месяца).</div>
             <div id="mktSeo" class="table-wrap"></div>
+            <div id="mktSerpLive" class="mkt-comp-ins" style="margin-top:14px"></div>
+            <div id="mktMetrikaLive" class="mkt-comp-ins" style="margin-top:12px"></div>
             <div class="section-label" style="margin-top:24px">Воронка сайта (онлайн-заказ)</div>
             <div class="section-hint">Яндекс.Метрика, янв–май. Путь от визита до онлайн-оплаты.</div>
             <div id="mktFunnel"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Поисковые запросы (2ГИС) — что ищут, чтобы найти</div>
+          <section class="section" id="mkt-s-demand">
+            <div class="section-label">Поисковые запросы (2ГИС) — что ищут, чтобы найти <span class="mkt-scope fix" title="Снимок 2ГИС за апрель 2026">апрель 2026</span></div>
             <div class="section-hint">2ГИС, апрель 2026. Доля запросов. ~53 % — брендовые («мария»), остальное — родовой спрос (торты/кондитерские/кофе/завтрак).</div>
             <div id="mktDemand"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Прочие каналы (за период)</div>
+          <section class="section" id="mkt-s-other">
+            <div class="section-label">Прочие каналы <span class="mkt-scope fix" title="Итоги за весь период янв–май">весь период</span></div>
             <div class="table-wrap"><table>
               <thead><tr><th>Канал</th><th>Показатель</th></tr></thead>
               <tbody>
                 <tr><td>Яндекс.Карты (карточка)</td><td>38 500 визитов · 554 звонка · 1 106 маршрутов</td></tr>
-                <tr><td>Промокоды (1С)</td><td>СОКОЛИКИ / ДЕСЕРТ / САМОВЫВОЗ — &lt;10% скидочного бюджета (доминируют автоскидки по картам + ДР)</td></tr>
+                <tr><td>Промокоды (1С, действующие на 27.05)</td><td>ЛЕТО (26.05–10.06), ЗВОНОК (20–31.05), ОФИС (до 30.09), ОЗЕРО (до 31.07), СУШИ (до 31.07), МарияCrew (до 31.12), Сладкий чек (до 30.06). Промокоды — &lt;10% скидочного бюджета (доминируют автоскидки по картам + ДР). Всего в справочнике «Акции» 541 запись за всё время.</td></tr>
                 <tr><td>Онлайн-заказы (сайт)</td><td>4 036 покупок · регистраций в лояльности 1 726 · кликов по телефону 2 501</td></tr>
                 <tr><td>Переходы к партнёрам</td><td>не отслеживается (нет цели в Метрике) — нужно настроить трекинг</td></tr>
               </tbody>
             </table></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">Анализ конкурентов</div>
+          <section class="section" id="mkt-s-comp">
+            <div class="section-label">Анализ конкурентов <span class="mkt-scope now" title="Снимок из открытых источников на дату анализа">на сегодня</span></div>
             <div class="section-hint">Кондитерские Иркутска: сайты, точки, соцсети, продукция, акции, программы лояльности, рейтинги. Данные из открытых источников; «н/д» — не найдено публично. 2ГИС также отслеживает как конкурентов: Блисс, Toti, Каде.</div>
             <div id="mktComp"></div>
             <div class="section-label" style="margin-top:24px">Соцсети и охваты</div>
             <div class="section-hint">Telegram — подписчики и средний охват (просмотры/пост, сняты с t.me). Instagram — справочно (Meta запрещена в РФ). VK — счётчик под анти-ботом, снимается вручную с залогиненного VK.</div>
             <div id="mktSocial"></div>
             <div class="section-label" style="margin-top:24px">Цены конкурентов</div>
-            <div class="section-hint">Сравнимые позиции, открытые источники (сайты/каталоги). «н/д» — цена не опубликована.</div>
+            <div class="section-hint">Спарсено с сайтов конкурентов 28.05.2026 (stefanycake.ru, etikacakes.ru, cakehome.ru). Стефания «торт на заказ» — 1800 ₽/кг (онлайн-каталог). «н/д» — цена не опубликована онлайн (капучино конкуренты в онлайн-меню не показывают; у ЯХОНТа сайта нет).</div>
             <div id="mktPrices"></div>
           </section>
 
-          <section class="section">
-            <div class="section-label">AI-сводка: выводы и рекомендации</div>
+          <section class="section" id="mkt-s-ai">
+            <div class="section-label">AI-сводка: выводы и рекомендации <span class="mkt-scope now" title="Синтез на дату анализа">на сегодня</span></div>
             <div class="section-hint">Синтез по всем данным маркетинга и конкурентам — приоритеты для роста.</div>
             <div id="mktAI"></div>
           </section>
@@ -1382,6 +1451,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=61"></script>
+    <script src="/app.js?v=81"></script>
   </body>
 </html>

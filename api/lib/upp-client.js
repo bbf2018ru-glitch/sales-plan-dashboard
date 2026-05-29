@@ -79,8 +79,30 @@ async function callObject(kind, name) {
   return fetchUppPackage({ url, ...authOpts() });
 }
 
-// /catalog (НЕ работает у Маши — URL шаблон не зарегистрирован в Конфигураторе)
-// Оставлен для будущей совместимости.
+// /pull — полный пакет за месяц; нужен ради products[] с НоменклатурнаяГруппа
+// (розничная категория, которой нет в /products-detail). Тяжёлый — кэшировать.
+async function callPull(period) {
+  if (!base()) throw new Error('UPP_PULL_URL не настроен');
+  const url = `${base()}/pull?period=${encodeURIComponent(period)}`;
+  return fetchUppPackage({ url, ...authOpts() });
+}
+
+// /stores-detail — справочник Склады (code, name, ВидСклада/формат).
+async function callStoresDetail(limit = 2000) {
+  if (!base()) throw new Error('UPP_PULL_URL не настроен');
+  const url = `${base()}/stores-detail?limit=${limit}`;
+  return fetchUppPackage({ url, ...authOpts() });
+}
+
+// /sales-detail — строки чеков (НомерЧека/КартаКод/суммы). Потолка нет (тянет 78k+).
+async function callSalesDetail(period, limit = 500000) {
+  if (!base()) throw new Error('UPP_PULL_URL не настроен');
+  const url = `${base()}/sales-detail?period=${encodeURIComponent(period)}&limit=${limit}`;
+  return fetchUppPackage({ url, ...authOpts() });
+}
+
+// /catalog — у Маши РАБОТАЕТ для справочника «Акции» (проверено 27.05.2026),
+// несмотря на старое примечание. Лимит можно поднимать.
 async function callCatalog(name, limit = 999) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/catalog?name=${encodeURIComponent(name)}&limit=${limit}`;
@@ -116,5 +138,8 @@ module.exports = {
   callDocument,
   callObject,
   callCatalog,
+  callSalesDetail,
+  callStoresDetail,
+  callPull,
   makeCache
 };

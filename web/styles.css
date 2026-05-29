@@ -140,7 +140,7 @@ table, .kpi-value, .spot-value, .num, td, th, input, .pct-val, .rec-kpi-val,
 /* ── Shell ────────────────────────────────────────────────────────── */
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 100vh;
   position: relative;
   z-index: 1;
@@ -362,6 +362,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 /* ── Page switcher (Dashboard / Analytics) ────────────────────────── */
 #page-dashboard.hidden,
 #page-analytics.hidden,
+#page-marketing.hidden,
 .empty-state.hidden,
 .btn-group [data-tw].hidden,
 .atab-section.hidden {
@@ -592,7 +593,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 /* ── Content ──────────────────────────────────────────────────────── */
 .content {
   padding: 14px 18px 24px;
-  overflow-x: hidden;
+  /* overflow-x:hidden убран — он делал .content scroll-контейнером и ломал
+     position:sticky (под-навигация, sticky-метрики). Переполнение колонки
+     решено через minmax(0,1fr) в .shell. */
   position: relative;
 }
 
@@ -602,11 +605,11 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .section { margin-bottom: 22px; }
 
 .section-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .16em;
-  color: var(--hint);
+  letter-spacing: .08em;
+  color: var(--ink);           /* было var(--hint) — заголовки не читались (контраст ~2.5:1) */
   margin-bottom: 12px;
 }
 
@@ -619,10 +622,11 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 
 .section-hint {
-  font-size: 12px;
-  color: var(--hint);
+  font-size: 12.5px;
+  color: var(--muted);           /* было var(--hint) — описания плохо читались */
   margin-top: 4px;
   font-weight: 400;
+  line-height: 1.5;
 }
 
 /* ── Icon buttons / generic ───────────────────────────────────────── */
@@ -4013,3 +4017,113 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-ai-list{margin:8px 0 0;padding-left:22px;font-size:14px}
 .mkt-ai-list li{margin:8px 0}
 .mkt-dbar{height:8px;background:var(--accent);border-radius:4px;opacity:.7;min-width:4px}
+
+/* ── Маркетинг: sticky под-навигация ──────────────────────────────── */
+.mkt-nav{
+  position:sticky; top:0; z-index:50;
+  display:flex; flex-wrap:wrap; gap:6px;
+  padding:10px 12px; margin-bottom:14px;
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--line); border-radius:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.18);
+}
+.mkt-nav a{
+  font-size:12.5px; line-height:1; text-decoration:none;
+  color:var(--muted); padding:7px 11px; border-radius:9px;
+  border:1px solid transparent; white-space:nowrap;
+  transition:background .14s,color .14s,border-color .14s;
+}
+.mkt-nav a:hover{ color:var(--text); background:var(--accent-soft); }
+.mkt-nav a.active{ color:var(--accent); background:var(--accent-soft); border-color:var(--accent); }
+/* якорь не уезжает под sticky-навигацию */
+#page-marketing .section{ scroll-margin-top:64px; }
+/* Дашборд: под-навигация стыкуется со sticky-полосой метрик (та опускается ниже nav) */
+#page-dashboard .sticky-metrics{ top:54px; }
+#page-dashboard .section{ scroll-margin-top:104px; }
+
+/* ── Маркетинг: бейджи охвата периода ─────────────────────────────── */
+.mkt-scope{
+  display:inline-block; vertical-align:middle;
+  margin-left:8px; padding:2px 8px; border-radius:999px;
+  font-size:10.5px; font-weight:600; letter-spacing:.02em;
+  text-transform:uppercase; white-space:nowrap; cursor:help;
+}
+.mkt-scope.dyn{ color:var(--accent); background:var(--accent-soft); }
+.mkt-scope.fix{ color:var(--muted); background:rgba(150,150,170,.16); }
+.mkt-scope.now{ color:#b8860b; background:rgba(184,134,11,.14); }
+
+/* ── Маркетинг: широкие таблицы скроллятся, а не сжимаются ─────────── */
+#mktComp .table-wrap, #mktSocial .table-wrap, #mktPrices .table-wrap{
+  -webkit-overflow-scrolling:touch;
+}
+#mktSocial table, #mktPrices table{ min-width:660px; }
+#mktComp > .table-wrap table{ min-width:720px; }
+
+/* ── AI-FAB «Маша»: меньше и полупрозрачный в покое, чтобы не перекрывать данные ── */
+.ai-chat-fab{ width:52px; height:52px; bottom:18px; right:18px; opacity:.62; }
+.ai-chat-fab:hover{ opacity:1; }
+@media (max-width:900px){ .ai-chat-fab{ opacity:.85; } }
+
+/* ── Маркетинг: баннер «только реальные данные» ──────────────────── */
+.mkt-data-note{
+  margin:0 0 16px; padding:12px 16px;
+  background:rgba(16,160,90,.10); border:1px solid rgba(16,160,90,.35);
+  border-radius:12px; font-size:13px; line-height:1.5; color:var(--ink);
+}
+.mkt-data-note b{ font-weight:700; }
+
+/* ── Маркетинг: живой YoY-блок ───────────────────────────────────── */
+.mkt-yoy-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:10px; }
+.mkt-yoy-card{ background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.mkt-yoy-l{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+.mkt-yoy-v{ font-size:22px; font-weight:700; color:var(--ink); margin:4px 0 2px; letter-spacing:-.02em; }
+.mkt-yoy-p{ font-size:12px; color:var(--muted); margin-bottom:8px; }
+.mkt-yoy-d{ display:inline-block; font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; }
+.mkt-yoy-up{ color:#10a05a; background:rgba(16,160,90,.12); }
+.mkt-yoy-down{ color:#e0466a; background:rgba(224,70,106,.12); }
+.mkt-yoy-flat{ color:var(--muted); background:rgba(150,150,170,.15); }
+.mkt-yoy-na{ color:var(--muted); background:rgba(150,150,170,.12); }
+.mkt-yoy-load{ padding:14px; color:var(--muted); font-size:13px; }
+
+/* ── Мобильное меню: сайдбар-drawer + гамбургер ──────────────────── */
+.nav-hamburger{ display:none; }
+.nav-backdrop{ display:none; }
+
+@media (max-width: 640px){
+  /* гамбургер в левом верхнем углу */
+  .nav-hamburger{
+    display:flex; align-items:center; justify-content:center;
+    position:fixed; top:10px; left:10px; z-index:310;
+    width:44px; height:44px; border-radius:12px;
+    border:1px solid var(--line); background:var(--glass); color:var(--text);
+    -webkit-backdrop-filter:blur(18px) saturate(160%); backdrop-filter:blur(18px) saturate(160%);
+    box-shadow:0 4px 16px rgba(0,0,0,.28); cursor:pointer;
+  }
+  /* сайдбар = выезжающий слева drawer */
+  .sidebar{
+    position:fixed; top:0; left:0; bottom:0; height:100%;
+    width:280px; max-width:86vw; margin:0;
+    border-radius:0 18px 18px 0;
+    transform:translateX(-100%); transition:transform .26s ease;
+    z-index:300; overflow-y:auto;
+    box-shadow:0 0 44px rgba(0,0,0,.5);
+  }
+  .sidebar.sidebar--open{ transform:none; }
+  .nav-backdrop{
+    display:block; position:fixed; inset:0; z-index:290;
+    background:rgba(0,0,0,.5); opacity:0; pointer-events:none;
+    transition:opacity .26s;
+  }
+  .nav-backdrop.show{ opacity:1; pointer-events:auto; }
+  body.nav-open{ overflow:hidden; }
+  /* контент на всю ширину, место под гамбургер */
+  .shell{ grid-template-columns:1fr; }
+  .content{ padding-top:60px; }
+  /* под-навигация: один скроллящийся ряд, не прячется под гамбургер */
+  #dashNav, #mktNav{ flex-wrap:nowrap; overflow-x:auto; padding-left:56px; -webkit-overflow-scrolling:touch; }
+  #dashNav a, #mktNav a{ flex:0 0 auto; }
+  /* sticky-метрики на дашборде поднимаем к верху (nav на мобиле узкий ряд) */
+  #page-dashboard .sticky-metrics{ top:0; padding-left:56px; }
+}

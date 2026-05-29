@@ -16,6 +16,7 @@ const { buildInsights } = require('./lib/insights');
 const { askAiChat, buildSuggestions } = require('./lib/ai-chat');
 const { getMarketTrends } = require('./lib/market-trends');
 const marketing = require('./lib/marketing-analytics');
+const marketingChannels = require('./lib/marketing-channels');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -85,6 +86,16 @@ setInterval(() => {
     if (now > expiry) sessions.delete(token);
   }
 }, 3600 * 1000);
+
+// ── Прогрев кэша «Маркетинг по каналам» (1С за месяц + YoY) ───────────────
+// Сервер крутится 24/7 → данные обновляются сами, без ПК.
+function warmMarketing() {
+  marketingChannels.warm()
+    .then(ok => console.log('[marketing-channels] warm', ok ? 'ok' : 'fail', new Date().toISOString()))
+    .catch(e => console.log('[marketing-channels] warm error', e.message));
+}
+setTimeout(warmMarketing, 15000);                 // через 15с после старта
+setInterval(warmMarketing, 6 * 60 * 60 * 1000);   // каждые 6 часов
 
 // ── AI-chat rate limit (per IP, защита Groq billing) ─────────────────────
 // AI-чат открыт без auth (чтобы работал у любого зашедшего на дашборд),
@@ -758,6 +769,17 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         sendJson(res, 500, { error: e.message });
       }
+      return;
+    }
+
+    // ── Маркетинг по каналам: метрики за месяц + YoY (живые данные из 1С) ──
+    if (pathname === '/api/marketing/channels' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await marketingChannels.getChannels(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
 

@@ -24,12 +24,14 @@ async function callRegister(name, fromYM, toYM, limit = 10000) {
   });
 }
 
+// Жёсткий потолок /register в HTTP-сервисе 1С: вернёт максимум 10 000 строк
+// (limit=50000/200000 всё равно даёт ровно 10 000 — проверено 27.05.2026).
+// Старый кап 999 (обход бага форматирования) снят: BSL Формат(Лимит,"ЧГ=") задеплоен.
+const REGISTER_CAP = 10000;
+
 // Бонусы — движения за период, агрегируем по карте
 async function bonusMovements(fromYM, toYM) {
-  // ВРЕМЕННО: текущий HTTP-сервис 1С имеет баг — Формат числа > 999 даёт
-  // "10 000" с разделителем тысяч и запрос ломается. Используем 999.
-  // Будет снят после обновления BSL (Формат(Лимит, "ЧГ=") уже в файле).
-  const data = await callRegister('Бонусы', fromYM, toYM, 999);
+  const data = await callRegister('Бонусы', fromYM, toYM, REGISTER_CAP);
   const byCard = new Map();
   for (const r of data.rows || []) {
     const card = r['БонуснаяКарта'] || '';
@@ -44,7 +46,9 @@ async function bonusMovements(fromYM, toYM) {
     period: { from: fromYM, to: toYM },
     totalCards: arr.length,
     totalMovements: data.rowsCount,
-    totalSum: arr.reduce((s, x) => s + x.sum, 0).toFixed(2),
+    // если упёрлись в потолок сервиса — число движений и сумма занижены (это floor, не точное)
+    capped: (data.rowsCount || 0) >= REGISTER_CAP,
+    totalSum: Number(arr.reduce((s, x) => s + x.sum, 0).toFixed(2)),
     topCards: arr.slice(0, 100).map(c => ({ ...c, sum: Number(c.sum.toFixed(2)) }))
   };
 }
@@ -52,7 +56,7 @@ async function bonusMovements(fromYM, toYM) {
 // Получить все карты с активными движениями за период
 async function activeCardsCount(fromYM, toYM) {
   try {
-    const data = await callRegister('Бонусы', fromYM, toYM, 999);
+    const data = await callRegister('Бонусы', fromYM, toYM, REGISTER_CAP);
     const cards = new Set();
     for (const r of data.rows || []) {
       if (r['БонуснаяКарта']) cards.add(r['БонуснаяКарта']);

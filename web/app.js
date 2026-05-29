@@ -2340,6 +2340,21 @@ function connectEvents() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+// Мобильное меню-drawer: гамбургер открывает сайдбар, backdrop/Esc/выбор раздела — закрывают.
+function initMobileNav(){
+  var burger=document.getElementById('navHamburger');
+  var sb=document.getElementById('sidebar');
+  var bd=document.getElementById('navBackdrop');
+  if(!burger||!sb||!bd) return;
+  function close(){ sb.classList.remove('sidebar--open'); bd.classList.remove('show'); document.body.classList.remove('nav-open'); burger.setAttribute('aria-expanded','false'); }
+  function open(){ sb.classList.add('sidebar--open'); bd.classList.add('show'); document.body.classList.add('nav-open'); burger.setAttribute('aria-expanded','true'); }
+  burger.addEventListener('click', function(){ sb.classList.contains('sidebar--open') ? close() : open(); });
+  bd.addEventListener('click', close);
+  sb.querySelectorAll('.nav-btn,[data-page]').forEach(function(b){ b.addEventListener('click', close); });
+  window.addEventListener('resize', function(){ if(window.innerWidth>640) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+}
+
 async function init() {
   initDarkTheme();
 
@@ -2367,6 +2382,8 @@ async function init() {
   initMobileCompact();
   initCmdK();
   initStickyMetrics();
+  pageNavInit('dashNav','page-dashboard');
+  initMobileNav();
   initDrillDown();
   initUrlState();
   $('storeNoteForm')?.addEventListener('submit', submitStoreNote);
@@ -2595,10 +2612,15 @@ async function loadCustomers() {
 
 function renderCustomersKpis(d) {
   const b = d.bonuses || {};
+  const moves = Number(b.totalMovements) || 0;
+  const movesStr = b.capped ? fmtNum(moves) + '+' : fmtNum(moves);
+  const capHint = b.capped
+    ? '<div style="font-size:11px;color:var(--muted)">выборка 1С ограничена 10 000 — число занижено</div>'
+    : '';
   $('customersKpis').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Активных карт</div><div class="kpi-value">${fmtNum(b.totalCards || 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Транзакций</div><div class="kpi-value">${fmtNum(b.totalMovements || 0)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Бонусов начислено</div><div class="kpi-value">${fmtNum(b.totalSum || 0)} ₽</div></div>
+    <div class="kpi-card"><div class="kpi-label">Активных карт</div><div class="kpi-value">${fmtNum(Number(b.totalCards) || 0)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Транзакций</div><div class="kpi-value">${movesStr}</div>${capHint}</div>
+    <div class="kpi-card"><div class="kpi-label">Бонусов начислено</div><div class="kpi-value">${fmtNum(Number(b.totalSum) || 0)} ₽</div></div>
     <div class="kpi-card"><div class="kpi-label">Период</div><div class="kpi-value" style="font-size:14px">${b.period?.from || '?'} — ${b.period?.to || '?'}</div></div>
   `;
 }
@@ -4122,9 +4144,9 @@ var MKT = {
   ctxPurch:[10,13,296,147,106],
   gis:[10131,10633,12584,12412,8662],
   gisAct:[11386,11233,12725,12591,8451],
-  sweet:[0,1,26,80,157],
-  sweetCards:[0,1,2,35,54],
-  sweetPts:[0,3,0,147,273]
+  sweet:[0,1,26,80,160],
+  sweetCards:[0,1,2,35,56],
+  sweetPts:[0,3,0,147,276]
 };
 function mNum(n){ return Math.round(n).toLocaleString('ru-RU'); }
 function mNum1(n){ return (Math.round(n*10)/10).toLocaleString('ru-RU'); }
@@ -4159,11 +4181,15 @@ function mktRender(){
   for(var i=lo;i<=hi;i++) idx.push(i);
   function sum(arr){ return idx.reduce(function(s,i){return s+arr[i];},0); }
   var rev=sum(MKT.revenue), smsC=sum(MKT.smsCost), ctxC=sum(MKT.ctxCost), smsS=sum(MKT.smsSent), pur=sum(MKT.ctxPurch), chq=sum(MKT.cheques);
+  // SEO-бюджет: фикс 46 000 ₽/мес (агентство+контент+техничка), реальная цифра от Маши.
+  var SEO_MONTHLY = 46000;
+  var seoC = SEO_MONTHLY * idx.length;
   document.getElementById('mktKpis').innerHTML =
     mKpi(mNum(rev)+' ₽','Выручка') +
-    mKpi(mNum(smsC+ctxC)+' ₽','Платный маркетинг (SMS+контекст)') +
+    mKpi(mNum(smsC+ctxC+seoC)+' ₽','Платный маркетинг (SMS+контекст+SEO)') +
     mKpi(mNum(smsS),'SMS отправлено ('+mNum(smsC)+' ₽)') +
-    mKpi(mNum(pur),'Покупок с рекламы ('+mNum(ctxC)+' ₽)');
+    mKpi(mNum(pur),'Покупок с рекламы ('+mNum(ctxC)+' ₽)') +
+    mKpi(mNum(seoC)+' ₽','SEO/контент ('+mNum(SEO_MONTHLY)+' ₽/мес × '+idx.length+')');
   document.getElementById('mktSms').innerHTML = mTbl(
     ['Месяц','Рассылок','SMS отправлено','Стоимость, ₽','Цена SMS, ₽'],
     idx.map(function(i){ return [MKT.months[i], mNum(MKT.smsCnt[i]), mNum(MKT.smsSent[i]), mNum(MKT.smsCost[i]), MKT.smsSent[i]?mNum1(MKT.smsCost[i]/MKT.smsSent[i]):'—']; }),
@@ -4235,7 +4261,7 @@ var COMPETITORS = [
     loyalty:'«Любимый покупатель»: кэшбэк 5/7/10 %, оплата до 30 % бонусами, 600 приветств.; клуб «Мария для своих» (100к+); геймификация «Сладкий чек»',
     online:'да + ЛК', products:'торты (флагман «Зебра»), бенто от 690 ₽, пирожные, пироги, выпечка, кофе, конфеты ручной работы',
     promos:'торт месяца −20 %, комбо кофе+круассан 349 ₽, розыгрыш «Сладкий чек» (iPhone 17/MacBook), 1000 бонусов за отзыв',
-    strong:'лучшая на рынке программа лояльности (кэшбэк + клуб 100к+), сильное SEO/контент (~70 % трафика), TG Mini App',
+    strong:'лучшая на рынке программа лояльности (кэшбэк + клуб 100к+), окупаемый SEO-контент (~70 % трафика сайта, 46 тыс ₽/мес), TG Mini App',
     weak:'часть точек проседает по рейтингу (4,1–4,3); охват и подписчики меньше, чем у Стефании' },
   { name:'Стефания', site:'stefanycake.ru', points:'~31–39 (Иркутск, Ангарск, Шелехов, Усолье, Черемхово)',
     social:'IG @stefanycake ~45 тыс. (2233 поста); VK, ОК, Telegram, Viber', followers:'~45 тыс. (IG)', rating:'2ГИС 4,7 (~1412 оценок) — топ рынка',
@@ -4270,6 +4296,16 @@ var COMP_INSIGHTS = [
   '<b>Позиционирование «посередине»:</b> Стефания — премиум, ЯХОНТ — эконом/масса. «Мария» с домашними рецептами и флагманом «Зебра» в выгодной середине, но без яркого премиум-образа — риск «застрять посередине».',
   '<b>Битва в VK/Telegram:</b> Instagram в РФ ограничен; публичных счётчиков VK/TG нет ни у кого — это зона, где «Мария» может обойти конкурентов с меньшими затратами.'
 ];
+// ОЦЕНКИ выручки и рекл.активности — НЕ публичные данные. Модель: точки × бенчмарк
+// выручки на точку (откалиброван на факте «Марии»: ~145 млн за янв–май ≈ 29 млн/мес ≈
+// 1,5 млн/точка/мес), скорректировано на сегмент. Точность ±30–40%.
+var COMP_ESTIMATES = [
+  { name:'Мария', us:true, points:'~17–22', rev:'~330–360 млн (факт-база: 145 млн за янв–май)', ad:'Измеримо', sig:'Директ РСЯ (~143к за период) + SMS (431к) + лояльность/кэшбэк' },
+  { name:'Стефания', points:'~31–39', rev:'~550–800 млн', ad:'Высокая', sig:'Лотерея ДОБРОКАР (приз — авто Jaecoo J7 ~2,5 млн), 45 тыс. IG, максимум точек/городов' },
+  { name:'Cake Home', points:'~20–24', rev:'~300–430 млн', ad:'Средняя', sig:'Конструктор торта, широкая сеть, слабые соцсети' },
+  { name:'ЯХОНТ', points:'~16–18', rev:'~190–260 млн (эконом-сегмент)', ad:'Низкая–средняя', sig:'Региональная сеть, масс-производство, без лояльности' },
+  { name:'Этика', points:'~7', rev:'~110–150 млн (премиум)', ad:'Средняя', sig:'Премиум-эстетика, премия «Лучшая кондитерская 2023», кофейня-формат' }
+];
 var REVIEWS = {
   'Мария': { rating:'2ГИС 4,4 (748) · Otzovik 2,0', pros:'вкус, оформление тортов, кофе, ранний режим (7:30)', cons:'БРАК (посторонние предметы в продукции!), нет реакции на жалобы, срывы заказов, цена/качество' },
   'Стефания': { rating:'2ГИС 4,8 (950) — топ рынка', pros:'свежесть, демократичные цены, персонал, выбор', cons:'волосы/грязь в кофемашине, менее пропитано, нехватка в час пик, сбои бонусов' },
@@ -4294,7 +4330,14 @@ function renderCompetitors(){
       (c.weak?'<dt class="bad">Слабые стороны</dt><dd>'+c.weak+'</dd>':'')+ '</dl></div>';
   }).join('');
   var ins='<div class="mkt-comp-ins"><div class="mkt-chart-t">Ключевые выводы</div><ul>'+COMP_INSIGHTS.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';
-  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div><div class="mkt-comp-cards">'+cards+'</div>'+ins;
+  // блок оценок выручки/рекламной активности
+  var estRows=COMP_ESTIMATES.map(function(e){
+    return '<tr'+(e.us?' class="mkt-total"':'')+'><td>'+e.name+'</td><td>'+e.points+'</td><td>'+e.rev+'</td><td>'+e.ad+'</td><td style="font-size:12px;color:var(--muted)">'+e.sig+'</td></tr>';
+  }).join('');
+  var est='<div class="section-label" style="margin-top:24px">Оценка масштаба и рекламной активности</div>'+
+    '<div class="section-hint">⚠️ Выручка и бюджеты конкурентов <b>публично не раскрываются</b>. Это <b>оценка ±30–40%</b> по модели: число точек × бенчмарк выручки на точку (калибровка на факте «Марии» ~1,5 млн ₽/точка/мес), с поправкой на сегмент. Рекламная активность — по наблюдаемым сигналам (лотереи, Директ, соцсети), не по реальным тратам.</div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Компания</th><th>Точек</th><th>Оценка выручки, ₽/год</th><th>Реклама</th><th>Сигналы</th></tr></thead><tbody>'+estRows+'</tbody></table></div>';
+  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div><div class="mkt-comp-cards">'+cards+'</div>'+est+ins;
 }
 var SOCIAL = [
   { name:'Мария', us:true, tg:'3 920', tgReach:'~200–440', ig:'~32 000', igReels:'~3,8 тыс (0,6–10к)', vk:'н/д' },
@@ -4318,9 +4361,9 @@ var CATEGORIES = [
   ['Торты целые',55135567],['Пирожные',21127701],['Стрит-фуд',8019151],['Кофе с собой',7989198],['Торты кусочки',7725087],['Выпечка сладкая',6913400],['Рулеты',6517416],['Пироги целые',5148008],['Блюда',4911741],['Пироги кусочки',1755024],['Кофе',1704047],['Хлеб',1631557],['Пироги заказные',1426635]
 ];
 var PRICES = [
-  ['Торт на заказ','1350–2320 ₽/шт','525–1350 ₽/кг','от 2090 ₽/кг','1690–2990 ₽/кг','640–1700 ₽/шт'],
+  ['Торт на заказ','1350–2320 ₽/шт','1800 ₽/кг','от 2090 ₽/кг','1790–2990 ₽/кг','640–1700 ₽/шт'],
   ['Бенто-торт','от 690 ₽','1000 ₽','от 1590 ₽','350–520 ₽','от 495 ₽'],
-  ['Кусочек / пирожное','н/д','89–199 ₽','95–460 ₽','н/д','н/д'],
+  ['Кусочек / пирожное','88–308 ₽','89–199 ₽','210–460 ₽','н/д','н/д'],
   ['Макаронс, ₽/шт','н/д','109 ₽','135 ₽','120 ₽','131 ₽'],
   ['Капучино','210–360 ₽','н/д','н/д','н/д','н/д']
 ];
@@ -4363,7 +4406,7 @@ function renderAlerts(){
 var AI_SUMMARY = [
   ['Измерить отдачу SMS','75 % платного бюджета (431к ₽) уходит на SMS, а ROI не считается. Включить атрибуцию «карта-получатель ↔ чек» и отключить неокупаемые сегменты — самый быстрый рычаг экономии/роста.'],
   ['Остановить отток лояльности','Карта в чеках упала 86 %→74 %. Вернуть привычку прикладывать карту — иначе деградируют и SMS-база, и кэшбэк-программа (наш главный ров против конкурентов).'],
-  ['Инвестировать в SEO/контент','Органика — ~70 % трафика почти бесплатно, тянут рецепты в блоге. Расширение контента дешевле любого платного канала.'],
+  ['Считать ROI SEO и масштабировать','SEO стоит 46 тыс ₽/мес (~230 тыс ₽ за янв–май) и даёт ~70 % трафика сайта — самый дешёвый ₽/визит канал. Подключить атрибуцию «органика → чек» (через UTM на купоны/каталоги) и при положительном ROI наращивать контент: одна статья-рецепт окупается за месяцы трафика.'],
   ['Качество и работа с жалобами','Главная боль по отзывам — брак (посторонние предметы) и отсутствие реакции на претензии. Регламент рекламаций (извинение + компенсация) поднимет рейтинг дешевле рекламы.'],
   ['Усилить Telegram','TG-охват в ~15–20× ниже Стефании — самый недоиспользованный канал. Брать вовлечённостью (по образцу Этики с высоким ER).'],
   ['Развивать кофе и кафе-формат','Капучино — №1 по штукам, кофе-меню — уникальное преимущество (эконом-сети Стефания/ЯХОНТ тут слабы).'],
@@ -4388,8 +4431,8 @@ function mktInit(){
   if(!_mktInited){
     var opts = MKT.months.map(function(m,i){ return '<option value="'+i+'">'+m.replace('*','')+'</option>'; }).join('');
     fromEl.innerHTML=opts; toEl.innerHTML=opts; fromEl.value='0'; toEl.value=String(MKT.months.length-1);
-    fromEl.addEventListener('change', mktRender);
-    toEl.addEventListener('change', mktRender);
+    fromEl.addEventListener('change', function(){ mktRender(); mktLoadYoY(); });
+    toEl.addEventListener('change', function(){ mktRender(); mktLoadYoY(); });
     var eb=document.getElementById('mktExportBtn'); if(eb) eb.addEventListener('click', mktExport);
     renderCompetitors();
     renderSocial();
@@ -4399,6 +4442,7 @@ function mktInit(){
     renderFunnel();
     renderDemand();
     renderAI();
+    pageNavInit('mktNav','page-marketing');
     var seo=document.getElementById('mktSeo');
     if(seo) seo.innerHTML = mTbl(
       ['Канал (янв–май)','Визиты','Доля'],
@@ -4407,5 +4451,292 @@ function mktInit(){
     _mktInited=true;
   }
   mktRender();
+  mktLoadYoY();
+}
+// Живой YoY-блок: тянет /api/marketing/channels за выбранный месяц (1С + год назад).
+function mktSelectedPeriod(){
+  var toEl=document.getElementById('mktTo');
+  var idx = toEl ? Number(toEl.value) : (MKT.months.length-1);
+  return '2026-' + String(idx+1).padStart(2,'0');
+}
+function mktDeltaBadge(v, unit){
+  if(v===null||v===undefined) return '<span class="mkt-yoy-d mkt-yoy-na">нет базы</span>';
+  var cls = v>0 ? 'mkt-yoy-up' : (v<0 ? 'mkt-yoy-down' : 'mkt-yoy-flat');
+  var sign = v>0?'+':'';
+  return '<span class="mkt-yoy-d '+cls+'">'+sign+mNum1(v)+(unit||' %')+' YoY</span>';
+}
+function mktYoYCard(label, curStr, prevStr, delta, unit){
+  return '<div class="mkt-yoy-card"><div class="mkt-yoy-l">'+label+'</div>'+
+    '<div class="mkt-yoy-v">'+curStr+'</div>'+
+    '<div class="mkt-yoy-p">год назад: '+prevStr+'</div>'+
+    mktDeltaBadge(delta, unit)+'</div>';
+}
+function mktLoadYoY(){
+  var el=document.getElementById('mktYoY'); if(!el) return;
+  var period=mktSelectedPeriod();
+  el.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
+  fetchJson('/api/marketing/channels?period='+period).then(function(d){
+    if(!d || d.error){ el.innerHTML='<div class="mkt-yoy-load">Нет данных: '+((d&&d.error)||'ошибка')+'</div>'; return; }
+    var rub=function(n){return mNum(n)+' ₽';};
+    var cards=[
+      mktYoYCard('Выручка', rub(d.revenue.cur), rub(d.revenue.prev), d.revenue.deltaPct),
+      mktYoYCard('Чеков', mNum(d.cheques.cur), mNum(d.cheques.prev), d.cheques.deltaPct),
+      mktYoYCard('Средний чек', rub(d.avgCheck.cur), rub(d.avgCheck.prev), d.avgCheck.deltaPct),
+      mktYoYCard('Карта лояльности', mNum1(d.cardPct.cur)+' %', mNum1(d.cardPct.prev)+' %', d.cardPct.deltaPp, ' п.п.'),
+      mktYoYCard('Оплачено бонусами', rub(d.bonus.cur), rub(d.bonus.prev), d.bonus.deltaPct),
+      mktYoYCard('Сладкий чек', d.sweet.cur.cards+' карт · '+d.sweet.cur.points+' б.', (d.sweet.isNew?'программы не было':d.sweet.prev.cards+' карт'), d.sweet.isNew?null:0)
+    ].join('');
+    el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
+    var hint=document.getElementById('mktYoYHint');
+    if(hint){ var t=d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—';
+      hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.fromCache?' (из кэша)':'')+'.'; }
+    // живые товары и категории за выбранный месяц (перекрывают статику)
+    var tp=document.getElementById('mktTopProd');
+    if(tp && d.topProducts && d.topProducts.length){ tp.innerHTML='<table><thead><tr><th>Товар</th><th class="num">Выручка ₽</th><th class="num">Шт</th></tr></thead><tbody>'+
+      d.topProducts.map(function(r,i){ return '<tr><td>'+(i+1)+'. '+r.name+'</td><td class="num">'+mNum(r.revenue)+'</td><td class="num">'+mNum(r.qty)+'</td></tr>'; }).join('')+'</tbody></table>'; }
+    var ct=document.getElementById('mktCats');
+    if(ct && d.categories && d.categories.length){ ct.innerHTML='<table><thead><tr><th>Категория</th><th class="num">Выручка ₽</th><th class="num">Доля</th><th class="num">YoY</th></tr></thead><tbody>'+
+      d.categories.map(function(r){ var dl=r.deltaPct; var ds=(dl==null?'—':(dl>0?'+':'')+mNum1(dl)+'%'); var dc=(dl==null?'':(dl>0?'color:#10a05a':(dl<0?'color:#e0466a':''))); return '<tr><td>'+r.group+'</td><td class="num">'+mNum(r.cur)+'</td><td class="num">'+mNum1(r.sharePct)+'%</td><td class="num" style="'+dc+'">'+ds+'</td></tr>'; }).join('')+'</tbody></table>'; }
+    // Помесячные ряды + YoY на графиках динамики (1С данные)
+    if(d.monthlySeries && d.monthlySeries.cur && d.monthlySeries.cur.length){
+      var cs=d.monthlySeries.cur, ps=d.monthlySeries.prev||[];
+      var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      var lbls=cs.map(function(m){ return MM[Number(m.ym.split('-')[1])]; });
+      function sumK(arr,k){ return arr.reduce(function(a,c){return a+(c[k]||0);},0); }
+      function setT(id, label, cV, pV, isPp){
+        var el=document.getElementById(id); if(!el) return;
+        var dl=null, ds='';
+        if(isPp){ dl=Math.round((cV-pV)*10)/10; ds=' · YoY '+(dl>=0?'+':'')+mNum1(dl)+' п.п.'; }
+        else { dl=pV?Math.round((cV-pV)/pV*1000)/10:null; ds=dl==null?'':' · YoY '+(dl>0?'+':'')+mNum1(dl)+'%'; }
+        var dc=dl==null?'':(dl>0?'color:#10a05a':(dl<0?'color:#e0466a':''));
+        el.innerHTML=label+' <span style="font-size:11px;font-weight:600;'+dc+'">'+ds+'</span>';
+      }
+      var cRev=sumK(cs,'revenue'), pRev=sumK(ps,'revenue');
+      var cChq=sumK(cs,'cheques'), pChq=sumK(ps,'cheques');
+      var cAvg=cChq?cRev/cChq:0, pAvg=pChq?pRev/pChq:0;
+      var cCardW=cChq?cs.reduce(function(a,c){return a+c.cardPct*c.cheques;},0)/cChq:0;
+      var pCardW=pChq?ps.reduce(function(a,c){return a+c.cardPct*c.cheques;},0)/pChq:0;
+      setT('mktChartRevT','Выручка, ₽', cRev, pRev);
+      setT('mktChartCheqT','Чеков, шт', cChq, pChq);
+      setT('mktChartAvgT','Средний чек, ₽', cAvg, pAvg);
+      setT('mktChartCardT','Карта лояльности, %', cCardW, pCardW, true);
+      var leg=document.getElementById('mktChartRevLeg');
+      if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>'+(cs[0]?cs[0].ym.slice(0,4):'')+'</span><span class="mkt-lg"><i style="background:#b8860b"></i>'+(ps[0]?ps[0].ym.slice(0,4):'')+'</span>'; }
+      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m.revenue;}), 'var(--accent)', '#b8860b');
+      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m.cheques;}), 'var(--accent)', '#b8860b');
+      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');
+      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b');
+    }
+    // По точкам — маркетинг
+    var bs=document.getElementById('mktByStore');
+    if(bs && d.byStore && d.byStore.length){
+      bs.innerHTML='<table><thead><tr><th>Точка</th><th class="num">Выручка ₽</th><th class="num">YoY</th><th class="num">Чеки</th><th class="num">Ср. чек</th><th class="num">Карта лоял.</th><th class="num">Δ карты</th></tr></thead><tbody>'+
+        d.byStore.map(function(r){
+          var dr=r.revenue.deltaPct, dcl=r.cardPct.deltaPp;
+          var drs=(dr==null?'нов.':(dr>0?'+':'')+mNum1(dr)+'%'); var drc=(dr==null?'color:var(--muted)':(dr>0?'color:#10a05a':(dr<0?'color:#e0466a':'')));
+          var dcls=(dcl==null?'—':(dcl>0?'+':'')+mNum1(dcl)+' п.п.'); var dclc=(dcl>=0?'color:#10a05a':'color:#e0466a');
+          return '<tr><td><b>'+r.name+'</b></td><td class="num">'+mNum(r.revenue.cur)+'</td><td class="num" style="'+drc+'">'+drs+'</td><td class="num">'+mNum(r.cheques.cur)+'</td><td class="num">'+mNum(r.avgCheck.cur)+' ₽</td><td class="num">'+mNum1(r.cardPct.cur)+'%</td><td class="num" style="'+dclc+'">'+dcls+'</td></tr>';
+        }).join('')+'</tbody></table>';
+    }
+    // живой 2ГИС из cron-скрейпа (d.external.gis)
+    var gl=document.getElementById('mktGisLive');
+    if(gl){ var g=d.external&&d.external.gis;
+      if(g){ var a=g.appearance||{}; var st=g.scrapedAt?new Date(g.scrapedAt).toLocaleString('ru-RU'):'—';
+        var acts=(g.actions||[]).slice(0,8).map(function(x){return x.name+' '+mNum1(x.pct)+'%';}).join(' · ');
+        var qs=(g.queries||[]).slice(0,8).map(function(x){return x.q+' '+mNum1(x.pct)+'%';}).join(' · ');
+        // Таблица позиций по каждой нашей рубрике
+        var rubsTable='';
+        if(g.appearanceByRubric && g.appearanceByRubric.length){
+          rubsTable='<div class="mkt-chart-t" style="margin-top:14px">Позиция и показы по каждой нашей рубрике в 2ГИС</div>'+
+            '<div class="table-wrap"><table><thead><tr><th>Рубрика</th><th class="num">Показы/мес</th><th class="num">Позиция (ср.)</th><th class="num">Диапазон</th></tr></thead><tbody>'+
+            g.appearanceByRubric.map(function(b){
+              if(b.error) return '<tr><td>'+b.rubric+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">— '+b.error+'</td></tr>';
+              var posColor=b.positionAvg<=5?'color:#10a05a':(b.positionAvg<=15?'':(b.positionAvg<=50?'color:#b8860b':'color:#e0466a'));
+              return '<tr><td><b>'+b.rubric+'</b></td><td class="num">'+mNum(b.impressions||0)+'</td><td class="num" style="'+posColor+'"><b>'+(b.positionAvg||'?')+'</b></td><td class="num">'+(b.positionMin||'?')+'–'+(b.positionMax||'?')+'</td></tr>';
+            }).join('')+'</tbody></table></div>';
+        }
+        gl.innerHTML='<div class="mkt-chart-t">Присутствие в выдаче 2ГИС <span class="mkt-scope dyn">live</span></div>'+
+          '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
+          (a.impressions?'<li><b>Показы в поиске (все рубрики):</b> '+mNum(a.impressions)+'/мес (за '+a.days+' дн), средняя позиция '+(a.positionAvg||'?')+' ('+(a.positionMin||'?')+'–'+(a.positionMax||'?')+').</li>':'')+
+          (acts?'<li><b>Действия на карточке:</b> '+acts+'.</li>':'')+
+          (qs?'<li><b>Топ-запросы:</b> '+qs+'.</li>':'')+
+          '</ul>'+rubsTable+
+          // Лента событий 2ГИС — снапшот за сегодня (последние ~50 событий)
+          (g.feed && g.feed.eventsCount ? (
+            '<div class="mkt-chart-t" style="margin-top:18px">Лента событий 2ГИС — снапшот за сегодня · '+g.feed.eventsCount+' событий, '+mNum1(g.feed.newUsersPct)+'% новых пользователей</div>'+
+            '<div class="mkt-2col" style="margin-top:8px">'+
+            '<div><div class="mkt-chart-t">По филиалам (из событий)</div><div class="table-wrap"><table><thead><tr><th>Филиал</th><th class="num">События</th></tr></thead><tbody>'+
+              g.feed.byBranch.slice(0,15).map(function(r){ return '<tr><td>'+r.branch+'</td><td class="num">'+r.events+'</td></tr>'; }).join('')+
+              '</tbody></table></div></div>'+
+            '<div><div class="mkt-chart-t">По типам действий</div><div class="table-wrap"><table><thead><tr><th>Тип</th><th class="num">События</th></tr></thead><tbody>'+
+              (g.feed.byEventType||[]).map(function(r){ return '<tr><td>'+r.type+'</td><td class="num">'+r.events+'</td></tr>'; }).join('')+
+              '</tbody></table></div></div>'+
+            '</div>'+
+            (g.feed.topSearch && g.feed.topSearch.length ? '<div style="font-size:12px;margin-top:8px"><b>Топ поисковых фраз из событий:</b> '+g.feed.topSearch.slice(0,8).map(function(s){return s.q+' ×'+s.events;}).join(' · ')+'</div>' : '')
+          ) : '')+
+          '<div style="font-size:11px;color:var(--muted);margin-top:8px">Скрейп 2ГИС по расписанию на сервере. Обновлено: '+st+(g.sessionExpired?' · ⚠️ сессия 2ГИС протухла, нужен релогин':'')+'.</div>';
+      } else { gl.innerHTML='<div style="font-size:12px;color:var(--muted)">2ГИС-данные ещё не собраны (cron-скрейп запустится по расписанию).</div>'; }
+    }
+    // живой Я.Директ из cron-скрейпа (d.external.direct)
+    var dl=document.getElementById('mktDirectLive');
+    if(dl){ var dd=d.external&&d.external.direct;
+      if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—';
+        dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка месяца <span class="mkt-scope dyn">live</span></div>'+
+          '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
+          '<li><b>Воронка:</b> показы <b>'+mNum(t.impressions)+'</b> → клики <b>'+mNum(t.clicks)+'</b> (CTR '+mNum1(t.ctrPct||0)+'%) → конверсии <b>'+mNum(t.conversions)+'</b> (CR '+mNum1(t.crPct||0)+'%).</li>'+
+          '<li><b>Расход:</b> '+mNum(t.spend)+' ₽ · <b>CPC</b> '+mNum1(t.cpc||0)+' ₽ · <b>CPA</b> '+mNum(t.cpa||0)+' ₽.</li>'+
+          (dd.balance?'<li><b>Остаток на счёте кабинета:</b> '+mNum(dd.balance)+' ₽.</li>':'')+
+          '<li><b>Структура:</b> РСЯ с гео-привязкой к районам точек («[ЕПК] РСЯ на Ядринцева» и т.п.). Цель — ecommerce-покупка.</li>'+
+          '</ul>'+
+          // Таблица по кампаниям с CPA-светофором (если есть)
+          ((dd.campaigns && dd.campaigns.length) ? (
+            '<div class="mkt-chart-t" style="margin-top:14px">По кампаниям за месяц</div>'+
+            '<div class="table-wrap"><table><thead><tr><th>Кампания</th><th>Статус</th><th class="num">Расход ₽</th><th class="num">Клики</th><th class="num">Конв.</th><th class="num">CPA ₽</th><th class="num">CTR</th><th class="num">CR</th></tr></thead><tbody>'+
+            dd.campaigns.map(function(c){
+              var cpaC = c.cpa==null?'color:var(--muted)':(c.cpa<=300?'color:#10a05a':(c.cpa<=800?'color:#b8860b':'color:#e0466a'));
+              return '<tr><td><b>'+c.name+'</b></td><td><span style="font-size:11px;color:var(--muted)">'+c.status+'</span></td><td class="num">'+mNum(c.spend)+'</td><td class="num">'+mNum(c.clicks)+'</td><td class="num">'+mNum(c.conversions)+'</td><td class="num" style="'+cpaC+'"><b>'+(c.cpa==null?'—':mNum(c.cpa))+'</b></td><td class="num">'+(c.ctrPct==null?'—':mNum1(c.ctrPct)+'%')+'</td><td class="num">'+(c.crPct==null?'—':mNum1(c.crPct)+'%')+'</td></tr>';
+            }).join('')+'</tbody></table></div>'
+          ) : '')+
+          '<div style="font-size:11px;color:var(--muted);margin-top:8px">Скрейп Директа по расписанию на сервере. Обновлено: '+st+(dd.sessionExpired?' · ⚠️ сессия Яндекса протухла, нужен релогин':'')+'.</div>';
+      } else { dl.innerHTML='<div style="font-size:12px;color:var(--muted)">Данные Я.Директа ещё не собраны (cron-скрейп запустится по расписанию).</div>'; }
+    }
+    // Соцсети — перекрываем TG-колонку в таблице #mktSocial живыми подписчиками
+    if (d.external && d.external.social && d.external.social.brands) {
+      var soTbl = document.querySelector('#mktSocial table');
+      if (soTbl) {
+        var brandKeyByName = { 'Мария':'maria', 'Стефания':'stefania', 'Этика':'etika', 'Cake Home':'cakehome', 'ЯХОНТ':'yahont' };
+        var trs2 = soTbl.querySelectorAll('tbody tr');
+        var anyLive = false;
+        trs2.forEach(function(tr){
+          var name = (tr.children[0]||{}).textContent.trim();
+          var k = brandKeyByName[name]; if (!k) return;
+          var br = d.external.social.brands[k];
+          if (br && br.telegram && br.telegram.subscribers) {
+            tr.children[1].innerHTML = mNum(br.telegram.subscribers) + ' <span style="font-size:10px;color:#10a05a">live</span>';
+            anyLive = true;
+          }
+        });
+        if (anyLive) {
+          var st = new Date(d.external.social.scrapedAt).toLocaleString('ru-RU');
+          var info2 = document.getElementById('mktSocialLiveInfo');
+          if (!info2 && soTbl.parentNode) {
+            info2 = document.createElement('div');
+            info2.id = 'mktSocialLiveInfo';
+            info2.style.cssText = 'font-size:11px;color:var(--muted);margin-top:6px';
+            soTbl.parentNode.parentNode.appendChild(info2);
+          }
+          if (info2) info2.textContent = 'Зелёный «live» в колонке Telegram = подписчики обновлены автоскрейпом t.me-preview (cron среда 04:30). Обновлено: ' + st;
+        }
+      }
+    }
+    // Цены конкурентов — перекрываем захардкоженные ячейки таблицы #mktPrices живыми из cron-скрейпа
+    if (d.external && d.external.prices && d.external.prices.competitors) {
+      var prTbl = document.querySelector('#mktPrices table');
+      if (prTbl) {
+        var fmtPrice = function(s){ if(!s) return null; return s.min===s.max ? (s.min+' ₽') : (s.min+'–'+s.max+' ₽'); };
+        // Мапим заголовок строки → ключ категории в JSON
+        var rowCatMap = { 'Торт на заказ':'tort_zakaz', 'Бенто-торт':'bento', 'Кусочек / пирожное':['kusochki','pirozhnoe','desserts'], 'Макаронс, ₽/шт':'macarons' };
+        // Колонки конкурентов: Мария(1) Стефания(2) Этика(3) Cake Home(4) ЯХОНТ(5)
+        var compColMap = { 'stefania':2, 'etika':3, 'cakehome':4 };
+        var trs = prTbl.querySelectorAll('tbody tr');
+        trs.forEach(function(tr){
+          var label = (tr.children[0]||{}).textContent || '';
+          var catKey = rowCatMap[label.trim()];
+          if (!catKey) return;
+          for (var cKey in compColMap) {
+            var col = compColMap[cKey];
+            var comp = d.external.prices.competitors[cKey];
+            if (!comp) continue;
+            // подбираем категорию: если у нас массив возможных ключей — берём первый существующий с не-null значением
+            var keys = Array.isArray(catKey) ? catKey : [catKey];
+            var match = null;
+            for (var i=0;i<keys.length;i++) { if (comp.categories[keys[i]]) { match = comp.categories[keys[i]]; break; } }
+            var newVal = fmtPrice(match);
+            if (newVal && tr.children[col]) {
+              tr.children[col].innerHTML = newVal + ' <span style="font-size:10px;color:#10a05a">live</span>';
+            }
+          }
+        });
+        // подпись «обновлено»
+        var hint = document.querySelector('#mkt-s-comp .section-hint, #mktPrices').parentElement.querySelector('.section-hint');
+        var st = new Date(d.external.prices.scrapedAt).toLocaleString('ru-RU');
+        var info = document.getElementById('mktPricesLiveInfo');
+        if (!info && prTbl.parentNode) {
+          info = document.createElement('div');
+          info.id = 'mktPricesLiveInfo';
+          info.style.cssText = 'font-size:11px;color:var(--muted);margin-top:6px';
+          prTbl.parentNode.parentNode.appendChild(info);
+        }
+        if (info) info.textContent = 'Зелёный «live» = ячейка обновлена сегодня автоскрейпом с сайта конкурента (cron вторник 04:30). Обновлено: ' + st;
+      }
+    }
+    // SERP — позиции в Яндексе: Мария vs Стефания (живые данные)
+    var sl=document.getElementById('mktSerpLive');
+    if(sl){ var seo=d.external&&d.external.seo;
+      if(seo && seo.queries){
+        var s=seo.summary||{};
+        var rankBadge=function(r){ if(r==null) return '<span style="color:var(--muted)">—</span>';
+          var clr=r<=3?'#10a05a':(r<=10?'#b8860b':'#e0466a');
+          return '<span style="color:'+clr+';font-weight:700">'+r+'</span>'; };
+        var rows=seo.queries.map(function(q){
+          if(q.captcha) return '<tr><td>'+q.q+'</td><td colspan="4" style="font-size:11px;color:var(--muted)">— Яндекс показал капчу, обновится на следующем запуске</td></tr>';
+          var r=q.ranks||{};
+          return '<tr><td><b>'+q.q+'</b></td><td class="num">'+rankBadge(r.maria)+'</td><td class="num">'+rankBadge(r.stefania)+'</td><td class="num">'+rankBadge(r.cakehome)+'</td><td style="font-size:11px;color:var(--muted)">'+(q.top1||'')+'</td></tr>';
+        }).join('');
+        var st=seo.scrapedAt?new Date(seo.scrapedAt).toLocaleString('ru-RU'):'—';
+        sl.innerHTML='<div class="mkt-chart-t">Позиции в Яндексе (lr=63 Иркутск): Мария vs конкуренты <span class="mkt-scope dyn">live</span></div>'+
+          '<div style="margin:6px 0 10px;font-size:13px"><b>В топ-10:</b> Мария — <span style="color:'+(s.mariaTop10>=s.stefaniaTop10?'#10a05a':'#e0466a')+';font-weight:700">'+(s.mariaTop10||0)+'</span> запросов · Стефания — <span style="color:#b8860b;font-weight:700">'+(s.stefaniaTop10||0)+'</span> · <b>Средняя позиция</b> (по запросам где обе ранжируются): Мария '+(s.avgRankMaria||'—')+', Стефания '+(s.avgRankStefania||'—')+'.</div>'+
+          '<div class="table-wrap"><table><thead><tr><th>Запрос</th><th class="num">Мария</th><th class="num">Стефания</th><th class="num">Cake Home</th><th>Топ-1</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:6px">Цвет ранга: ≤3 зелёный · ≤10 янтарь · >10 красный · «—» нет в выдаче. Скрейп Яндекс-SERP по расписанию (еженедельно). Обновлено: '+st+'.</div>';
+      } else {
+        sl.innerHTML='<div style="font-size:12px;color:var(--muted)">Позиции в Яндексе ещё не собраны (cron-скрейп запустится по расписанию).</div>';
+      }
+    }
+    // живая Я.Метрика из cron-скрейпа (d.external.metrika)
+    var ml=document.getElementById('mktMetrikaLive');
+    if(ml){ var mk=d.external&&d.external.metrika;
+      if(mk && (mk.totalVisits || mk.totalVisitsHeader || (mk.sources && mk.sources.length))){
+        var v=mk.totalVisits||mk.totalVisitsHeader||0; var st=mk.scrapedAt?new Date(mk.scrapedAt).toLocaleString('ru-RU'):'—';
+        var per=mk.period?(mk.period.label||(mk.period.start+'…'+mk.period.end)):'—';
+        var src=(mk.sources||[]).map(function(s){return s.name+' '+mNum(s.visits)+' ('+mNum1(s.sharePct)+'%)';}).join(' · ');
+        ml.innerHTML='<div class="mkt-chart-t">Метрика — трафик сайта <span class="mkt-scope dyn">live</span></div>'+
+          '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
+          '<li><b>Период:</b> '+per+'.</li>'+
+          (v?'<li><b>Визиты:</b> '+mNum(v)+'.</li>':'')+
+          (src?'<li><b>Источники:</b> '+src+'.</li>':'')+
+          '</ul><div style="font-size:11px;color:var(--muted);margin-top:6px">Скрейп Метрики по расписанию. Обновлено: '+st+(mk.sessionExpired?' · ⚠️ сессия Яндекса протухла, нужен релогин':'')+'.</div>';
+      } else if(mk && mk.gridTimeout){
+        ml.innerHTML='<div style="font-size:12px;color:var(--muted)">Метрика-SPA рендерится нестабильно через headless-браузер. Рекомендуем оформить OAuth-токен Metrika API (надёжный путь). Cron продолжит пытаться ежедневно.</div>';
+      } else {
+        ml.innerHTML='<div style="font-size:12px;color:var(--muted)">Метрика — данные ещё не собраны (cron-скрейп 06:30).</div>';
+      }
+    }
+  }).catch(function(e){ el.innerHTML='<div class="mkt-yoy-load">Ошибка загрузки: '+e.message+'</div>'; });
+}
+// Универсальная sticky-навигация по секциям страницы (Маркетинг и Дашборд).
+function pageNavInit(navId, pageId){
+  var nav=document.getElementById(navId); if(!nav || nav._navInited) return;
+  nav._navInited=true;
+  var links=[].slice.call(nav.querySelectorAll('a'));
+  var ids=links.map(function(a){ return a.getAttribute('href').slice(1); });
+  links.forEach(function(a){
+    a.addEventListener('click', function(e){
+      var t=document.getElementById(a.getAttribute('href').slice(1));
+      if(t){ e.preventDefault(); t.scrollIntoView({behavior:'smooth', block:'start'}); }
+    });
+  });
+  function spy(){
+    var pg=document.getElementById(pageId);
+    if(!pg || pg.classList.contains('hidden') || getComputedStyle(pg).display==='none') return;
+    var best=ids[0], bestTop=-1e9;
+    for(var i=0;i<ids.length;i++){
+      var el=document.getElementById(ids[i]); if(!el) continue;
+      var top=el.getBoundingClientRect().top - 80;
+      if(top<=0 && top>bestTop){ bestTop=top; best=ids[i]; }
+    }
+    links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('href').slice(1)===best); });
+  }
+  window.addEventListener('scroll', spy, {passive:true});
+  spy();
 }
 
