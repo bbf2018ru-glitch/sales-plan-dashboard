@@ -23,6 +23,8 @@ const {
 } = require('./upp-client');
 
 const cache = makeCache(5 * 60 * 1000);
+// 24-час кэш per-month уникальных карт (Set). Прошлые месяцы не меняются — большие TTL ок.
+const monthCardsCache = makeCache(24 * 60 * 60 * 1000);
 
 // ─── 1) Customers retention ─────────────────────────────────────────────────
 // Считает: новых клиентов в периоде (первая активность карты попадает в from..to)
@@ -97,6 +99,278 @@ async function buildCustomersRetention(fromYM, toYM) {
       returningCardsBonusSum: Number(returningSum.toFixed(2))
     }
   };
+}
+
+// Получает уникальные карты, активные в месяце ym (через регистр «Бонусы»).
+// Кэшируется per-month (24ч) — прошлые месяцы не меняются.
+async function getMonthCards(ym) {
+  return monthCardsCache.wrap('cards:' + ym, async () => {
+    const set = new Set();
+    try {
+      const d = await callRegister('Бонусы', ym, ym, 999);
+      for (const r of d.rows || []) {
+        const card = (r['БонуснаяКарта'] || '').trim();
+        if (card) set.add(card);
+      }
+    } catch (e) {
+      return { cards: Array.from(set), _err: e.message };
+    }
+    return { cards: Array.from(set) };
+  });
+}
+
+// Помесячно: новые карты в каждом месяце с янв пред.года по выбранный включительно.
+// «Новая» = карта появилась впервые ИМЕННО в этом месяце (нет в предыдущих 12 мес и нет
+// в более ранних месяцах того же ряда).
+// Non-blocking: если месяц не в кэше — добавляет _pending плейсхолдер и греет фон.
+async function buildNewCustomersMonthly(period) {
+  const [y, m] = period.split('-').map(Number);
+  // baseline 12 мес до янв пред.года (для отсечки «новых» от давних)
+  const seriesMonths = [];
+  for (let yy = y - 1; yy <= y; yy++) {
+    const lastM = (yy === y) ? m : 12;
+    for (let mm = 1; mm <= lastM; mm++) seriesMonths.push(`${yy}-${String(mm).padStart(2, '0')}`);
+  }
+  // baseline: 12 мес до первого месяца ряда
+  const baselineMonths = [];
+  let bm = seriesMonths[0];
+  for (let i = 0; i < 12; i++) { bm = prevMonth(bm); baselineMonths.unshift(bm); }
+
+  // Собираем baseline из того что есть в кэше (синхронно). Недостающее греется фоном.
+  const baselineCards = new Set();
+  let baselinePending = 0;
+  for (const ym of baselineMonths) {
+    const c = monthCardsCache.getCached('cards:' + ym);
+    if (c) {
+      for (const card of c.cards || []) baselineCards.add(card);
+    } else {
+      baselinePending++;
+      if (!monthCardsCache.isPending('cards:' + ym)) {
+        getMonthCards(ym).then(() => console.log(`[new-customers] warm baseline ${ym}`)).catch(() => {});
+      }
+    }
+  }
+
+  // Серия по месяцам периода
+  const series = [];
+  const seenCards = new Set(baselineCards); // карты которые уже встречались
+  let seriesPending = 0;
+  for (const ym of seriesMonths) {
+    const c = monthCardsCache.getCached('cards:' + ym);
+    if (!c) {
+      series.push({ ym, newCards: null, activeCards: null, _pending: true });
+      seriesPending++;
+      if (!monthCardsCache.isPending('cards:' + ym)) {
+        getMonthCards(ym).then(() => console.log(`[new-customers] warm series ${ym}`)).catch(() => {});
+      }
+      continue;
+    }
+    let newInMonth = 0;
+    for (const card of c.cards || []) {
+      if (!seenCards.has(card)) { newInMonth++; seenCards.add(card); }
+    }
+    series.push({ ym, newCards: newInMonth, activeCards: (c.cards || []).length });
+  }
+  return {
+    period,
+    range: { from: seriesMonths[0], to: seriesMonths[seriesMonths.length - 1] },
+    baseline: { months: baselineMonths.length, pending: baselinePending, knownCards: baselineCards.size },
+    series,
+    seriesPending
+  };
+}
+
+// Per-month UDS-промокоды (для матрицы «месяц × код»). Кэш 24ч.
+const promoMonthCache = makeCache(24 * 60 * 60 * 1000);
+
+async function getUdsMonthlyAggregate(ym) {
+  return promoMonthCache.wrap('uds:' + ym, async () => {
+    const codes = new Map(); // code → { uses, revenue }
+    try {
+      const d = await callDocument('ЧекККМ', ym, ym, 999);
+      const rows = d.rows || [];
+      let truncated = rows.length >= 999;
+      for (const r of rows) {
+        const code = (r['uds_КодСкидки'] || '').trim();
+        if (!code) continue;
+        const sum = parseRu(r['СуммаДокумента']) || 0;
+        if (!codes.has(code)) codes.set(code, { code, uses: 0, revenue: 0 });
+        const c = codes.get(code); c.uses += 1; c.revenue += sum;
+      }
+      return { codes: Array.from(codes.values()), truncated };
+    } catch (e) { return { codes: [], _err: e.message }; }
+  });
+}
+
+// Помесячная детализация UDS-промокодов: код × месяц × uses × revenue.
+// Non-blocking — что в кэше отдаём, недостающее греется фоном.
+async function buildPromoCodesMonthly(period) {
+  const [y, m] = period.split('-').map(Number);
+  const months = [];
+  for (let yy = y - 1; yy <= y; yy++) {
+    const lastM = (yy === y) ? m : 12;
+    for (let mm = 1; mm <= lastM; mm++) months.push(`${yy}-${String(mm).padStart(2, '0')}`);
+  }
+
+  // code → { totalUses, totalRevenue, byMonth: { ym → {uses, revenue} } }
+  const codes = new Map();
+  let pending = 0;
+  for (const ym of months) {
+    const c = promoMonthCache.getCached('uds:' + ym);
+    if (!c) {
+      pending++;
+      if (!promoMonthCache.isPending('uds:' + ym)) {
+        getUdsMonthlyAggregate(ym).then(() => console.log(`[promo-monthly] warm ${ym}`)).catch(() => {});
+      }
+      continue;
+    }
+    for (const row of c.codes || []) {
+      if (!codes.has(row.code)) codes.set(row.code, { code: row.code, totalUses: 0, totalRevenue: 0, byMonth: {} });
+      const e = codes.get(row.code);
+      e.totalUses += row.uses;
+      e.totalRevenue += row.revenue;
+      e.byMonth[ym] = { uses: row.uses, revenue: Math.round(row.revenue) };
+    }
+  }
+
+  // Топ-50 по выручке + помесячная разбивка
+  const arr = Array.from(codes.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
+  return {
+    period,
+    range: { from: months[0], to: months[months.length - 1] },
+    months,
+    monthsPending: pending,
+    totalCodes: arr.length,
+    summary: {
+      totalUses: arr.reduce((s, c) => s + c.totalUses, 0),
+      totalRevenue: Math.round(arr.reduce((s, c) => s + c.totalRevenue, 0))
+    },
+    codes: arr.slice(0, 50).map(c => ({
+      code: c.code,
+      totalUses: c.totalUses,
+      totalRevenue: Math.round(c.totalRevenue),
+      avgTicket: c.totalUses ? Math.round(c.totalRevenue / c.totalUses) : 0,
+      byMonth: c.byMonth
+    })),
+    note: 'Сумма скидки (расход на промо) пока не показывается — требует JOIN c регистром ПредоставленныеСкидки по ссылке на документ-чек. Будет добавлено отдельной задачей.'
+  };
+}
+
+async function warmPromoCodesMonthly(period) {
+  const p = period || nowYM();
+  const [y, m] = p.split('-').map(Number);
+  const months = [];
+  for (let yy = y - 1; yy <= y; yy++) {
+    const lastM = (yy === y) ? m : 12;
+    for (let mm = 1; mm <= lastM; mm++) months.push(`${yy}-${String(mm).padStart(2, '0')}`);
+  }
+  let ok = 0, fail = 0;
+  for (const ym of months) {
+    try { await getUdsMonthlyAggregate(ym); ok++; } catch { fail++; }
+  }
+  console.log(`[promo-monthly] warm done: ok=${ok} fail=${fail} months=${months.length}`);
+  return { ok, fail, total: months.length };
+}
+
+// «Торт месяца» — автоопределение по всплеску продаж конкретного торта в каждом месяце
+// vs его средняя за все 17 месяцев. Использует кэш marketing-channels (aggSales).
+// Возвращает [{ ym, productCode, name, revenue, qty, ratio, categoryRevenue, sharePct }, ...]
+async function buildCakeOfMonthSeries(period) {
+  // Ленивый require — circular dependency safety
+  const mc = require('./marketing-channels')._internal;
+  const months = mc.monthsExtendedSeries(period);
+  const pmap = await mc.getProductMap(period); // productCode → { name, group }
+
+  // Собираем productCode → revenue по месяцам. Только товары из «тортовой» группы.
+  const TORT_RE = /торт/i;
+  const productMonthly = new Map(); // code → { name, byMonth: { ym → {revenue, qty} } }
+  const monthData = [];             // [{ ym, ready, categoryRevenue }]
+  for (const ym of months) {
+    const cached = mc.monthCache.getCached('agg:' + ym);
+    if (!cached) {
+      monthData.push({ ym, ready: false });
+      if (!mc.monthCache.isPending('agg:' + ym)) {
+        mc.aggSales(ym).then(() => console.log(`[cake-of-month] warm agg ${ym}`)).catch(() => {});
+      }
+      continue;
+    }
+    let catRev = 0;
+    for (const [code, v] of cached.products) {
+      const meta = pmap[code];
+      if (!meta) continue;
+      // «Торт» определяем по группе товара или по имени
+      const isTort = TORT_RE.test(meta.group || '') || TORT_RE.test(meta.name || '');
+      if (!isTort) continue;
+      catRev += v.sum || 0;
+      if (!productMonthly.has(code)) productMonthly.set(code, { code, name: meta.name, byMonth: {} });
+      productMonthly.get(code).byMonth[ym] = { revenue: v.sum || 0, qty: v.qty || 0 };
+    }
+    monthData.push({ ym, ready: true, categoryRevenue: Math.round(catRev) });
+  }
+
+  // Для каждого товара: avg выручка по доступным месяцам.
+  const productAvg = new Map();
+  for (const [code, p] of productMonthly) {
+    const vals = Object.values(p.byMonth).map(v => v.revenue || 0);
+    if (!vals.length) continue;
+    productAvg.set(code, vals.reduce((a, b) => a + b, 0) / vals.length);
+  }
+
+  // Для каждого месяца: ищем торт с наибольшим ratio = revenue[ym] / avgOverall.
+  // Минимальный порог: revenue в этом месяце >= 50 000 ₽ (отсечь редко продаваемые товары).
+  const series = monthData.map(md => {
+    if (!md.ready) return { ym: md.ym, _pending: true };
+    let best = null;
+    for (const [code, p] of productMonthly) {
+      const m = p.byMonth[md.ym];
+      if (!m || m.revenue < 50000) continue;
+      const avg = productAvg.get(code) || 1;
+      const ratio = m.revenue / avg;
+      if (!best || ratio > best.ratio) best = { code, name: p.name, revenue: Math.round(m.revenue), qty: Math.round(m.qty), ratio: Math.round(ratio * 100) / 100 };
+    }
+    if (!best) return { ym: md.ym, productCode: null, name: 'нет данных', revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
+    return {
+      ym: md.ym,
+      productCode: best.code,
+      name: best.name,
+      revenue: best.revenue,
+      qty: best.qty,
+      ratio: best.ratio,
+      categoryRevenue: md.categoryRevenue,
+      sharePct: md.categoryRevenue ? Math.round((best.revenue / md.categoryRevenue) * 1000) / 10 : null
+    };
+  });
+
+  const pendingCount = series.filter(s => s._pending).length;
+  return {
+    period,
+    method: 'auto: max(revenue/avg) среди тортов с месячной выручкой ≥50к',
+    range: { from: months[0], to: months[months.length - 1] },
+    series,
+    seriesPending: pendingCount,
+    productsConsidered: productMonthly.size
+  };
+}
+
+// Прогрев per-month кэша карт для всей расширенной серии — фоном из server.js.
+async function warmNewCustomersMonthly(period) {
+  const p = period || nowYM();
+  const [y, m] = p.split('-').map(Number);
+  const months = [];
+  // baseline 12 мес + series 17 мес = 29 месяцев
+  let bm = `${y - 1}-01`;
+  for (let i = 0; i < 12; i++) { bm = prevMonth(bm); months.unshift(bm); }
+  for (let yy = y - 1; yy <= y; yy++) {
+    const lastM = (yy === y) ? m : 12;
+    for (let mm = 1; mm <= lastM; mm++) months.push(`${yy}-${String(mm).padStart(2, '0')}`);
+  }
+  let ok = 0, fail = 0;
+  for (const ym of months) {
+    try { await getMonthCards(ym); ok++; }
+    catch { fail++; }
+  }
+  console.log(`[new-customers] warm done: ok=${ok} fail=${fail} months=${months.length}`);
+  return { ok, fail, total: months.length };
 }
 
 // ─── 2) Sales-kg ────────────────────────────────────────────────────────────
@@ -440,6 +714,47 @@ async function getCustomersRetention(opts = {}) {
   });
 }
 
+// Помесячная детализация UDS-промокодов. Non-blocking.
+async function getPromoCodesMonthly(opts = {}) {
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  const period = opts.period || nowYM();
+  return cached(`promo-monthly:${period}`, async () => {
+    try {
+      return { available: true, ...(await buildPromoCodesMonthly(period)) };
+    } catch (e) {
+      return { available: false, error: e.message };
+    }
+  });
+}
+
+// «Торт месяца» помесячно (автоопределение). Non-blocking — что в кэше отдаём.
+async function getCakeOfMonthSeries(opts = {}) {
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  const period = opts.period || nowYM();
+  return cached(`cake-of-month:${period}`, async () => {
+    try {
+      return { available: true, ...(await buildCakeOfMonthSeries(period)) };
+    } catch (e) {
+      return { available: false, error: e.message };
+    }
+  });
+}
+
+// Помесячно: новые карты с янв пред.года по выбранный месяц. Non-blocking — что в кэше отдаём,
+// остальное греется фоном. Внешний рендер фильтрует _pending точки.
+async function getNewCustomersMonthly(opts = {}) {
+  if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
+  const period = opts.period || nowYM();
+  // cache 5 мин — чтобы при «греется фоном» подхватывать новые точки быстро
+  return cached(`new-customers-monthly:${period}`, async () => {
+    try {
+      return { available: true, ...(await buildNewCustomersMonthly(period)) };
+    } catch (e) {
+      return { available: false, error: e.message };
+    }
+  });
+}
+
 async function getSalesKg(db, opts = {}) {
   if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
   const fromISO = opts.from || null;
@@ -529,6 +844,11 @@ async function getTopCustomersByRevenue(opts = {}) {
 
 module.exports = {
   getCustomersRetention,
+  getNewCustomersMonthly,
+  warmNewCustomersMonthly,
+  getPromoCodesMonthly,
+  warmPromoCodesMonthly,
+  getCakeOfMonthSeries,
   getSalesKg,
   getChequeCategories,
   getPromoDynamics,

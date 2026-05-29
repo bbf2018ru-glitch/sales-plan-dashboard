@@ -307,4 +307,8 @@ async function warmExtendedSeries(period) {
   return { ok, fail, total: months.length };
 }
 
-module.exports = { getChannels, warm, warmExtendedSeries, _compute: compute };
+// Внутренние API для других модулей (cake-of-month и т.п. читают наш кэш).
+module.exports = {
+  getChannels, warm, warmExtendedSeries, _compute: compute,
+  _internal: { aggSales, getProductMap, monthCache, monthsExtendedSeries }
+};

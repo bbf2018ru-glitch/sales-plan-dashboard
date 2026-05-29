@@ -22,6 +22,11 @@ const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
   getCustomersRetention,
+  getNewCustomersMonthly,
+  warmNewCustomersMonthly,
+  getPromoCodesMonthly,
+  warmPromoCodesMonthly,
+  getCakeOfMonthSeries,
   getSalesKg,
   getChequeCategories,
   getPromoDynamics,
@@ -106,6 +111,24 @@ function warmExtended() {
 }
 setTimeout(warmExtended, 60000);
 setInterval(warmExtended, 24 * 60 * 60 * 1000);
+
+// Помесячный «новые карты лояльности» — ~29 запросов к 1С последовательно (тоже медленный).
+function warmNewCustomers() {
+  warmNewCustomersMonthly()
+    .then(r => console.log('[new-customers] warm result', JSON.stringify(r)))
+    .catch(e => console.log('[new-customers] warm error', e.message));
+}
+setTimeout(warmNewCustomers, 90000);
+setInterval(warmNewCustomers, 24 * 60 * 60 * 1000);
+
+// UDS-промокоды помесячно — 17 запросов callDocument('ЧекККМ').
+function warmPromoCodes() {
+  warmPromoCodesMonthly()
+    .then(r => console.log('[promo-monthly] warm result', JSON.stringify(r)))
+    .catch(e => console.log('[promo-monthly] warm error', e.message));
+}
+setTimeout(warmPromoCodes, 120000);
+setInterval(warmPromoCodes, 24 * 60 * 60 * 1000);
 
 // ── AI-chat rate limit (per IP, защита Groq billing) ─────────────────────
 // AI-чат открыт без auth (чтобы работал у любого зашедшего на дашборд),
@@ -646,6 +669,41 @@ const server = http.createServer(async (req, res) => {
       const to = parsedUrl.searchParams.get('to');
       try {
         sendJson(res, 200, await getCustomersRetention({ from, to }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // Помесячно: новые карты лояльности с янв пред.года по выбранный (?period=YYYY-MM).
+    // Используется на вкладке Маркетинг как трендовый график.
+    if (pathname === '/api/analytics/new-customers-monthly' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const period = parsedUrl.searchParams.get('period');
+      try {
+        sendJson(res, 200, await getNewCustomersMonthly({ period }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // UDS-промокоды детально: код × месяц × uses × revenue. Non-blocking.
+    if (pathname === '/api/analytics/promo-codes-monthly' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const period = parsedUrl.searchParams.get('period');
+      try {
+        sendJson(res, 200, await getPromoCodesMonthly({ period }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // «Торт месяца» помесячно (автоопределение по всплеску продаж конкретного торта).
+    // Не делает новых вызовов в 1С — читает кэш marketing-channels (aggSales).
+    if (pathname === '/api/analytics/cake-of-month' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const period = parsedUrl.searchParams.get('period');
+      try {
+        sendJson(res, 200, await getCakeOfMonthSeries({ period }));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

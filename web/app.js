@@ -4564,6 +4564,84 @@ function mktLoadYoY(){
       mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');
       mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b');
     }
+    // Промокоды UDS — помесячная матрица.
+    fetchJson('/api/analytics/promo-codes-monthly?period='+period).then(function(pc){
+      if(!pc||!pc.available) return;
+      var el=document.getElementById('mktPromoCodes'); var hint=document.getElementById('mktPromoCodesHint');
+      if(!el) return;
+      var MM4=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      var months=pc.months||[];
+      var codes=pc.codes||[];
+      if(!codes.length){
+        el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Чеки с промокодами прогреваются из 1С (~5 мин/мес × '+(months.length||17)+' мес). Обнови страницу позже.</div>';
+        if(hint) hint.textContent='Прогрев фоном · '+(pc.monthsPending||0)+' мес. в очереди';
+        return;
+      }
+      // компактные ярлыки месяцев в шапку
+      var monthLbls=months.map(function(ym){ var p=ym.split('-'); return p[0].slice(2)+'-'+MM4[Number(p[1])]; });
+      // Полный заголовок: Код | Всего uses | Всего выручка | Ср.чек | <месяц1>| <месяц2>...
+      var thead='<tr><th>Промокод</th><th class="num">Применений всего</th><th class="num">Выручка всего, ₽</th><th class="num">Ср.чек, ₽</th>'+
+        monthLbls.map(function(l){return '<th class="num" style="font-size:10px;writing-mode:vertical-rl;transform:rotate(180deg);height:60px">'+l+'</th>';}).join('')+'</tr>';
+      var tbody=codes.slice(0,30).map(function(c){
+        var monthCells=months.map(function(ym){
+          var m=c.byMonth[ym];
+          if(!m||!m.revenue) return '<td class="num" style="color:var(--muted);font-size:11px">—</td>';
+          return '<td class="num" title="'+m.uses+' исп. · '+mNum(m.revenue)+' ₽">'+mNum(m.revenue)+'</td>';
+        }).join('');
+        return '<tr><td><b>'+c.code+'</b></td><td class="num">'+mNum(c.totalUses)+'</td><td class="num">'+mNum(c.totalRevenue)+'</td><td class="num">'+mNum(c.avgTicket)+'</td>'+monthCells+'</tr>';
+      }).join('');
+      el.innerHTML='<table style="font-size:12px"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>';
+      if(hint){
+        var pending=pc.monthsPending||0;
+        hint.innerHTML='Топ-30 кодов по выручке. Всего <b>'+pc.totalCodes+'</b> уникальных кодов · применений <b>'+mNum(pc.summary.totalUses)+'</b> · выручка <b>'+mNum(pc.summary.totalRevenue)+' ₽</b>.'+(pending?' · '+pending+' мес. ещё прогреваются':'')+'<br><span style="opacity:.7">'+(pc.note||'')+'</span>';
+      }
+    }).catch(function(){});
+
+    // Торт месяца — авто-определение торта-флагмана каждого месяца.
+    fetchJson('/api/analytics/cake-of-month?period='+period).then(function(cm){
+      if(!cm||!cm.available||!cm.series) return;
+      var el=document.getElementById('mktCake'); var hint=document.getElementById('mktCakeHint');
+      if(!el) return;
+      var MM3=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      var ready=cm.series.filter(function(s){return !s._pending && s.productCode;});
+      if(!ready.length){
+        el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Данные тортов прогреваются вместе с основной серией 1С. Обнови страницу через 10–30 мин.</div>';
+        if(hint) hint.textContent='Прогрев из 1С (фоновый ~30 мин)';
+        return;
+      }
+      el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт-флагман</th><th class="num">Выручка ₽</th><th class="num">Штук</th><th class="num">Доля в тортах</th><th class="num">×ср.</th></tr></thead><tbody>'+
+        ready.map(function(s){
+          var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
+          var rc=s.ratio>=2?'color:#10a05a':(s.ratio>=1.3?'color:#b8860b':'');
+          return '<tr><td>'+lbl+'</td><td><b>'+s.name+'</b></td><td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(s.qty)+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td><td class="num" style="'+rc+'">×'+(s.ratio!=null?mNum1(s.ratio):'?')+'</td></tr>';
+        }).join('')+'</tbody></table>';
+      if(hint){
+        var pending=cm.seriesPending||0;
+        hint.innerHTML='Метод: '+cm.method+'. Рассмотрено '+cm.productsConsidered+' тортов. Колонка <b>×ср.</b> — во сколько раз выручка торта в этом месяце превысила свою среднюю за 17 мес (зелёное ≥2× — явный «эффект акции», жёлтое ≥1,3× — заметный, без цвета — спорный).'+(pending?' · '+pending+' мес. ещё прогреваются':'');
+      }
+    }).catch(function(){});
+
+    // Новые карты лояльности по месяцам — отдельный endpoint (тоже non-blocking).
+    // 17 точек: с янв пред.года по выбранный. Бар = сколько НОВЫХ карт активировались впервые в этом месяце.
+    fetchJson('/api/analytics/new-customers-monthly?period='+period).then(function(nc){
+      if(!nc||!nc.available||!nc.series) return;
+      var hint=document.getElementById('mktChartNewCustHint');
+      var MM2=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      var ready=nc.series.filter(function(s){return !s._pending && s.newCards!=null;});
+      if(!ready.length){
+        var el=document.getElementById('mktChartNewCust');
+        if(el) el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Карты лояльности 2024–2026 прогреваются из 1С (~5 мин на месяц × 29 мес ≈ 2,5 ч). Обнови страницу через несколько минут — точки появятся.</div>';
+        if(hint) hint.textContent='Прогревается из 1С (фоновый ~2,5 ч)';
+        return;
+      }
+      var lbls2=ready.map(function(s){ var p=s.ym.split('-'); return p[0].slice(2)+'-'+MM2[Number(p[1])]; });
+      mBars('mktChartNewCust', lbls2, ready.map(function(s){return s.newCards;}), 'var(--accent)', ' карт');
+      if(hint){
+        var pending=nc.seriesPending||0;
+        var sum=ready.reduce(function(a,s){return a+s.newCards;},0);
+        hint.textContent='Сумма по '+ready.length+' мес.: '+mNum(sum)+' новых карт. Baseline 12 мес до старта (отсекает «не новых»).'+(pending?' · '+pending+' мес. ещё прогреваются':'');
+      }
+    }).catch(function(){});
     // По точкам — маркетинг
     var bs=document.getElementById('mktByStore');
     if(bs && d.byStore && d.byStore.length){
