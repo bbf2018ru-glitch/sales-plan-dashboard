@@ -4579,21 +4579,26 @@ function mktLoadYoY(){
       }
       // компактные ярлыки месяцев в шапку
       var monthLbls=months.map(function(ym){ var p=ym.split('-'); return p[0].slice(2)+'-'+MM4[Number(p[1])]; });
-      // Полный заголовок: Код | Всего uses | Всего выручка | Ср.чек | <месяц1>| <месяц2>...
-      var thead='<tr><th>Промокод</th><th class="num">Применений всего</th><th class="num">Выручка всего, ₽</th><th class="num">Ср.чек, ₽</th>'+
+      // Заголовок: Код | Применений | Выручка | Ср.чек | Бонусы списано | ДРР% | <месяц1>...
+      var thead='<tr><th>Промокод</th><th class="num">Прим.</th><th class="num">Выручка, ₽</th><th class="num">Ср.чек, ₽</th><th class="num">Бонусы списано, ₽</th><th class="num">ДРР %</th>'+
         monthLbls.map(function(l){return '<th class="num" style="font-size:10px;writing-mode:vertical-rl;transform:rotate(180deg);height:60px">'+l+'</th>';}).join('')+'</tr>';
       var tbody=codes.slice(0,30).map(function(c){
         var monthCells=months.map(function(ym){
           var m=c.byMonth[ym];
           if(!m||!m.revenue) return '<td class="num" style="color:var(--muted);font-size:11px">—</td>';
-          return '<td class="num" title="'+m.uses+' исп. · '+mNum(m.revenue)+' ₽">'+mNum(m.revenue)+'</td>';
+          var ttl=m.uses+' исп. · '+mNum(m.revenue)+' ₽'+(m.bonusUsed?' · бонусы '+mNum(m.bonusUsed):'');
+          return '<td class="num" title="'+ttl+'">'+mNum(m.revenue)+'</td>';
         }).join('');
-        return '<tr><td><b>'+c.code+'</b></td><td class="num">'+mNum(c.totalUses)+'</td><td class="num">'+mNum(c.totalRevenue)+'</td><td class="num">'+mNum(c.avgTicket)+'</td>'+monthCells+'</tr>';
+        var drrC=c.drrPct>=20?'color:#e0466a':(c.drrPct>=10?'color:#b8860b':'');
+        return '<tr><td><b>'+c.code+'</b></td><td class="num">'+mNum(c.totalUses)+'</td><td class="num">'+mNum(c.totalRevenue)+'</td><td class="num">'+mNum(c.avgTicket)+'</td><td class="num">'+(c.totalBonusUsed?mNum(c.totalBonusUsed):'<span style="color:var(--muted)">—</span>')+'</td><td class="num" style="'+drrC+'">'+(c.totalBonusUsed?mNum1(c.drrPct)+' %':'—')+'</td>'+monthCells+'</tr>';
       }).join('');
       el.innerHTML='<table style="font-size:12px"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>';
       if(hint){
         var pending=pc.monthsPending||0;
-        hint.innerHTML='Топ-30 кодов по выручке. Всего <b>'+pc.totalCodes+'</b> уникальных кодов · применений <b>'+mNum(pc.summary.totalUses)+'</b> · выручка <b>'+mNum(pc.summary.totalRevenue)+' ₽</b>.'+(pending?' · '+pending+' мес. ещё прогреваются':'')+'<br><span style="opacity:.7">'+(pc.note||'')+'</span>';
+        var sumBon=pc.summary.totalBonusUsed||0;
+        var sumRev=pc.summary.totalRevenue||0;
+        var avgDrr=sumRev?Math.round(sumBon/sumRev*1000)/10:0;
+        hint.innerHTML='Топ-30 кодов по выручке. Всего <b>'+pc.totalCodes+'</b> уникальных кодов · применений <b>'+mNum(pc.summary.totalUses)+'</b> · выручка <b>'+mNum(sumRev)+' ₽</b> · бонусов списано <b>'+mNum(sumBon)+' ₽</b> (ДРР ~'+mNum1(avgDrr)+' %).'+(pending?' · '+pending+' мес. ещё прогреваются':'')+'<br><span style="opacity:.7">'+(pc.note||'')+'</span>';
       }
     }).catch(function(){});
 

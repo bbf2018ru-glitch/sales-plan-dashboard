@@ -74,7 +74,7 @@ async function aggSales(period) {
 async function _aggSalesUncached(period) {
   const d = await callSalesDetail(period);
   const rows = d.rows || [];
-  const cheque = new Map(); // chequeNo -> { sum, hasCard, store }
+  const cheque = new Map(); // chequeNo -> { sum, hasCard, store, bonus }
   const products = new Map(); // productCode -> { sum, qty }
   const storeAcc = new Map(); // storeCode -> { revenue, cheques(Set), withCard(Set), bonus }
   let bonus = 0;
@@ -82,9 +82,10 @@ async function _aggSalesUncached(period) {
     const cn = r.chequeNo;
     const sc = String(r.storeCode || '').trim();
     if (cn) {
-      if (!cheque.has(cn)) cheque.set(cn, { sum: 0, hasCard: false, store: sc });
+      if (!cheque.has(cn)) cheque.set(cn, { sum: 0, hasCard: false, store: sc, bonus: 0 });
       const c = cheque.get(cn);
       c.sum += parseRu(r.sum);
+      c.bonus += parseRu(r.payBonus);
       if (String(r.cardCode || '').trim()) c.hasCard = true;
       if (sc && !c.store) c.store = sc;
     }
@@ -118,6 +119,10 @@ async function _aggSalesUncached(period) {
       bonus: Math.round(s.bonus)
     });
   }
+  // chequeBonus: Map(chequeNo → суммарная оплата бонусами в этом чеке)
+  // Используется в UDS-промокодах (extended-analytics.getUdsMonthlyAggregate) для расхода
+  const chequeBonus = new Map();
+  for (const [cn, c] of cheque) chequeBonus.set(cn, Math.round(c.bonus || 0));
   return {
     revenue: Math.round(revenue),
     cheques,
@@ -125,7 +130,8 @@ async function _aggSalesUncached(period) {
     cardPct: cheques ? Math.round((withCard / cheques) * 1000) / 10 : 0,
     bonus: Math.round(bonus),
     products,
-    byStore
+    byStore,
+    chequeBonus
   };
 }
 
@@ -275,6 +281,7 @@ async function compute(period) {
       gis: readExternal('2gis.json'),
       direct: readExternal('direct.json'),
       metrika: readExternal('metrika.json'),
+      metrikaHistory: readExternal('metrika-history.json'),
       seo: readExternal('seo.json'),
       prices: readExternal('prices.json'),
       social: readExternal('social.json')

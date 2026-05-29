@@ -185,18 +185,34 @@ const promoMonthCache = makeCache(24 * 60 * 60 * 1000);
 
 async function getUdsMonthlyAggregate(ym) {
   return promoMonthCache.wrap('uds:' + ym, async () => {
-    const codes = new Map(); // code → { uses, revenue }
+    const codes = new Map(); // code → { uses, revenue, bonusUsed }
     try {
+      // 1) Получаем чеки с UDS-кодом
       const d = await callDocument('ЧекККМ', ym, ym, 999);
       const rows = d.rows || [];
-      let truncated = rows.length >= 999;
+      const truncated = rows.length >= 999;
+      const chequeByNum = new Map(); // Номер → code
       for (const r of rows) {
         const code = (r['uds_КодСкидки'] || '').trim();
+        const num = (r['Номер'] || '').trim();
         if (!code) continue;
         const sum = parseRu(r['СуммаДокумента']) || 0;
-        if (!codes.has(code)) codes.set(code, { code, uses: 0, revenue: 0 });
+        if (!codes.has(code)) codes.set(code, { code, uses: 0, revenue: 0, bonusUsed: 0 });
         const c = codes.get(code); c.uses += 1; c.revenue += sum;
+        if (num) chequeByNum.set(num, code);
       }
+      // 2) Подтягиваем расход = оплата бонусами по тем же чекам (из marketing-channels кэша)
+      // Если aggSales уже в кэше — используем без запроса; иначе ничего не считаем для bonus
+      try {
+        const mc = require('./marketing-channels')._internal;
+        const cached = mc.monthCache.getCached('agg:' + ym);
+        if (cached && cached.chequeBonus) {
+          for (const [num, code] of chequeByNum) {
+            const b = cached.chequeBonus.get(num);
+            if (b) codes.get(code).bonusUsed += b;
+          }
+        }
+      } catch (_) { /* mc недоступен */ }
       return { codes: Array.from(codes.values()), truncated };
     } catch (e) { return { codes: [], _err: e.message }; }
   });
@@ -225,11 +241,12 @@ async function buildPromoCodesMonthly(period) {
       continue;
     }
     for (const row of c.codes || []) {
-      if (!codes.has(row.code)) codes.set(row.code, { code: row.code, totalUses: 0, totalRevenue: 0, byMonth: {} });
+      if (!codes.has(row.code)) codes.set(row.code, { code: row.code, totalUses: 0, totalRevenue: 0, totalBonusUsed: 0, byMonth: {} });
       const e = codes.get(row.code);
       e.totalUses += row.uses;
       e.totalRevenue += row.revenue;
-      e.byMonth[ym] = { uses: row.uses, revenue: Math.round(row.revenue) };
+      e.totalBonusUsed += row.bonusUsed || 0;
+      e.byMonth[ym] = { uses: row.uses, revenue: Math.round(row.revenue), bonusUsed: Math.round(row.bonusUsed || 0) };
     }
   }
 
@@ -243,16 +260,19 @@ async function buildPromoCodesMonthly(period) {
     totalCodes: arr.length,
     summary: {
       totalUses: arr.reduce((s, c) => s + c.totalUses, 0),
-      totalRevenue: Math.round(arr.reduce((s, c) => s + c.totalRevenue, 0))
+      totalRevenue: Math.round(arr.reduce((s, c) => s + c.totalRevenue, 0)),
+      totalBonusUsed: Math.round(arr.reduce((s, c) => s + c.totalBonusUsed, 0))
     },
     codes: arr.slice(0, 50).map(c => ({
       code: c.code,
       totalUses: c.totalUses,
       totalRevenue: Math.round(c.totalRevenue),
+      totalBonusUsed: Math.round(c.totalBonusUsed),
       avgTicket: c.totalUses ? Math.round(c.totalRevenue / c.totalUses) : 0,
+      drrPct: c.totalRevenue ? Math.round((c.totalBonusUsed / c.totalRevenue) * 1000) / 10 : 0,
       byMonth: c.byMonth
     })),
-    note: 'Сумма скидки (расход на промо) пока не показывается — требует JOIN c регистром ПредоставленныеСкидки по ссылке на документ-чек. Будет добавлено отдельной задачей.'
+    note: 'Расход = оплата бонусами в этих чеках (поле payBonus в ЧекККМ). Заполняется по мере прогрева кэша marketing-channels: для месяцев где основная серия ещё не прогрета, bonusUsed=0.'
   };
 }
 
