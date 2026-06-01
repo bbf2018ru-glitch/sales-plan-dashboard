@@ -4363,9 +4363,10 @@ var SOCIAL = [
 ];
 function renderSocial(){
   var el=document.getElementById('mktSocial'); if(!el) return;
-  var cols=['Компания','Telegram, подп.','TG охват, просм./пост','Instagram, подп.','IG Reels, просм./рилс','VK'];
+  // Помечаем колонки-оценки явно — числа без live-источника
+  var cols=['Компания','Telegram, подп.','TG охват (оценка)','Instagram (оценка)','IG Reels (оценка)','VK'];
   var th=cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
-  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+s.tg+'</td><td class="num">'+s.tgReach+'</td><td class="num">'+s.ig+'</td><td class="num">'+(s.igReels||'н/д')+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
+  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+s.tg+'</td><td class="num" style="color:var(--muted)">'+s.tgReach+'</td><td class="num" style="color:var(--muted)">'+s.ig+'</td><td class="num" style="color:var(--muted)">'+(s.igReels||'н/д')+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>IG Reels</b>: ~3,8 тыс просм./рилс vs ~15 тыс у Стефании (×4) и ~7,5 тыс у Cake Home (с виральными до 107к); сопоставимо с Этикой, выше ЯХОНТа. <b>Telegram</b>: подписчиков ×19 и охвата поста ×15–20 меньше Стефании — самый недоиспользованный канал. Instagram-подписчики — паритет (3-е место, 32к). VK-охваты приватны (счётчик подписчиков под анти-ботом — снять вручную с залогиненного VK). Просмотры IG Reels — публичные (счётчик на рилсе), по 12 последним.</div>';
 }
@@ -4722,7 +4723,7 @@ function mktLoadYoY(){
           '<div style="font-size:11px;color:var(--muted);margin-top:8px">Скрейп Директа по расписанию на сервере. Обновлено: '+st+(dd.sessionExpired?' · ⚠️ сессия Яндекса протухла, нужен релогин':'')+'.</div>';
       } else { dl.innerHTML='<div style="font-size:12px;color:var(--muted)">Данные Я.Директа ещё не собраны (cron-скрейп запустится по расписанию).</div>'; }
     }
-    // Соцсети — перекрываем TG-колонку в таблице #mktSocial живыми подписчиками
+    // Соцсети — перекрываем TG+VK колонки в таблице #mktSocial живыми подписчиками
     if (d.external && d.external.social && d.external.social.brands) {
       var soTbl = document.querySelector('#mktSocial table');
       if (soTbl) {
@@ -4735,6 +4736,14 @@ function mktLoadYoY(){
           var br = d.external.social.brands[k];
           if (br && br.telegram && br.telegram.subscribers) {
             tr.children[1].innerHTML = mNum(br.telegram.subscribers) + ' <span style="font-size:10px;color:#10a05a">live</span>';
+            anyLive = true;
+          } else if (br && br.telegram === null) {
+            tr.children[1].innerHTML = 'н/д <span style="font-size:10px;color:var(--muted)">live</span>';
+            anyLive = true;
+          }
+          // VK live (5-я колонка, index 5)
+          if (br && br.vk && br.vk.subscribers) {
+            tr.children[5].innerHTML = br.vk.handle + ' · ' + mNum(br.vk.subscribers) + ' <span style="font-size:10px;color:#10a05a">live</span>';
             anyLive = true;
           }
         });
