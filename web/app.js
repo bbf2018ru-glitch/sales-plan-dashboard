@@ -4262,8 +4262,8 @@ function mktExport(){
   push(['Продажи и лояльность']); push(['Месяц','Выручка руб','Чеков','Ср.чек руб','Карта лоял. %','Бонусами руб']);
   idx.forEach(function(i){ push([nm(i), MKT.revenue[i], MKT.cheques[i], mktCsvN(MKT.revenue[i]/MKT.cheques[i]), mktCsvN(MKT.cardPct[i],1), MKT.bonus[i]]); });
   var chq=sum(MKT.cheques), rev=sum(MKT.revenue); push(['Итого', rev, chq, mktCsvN(rev/chq), '', sum(MKT.bonus)]); L.push('');
-  push(['SEO / источники трафика (за весь период янв–май)']); push(['Канал','Визиты','Доля %']);
-  [['Переходы из поиска (SEO)',173894,'69,9'],['Прямые заходы',37516,'15,1'],['Переходы по рекламе',23685,'9,5'],['Переходы по ссылкам',7809,'3,1'],['Внутренние',3918,'1,6'],['Соцсети/рекоменд./мессенджеры',1886,'0,8'],['Всего',248708,'100']].forEach(push);
+  // SEO/источники: hardcoded ранее (173k SEO, 248k всего) выдуман — реальная Метрика даёт другие цифры,
+  // см. блок «Источники трафика сайта» на вкладке. В CSV эту секцию пока не включаем.
   var csv='﻿'+L.join('\n');
   var el=document.createElement('a');
   el.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
@@ -4397,14 +4397,19 @@ function renderPrices(){
     PRICES.map(function(r){ return '<tr><td>'+r[0]+'</td><td class="mkt-priceus">'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[5]+'</td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по ценам:</b> «Мария» — в середине. Бенто от 690 ₽ — самый дешёвый старт на рынке (трафик-драйвер). Целые торты дороже эконом-сетей (Стефания от 525 ₽/кг, ЯХОНТ от 640 ₽/шт), но дешевле премиума (Этика от 2090 ₽/кг, Cake Home до 2990 ₽/кг). Кофе-меню — единственное публичное на рынке.</div>';
 }
-var FUNNEL = [['Визиты сайта',249208],['Добавили в корзину',16373],['Оформили заказ',5216],['Онлайн-оплата',414]];
+// FUNNEL: hardcoded заменён на live из external.metrika. Старые цифры (249к/16к/5к/414) были выдуманы — реальный счётчик 43949414 даёт ~2k/мес визитов, см. live-блок.
+var FUNNEL = null;
 function renderFunnel(){
   var el=document.getElementById('mktFunnel'); if(!el) return;
+  if(!FUNNEL){
+    el.innerHTML='<div class="section-hint">Воронка сайта пока не рендерится — старые цифры (249к визитов, 16к корзина, 5к заказы, 414 оплат) были выдуманы. Реальный счётчик Метрики 43949414 даёт ~2 тыс визитов/мес (см. live-блок ниже). После настройки целей в Метрике (Ecommerce: add_to_cart / purchase) воронку соберём из realtime API.</div>';
+    return;
+  }
   var max=FUNNEL[0][1];
   el.innerHTML='<div class="mkt-funnel">'+FUNNEL.map(function(s,i){
     var w=Math.max(s[1]/max*100,8), conv=i?(s[1]/FUNNEL[i-1][1]*100):100;
     return '<div class="mkt-fstep"><div class="mkt-fbar" style="width:'+w.toFixed(1)+'%"><span>'+s[0]+'</span><b>'+mNum(s[1])+'</b></div><div class="mkt-fconv">'+(i?'→ '+conv.toFixed(1).replace('.',',')+' % от пред.':'')+'</div></div>';
-  }).join('')+'</div><div class="section-hint" style="margin-top:6px">Ecommerce-покупок (все способы оплаты) — 4 036. Узкие места: переход «корзина → заказ» и доля онлайн-оплаты.</div>';
+  }).join('')+'</div>';
 }
 function renderAlerts(){
   var el=document.getElementById('mktAlerts'); if(!el) return;
@@ -4459,10 +4464,7 @@ function mktInit(){
     renderAI();
     pageNavInit('mktNav','page-marketing');
     var seo=document.getElementById('mktSeo');
-    if(seo) seo.innerHTML = mTbl(
-      ['Канал (янв–май)','Визиты','Доля'],
-      [['Переходы из поиска (SEO)','173 894','69,9 %'],['Прямые заходы','37 516','15,1 %'],['Переходы по рекламе','23 685','9,5 %'],['Переходы по ссылкам','7 809','3,1 %'],['Внутренние','3 918','1,6 %'],['Соцсети / рекоменд. / мессенджеры','1 886','0,8 %']],
-      ['Всего','248 708','100 %']);
+    if(seo) seo.innerHTML = '<div style="font-size:12px;color:var(--muted)">Источники трафика рендерятся ниже live из Метрики (counter 43949414).</div>';
     _mktInited=true;
   }
   mktRender();
@@ -4829,6 +4831,21 @@ function mktLoadYoY(){
         ml.innerHTML='<div style="font-size:12px;color:var(--muted)">Метрика-SPA рендерится нестабильно через headless-браузер. Рекомендуем оформить OAuth-токен Metrika API (надёжный путь). Cron продолжит пытаться ежедневно.</div>';
       } else {
         ml.innerHTML='<div style="font-size:12px;color:var(--muted)">Метрика — данные ещё не собраны (cron-скрейп 06:30).</div>';
+      }
+    }
+    // Заменяем hardcoded SEO-таблицу на реальную из Метрики (counter 43949414)
+    var seoEl=document.getElementById('mktSeo');
+    if(seoEl){
+      var mk2=d.external&&d.external.metrika;
+      if(mk2 && mk2.sources && mk2.sources.length){
+        var v2=mk2.totalVisits||0;
+        seoEl.innerHTML = mTbl(
+          ['Источник трафика','Визиты','Доля'],
+          mk2.sources.map(function(s){ return [s.name, mNum(s.visits), mNum1(s.sharePct)+' %']; }),
+          ['Всего', mNum(v2), '100 %']
+        ) + '<div style="font-size:11px;color:var(--muted);margin-top:6px">Из Метрики counter 43949414, период «'+(mk2.period?mk2.period.label:'?')+'». ⚠️ Реальный трафик — '+mNum(v2)+'/мес. Прежние цифры в коде (173k SEO, 248k всего) были оценкой и не подтвердились живыми данными — задача на ревизию SEO-расхода 46к/мес.</div>';
+      } else {
+        seoEl.innerHTML='<div class="section-hint">Live-источники Метрики ещё не загружены.</div>';
       }
     }
   }).catch(function(e){ el.innerHTML='<div class="mkt-yoy-load">Ошибка загрузки: '+e.message+'</div>'; });
