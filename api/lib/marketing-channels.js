@@ -284,7 +284,8 @@ async function compute(period) {
       metrikaHistory: readExternal('metrika-history.json'),
       seo: readExternal('seo.json'),
       prices: readExternal('prices.json'),
-      social: readExternal('social.json')
+      social: readExternal('social.json'),
+      bloggers: readExternal('bloggers.json')
     },
     refreshedAt: new Date().toISOString()
   };

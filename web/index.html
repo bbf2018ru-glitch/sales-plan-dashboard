@@ -1285,8 +1285,9 @@
           </section>
 
           <section class="section" id="mkt-s-promo" data-mgroup="loyalty">
-            <div class="section-label">Промокоды (UDS) — детально <span class="mkt-scope dyn" title="Топ-кодов по выручке с разбивкой по месяцам">17 мес</span></div>
-            <div class="section-hint">Из 1С: чеки с непустым <code>uds_КодСкидки</code>. Для каждого кода — сумма выручки и сколько раз применили, помесячно. <b>Сумма скидки</b> (расход на промо) пока не показывается — требует JOIN с регистром ПредоставленныеСкидки, добавим отдельно.</div>
+            <div class="section-label">Промокоды (UDS) — детально <span class="mkt-scope dyn" title="Свежие применения + матрица помесячно">17 мес · live</span></div>
+            <div class="section-hint">Из 1С: чеки с непустым <code>uds_КодСкидки</code>. Сверху — свежие применения (по дате чека). Ниже — матрица кодов помесячно с выручкой и расходом бонусов.</div>
+            <div id="mktPromoFresh" style="margin-bottom:18px"></div>
             <div id="mktPromoCodes" class="table-wrap"></div>
             <div id="mktPromoCodesHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
@@ -1298,10 +1299,26 @@
             <div id="mktCakeHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
+          <section class="section" id="mkt-s-bloggers" data-mgroup="channels">
+            <div class="section-label">Блогеры <span class="mkt-scope dyn" title="Из Google Sheets — обновляется при следующем скрейпе">из таблицы</span></div>
+            <div class="section-hint">Маркетинг через инфлюенсеров: депозит за упоминание / сторис / рилс. Источник — твоя таблица в Google Sheets (открыта по ссылке).</div>
+            <div id="mktBloggersKpi"></div>
+            <div id="mktBloggers" class="table-wrap"></div>
+            <div id="mktBloggersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+          </section>
+
           <section class="section" id="mkt-s-sms" data-mgroup="channels">
             <div class="section-label">SMS-рассылки <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">1С, отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. Атрибуция покупок — ждёт доработки выгрузки 1С.</div>
+            <div class="section-hint">1С отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. <b>Детализация по каждой рассылке</b> (текст, получатели, конверсия, даты действия скидки) — в плане BSL-патча 1С (новый endpoint <code>/sms-detail</code>). Сейчас показываем агрегаты помесячно.</div>
             <div id="mktSms" class="table-wrap"></div>
+            <div class="mkt-comp-ins" style="margin-top:12px;font-size:12px">
+              <div class="mkt-chart-t">Что появится после BSL-патча</div>
+              <ul style="margin:6px 0 0;padding-left:20px;line-height:1.6">
+                <li><b>Каждая рассылка:</b> дата, текст SMS, количество получателей, расход, даты действия купона/скидки</li>
+                <li><b>Конверсия:</b> JOIN получателей рассылки с чеками в окне действия — кто купил, на какую сумму, ROI каждой рассылки</li>
+                <li><b>Сегмент-аналитика:</b> «спящие» vs «топ» vs «новые» — какой сегмент окупается лучше</li>
+              </ul>
+            </div>
           </section>
 
           <section class="section" id="mkt-s-ctx" data-mgroup="channels">
@@ -1322,6 +1339,7 @@
             <div class="section-label">Программа «Сладкий чек» <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">1С (РегистрНакопления.СладкийЧек) — геймификация: баллы за задания по картам лояльности. Новая программа, быстро растёт: 35 карт (апр) → 56 (май). Задания мая: «Покупка» 131× (1 балл), «Большой чек ≥1500 ₽» 15× (5 баллов), «Для двоих ≥1000 ₽» 13× (5 баллов). «Выполнений» = срабатываний заданий, «Баллов» — начислено всего.</div>
             <div id="mktSweet" class="table-wrap"></div>
+            <div id="mktSweetLive" class="mkt-comp-ins" style="margin-top:12px"></div>
             <div class="mkt-comp-ins" style="margin-top:12px">
               <div class="mkt-chart-t">Атрибуция: драйвер продаж или пассивная отметка?</div>
               <ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">
@@ -1474,6 +1492,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=89"></script>
+    <script src="/app.js?v=91"></script>
   </body>
 </html>

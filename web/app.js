@@ -4736,6 +4736,68 @@ function mktLoadYoY(){
       mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');
       mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b');
     }
+    // Блогеры (из Google Sheets через bloggers.json) — render таблица + KPI
+    if (d.external && d.external.bloggers) {
+      var bj = d.external.bloggers;
+      var kpiEl = document.getElementById('mktBloggersKpi');
+      var tblEl = document.getElementById('mktBloggers');
+      var hintEl = document.getElementById('mktBloggersHint');
+      if (kpiEl && bj.summary) {
+        var s = bj.summary;
+        kpiEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.total)+'</div><div class="mkt-l">Блогеров в работе</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalSubscribers)+'</div><div class="mkt-l">Совокупная аудитория</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalDepositRub)+' ₽</div><div class="mkt-l">Депозит выдано (общая)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum1(s.postRate)+' %</div><div class="mkt-l">Доля выложивших</div></div>'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.pickedUp)+' / '+mNum(s.total)+'</div><div class="mkt-l">Забрали карту ('+mNum1(s.pickupRate)+'%)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.posted)+'</div><div class="mkt-l">Выложили (фактически)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalClicks||0)+'</div><div class="mkt-l">Переходов к нам (из '+mNum(s.withClicks||0)+' блогеров с метрикой)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+(s.cpcRub?mNum(s.cpcRub)+' ₽':'—')+'</div><div class="mkt-l">CPC (депозит ÷ переходы)</div></div>'+
+          '</div>';
+      }
+      if (tblEl && bj.bloggers) {
+        var bs = bj.bloggers.slice().sort(function(a,b){return (b.subscribers||0)-(a.subscribers||0);});
+        tblEl.innerHTML = '<table style="font-size:12px"><thead><tr><th>Блогер</th><th class="num">Подписчиков</th><th class="num">Депозит ₽</th><th>Точка выдачи</th><th>Забрали</th><th>Выложено</th><th class="num">Переходов</th><th>Комментарий</th></tr></thead><tbody>'+
+          bs.map(function(b){
+            var subs = b.subscribers ? mNum(b.subscribers) : '<span style="color:var(--muted)">?</span>';
+            var dep = b.depositRub ? mNum(b.depositRub) : '—';
+            var pickup = (b.pickupDate||'').slice(0,30);
+            var pickC = /не\s+забрала/i.test(pickup) ? 'color:#e0466a' : '';
+            var posted = (b.posted||'').slice(0,30);
+            var postC = posted && /сторис|рилс/i.test(posted) ? 'color:#10a05a' : 'color:var(--muted)';
+            var cl = b.clicks!=null ? mNum(b.clicks) : '<span style="color:var(--muted)">—</span>';
+            var notes = (b.notes||'').slice(0,50);
+            return '<tr><td><b>'+b.handle+'</b></td><td class="num">'+subs+'</td><td class="num">'+dep+'</td><td style="font-size:11px">'+(b.pickupAddress||'').slice(0,30)+'</td><td style="font-size:11px;'+pickC+'">'+pickup+'</td><td style="font-size:11px;'+postC+'">'+posted+'</td><td class="num">'+cl+'</td><td style="font-size:11px;color:var(--muted)">'+notes+'</td></tr>';
+          }).join('')+'</tbody></table>';
+      }
+      if (hintEl && bj.scrapedAt) {
+        hintEl.innerHTML = 'Источник: '+(bj.url?'<a href="'+bj.url+'" target="_blank">Google Sheets</a>':'таблица')+'. Обновлено: '+new Date(bj.scrapedAt).toLocaleString('ru-RU')+'. Колонка «Переходов» — из текста «N переходов» в столбце «Статистика» твоей таблицы (где удалось вытащить число).';
+      }
+    }
+
+    // Сладкий чек — live разбивка по заданиям для текущего периода (d.sweet.cur.tasks)
+    if (d.sweet && d.sweet.cur) {
+      var swEl = document.getElementById('mktSweetLive');
+      if (swEl) {
+        var sc = d.sweet.cur, sp = d.sweet.prev || {};
+        var tasks = sc.tasks || {};
+        var tasksArr = Object.entries(tasks).map(function(e){ return { name:e[0], events: typeof e[1]==='object'?(e[1].events||0):e[1], points: typeof e[1]==='object'?(e[1].points||0):0 }; }).sort(function(a,b){return b.events-a.events;});
+        var totalEv = tasksArr.reduce(function(s,t){return s+t.events;},0) || 1;
+        swEl.innerHTML = '<div class="mkt-chart-t">Live за '+(d.monthName||'')+' — задания (из регистра СладкийЧек)</div>' +
+          '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0">'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.cards||0)+'</div><div class="mkt-l">Активных карт</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.events||0)+'</div><div class="mkt-l">Выполнений заданий</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.points||0)+'</div><div class="mkt-l">Баллов начислено</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+(sp.cards?mNum(sp.cards):'—')+'</div><div class="mkt-l">Карт год назад</div></div>'+
+          '</div>'+
+          (tasksArr.length?'<div class="table-wrap"><table><thead><tr><th>Задание</th><th class="num">Выполнений</th><th class="num">Доля</th></tr></thead><tbody>'+
+            tasksArr.map(function(t){ var pct=t.events/totalEv*100; var pc=pct>=50?'color:#e0466a':(pct>=20?'color:#b8860b':''); return '<tr><td>'+t.name+'</td><td class="num">'+mNum(t.events)+'</td><td class="num" style="'+pc+'">'+mNum1(pct)+' %</td></tr>'; }).join('')+
+            '</tbody></table></div>':
+            '<div style="font-size:12px;color:var(--muted)">Заданий не было.</div>');
+      }
+    }
     // Последние UDS-применения (recentApplications с датой/чеком/суммой) — отдельный fetch
     var ymP = (period||'').split('-'); var nowY = +ymP[0], nowM = +ymP[1];
     var fromYM = (nowY-1)+'-'+String(nowM).padStart(2,'0');
