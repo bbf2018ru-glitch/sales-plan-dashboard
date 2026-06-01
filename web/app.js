@@ -4839,11 +4839,15 @@ function mktLoadYoY(){
       var mk2=d.external&&d.external.metrika;
       if(mk2 && mk2.sources && mk2.sources.length){
         var v2=mk2.totalVisits||0;
+        var seoSrc=(mk2.sources||[]).find(function(s){return /поиск/i.test(s.name);});
+        var seoNote = seoSrc && seoSrc.sharePct>=40
+          ? '✓ SEO даёт '+mNum(seoSrc.visits)+' визитов ('+mNum1(seoSrc.sharePct)+'%) — главный канал. Расход 46к/мес оправдан.'
+          : seoSrc ? '⚠️ SEO даёт '+mNum(seoSrc.visits)+' визитов ('+mNum1(seoSrc.sharePct)+'%) — стоит обсудить ROI 46к/мес SEO-расхода.' : '';
         seoEl.innerHTML = mTbl(
           ['Источник трафика','Визиты','Доля'],
           mk2.sources.map(function(s){ return [s.name, mNum(s.visits), mNum1(s.sharePct)+' %']; }),
           ['Всего', mNum(v2), '100 %']
-        ) + '<div style="font-size:11px;color:var(--muted);margin-top:6px">Из Метрики counter 43949414, период «'+(mk2.period?mk2.period.label:'?')+'». ⚠️ Реальный трафик — '+mNum(v2)+'/мес. Прежние цифры в коде (173k SEO, 248k всего) были оценкой и не подтвердились живыми данными — задача на ревизию SEO-расхода 46к/мес.</div>';
+        ) + '<div style="font-size:11px;color:var(--muted);margin-top:6px">Из Метрики (счётчик 43949414), период «'+(mk2.period?mk2.period.label:'last_month')+'». '+seoNote+' Помесячная разбивка с янв 2025 пока не доступна — Метрика SPA игнорирует URL-фильтр date1/date2, нужен Playwright-клик по datepicker.</div>';
       } else {
         seoEl.innerHTML='<div class="section-hint">Live-источники Метрики ещё не загружены.</div>';
       }
