@@ -217,13 +217,19 @@
 
         <!-- 1. Итоги периода (KPI) -->
         <section class="section" id="dash-s-kpi">
-          <div class="section-label">Итоги периода</div>
+          <div class="block-head">
+            <div class="section-label">Итоги периода</div>
+            <span class="bp-mount no-print" data-bp="kpi"></span>
+          </div>
           <div id="kpis" class="kpi-grid"></div>
         </section>
 
         <!-- 2. Прогноз и ритм -->
         <section class="section" id="dash-s-forecast">
-          <div class="section-label">Прогноз и ритм</div>
+          <div class="block-head">
+            <div class="section-label">Прогноз и ритм</div>
+            <span class="bp-mount no-print" data-bp="forecast"></span>
+          </div>
           <div id="forecastPanel" class="forecast-grid"></div>
         </section>
 
@@ -256,8 +262,11 @@
           </article>
           <article class="panel panel-narrow">
             <div class="panel-header">
-              <div class="panel-title">Сравнение</div>
-              <div class="panel-subtitle">прошлый месяц и год назад</div>
+              <div>
+                <div class="panel-title">Сравнение</div>
+                <div class="panel-subtitle">прошлый месяц и год назад</div>
+              </div>
+              <span class="bp-mount no-print" data-bp="comparison"></span>
             </div>
             <div id="comparisonPanel"></div>
           </article>
@@ -298,11 +307,14 @@
                 <div class="panel-title">Тренд по месяцам</div>
                 <div class="panel-subtitle" id="trendSubtitle">историческая динамика — план и факт</div>
               </div>
+              <div class="block-head-tools">
+              <span class="bp-mount no-print" data-bp="trend"></span>
               <div class="btn-group" id="trendWindowBtns">
                 <button class="btn-xs" data-tw="3">3М</button>
                 <button class="btn-xs" data-tw="6">6М</button>
                 <button class="btn-xs btn-xs-active" data-tw="12">12М</button>
                 <button class="btn-xs" data-tw="24">Всё</button>
+              </div>
               </div>
             </div>
             <div id="trendChart" class="chart-wrap"></div>
@@ -315,10 +327,13 @@
               <div class="section-label">По точкам</div>
               <div class="section-hint">Нажмите заголовок для сортировки · строку — для детализации · ✎ — редактировать план</div>
             </div>
+            <div class="block-head-tools">
+            <span class="bp-mount no-print" data-bp="stores"></span>
             <button id="exportSalesBtnH" class="icon-btn" title="Экспорт CSV">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               CSV
             </button>
+            </div>
           </div>
           <div class="panel">
             <div class="table-wrap">

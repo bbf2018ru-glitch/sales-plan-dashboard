@@ -599,13 +599,26 @@ function buildYoYComparison(db, period, currentTotals) {
 function buildTrend(db, period, windowSize = 12) {
   const periods = [];
 
+  // Мемоизация: один и тот же период считается и в окне, и как «год назад»
+  // для более позднего месяца — не пересчитываем aggregatePeriodCore дважды.
+  const coreCache = new Map();
+  const getCore = (p) => {
+    if (!coreCache.has(p)) coreCache.set(p, aggregatePeriodCore(db, p));
+    return coreCache.get(p);
+  };
+
   for (let index = windowSize - 1; index >= 0; index -= 1) {
     const currentPeriod = shiftPeriod(period, -index);
     if (!currentPeriod) {
       continue;
     }
 
-    const summary = aggregatePeriodCore(db, currentPeriod);
+    const summary = getCore(currentPeriod);
+    // YoY: тот же месяц год назад. hasPrevYear=false → фронт показывает «н/д».
+    const prevYearPeriod = shiftPeriod(currentPeriod, -12);
+    const prevYear = prevYearPeriod ? getCore(prevYearPeriod) : null;
+    const prevYearHasData = prevYear && (prevYear.totals.plan > 0 || prevYear.totals.fact > 0);
+
     periods.push({
       period: currentPeriod,
       plan: roundMetric(summary.totals.plan),
@@ -614,7 +627,10 @@ function buildTrend(db, period, windowSize = 12) {
       marginPct: summary.totals.marginPct,
       completion: summary.totals.completion,
       gap: roundMetric(summary.totals.gap),
-      quantity: roundMetric(summary.totals.quantity)
+      quantity: roundMetric(summary.totals.quantity),
+      prevYearPeriod: prevYearHasData ? prevYearPeriod : null,
+      factPrevYear: prevYearHasData ? roundMetric(prevYear.totals.fact) : null,
+      planPrevYear: prevYearHasData ? roundMetric(prevYear.totals.plan) : null
     });
   }
 

@@ -47,7 +47,12 @@ const state = {
   pinRequired: false,
   editStoreId: '',
   editPlanData: [],
-  trendWindow: 12
+  trendWindow: 12,
+  // Пер-блочный выбор месяца: blockPeriods[key] = 'YYYY-MM' либо отсутствует
+  // (тогда блок следует общему state.period). summaryCache — кэш summary по
+  // периодам, чтобы не дёргать /api/dashboard/summary повторно.
+  blockPeriods: {},
+  summaryCache: new Map()
 };
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -232,9 +237,23 @@ function renderTrendChart(summary) {
   const dense = pts.length > 8;
   const W = 560, H = 240, pad = { t: 24, r: 20, b: dense ? 54 : 46, l: 68 };
   const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b, n = pts.length;
-  const maxVal = Math.max(...pts.flatMap(p => [p.plan, p.fact]), 1);
+  const maxVal = Math.max(...pts.flatMap(p => [p.plan, p.fact, p.factPrevYear || 0]), 1);
   const xp = i => pad.l + (n > 1 ? (i / (n - 1)) * pw : pw / 2);
   const yp = v => pad.t + ph - (v / maxVal) * ph;
+
+  // YoY: линия факта того же месяца год назад. Разрывается там, где данных
+  // за прошлый год нет (factPrevYear === null), чтобы не врать интерполяцией.
+  let pyD = '', pyOpen = false, pyHasAny = false;
+  pts.forEach((p, i) => {
+    if (p.factPrevYear != null) {
+      pyD += `${pyOpen ? 'L' : 'M'}${xp(i).toFixed(1)},${yp(p.factPrevYear).toFixed(1)} `;
+      pyOpen = true; pyHasAny = true;
+    } else {
+      pyOpen = false;
+    }
+  });
+  const pyDots = pyHasAny ? pts.map((p, i) => p.factPrevYear == null ? '' :
+    `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.factPrevYear).toFixed(1)}" r="2.5" fill="#a855f7"><title>${bpMonthLabel(p.prevYearPeriod)}: ${fmtAxis(p.factPrevYear)}</title></circle>`).join('') : '';
 
   const grids = Array.from({ length: 5 }, (_, i) => {
     const v = maxVal / 4 * i, y = yp(v);
@@ -274,10 +293,12 @@ function renderTrendChart(summary) {
     ${grids}
     <path d="${areaD}" fill="url(#tg)"/>
     <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="2" stroke-dasharray="6,4"/>
+    ${pyHasAny ? `<path d="${pyD.trim()}" fill="none" stroke="#a855f7" stroke-width="2" stroke-dasharray="2,3" opacity="0.85"/>${pyDots}` : ''}
     <path d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${dots}${xlabels}
     <text x="${pad.l}" y="${H - 4}" fill="var(--hint)" font-size="10">─ ─ план</text>
     <text x="${pad.l + 54}" y="${H - 4}" fill="var(--accent)" font-size="10">─── факт</text>
+    ${pyHasAny ? `<text x="${pad.l + 108}" y="${H - 4}" fill="#a855f7" font-size="10">··· факт пр. года</text>` : ''}
   </svg>`;
 }
 
@@ -967,16 +988,29 @@ function renderForecast(summary) {
 }
 
 // ── Comparison ─────────────────────────────────────────────────────────────
-function renderCmpCard(label, c) {
+function renderCmpCard(label, c, curFact) {
   if (!c?.hasData) {
     return `<div class="cmp-card neutral">
       <div class="cmp-period">${label}</div>
-      <div class="empty-state" style="padding:8px 0">Нет данных.</div>
+      <div class="empty-state" style="padding:8px 0">Нет данных за прошлый период.</div>
     </div>`;
   }
   const tone = c.factDelta >= 0 ? 'good' : 'bad';
+  // Мини-бары «сейчас vs период сравнения» по факту выручки.
+  let barsHtml = '';
+  if (isNum(curFact)) {
+    const prevFact = curFact - c.factDelta;
+    const mx = Math.max(curFact, prevFact, 1);
+    const wNow = (curFact / mx * 100).toFixed(1);
+    const wPrev = (Math.max(prevFact, 0) / mx * 100).toFixed(1);
+    barsHtml = `<div class="cmp-bars">
+      <div class="cmp-bar-row"><span class="cmp-bar-lbl">сейчас</span><span class="cmp-bar-track"><span class="cmp-bar-fill now" style="width:${wNow}%"></span></span><span class="cmp-bar-val">${fmtMoneyShort(curFact)}</span></div>
+      <div class="cmp-bar-row"><span class="cmp-bar-lbl">${c.previousPeriod}</span><span class="cmp-bar-track"><span class="cmp-bar-fill prev" style="width:${wPrev}%"></span></span><span class="cmp-bar-val">${fmtMoneyShort(prevFact)}</span></div>
+    </div>`;
+  }
   return `<div class="cmp-card ${tone}">
     <div class="cmp-period">${label} (${c.previousPeriod})</div>
+    ${barsHtml}
     <div class="cmp-rows">
       <div class="cmp-row"><span>Факт</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDelta, formatMoney)}</strong></div>
       <div class="cmp-row"><span>Изм. %</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDeltaPercent, v => v.toFixed(1) + '%')}</strong></div>
@@ -987,13 +1021,17 @@ function renderCmpCard(label, c) {
   </div>`;
 }
 
-function renderComparison(summary) {
+// ВАЖНО: называется renderDashComparison, а не renderComparison — ниже в файле
+// есть второй function renderComparison() для таба аналитики (пишет в
+// #comparisonTbl). Объявления функций хойстятся, и одноимённая затирала бы эту.
+function renderDashComparison(summary) {
   const yoyLabel = summary.yoy?.yearsBack > 1
     ? `vs. тот же месяц ${summary.yoy.yearsBack} года назад`
     : 'vs. тот же месяц год назад';
+  const curFact = summary.totals?.fact;
   $('comparisonPanel').innerHTML =
-    renderCmpCard('vs. прошлый месяц', summary.comparison) +
-    renderCmpCard(yoyLabel, summary.yoy);
+    renderCmpCard('vs. прошлый месяц', summary.comparison, curFact) +
+    renderCmpCard(yoyLabel, summary.yoy, curFact);
 }
 
 // ── Spotlight ──────────────────────────────────────────────────────────────
@@ -2230,10 +2268,112 @@ function userLogout() {
   doLogout();
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// ПЕР-БЛОЧНЫЙ ВЫБОР МЕСЯЦА (таб «Дашборд»)
+// Каждый из этих блоков можно независимо переключить на другой месяц.
+// Блок без override следует общему state.period. YoY-сравнение с прошлым
+// годом рисуется внутри самих рендеров (тренд-линия, KPI-бейджи, бары).
+// ════════════════════════════════════════════════════════════════════════
+
+const DASH_BLOCKS = {
+  kpi:        { render: (s) => renderKpis(s) },
+  forecast:   { render: (s) => renderForecast(s) },
+  comparison: { render: (s) => renderDashComparison(s) },
+  trend:      { render: (s) => renderTrendChart(s) },
+  stores:     { render: (s) => renderStores(s) }
+};
+
+const RU_MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+function bpMonthLabel(period) {
+  if (!period || !/^\d{4}-\d{2}$/.test(period)) return period || '—';
+  const [y, m] = period.split('-').map(Number);
+  return `${RU_MONTHS_SHORT[m - 1]} ${y}`;
+}
+
+// Эффективный период блока: его override либо общий период.
+function bpEffective(key) {
+  return state.blockPeriods[key] || state.period;
+}
+
+// Кэширующая загрузка summary за период (переиспользует существующий endpoint).
+async function getSummaryForPeriod(period, { force = false } = {}) {
+  if (!period) return null;
+  if (!force && state.summaryCache.has(period)) return state.summaryCache.get(period);
+  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(period)}&trend_window=24`);
+  state.summaryCache.set(period, summary);
+  return summary;
+}
+
+// Рендер одного блока из summary за его эффективный период.
+async function applyDashBlock(key) {
+  const cfg = DASH_BLOCKS[key];
+  if (!cfg) return;
+  const period = bpEffective(key);
+  try {
+    const summary = (period === state.period && state.summary)
+      ? state.summary
+      : await getSummaryForPeriod(period);
+    if (summary) cfg.render(summary);
+  } catch (err) {
+    console.error('applyDashBlock failed', key, err);
+  }
+  updateBlockControlUI(key);
+}
+
+// После полной загрузки общего summary — переналожить блоки с override.
+async function reapplyBlockOverrides() {
+  const keys = Object.keys(state.blockPeriods).filter(k => state.blockPeriods[k]);
+  await Promise.all(keys.map(applyDashBlock));
+}
+
+function blockControlHtml(key) {
+  const periods = window.__metaPeriods__ || [];
+  const cur = bpEffective(key);
+  const overridden = !!state.blockPeriods[key];
+  const opts = periods.map(p => `<option value="${p}"${p === cur ? ' selected' : ''}>${bpMonthLabel(p)}</option>`).join('');
+  return `<span class="bp-ctrl${overridden ? ' bp-active' : ''}">
+    <svg class="bp-cal" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <select class="bp-select" data-bp-select="${key}" title="Месяц для этого блока">${opts}</select>
+    <button class="bp-reset" data-bp-reset="${key}" title="Вернуть к общему периоду"${overridden ? '' : ' hidden'}>↺</button>
+  </span>`;
+}
+
+function updateBlockControlUI(key) {
+  const mount = document.querySelector(`.bp-mount[data-bp="${key}"]`);
+  if (!mount) return;
+  mount.innerHTML = blockControlHtml(key);
+}
+
+// Первичная отрисовка всех контролов (после того как известны периоды).
+function injectBlockControls() {
+  Object.keys(DASH_BLOCKS).forEach(updateBlockControlUI);
+}
+
+// Смена месяца для блока (или сброс period=null → следовать общему).
+async function setBlockPeriod(key, period) {
+  if (!period || period === state.period) {
+    delete state.blockPeriods[key];
+  } else {
+    state.blockPeriods[key] = period;
+  }
+  await applyDashBlock(key);
+}
+
+// Делегированные обработчики контролов.
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-bp-select]');
+  if (sel) setBlockPeriod(sel.dataset.bpSelect, sel.value);
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-bp-reset]');
+  if (btn) setBlockPeriod(btn.dataset.bpReset, null);
+});
+
 async function loadSummary() {
   if (!state.period) return;
   const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}&trend_window=24`);
   state.summary = summary;
+  state.summaryCache.set(state.period, summary);
   // Раньше автоматически выбирался первый магазин из списка — это разворачивало
   // огромный блок «По товарам» (8000+ пикселей) на главной для случайного
   // магазина. Теперь не выбираем — пользователь сам кликает на строку.
@@ -2246,12 +2386,17 @@ async function loadSummary() {
   renderForecast(summary);
   renderTrendChart(summary);
   renderWeekdayHeatmap(summary);
-  renderComparison(summary);
+  renderDashComparison(summary);
   renderSpotlight(summary);
   renderStores(summary);
   renderProducts(summary);
   await loadStoreDetails();
   await loadComments();
+
+  // Пер-блочные контролы месяца + переналожение блоков с override
+  // (общий рендер выше затёр их DOM данными общего периода).
+  injectBlockControls();
+  await reapplyBlockOverrides();
 
   $('lastUpdate').textContent = `обновлено: ${new Date().toLocaleTimeString('ru-RU')}`;
   enhancePinningOnPage();
@@ -2493,7 +2638,7 @@ async function init() {
       if (!btn) return;
       state.trendWindow = Number(btn.dataset.tw);
       $('trendWindowBtns').querySelectorAll('[data-tw]').forEach(b => b.classList.toggle('btn-xs-active', b === btn));
-      if (state.summary) renderTrendChart(state.summary);
+      applyDashBlock('trend');
     });
 
     setInterval(loadSummary, 30000);
