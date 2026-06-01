@@ -1229,33 +1229,8 @@
 
         <!-- ═══ МАРКЕТИНГ ═══ -->
         <div id="page-marketing" class="hidden">
-          <nav class="mkt-nav" id="mktNav" aria-label="Разделы маркетинга">
-            <a href="#mkt-s-kpi">Обзор</a>
-            <a href="#mkt-s-alerts">Алерты</a>
-            <a href="#mkt-s-charts">Динамика</a>
-            <a href="#mkt-s-cake">Торт месяца</a>
-            <a href="#mkt-s-promo">Промокоды</a>
-            <a href="#mkt-s-sms">SMS</a>
-            <a href="#mkt-s-ctx">Директ</a>
-            <a href="#mkt-s-gis">2ГИС</a>
-            <a href="#mkt-s-sweet">Сладкий чек</a>
-            <a href="#mkt-s-sales">Лояльность</a>
-            <a href="#mkt-s-stores">По точкам</a>
-            <a href="#mkt-s-prod">Товары</a>
-            <a href="#mkt-s-seo">SEO</a>
-            <a href="#mkt-s-demand">Запросы</a>
-            <a href="#mkt-s-other">Прочее</a>
-            <a href="#mkt-s-comp">Конкуренты</a>
-            <a href="#mkt-s-ai">AI-сводка</a>
-          </nav>
-
-          <div class="mkt-data-note">
-            🔒 <b>Только реальные данные.</b> Все цифры взяты напрямую из источников — 1С, 2ГИС, Яндекс.Директ, Яндекс.Метрика. Где данных нет — стоит «н/д». Прогнозные/расчётные значения явно помечены словом «оценка». Ничего не выдумывается.
-          </div>
-
-          <section class="section" id="mkt-s-kpi">
-            <div class="section-label">Маркетинг по каналам <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">Данные за янв–май 2026 (1С, Яндекс.Метрика/Директ, 2ГИС). Выбери период — таблицы и итоги пересчитаются. *Май — неполный (до 26.05).</div>
+          <!-- Липкая шапка маркетинга: период + под-табы (видны во всех группах) -->
+          <div class="mkt-topbar">
             <div class="mkt-period">
               <span>Период с</span>
               <select id="mktFrom" class="mkt-sel"></select>
@@ -1263,18 +1238,34 @@
               <select id="mktTo" class="mkt-sel"></select>
               <button id="mktExportBtn" class="mkt-export" type="button">⬇ Экспорт в Excel</button>
             </div>
+            <div class="analytics-tabs mkt-tabs" id="mktTabs" role="tablist" aria-label="Разделы маркетинга">
+              <button class="atab atab-active" type="button" data-mgroup="overview">Обзор</button>
+              <button class="atab" type="button" data-mgroup="channels">Каналы</button>
+              <button class="atab" type="button" data-mgroup="loyalty">Лояльность</button>
+              <button class="atab" type="button" data-mgroup="products">Товары</button>
+              <button class="atab" type="button" data-mgroup="competitors">Конкуренты</button>
+            </div>
+          </div>
+
+          <div class="mkt-data-note">
+            🔒 <b>Только реальные данные.</b> Все цифры взяты напрямую из источников — 1С, 2ГИС, Яндекс.Директ, Яндекс.Метрика. Где данных нет — стоит «н/д». Прогнозные/расчётные значения явно помечены словом «оценка». Ничего не выдумывается.
+          </div>
+
+          <section class="section" id="mkt-s-kpi" data-mgroup="overview">
+            <div class="section-label">Маркетинг по каналам <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
+            <div class="section-hint">Данные за янв–май 2026 (1С, Яндекс.Метрика/Директ, 2ГИС). Выбери период вверху — таблицы и итоги пересчитаются. *Май — неполный (до 26.05).</div>
             <div class="mkt-kpis" id="mktKpis"></div>
             <div class="section-label" style="margin-top:20px">За месяц · сравнение с прошлым годом (YoY) <span class="mkt-scope dyn" title="Живые данные из 1С, обновляются на сервере автоматически">live</span></div>
             <div class="section-hint" id="mktYoYHint">Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК).</div>
             <div id="mktYoY" class="mkt-yoy"></div>
           </section>
 
-          <section class="section" id="mkt-s-alerts">
+          <section class="section" id="mkt-s-alerts" data-mgroup="overview">
             <div class="section-label">Алерты — на что обратить внимание <span class="mkt-scope fix" title="Считается по всему периоду янв–май">весь период</span></div>
             <div id="mktAlerts" class="mkt-alerts"></div>
           </section>
 
-          <section class="section" id="mkt-s-charts">
+          <section class="section" id="mkt-s-charts" data-mgroup="overview">
             <div class="section-label">Динамика по месяцам с янв прошлого года · YoY <span class="mkt-scope dyn" title="17 точек: с янв 2025 по выбранный месяц 2026. Светлая серия — тот же месяц годом ранее">live · 17 мес</span></div>
             <div class="section-hint">Тёмная серия — факт каждого месяца, светлая — этот же месяц годом ранее (YoY-сравнение). Δ% YoY у каждого графика — над ним. Источник — 1С.</div>
             <div class="mkt-charts">
@@ -1293,41 +1284,41 @@
             </div>
           </section>
 
-          <section class="section" id="mkt-s-promo">
+          <section class="section" id="mkt-s-promo" data-mgroup="loyalty">
             <div class="section-label">Промокоды (UDS) — детально <span class="mkt-scope dyn" title="Топ-кодов по выручке с разбивкой по месяцам">17 мес</span></div>
             <div class="section-hint">Из 1С: чеки с непустым <code>uds_КодСкидки</code>. Для каждого кода — сумма выручки и сколько раз применили, помесячно. <b>Сумма скидки</b> (расход на промо) пока не показывается — требует JOIN с регистром ПредоставленныеСкидки, добавим отдельно.</div>
             <div id="mktPromoCodes" class="table-wrap"></div>
             <div id="mktPromoCodesHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
-          <section class="section" id="mkt-s-cake">
+          <section class="section" id="mkt-s-cake" data-mgroup="loyalty">
             <div class="section-label">Торт месяца — эффект акции <span class="mkt-scope dyn" title="Автоопределение: торт с наибольшим всплеском продаж в каждом месяце vs его средняя">авто · 17 мес</span></div>
             <div class="section-hint">Каждый месяц мы продвигаем один торт (со скидкой −20 %). Здесь — какой именно «работал» (по 1С: товар с максимальным отклонением «выручка месяца / средняя за 17 мес»), сколько он принёс, какая доля в общей выручке тортовой категории и во сколько раз обошёл свою норму.</div>
             <div id="mktCake" class="table-wrap"></div>
             <div id="mktCakeHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
-          <section class="section" id="mkt-s-sms">
+          <section class="section" id="mkt-s-sms" data-mgroup="channels">
             <div class="section-label">SMS-рассылки <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">1С, отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. Атрибуция покупок — ждёт доработки выгрузки 1С.</div>
             <div id="mktSms" class="table-wrap"></div>
           </section>
 
-          <section class="section" id="mkt-s-ctx">
+          <section class="section" id="mkt-s-ctx" data-mgroup="channels">
             <div class="section-label">Контекстная реклама (Яндекс.Директ) <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">Агентский кабинет. Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽ (период), отказы 14,8% (лучше среднего по сайту). <b>«Сумма заказов» и «ДРР»</b> заполнятся после обновления скрейпа на колонку «Доход» (требует расширения vds-scrape-direct.js, в плане).</div>
             <div id="mktCtx" class="table-wrap"></div>
             <div id="mktDirectLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
 
-          <section class="section" id="mkt-s-gis">
+          <section class="section" id="mkt-s-gis" data-mgroup="channels">
             <div class="section-label">2ГИС — карточка компании <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">«Мария, кафе-кондитерская». 2ГИС ≫ Яндекс.Карты по маршрутам/звонкам (~1 578 vs ~221/мес).</div>
             <div id="mktGis" class="table-wrap"></div>
             <div id="mktGisLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
 
-          <section class="section" id="mkt-s-sweet">
+          <section class="section" id="mkt-s-sweet" data-mgroup="loyalty">
             <div class="section-label">Программа «Сладкий чек» <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">1С (РегистрНакопления.СладкийЧек) — геймификация: баллы за задания по картам лояльности. Новая программа, быстро растёт: 35 карт (апр) → 56 (май). Задания мая: «Покупка» 131× (1 балл), «Большой чек ≥1500 ₽» 15× (5 баллов), «Для двоих ≥1000 ₽» 13× (5 баллов). «Выполнений» = срабатываний заданий, «Баллов» — начислено всего.</div>
             <div id="mktSweet" class="table-wrap"></div>
@@ -1342,19 +1333,19 @@
             </div>
           </section>
 
-          <section class="section" id="mkt-s-sales">
+          <section class="section" id="mkt-s-sales" data-mgroup="loyalty">
             <div class="section-label">Продажи и лояльность <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
             <div class="section-hint">Розница, 1С. Тревога: доля чеков с картой лояльности падает (86 % → 74 %).</div>
             <div id="mktSales" class="table-wrap"></div>
           </section>
 
-          <section class="section" id="mkt-s-stores">
+          <section class="section" id="mkt-s-stores" data-mgroup="products">
             <div class="section-label">По точкам — маркетинг <span class="mkt-scope dyn" title="Живые данные из 1С, YoY к тому же месяцу год назад">live · за месяц</span></div>
             <div class="section-hint">Выручка / средний чек / % карты лояльности в разрезе каждой точки + Δ к маю прошлого года. Помогает увидеть, где маркетинг работает, где карта лояльности проседает, где рост или падение год-к-году.</div>
             <div id="mktByStore" class="table-wrap"></div>
           </section>
 
-          <section class="section" id="mkt-s-prod">
+          <section class="section" id="mkt-s-prod" data-mgroup="products">
             <div class="section-label">Товары и категории <span class="mkt-scope dyn" title="Живые данные из 1С за выбранный месяц, авто-обновление">live · за месяц</span></div>
             <div class="section-hint">1С, розница, за выбранный месяц (тянется с сервера, обновляется само). Категории — с колонкой YoY (Δ к тому же месяцу год назад). Ядро оборота — целые торты; кофе — лидер по штукам.</div>
             <div class="mkt-2col">
@@ -1363,7 +1354,7 @@
             </div>
           </section>
 
-          <section class="section" id="mkt-s-seo">
+          <section class="section" id="mkt-s-seo" data-mgroup="channels">
             <div class="section-label">SEO / источники трафика сайта <span class="mkt-scope fix" title="Не зависит от выбора месяца — весь период янв–май">весь период</span></div>
             <div class="section-hint">Метрика maria-irk.ru. Органика — главный канал (~70 %), драйвер — рецепты в блоге. Канал НЕ бесплатный: SEO-ведение и контент стоят <b>46 тыс ₽/мес</b> (~230 тыс ₽ за янв–май 2026). Помесячная органика — через Metrika API (в планах); сейчас показаны итоги за период (не зависят от выбора месяца).</div>
             <div id="mktSeo" class="table-wrap"></div>
@@ -1374,13 +1365,13 @@
             <div id="mktFunnel"></div>
           </section>
 
-          <section class="section" id="mkt-s-demand">
+          <section class="section" id="mkt-s-demand" data-mgroup="channels">
             <div class="section-label">Поисковые запросы (2ГИС) — что ищут, чтобы найти <span class="mkt-scope fix" title="Снимок 2ГИС за апрель 2026">апрель 2026</span></div>
             <div class="section-hint">2ГИС, апрель 2026. Доля запросов. ~53 % — брендовые («мария»), остальное — родовой спрос (торты/кондитерские/кофе/завтрак).</div>
             <div id="mktDemand"></div>
           </section>
 
-          <section class="section" id="mkt-s-other">
+          <section class="section" id="mkt-s-other" data-mgroup="channels">
             <div class="section-label">Прочие каналы <span class="mkt-scope fix" title="Итоги за весь период янв–май">весь период</span></div>
             <div class="table-wrap"><table>
               <thead><tr><th>Канал</th><th>Показатель</th></tr></thead>
@@ -1393,7 +1384,7 @@
             </table></div>
           </section>
 
-          <section class="section" id="mkt-s-comp">
+          <section class="section" id="mkt-s-comp" data-mgroup="competitors">
             <div class="section-label">Анализ конкурентов <span class="mkt-scope now" title="Снимок из открытых источников на дату анализа">на сегодня</span></div>
             <div class="section-hint">Кондитерские Иркутска: сайты, точки, соцсети, продукция, акции, программы лояльности, рейтинги. Данные из открытых источников; «н/д» — не найдено публично. 2ГИС также отслеживает как конкурентов: Блисс, Toti, Каде.</div>
             <div id="mktComp"></div>
@@ -1405,7 +1396,7 @@
             <div id="mktPrices"></div>
           </section>
 
-          <section class="section" id="mkt-s-ai">
+          <section class="section" id="mkt-s-ai" data-mgroup="competitors">
             <div class="section-label">AI-сводка: выводы и рекомендации <span class="mkt-scope now" title="Синтез на дату анализа">на сегодня</span></div>
             <div class="section-hint">Синтез по всем данным маркетинга и конкурентам — приоритеты для роста.</div>
             <div id="mktAI"></div>

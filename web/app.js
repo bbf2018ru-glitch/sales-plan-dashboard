@@ -2654,11 +2654,34 @@ async function init() {
 const analyticsState = {
   currentPage: 'dashboard',
   currentTab: localStorage.getItem('maria_atab') || 'network',
+  marketingGroup: localStorage.getItem('maria_mgroup') || 'overview',
   data: null,
   abcFilter: 'all',
   abcLimit: 50,
   range: { from: null, to: null }
 };
+
+// Под-табы маркетинга: группируют 17 секций в 5 групп (по data-mgroup).
+// Зеркалит механику switchAnalyticsTab — секции не из активной группы прячем.
+function initMarketingTabs() {
+  document.querySelectorAll('#mktTabs .atab').forEach(btn => {
+    btn.addEventListener('click', () => switchMarketingGroup(btn.dataset.mgroup));
+  });
+}
+function switchMarketingGroup(group) {
+  const groups = ['overview', 'channels', 'loyalty', 'products', 'competitors'];
+  if (!groups.includes(group)) group = 'overview';
+  analyticsState.marketingGroup = group;
+  localStorage.setItem('maria_mgroup', group);
+  document.querySelectorAll('#mktTabs .atab').forEach(b =>
+    b.classList.toggle('atab-active', b.dataset.mgroup === group));
+  document.querySelectorAll('#page-marketing section[data-mgroup]').forEach(s =>
+    s.classList.toggle('hidden', s.dataset.mgroup !== group));
+  // Закладки/пиннинг в видимых секциях (как в аналитике)
+  document.querySelectorAll('#page-marketing section[data-mgroup]:not(.hidden)').forEach(s => {
+    if (typeof enhancePinningInSection === 'function') enhancePinningInSection(s);
+  });
+}
 
 function initPageNav() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -4608,7 +4631,8 @@ function mktInit(){
     renderFunnel();
     renderDemand();
     renderAI();
-    pageNavInit('mktNav','page-marketing');
+    initMarketingTabs();
+    switchMarketingGroup(analyticsState.marketingGroup);
     var seo=document.getElementById('mktSeo');
     if(seo) seo.innerHTML = '<div style="font-size:12px;color:var(--muted)">Источники трафика рендерятся ниже live из Метрики (counter 43949414).</div>';
     _mktInited=true;
@@ -4712,6 +4736,29 @@ function mktLoadYoY(){
       mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');
       mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b');
     }
+    // Последние UDS-применения (recentApplications с датой/чеком/суммой) — отдельный fetch
+    var ymP = (period||'').split('-'); var nowY = +ymP[0], nowM = +ymP[1];
+    var fromYM = (nowY-1)+'-'+String(nowM).padStart(2,'0');
+    fetchJson('/api/analytics/uds-promocodes?from='+fromYM+'&to='+period).then(function(uds){
+      if(!uds || !uds.recentApplications) return;
+      var el=document.getElementById('mktPromoFresh');
+      if(!el) return;
+      var rate = uds.totalChecksScanned ? (uds.checksWithPromocode/uds.totalChecksScanned*100) : 0;
+      var rateC = rate < 2 ? 'color:#e0466a' : (rate < 5 ? 'color:#b8860b' : 'color:#10a05a');
+      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+mNum(uds.totalChecksScanned)+'</div><div class="mkt-l">Чеков просмотрено</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+mNum(uds.checksWithPromocode)+'</div><div class="mkt-l">С промокодом</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v" style="'+rateC+'">'+mNum1(rate)+' %</div><div class="mkt-l">Доля чеков с промо</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+mNum(uds.uniqueCodes)+'</div><div class="mkt-l">Уникальных кодов</div></div>'+
+        '</div>'+
+        '<div class="mkt-chart-t">Последние '+(uds.recentApplications||[]).length+' применений (свежее наверху)</div>'+
+        '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Промокод</th><th>Чек №</th><th class="num">Сумма ₽</th><th>Точка</th></tr></thead><tbody>'+
+        (uds.recentApplications||[]).slice(0,40).map(function(r){
+          return '<tr><td style="font-size:11px">'+(r.date||'')+'</td><td><b>'+r.code+'</b></td><td style="font-size:11px;color:var(--muted)">'+(r.docNumber||'—')+'</td><td class="num">'+mNum(r.sum)+'</td><td style="font-size:11px;color:var(--muted)">'+((r.store||'—')+'').slice(0,30)+'</td></tr>';
+        }).join('')+'</tbody></table></div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px">Период '+fromYM+' → '+period+'.'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
+    }).catch(function(){});
+
     // Промокоды UDS — помесячная матрица.
     fetchJson('/api/analytics/promo-codes-monthly?period='+period).then(function(pc){
       if(!pc||!pc.available) return;

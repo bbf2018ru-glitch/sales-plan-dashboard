@@ -363,6 +363,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 #page-dashboard.hidden,
 #page-analytics.hidden,
 #page-marketing.hidden,
+#page-marketing section[data-mgroup].hidden,
 .empty-state.hidden,
 .btn-group [data-tw].hidden,
 .atab-section.hidden {
@@ -4231,4 +4232,22 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
   font-weight: 600;
   color: var(--hint);
   white-space: nowrap;
+}
+
+/* ── Маркетинг: липкая шапка (период + под-табы) + группы-секции ────────── */
+.mkt-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  padding-top: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 8px 12px -10px var(--bg);
+}
+.mkt-topbar .mkt-period { margin: 0 0 8px; }
+.mkt-topbar .mkt-tabs { margin-top: 0; }
+/* Под-табы маркетинга используют тот же вид, что и табы аналитики (.atab) */
+@media (max-width: 720px) {
+  .mkt-topbar .mkt-period { font-size: 13px; }
+  .mkt-topbar .mkt-export { margin-left: 0; }
 }
