@@ -842,8 +842,8 @@ const server = http.createServer(async (req, res) => {
 
     // ── Маркетинг по каналам: метрики за месяц + YoY (живые данные из 1С) ──
     if (pathname === '/api/marketing/channels' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      // Открыт без авторизации — как /api/dashboard/summary. Read-only маркетинг-агрегаты
+      // из кэша (прогрев фоном), той же чувствительности, что и уже публичный summary.
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await marketingChannels.getChannels(period));
