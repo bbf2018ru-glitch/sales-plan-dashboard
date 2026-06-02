@@ -4988,6 +4988,22 @@ function mktLoadYoY(){
           return '<tr><td><b>'+r.name+'</b></td><td class="num">'+mNum(r.revenue.cur)+'</td><td class="num" style="'+drc+'">'+drs+'</td><td class="num">'+mNum(r.cheques.cur)+'</td><td class="num">'+mNum(r.avgCheck.cur)+' ₽</td><td class="num">'+mNum1(r.cardPct.cur)+'%</td><td class="num" style="'+dclc+'">'+dcls+'</td></tr>';
         }).join('')+'</tbody></table>';
     }
+    // 2ГИС Сторис — Маша платит за продвижение
+    if (d.external && d.external.gis && d.external.gis.stories) {
+      var st = d.external.gis.stories;
+      var stEl = document.getElementById('mktGisStories');
+      if (stEl) {
+        var topics = (st.topics || []).filter(function(t){return !/Просмотров|Кликов|превью|сторис|кнопк/i.test(t);}).slice(0, 25);
+        stEl.innerHTML = '<div class="mkt-chart-t">2ГИС Сторис · '+(st.period||'')+' <span class="mkt-scope dyn">live</span></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:8px 0">' +
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(st.previewViews||0)+'</div><div class="mkt-l">Просмотров превью</div></div>' +
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(st.storiesViews||0)+'</div><div class="mkt-l">Просмотров сторис</div></div>' +
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(st.buttonClicks||0)+'</div><div class="mkt-l">Кликов в кнопку</div></div>' +
+          '</div>' +
+          (topics.length ? '<div style="margin:6px 0;font-size:12px;line-height:1.8"><b>Темы сторис:</b> ' + topics.map(function(t){return '<span style="background:#eaeaea;padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '');
+      }
+    }
+
     // 2ГИС: отзывы + теги (парсятся с /branches/X/reviews)
     if (d.external && d.external.gis && d.external.gis.reviews) {
       var grEl = document.getElementById('mktGisReviews');
