@@ -1,4 +1,7 @@
 node_modules/
 .env
 data/db.json
+# Списки получателей SMS (ПДн: ФИО + телефоны) — не коммитим
+data/sms-*.txt
+data/sms-*.csv
 

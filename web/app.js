@@ -4363,10 +4363,15 @@ function mktRender(){
     ['Месяц','Рассылок','SMS отправлено','Стоимость, ₽','Цена SMS, ₽'],
     idx.map(function(i){ return [MKT.months[i], mNum(MKT.smsCnt[i]), mNum(MKT.smsSent[i]), mNum(MKT.smsCost[i]), MKT.smsSent[i]?mNum1(MKT.smsCost[i]/MKT.smsSent[i]):'—']; }),
     ['Итого', mNum(sum(MKT.smsCnt)), mNum(smsS), mNum(smsC), smsS?mNum1(smsC/smsS):'—']);
-  // Я.Директ помесячно. «Сумма заказов» = доход с ecommerce-цели; пока скрейпер её не извлекает (см. external.direct.totals.revenue)
-  var ctxRevByMonth = (MKT.ctxRevenue || [null,null,null,null,null]);
-  var sumCtxRev = ctxRevByMonth.reduce(function(s,v,i){ return idx.indexOf(i)>=0 && v!=null ? s+v : s; }, 0);
-  var hasAnyRev = ctxRevByMonth.some(function(v,i){ return idx.indexOf(i)>=0 && v!=null; });
+  // Я.Директ помесячно. «Сумма заказов» = оценка через средний чек 1С (real ecom-revenue требует BSL-патча или Метрика-цели):
+  //   revenue ≈ ctxPurch × avgCheck месяца (общий средний чек из 1С)
+  // Это оценка — для точного дохода нужна атрибуция «контекст → чек» через UTM/cookie.
+  var ctxRevByMonth = idx.map(function(i){ return MKT.ctxPurch[i] && MKT.cheques[i] ? Math.round(MKT.ctxPurch[i] * (MKT.revenue[i]/MKT.cheques[i])) : null; });
+  // expand back to full-index array
+  var ctxRevFull = MKT.months.map(function(_, j){ var k = idx.indexOf(j); return k >= 0 ? ctxRevByMonth[k] : null; });
+  var sumCtxRev = ctxRevByMonth.reduce(function(s,v){ return s + (v||0); }, 0);
+  var hasAnyRev = ctxRevByMonth.some(function(v){ return v != null && v > 0; });
+  ctxRevByMonth = ctxRevFull; // используем как table data
   document.getElementById('mktCtx').innerHTML = mTbl(
     ['Месяц','Расход, ₽','Клики','Покупок','Сумма заказов, ₽','CPA, ₽','ДРР, %'],
     idx.map(function(i){
@@ -4736,6 +4741,33 @@ function mktLoadYoY(){
       mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');
       mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b');
     }
+    // Партнёры (Bitrix iblock 88) — список с UTM-метками
+    if (d.external && d.external.partners) {
+      var pj = d.external.partners;
+      var pEl = document.getElementById('mktPartners');
+      var pHint = document.getElementById('mktPartnersHint');
+      if (pEl && pj.partners) {
+        var rows = pj.partners.map(function(pr){
+          var url = pr.targetUrl || (pr.props ? Object.values(pr.props).find(function(v){return /^\s*https?:\/\//.test(v);}) : '');
+          if (url) url = url.trim().replace(/&amp;/g, '&');
+          var clean = url ? url.split('?')[0] : '';
+          var utm = url && url.includes('?') ? url.split('?')[1] : '';
+          // короткий парс UTM
+          var utmObj = {};
+          (utm||'').split('&').forEach(function(p){ var kv = p.split('='); if (kv[0]) utmObj[kv[0]] = decodeURIComponent(kv[1]||''); });
+          var utmTags = ['utm_source','utm_medium','utm_campaign'].map(function(k){ return utmObj[k] ? '<span style="font-size:10px;background:#eaeaea;padding:2px 6px;border-radius:3px;margin-right:4px">'+k.replace('utm_','')+': '+utmObj[k].slice(0,20)+'</span>' : ''; }).join('');
+          var clicks = pr.metrikaClicks != null ? mNum(pr.metrikaClicks) : '<span style="color:var(--muted)">—</span>';
+          var ac = pr.active === false ? 'color:#e0466a' : '';
+          return '<tr><td><b style="'+ac+'">'+pr.name+'</b></td><td style="font-size:11px"><a href="'+url+'" target="_blank" style="color:#0066cc">'+(clean||'').replace(/^https?:\/\/(www\.)?/,'').slice(0,40)+'</a></td><td style="font-size:11px">'+(utmTags||'<span style="color:var(--muted)">без UTM</span>')+'</td><td class="num">'+clicks+'</td><td style="font-size:11px;color:'+(pr.active===false?'#e0466a':'#10a05a')+'">'+(pr.active===false?'выкл':'актив')+'</td></tr>';
+        }).join('');
+        pEl.innerHTML = '<table style="font-size:12px"><thead><tr><th>Партнёр</th><th>Ссылка</th><th>UTM</th><th class="num">Переходов</th><th>Статус</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      }
+      if (pHint) {
+        var active = (pj.partners||[]).filter(function(p){return p.active!==false;}).length;
+        pHint.innerHTML = 'Всего <b>'+pj.total+'</b> партнёров · активных <b>'+active+'</b>. Источник: Bitrix CMS iblock 88. Обновлено: '+(pj.scrapedAt?new Date(pj.scrapedAt).toLocaleString('ru-RU'):'?')+'.<br><span style="color:#b8860b">⚠️ Колонка «Переходов» = 0 для всех. Нужно настроить в Яндекс.Метрике <b>Цели на клики</b> по ссылкам (URL содержит utm_source) — после этого Метрика начнёт логировать переходы и дашборд их подхватит.</span>';
+      }
+    }
+
     // Блогеры (из Google Sheets через bloggers.json) — render таблица + KPI
     if (d.external && d.external.bloggers) {
       var bj = d.external.bloggers;

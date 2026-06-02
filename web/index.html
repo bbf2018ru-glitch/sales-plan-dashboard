@@ -1299,6 +1299,13 @@
             <div id="mktCakeHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
+          <section class="section" id="mkt-s-partners" data-mgroup="channels">
+            <div class="section-label">Партнёры — преференции в ЛК сайта <span class="mkt-scope dyn" title="Bitrix CMS инфоблок 88 «privilege»">из Bitrix</span></div>
+            <div class="section-hint">Компании-партнёры с преференциями для клиентов «Марии». Список из админки Bitrix (инфоблок 88). У каждого партнёра — UTM-метка для трекинга. <b>Количество переходов</b> появится после настройки целей в Метрике (по UTM-меткам или по `click` на ссылку с классом партнёра).</div>
+            <div id="mktPartners" class="table-wrap"></div>
+            <div id="mktPartnersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+          </section>
+
           <section class="section" id="mkt-s-bloggers" data-mgroup="channels">
             <div class="section-label">Блогеры <span class="mkt-scope dyn" title="Из Google Sheets — обновляется при следующем скрейпе">из таблицы</span></div>
             <div class="section-hint">Маркетинг через инфлюенсеров: депозит за упоминание / сторис / рилс. Источник — твоя таблица в Google Sheets (открыта по ссылке).</div>
@@ -1323,7 +1330,7 @@
 
           <section class="section" id="mkt-s-ctx" data-mgroup="channels">
             <div class="section-label">Контекстная реклама (Яндекс.Директ) <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">Я.Директ <b>ведёт агентство</b> — наш аккаунт <code>fabrika-mari</code> в Яндексе пустой (видимо рекламу ведут под другим логином в агентстве). Для live-данных по «Доходу/ДРР» нужно подключение к агентскому кабинету (запрос URL/API от подрядчика). Покупки — по цели «Ecommerce: покупка» (атрибуция автоматическая). CPC ~12,9 ₽ (период), отказы 14,8% (лучше среднего по сайту).</div>
+            <div class="section-hint">Я.Директ <b>ведёт агентство</b> — кабинет под их логином. <b>Сумма заказов и ДРР</b> — оценка через 1С: <code>покупок × средний чек месяца</code>. Точная атрибуция «реклама → чек» требует UTM-cookie на сайте или Метрика-цели на покупку. Покупки и расход — фактические из MKT.</div>
             <div id="mktCtx" class="table-wrap"></div>
             <div id="mktDirectLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
@@ -1492,6 +1499,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=92"></script>
+    <script src="/app.js?v=93"></script>
   </body>
 </html>

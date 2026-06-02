@@ -285,7 +285,8 @@ async function compute(period) {
       seo: readExternal('seo.json'),
       prices: readExternal('prices.json'),
       social: readExternal('social.json'),
-      bloggers: readExternal('bloggers.json')
+      bloggers: readExternal('bloggers.json'),
+      partners: readExternal('partners.json')
     },
     refreshedAt: new Date().toISOString()
   };
