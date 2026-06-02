@@ -81,9 +81,14 @@ async function _aggSalesUncached(period) {
   for (const r of rows) {
     const cn = r.chequeNo;
     const sc = String(r.storeCode || '').trim();
-    if (cn) {
-      if (!cheque.has(cn)) cheque.set(cn, { sum: 0, hasCard: false, store: sc, bonus: 0 });
-      const c = cheque.get(cn);
+    // НомерЧекаККМ НЕ уникален: повторяется между магазинами и сменами (сбрасывается
+    // каждую смену). Ключ чека = магазин + номер + день, иначе разные чеки сливаются
+    // в один → счётчик чеков занижен, а средний чек завышен.
+    const day = String(r.date || '').slice(0, 10);
+    const ck = cn ? (sc + '|' + cn + '|' + day) : '';
+    if (ck) {
+      if (!cheque.has(ck)) cheque.set(ck, { sum: 0, hasCard: false, store: sc, bonus: 0 });
+      const c = cheque.get(ck);
       c.sum += parseRu(r.sum);
       c.bonus += parseRu(r.payBonus);
       if (String(r.cardCode || '').trim()) c.hasCard = true;
@@ -96,7 +101,7 @@ async function _aggSalesUncached(period) {
       if (!storeAcc.has(sc)) storeAcc.set(sc, { revenue: 0, cheques: new Set(), withCard: new Set(), bonus: 0 });
       const s = storeAcc.get(sc);
       s.revenue += rowSum; s.bonus += rowBonus;
-      if (cn) { s.cheques.add(cn); if (String(r.cardCode || '').trim()) s.withCard.add(cn); }
+      if (ck) { s.cheques.add(ck); if (String(r.cardCode || '').trim()) s.withCard.add(ck); }
     }
     const pc = String(r.productCode || '').trim();
     if (pc) {

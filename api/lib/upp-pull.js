@@ -2,7 +2,10 @@ const http = require('node:http');
 const https = require('node:https');
 const { URL } = require('node:url');
 
-const DEFAULT_TIMEOUT_MS = 60000;
+// 1С на тяжёлых выгрузках (/sales-detail за полный месяц, /pull) отвечает
+// ~100-120с. Прежние 60с резали ответ → оба ретрая падали по таймауту и
+// витрина «Маркетинг по каналам» оставалась пустой/с нулями. 180с с запасом.
+const DEFAULT_TIMEOUT_MS = 180000;
 
 async function fetchUppPackage(opts) {
   // Retry: 1 повтор через 2 сек на случай разового таймаута/сбоя сети

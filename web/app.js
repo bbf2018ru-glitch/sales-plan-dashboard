@@ -4555,7 +4555,11 @@ var PRICES = [
   ['Макаронс, ₽/шт','н/д','109 ₽','135 ₽','120 ₽','131 ₽'],
   ['Капучино','210–360 ₽','н/д','н/д','н/д','н/д']
 ];
-function renderProducts(){
+// ВАЖНО: mktRenderProducts, а НЕ renderProducts — на дашборде есть свой
+// function renderProducts(summary) (пишет в #productsList). Одноимённое
+// объявление здесь хойстингом затирало бы дашбордовое (та же ловушка, что
+// была с renderComparison). Маркетинговый рендер товаров изолирован.
+function mktRenderProducts(){
   var tp=document.getElementById('mktTopProd'), ct=document.getElementById('mktCats');
   if(tp){ tp.innerHTML='<table><thead><tr><th>Товар</th><th class="num">Выручка ₽</th><th class="num">Шт</th></tr></thead><tbody>'+
     TOP_PRODUCTS.map(function(r,i){ return '<tr><td>'+(i+1)+'. '+r[0]+'</td><td class="num">'+mNum(r[1])+'</td><td class="num">'+mNum(r[2])+'</td></tr>'; }).join('')+'</tbody></table>'; }
@@ -4629,7 +4633,7 @@ function mktInit(){
     var eb=document.getElementById('mktExportBtn'); if(eb) eb.addEventListener('click', mktExport);
     renderCompetitors();
     renderSocial();
-    renderProducts();
+    mktRenderProducts();
     renderPrices();
     renderAlerts();
     renderFunnel();
