@@ -1274,13 +1274,9 @@
               <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartCardT">Карта лояльности, %</div><div id="mktChartCard"></div></div>
               <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartNewCustT">Новые карты лояльности, шт/мес</div><div id="mktChartNewCust"></div><div id="mktChartNewCustHint" style="font-size:11px;color:var(--muted);margin-top:4px"></div></div>
             </div>
-            <div class="section-label" style="margin-top:24px">Платные каналы (пока статика — оживут в этапах 5.C/5.D)</div>
-            <div class="section-hint">Эти три графика заработают вживую, когда подключим помесячные ряды Я.Директа (5.C) и 2ГИС (5.D). SMS — после BSL-патча posted=0 в 1С.</div>
-            <div class="mkt-charts">
-              <div class="mkt-chart"><div class="mkt-chart-t">Платный маркетинг: SMS vs Контекст, ₽</div><div id="mktChartSpend"></div><div id="mktChartLegend" class="mkt-legend"></div></div>
-              <div class="mkt-chart"><div class="mkt-chart-t">Покупки с рекламы (контекст), шт</div><div id="mktChartPurch"></div></div>
-              <div class="mkt-chart"><div class="mkt-chart-t">2ГИС: переходы на карточку</div><div id="mktChartGis"></div></div>
-            </div>
+            <div class="section-label" style="margin-top:24px">Платные каналы — текущие показатели <span class="mkt-scope now" title="Live-скрейп Я.Директа и 2ГИС на сервере. Это снимок на дату скрейпа (месяц-to-date), НЕ зависит от выбранного слева месяца.">live · снимок</span></div>
+            <div class="section-hint">Я.Директ и 2ГИС — из автоскрейпа на сервере (снимок на дату скрейпа, месяц-to-date; не зависит от выбора месяца слева — у этих каналов помесячной истории пока нет). Помесячная отдача SMS — после BSL-патча получателей в 1С (атрибуция «карта ↔ чек»). Детализация Директа и 2ГИС — в разделе «Каналы».</div>
+            <div id="mktPaidLive"></div>
           </section>
 
           <section class="section" id="mkt-s-promo" data-mgroup="loyalty">
