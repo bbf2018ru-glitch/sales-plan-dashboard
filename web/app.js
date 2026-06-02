@@ -4988,6 +4988,30 @@ function mktLoadYoY(){
           return '<tr><td><b>'+r.name+'</b></td><td class="num">'+mNum(r.revenue.cur)+'</td><td class="num" style="'+drc+'">'+drs+'</td><td class="num">'+mNum(r.cheques.cur)+'</td><td class="num">'+mNum(r.avgCheck.cur)+' ₽</td><td class="num">'+mNum1(r.cardPct.cur)+'%</td><td class="num" style="'+dclc+'">'+dcls+'</td></tr>';
         }).join('')+'</tbody></table>';
     }
+    // 2ГИС: отзывы + теги (парсятся с /branches/X/reviews)
+    if (d.external && d.external.gis && d.external.gis.reviews) {
+      var grEl = document.getElementById('mktGisReviews');
+      if (grEl) {
+        var rv = d.external.gis.reviews;
+        var items = rv.items || [];
+        var tags = rv.tags || [];
+        var gmTotal = rv.googleMapsReviews;
+        grEl.innerHTML = '<div class="mkt-chart-t">Отзывы 2ГИС <span class="mkt-scope dyn">live</span></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:8px 0">' +
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(items.length)+'</div><div class="mkt-l">Свежих отзывов</div></div>' +
+          (gmTotal ? '<div class="mkt-kpi"><div class="mkt-v">'+mNum(gmTotal)+'</div><div class="mkt-l">Отзывов на Google Maps</div></div>' : '<div></div>') +
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(tags.length)+'</div><div class="mkt-l">Тегов от клиентов</div></div>' +
+          '</div>' +
+          (tags.length ? '<div style="margin:8px 0"><b>Темы отзывов:</b> ' + tags.map(function(t){return '<span style="font-size:11px;background:#eaeaea;padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '') +
+          '<div class="table-wrap" style="max-height:400px;overflow-y:auto"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Платформа</th><th>Автор</th><th>Отзыв</th></tr></thead><tbody>' +
+          items.slice(0, 25).map(function(r){
+            var pc = r.platform === '2GIS' ? 'color:#10a05a' : (r.platform === 'Google maps' ? 'color:#b8860b' : 'color:var(--muted)');
+            return '<tr><td style="font-size:11px;white-space:nowrap">'+r.date+'</td><td style="font-size:11px;'+pc+'">'+r.platform+'</td><td style="font-size:11px"><b>'+r.author+'</b></td><td style="font-size:11px">'+r.text.slice(0, 200)+(r.text.length>200?'…':'')+'</td></tr>';
+          }).join('') +
+          '</tbody></table></div>';
+      }
+    }
+
     // живой 2ГИС из cron-скрейпа (d.external.gis)
     var gl=document.getElementById('mktGisLive');
     if(gl){ var g=d.external&&d.external.gis;
