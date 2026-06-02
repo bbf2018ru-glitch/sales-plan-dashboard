@@ -2627,12 +2627,13 @@ async function init() {
       state.selectedStoreId = '';
       $('storeDetailTitle').textContent = 'Детализация точки';
       urlStateWrite();
+      // Маркетинг по каналам слушается этого же глобального периода — обновляем
+      // сразу (независимо от loadSummary, который рисует Дашборд).
+      if (analyticsState.currentPage === 'marketing' && typeof mktLoadYoY === 'function') mktLoadYoY();
       await loadSummary();
       loadInsights();
       analyticsState.data = null;
       if (analyticsState.currentPage === 'analytics') await loadAnalytics();
-      // Маркетинг по каналам слушается этого же глобального периода
-      if (analyticsState.currentPage === 'marketing' && typeof mktLoadYoY === 'function') mktLoadYoY();
     });
 
     $('trendWindowBtns')?.addEventListener('click', e => {
