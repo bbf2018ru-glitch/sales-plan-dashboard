@@ -4812,12 +4812,14 @@ function mktLoadYoY(){
     // Блогеры (из Google Sheets через bloggers.json) — render таблица + KPI
     if (d.external && d.external.bloggers) {
       var bj = d.external.bloggers;
-      var kpiEl = document.getElementById('mktBloggersKpi');
+      // ВНИМАНИЕ: не называть var kpiEl — внешний kpiEl (#mktKpis) function-scoped в .then,
+      // и var-хойстинг затенит его на всю функцию → верхние KPI «Маркетинг по каналам» не отрисуются.
+      var bloggersKpiEl = document.getElementById('mktBloggersKpi');
       var tblEl = document.getElementById('mktBloggers');
       var hintEl = document.getElementById('mktBloggersHint');
-      if (kpiEl && bj.summary) {
+      if (bloggersKpiEl && bj.summary) {
         var s = bj.summary;
-        kpiEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
+        bloggersKpiEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.total)+'</div><div class="mkt-l">Блогеров в работе</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalSubscribers)+'</div><div class="mkt-l">Совокупная аудитория</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalDepositRub)+' ₽</div><div class="mkt-l">Депозит выдано (общая)</div></div>'+
