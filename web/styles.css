@@ -7,14 +7,16 @@
 /* ── Variables (default = dark glass) ─────────────────────────────── */
 :root, [data-theme=dark] {
   /* surface tokens kept under their old names so existing rules + JS work */
-  --bg:          #0a0814;
-  --paper:       rgba(255,255,255,.04);     /* glass panel */
-  --ink:         #ecedf5;
-  --muted:       #9aa0b8;
-  --hint:        #6c7290;
-  --line:        rgba(255,255,255,.08);
-  --accent:      #ff7a96;
-  --accent-soft: rgba(255,122,150,.14);
+  /* Redesign 2026 — V2 «Graphite»: структурный минимализм вместо стекла.
+     Сплошные поверхности, видимые 1px-границы, глубина через тень-elevation. */
+  --bg:          #0a0b0f;
+  --paper:       #191d28;                    /* сплошная приподнятая карточка */
+  --ink:         #f4f6fb;
+  --muted:       #aeb4c6;
+  --hint:        #7e859a;
+  --line:        #2b3242;                    /* видимая граница 1px */
+  --accent:      #ff6b8a;
+  --accent-soft: rgba(255,107,138,.14);
   --good:        #34d399;
   --good-soft:   rgba(52,211,153,.14);
   --warn:        #fbbf24;
@@ -22,22 +24,22 @@
   --bad:         #fb7185;
   --bad-soft:    rgba(251,113,133,.14);
 
-  /* glass-specific */
-  --glass:        rgba(255,255,255,.04);
-  --glass-strong: rgba(255,255,255,.07);
-  --glass-edge:   rgba(255,255,255,.10);
-  --glass-shine:  linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.02) 40%, transparent 65%);
-  --glow-accent:  0 0 0 1px rgba(255,122,150,.18), 0 8px 36px -8px rgba(255,122,150,.45);
-  --glow-card:    0 1px 0 0 rgba(255,255,255,.06) inset, 0 24px 60px -28px rgba(0,0,0,.55);
+  /* surfaces (solid — не стекло) */
+  --glass:        #191d28;
+  --glass-strong: #20262f;
+  --glass-edge:   #343c4e;                   /* hover-граница */
+  --glass-shine:  none;
+  --glow-accent:  0 0 0 1px rgba(255,107,138,.32);
+  --glow-card:    0 2px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.045);
 
-  /* ambient orbs */
-  --orb-1: radial-gradient(circle at 18% 12%, rgba(232,100,126,.32), transparent 55%);
-  --orb-2: radial-gradient(circle at 82% 8%,  rgba(124,92,255,.28),  transparent 50%);
-  --orb-3: radial-gradient(circle at 60% 95%, rgba(56,189,248,.18),  transparent 55%);
+  /* ambient orbs — отключены (расстекление) */
+  --orb-1: none;
+  --orb-2: none;
+  --orb-3: none;
 
   --shadow:      var(--glow-card);
-  --radius:      20px;
-  --radius-sm:   10px;
+  --radius:      16px;
+  --radius-sm:   11px;
   --sidebar-w:   268px;
   --overlay-bg:  rgba(8, 6, 18, 0.66);
 }
