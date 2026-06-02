@@ -5181,7 +5181,11 @@ function mktLoadYoY(){
         seoEl.innerHTML='<div class="section-hint">Live-источники Метрики ещё не загружены.</div>';
       }
     }
-  }).catch(function(e){ el.innerHTML='<div class="mkt-yoy-load">Ошибка загрузки: '+e.message+'</div>'; });
+  }).catch(function(e){
+    var msg='<div class="mkt-yoy-load">Нет данных за период: '+e.message+'</div>';
+    el.innerHTML=msg;
+    if(kpiEl) kpiEl.innerHTML=msg;
+  });
 }
 // Универсальная sticky-навигация по секциям страницы (Маркетинг и Дашборд).
 function pageNavInit(navId, pageId){
