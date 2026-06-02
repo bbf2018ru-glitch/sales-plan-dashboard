@@ -898,9 +898,14 @@ function aggregatePeriodCore(db, period, opts = {}) {
   // (текущий или прошлый месяц).
   const forecast = buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, db.sales, db.plans);
   const daily = buildDailySeries(period, plans, sales);
+  // Себестоимость/маржа — ОЦЕНКА, если активна подгонка под markup
+  // (STORE_MARKUPS_JSON): cost масштабируется под целевую валовую прибыль
+  // или реконструируется при cost=0. Фронт показывает «(оценка)» у маржи.
+  const costEstimated = storeCostScale.size > 0 || storeMarkupFallback.size > 0;
 
   return {
     period,
+    costEstimated,
     totals: {
       plan: totalPlan,
       fact: totalFact,

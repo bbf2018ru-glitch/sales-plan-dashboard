@@ -36,7 +36,7 @@ async function buildCustomersRetention(fromYM, toYM) {
   for (let i = 0; i < 6; i++) baseFrom = prevMonth(baseFrom);
   const baseTo = prevMonth(fromYM);
 
-  // 1. Карты в baseline (последовательно по месяцам — лимит /register 999)
+  // 1. Карты в baseline (последовательно по месяцам — лимит /register 5000)
   const baselineCards = new Set();
   const baselineMonths = rangeMonths(baseFrom, baseTo);
   for (const ym of baselineMonths) {

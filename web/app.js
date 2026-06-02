@@ -657,8 +657,8 @@ function renderKpis(summary) {
     { id: 'completion', label: 'Выполнение плана', value: completionVal,
       sub: completionSubV2, tone: completionTone,
       tip: 'Процент факта от плана МЕСЯЦА (до конца месяца). Подпись — темп: % факта от плана-на-сегодня (план месяца, пропорционально пройденным дням с учётом часа в Иркутске).' },
-    { id: 'margin', label: 'Маржа', value: moneyShort(summary.totals.margin),
-      sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.` : 'нет данных от 1С') + vsPrev('margin'),
+    { id: 'margin', label: 'Маржа' + (summary.costEstimated ? ' (оценка)' : ''), value: moneyShort(summary.totals.margin),
+      sub: (isNum(summary.totals.marginPct) ? `${summary.totals.marginPct}% от выр.${summary.costEstimated ? ' · оценка (cost подогнан под markup)' : ''}` : 'нет данных от 1С') + vsPrev('margin'),
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
       tip: 'Валовая прибыль = факт − себестоимость. Когда 1С не передаёт себестоимость напрямую, считается через STORE_MARKUPS_JSON env (per-store markup% из отчёта «Валовая прибыль»).' },
     { id: 'projected', label: 'Прогноз', value: planIncomplete ? '—' : moneyShort(f.projectedFact), sub: projectedSubV2, tone: projectedTone,
@@ -4790,10 +4790,13 @@ function mktLoadYoY(){
           '<b>Шаг 2.</b> Вставь в <code>/local/templates/&lt;твой шаблон&gt;/footer.php</code> перед <code>&lt;/body&gt;</code> через Bitrix-fileman:<br>' +
           '<pre style="background:#1e1e1e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:11px;overflow-x:auto;margin:8px 0">&lt;script&gt;\n' +
           'document.addEventListener(\'click\', function(e) {\n' +
-          '  var a = e.target.closest(\'a[href*="utm_source"]\');\n' +
+          '  // Партнёрская ссылка: либо с utm_campaign, либо с data-partner, либо в блоке преференций\n' +
+          '  var a = e.target.closest(\'a[href*="utm_"], a[data-partner], .b-privilege a, .privilege a\');\n' +
           '  if (!a) return;\n' +
-          '  var m = a.href.match(/utm_source=([^&amp;]+)/);\n' +
-          '  var partner = m ? decodeURIComponent(m[1]) : \'unknown\';\n' +
+          '  // partner-ID: данные сайта или домен ссылки (уникален для каждого)\n' +
+          '  var partner = a.getAttribute(\'data-partner\');\n' +
+          '  try { if (!partner) partner = new URL(a.href).hostname.replace(/^www\\./, \'\'); } catch(_){}\n' +
+          '  if (!partner) return;\n' +
           '  if (typeof ym === \'function\') {\n' +
           '    ym(43949414, \'reachGoal\', \'partner_click\', { partner: partner });\n' +
           '  }\n' +
