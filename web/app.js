@@ -4671,24 +4671,13 @@ function mktLoadYoY(){
   var period=mktSelectedPeriod();
   var echo=document.getElementById('mktPeriodEcho'); if(echo) echo.textContent=period;
   el.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
-  var kpiEl=document.getElementById('mktKpis');
-  if(kpiEl) kpiEl.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
   fetchJson('/api/marketing/channels?period='+period).then(function(d){
     if(!d || d.error){
       var msg='<div class="mkt-yoy-load">Нет данных за период: '+((d&&d.error)||'ошибка')+'</div>';
-      el.innerHTML=msg; if(kpiEl) kpiEl.innerHTML=msg; return;
+      el.innerHTML=msg; return;
     }
     var rub=function(n){return mNum(n)+' ₽';};
-    // Верхние KPI «Маркетинг по каналам» — живые из 1С за выбранный (слева) период.
-    if(kpiEl){
-      kpiEl.innerHTML =
-        mKpi(rub(d.revenue.cur),'Выручка') +
-        mKpi(mNum(d.cheques.cur),'Чеков') +
-        mKpi(rub(d.avgCheck.cur),'Средний чек') +
-        mKpi(mNum1(d.cardPct.cur)+' %','Карта лояльности в чеках') +
-        mKpi(rub(d.bonus.cur),'Оплачено бонусами') +
-        mKpi((d.sweet&&d.sweet.cur?d.sweet.cur.cards:0)+' карт','Сладкий чек ('+(d.sweet&&d.sweet.cur?d.sweet.cur.points:0)+' б.)');
-    }
+    // Верхние KPI-карточки удалены — блок YoY ниже даёт те же метрики + сравнение с прошлым годом.
     var cards=[
       mktYoYCard('Выручка', rub(d.revenue.cur), rub(d.revenue.prev), d.revenue.deltaPct),
       mktYoYCard('Чеков', mNum(d.cheques.cur), mNum(d.cheques.prev), d.cheques.deltaPct),
@@ -4812,8 +4801,9 @@ function mktLoadYoY(){
     // Блогеры (из Google Sheets через bloggers.json) — render таблица + KPI
     if (d.external && d.external.bloggers) {
       var bj = d.external.bloggers;
-      // ВНИМАНИЕ: не называть var kpiEl — внешний kpiEl (#mktKpis) function-scoped в .then,
-      // и var-хойстинг затенит его на всю функцию → верхние KPI «Маркетинг по каналам» не отрисуются.
+      // ВНИМАНИЕ: весь этот .then — одна function-scope. НЕ объявлять тут var с именами
+      // внешних переменных колбэка (el=#mktYoY и т.п.) — var-хойстинг затенит их на всю
+      // функцию, и верхний блок молча зависнет на «Загрузка». Поэтому bloggersKpiEl, не kpiEl.
       var bloggersKpiEl = document.getElementById('mktBloggersKpi');
       var tblEl = document.getElementById('mktBloggers');
       var hintEl = document.getElementById('mktBloggersHint');
@@ -5233,7 +5223,6 @@ function mktLoadYoY(){
   }).catch(function(e){
     var msg='<div class="mkt-yoy-load">Нет данных за период: '+e.message+'</div>';
     el.innerHTML=msg;
-    if(kpiEl) kpiEl.innerHTML=msg;
   });
 }
 // Универсальная sticky-навигация по секциям страницы (Маркетинг и Дашборд).
