@@ -4588,16 +4588,90 @@ function renderFunnel(){
     return '<div class="mkt-fstep"><div class="mkt-fbar" style="width:'+w.toFixed(1)+'%"><span>'+s[0]+'</span><b>'+mNum(s[1])+'</b></div><div class="mkt-fconv">'+(i?'→ '+conv.toFixed(1).replace('.',',')+' % от пред.':'')+'</div></div>';
   }).join('')+'</div>';
 }
-function renderAlerts(){
+// Алерты живые: считаются из данных /api/marketing/channels за ВЫБРАННЫЙ период (d).
+// Без аргументов — плейсхолдер (вызывается из mktInit до загрузки). Только реальные данные.
+// Для незавершённого (текущего) месяца абсолютный YoY по выручке/чекам недостоверен —
+// показываем лишь относительные сигналы (доли: средний чек, карта) + пометку.
+function renderAlerts(d, period){
   var el=document.getElementById('mktAlerts'); if(!el) return;
-  var a=[], sum=function(arr){return arr.reduce(function(s,x){return s+x;},0);};
-  var lo=MKT.cardPct[0], hi=MKT.cardPct[MKT.cardPct.length-1];
-  if(hi<lo) a.push(['red','Лояльность падает','Карта лояльности в чеках: '+mNum1(lo)+' % → '+mNum1(hi)+' %. Теряется база для CRM и SMS.']);
-  a.push(['red','SMS вслепую','На SMS ушло '+mNum(sum(MKT.smsCost))+' ₽, но отдача в покупках не измеряется. Приоритет №1 — включить атрибуцию.']);
-  var cMar=MKT.ctxCost[2]/MKT.ctxPurch[2], cMay=MKT.ctxCost[4]/MKT.ctxPurch[4];
-  if(cMay>cMar) a.push(['amber','CPA контекста растёт','Стоимость покупки с рекламы: '+mNum(cMar)+' ₽ (март) → '+mNum(cMay)+' ₽ (май). Проверить кампании.']);
-  a.push(['amber','Отзывы: брак','Главная жалоба «Марии» — посторонние предметы/качество (2ГИС 4,4 vs Otzovik 2,0). Регламент рекламаций — дешёвый рычаг роста рейтинга.']);
-  a.push(['green','Сила: кофе и кафе','Капучино — №1 по штукам (11 390), единственное публичное кофе-меню на рынке. Зона роста, где эконом-сети слабы.']);
+  if(!d){ el.innerHTML='<div class="mkt-yoy-load">Загрузка сигналов…</div>'; return; }
+  var a=[], mn=d.monthName||'';
+  var now=new Date(), curYM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var partial = period===curYM; // текущий месяц ещё идёт
+
+  // Карта лояльности (доля — достоверна и для неполного месяца)
+  if(d.cardPct && d.cardPct.deltaPp!=null){
+    var dpp=d.cardPct.deltaPp;
+    if(dpp<=-1) a.push(['red','Лояльность падает','Карта лояльности в чеках '+mNum1(d.cardPct.cur)+' % (год назад '+mNum1(d.cardPct.prev)+' %, '+mNum1(dpp)+' п.п.). Теряется база для CRM и SMS.']);
+    else if(dpp>=1) a.push(['green','Лояльность растёт','Карта лояльности '+mNum1(d.cardPct.cur)+' % (+'+mNum1(dpp)+' п.п. YoY) — база для CRM крепнет.']);
+  }
+  // Средний чек (доля)
+  if(d.avgCheck && d.avgCheck.deltaPct!=null){
+    var ac=d.avgCheck.deltaPct;
+    if(ac<=-3) a.push(['amber','Средний чек ниже прошлого года','Средний чек '+mNum(d.avgCheck.cur)+' ₽ ('+mNum1(ac)+' % YoY). Проверить промо/скидки и структуру чека.']);
+    else if(ac>=3) a.push(['green','Средний чек растёт','Средний чек '+mNum(d.avgCheck.cur)+' ₽ (+'+mNum1(ac)+' % YoY).']);
+  }
+  // Выручка YoY — только для завершённого месяца (для текущего абсолют недостоверен)
+  if(!partial && d.revenue && d.revenue.deltaPct!=null){
+    var rv=d.revenue.deltaPct;
+    if(rv<=-5) a.push(['red','Выручка ниже прошлого года',mn+': '+mNum(d.revenue.cur)+' ₽ ('+mNum1(rv)+' % к тому же месяцу год назад).']);
+    else if(rv>=5) a.push(['green','Выручка растёт YoY',mn+': '+mNum(d.revenue.cur)+' ₽ (+'+mNum1(rv)+' % YoY).']);
+  }
+  // Точки: худшая и лучшая по YoY (завершённый месяц)
+  if(!partial && d.byStore && d.byStore.length){
+    // Только реально работавшие ОБА года розничные точки: иначе −100% (закрытые) и
+    // +500 % (новые, база ~0) дают ложные сигналы. Склады/опт/цех — не розница.
+    var ys=d.byStore.filter(function(s){
+      return s.revenue && s.revenue.deltaPct!=null && s.revenue.cur>0 && s.revenue.prev>=1000000
+        && !/склад|опт|цех|производ/i.test(s.name||'');
+    }).slice().sort(function(x,y){return x.revenue.deltaPct-y.revenue.deltaPct;});
+    if(ys.length){
+      var worst=ys[0], best=ys[ys.length-1];
+      if(worst.revenue.deltaPct<=-10) a.push(['amber','Точка проседает YoY',worst.name+': выручка '+mNum(worst.revenue.cur)+' ₽ ('+mNum1(worst.revenue.deltaPct)+' % к тому же месяцу год назад). Разобраться с точкой.']);
+      if(best.revenue.deltaPct>=15) a.push(['green','Точка-лидер роста',best.name+': +'+mNum1(best.revenue.deltaPct)+' % выручки YoY ('+mNum(best.revenue.cur)+' ₽).']);
+    }
+  }
+  // Категории: топ-растущая / падающая (завершённый месяц). Только заметная доля и
+  // ненулевая база год назад — иначе мелкая/новая категория даёт «+780 %» из шума.
+  if(!partial && d.categories && d.categories.length){
+    var cg=d.categories.filter(function(c){return c.deltaPct!=null && c.prev>0;}).slice().sort(function(x,y){return y.deltaPct-x.deltaPct;});
+    var up=cg.filter(function(c){return c.sharePct>=5;})[0];
+    if(up && up.deltaPct>=10) a.push(['green','Категория на подъёме',up.group+': +'+mNum1(up.deltaPct)+' % YoY ('+mNum1(up.sharePct)+' % выручки).']);
+    var downs=cg.filter(function(c){return c.sharePct>=3;});
+    var drop=downs.length?downs[downs.length-1]:null;
+    if(drop && drop.deltaPct<=-10) a.push(['amber','Категория падает',drop.group+': '+mNum1(drop.deltaPct)+' % YoY ('+mNum1(drop.sharePct)+' % выручки).']);
+  }
+  // Я.Директ: дорогой CPA и заканчивающийся баланс
+  var dir=d.external&&d.external.direct;
+  if(dir&&dir.totals&&dir.totals.spend){
+    var t=dir.totals;
+    if(t.cpa!=null && t.cpa>=400) a.push(['amber','CPA контекста дорогой','Я.Директ: CPA '+mNum(t.cpa)+' ₽/конверсию (расход '+mNum(t.spend)+' ₽, '+mNum(t.conversions)+' конв.). Оптимизировать кампании.']);
+    if(dir.balance!=null && t.spend>0 && dir.balance<t.spend) a.push(['red','Баланс Директа кончается','Остаток '+mNum(dir.balance)+' ₽ при расходе ~'+mNum(t.spend)+' ₽/мес (меньше месяца). Пополнить — иначе реклама встанет.']);
+  }
+  // 2ГИС: позиция в выдаче (актуально всегда)
+  var gis=d.external&&d.external.gis;
+  if(gis&&gis.appearance&&gis.appearance.positionAvg!=null){
+    if(gis.appearance.positionAvg<=5) a.push(['green','Топ в 2ГИС','Средняя позиция в выдаче 2ГИС — '+gis.appearance.positionAvg+' ('+mNum(gis.appearance.impressions||0)+' показов/мес). Сильный органический канал.']);
+    else if(gis.appearance.positionAvg>=20) a.push(['amber','Низко в 2ГИС','Средняя позиция в 2ГИС — '+gis.appearance.positionAvg+'. Поработать с рубриками и карточкой.']);
+  }
+  // Метрика: доля органики
+  var mk=d.external&&d.external.metrika;
+  if(mk&&mk.sources&&mk.sources.length){
+    var seoSrc=mk.sources.find(function(s){return /поиск|seo/i.test(s.name);});
+    if(seoSrc && seoSrc.sharePct>=50) a.push(['green','SEO — главный канал сайта','Органика '+mNum1(seoSrc.sharePct)+' % трафика сайта ('+mNum(seoSrc.visits)+' визитов). Расход 46к/мес оправдан.']);
+  }
+  // SMS без атрибуции (постоянный приоритет, пока нет BSL-патча получателей)
+  a.push(['amber','SMS без атрибуции','Отдача SMS-рассылок в покупках пока не измеряется (ждём BSL-патч получателей в 1С). Приоритет — атрибуция «карта-получатель ↔ чек».']);
+  // «Сладкий чек» — пассивный штамп
+  if(d.sweet&&d.sweet.cur&&d.sweet.cur.tasks){
+    var tk=d.sweet.cur.tasks;
+    var totalEv=Object.keys(tk).reduce(function(s,k){var v=tk[k];return s+(typeof v==='object'?(v.events||0):v);},0);
+    var buy=tk['Покупка']; var buyEv=typeof buy==='object'?(buy&&buy.events||0):(buy||0);
+    if(totalEv>0 && buyEv/totalEv>=0.7) a.push(['amber','«Сладкий чек» — пассивный штамп',Math.round(buyEv/totalEv*100)+' % срабатываний — «Покупка» (1 балл за любой чек). Программа пока не двигает поведение; поднять пороги/награждать повторные визиты.']);
+  }
+
+  if(partial) a.unshift(['amber','Месяц ещё не закончился',mn+' в процессе — сравнение выручки и чеков с прошлым годом по абсолюту недостоверно. Показаны относительные сигналы (средний чек, карта лояльности, позиции в выдаче). Итоги — после закрытия месяца.']);
+  if(!a.length) a.push(['green','Существенных отклонений нет','За '+mn+' ключевые метрики в норме относительно прошлого года.']);
   el.innerHTML=a.map(function(x){ return '<div class="mkt-alert mkt-alert-'+x[0]+'"><div class="mkt-alert-t">'+x[1]+'</div><div>'+x[2]+'</div></div>'; }).join('');
 }
 var AI_SUMMARY = [
@@ -4687,6 +4761,8 @@ function mktLoadYoY(){
       mktYoYCard('Сладкий чек', d.sweet.cur.cards+' карт · '+d.sweet.cur.points+' б.', (d.sweet.isNew?'программы не было':d.sweet.prev.cards+' карт'), d.sweet.isNew?null:0)
     ].join('');
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
+    // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
+    try { renderAlerts(d, period); } catch(_){}
     var hint=document.getElementById('mktYoYHint');
     if(hint){ var t=d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—';
       hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.fromCache?' (из кэша)':'')+'.'; }
