@@ -1,7 +1,7 @@
 // Промо-аналитика — скидки, купоны, акции, подарочные сертификаты.
 // Тянет через HTTP-сервис 1С УПП напрямую.
 //
-// До обновления BSL (баг с разделителем тысяч) — лимит 999 строк за запрос,
+// До обновления BSL (баг с разделителем тысяч) — лимит 5000 строк за запрос,
 // чанкуем по неделям чтобы охватить весь месяц. После обновления — лимит 100k.
 
 const { fetchUppPackage } = require('./upp-pull');
@@ -9,7 +9,7 @@ const { fetchUppPackage } = require('./upp-pull');
 const BASE_URL = process.env.UPP_PULL_URL || '';
 const BASE = BASE_URL.replace(/\/pull(\?.*)?$/, '');
 
-async function callRegister(name, fromYM, toYM, limit = 999) {
+async function callRegister(name, fromYM, toYM, limit = 5000) {
   if (!BASE) throw new Error('UPP_PULL_URL не настроен');
   const url = `${BASE}/register?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
   return fetchUppPackage({
@@ -27,10 +27,10 @@ function parseRu(num) {
 // Чанкуем месяц на куски (всё равно YYYY-MM/YYYY-MM т.к. /register принимает
 // формат YYYY-MM, не дни). До обновления BSL ограничены лимитом 999.
 async function fetchAllDiscounts(fromYM, toYM) {
-  const data = await callRegister('ПредоставленныеСкидки', fromYM, toYM, 999);
+  const data = await callRegister('ПредоставленныеСкидки', fromYM, toYM, 5000);
   return {
     rows: data.rows || [],
-    truncated: (data.rowsCount || 0) >= 999  // признак что упёрлись в лимит
+    truncated: (data.rowsCount || 0) >= 5000  // признак что упёрлись в лимит
   };
 }
 
@@ -87,7 +87,7 @@ function aggregateDiscounts(rows) {
 
 async function fetchGiftCertificates(fromYM, toYM) {
   try {
-    const data = await callRegister('ПодарочныеСертификаты', fromYM, toYM, 999);
+    const data = await callRegister('ПодарочныеСертификаты', fromYM, toYM, 5000);
     let total = 0;
     let count = 0;
     for (const r of data.rows || []) {
@@ -97,7 +97,7 @@ async function fetchGiftCertificates(fromYM, toYM) {
     return {
       movements: count,
       totalSum: Number(total.toFixed(2)),
-      truncated: count >= 999
+      truncated: count >= 5000
     };
   } catch (e) {
     return { error: e.message };
@@ -106,10 +106,10 @@ async function fetchGiftCertificates(fromYM, toYM) {
 
 async function fetchCoffeeCertificates(fromYM, toYM) {
   try {
-    const data = await callRegister('СертификатыНаКофе', fromYM, toYM, 999);
+    const data = await callRegister('СертификатыНаКофе', fromYM, toYM, 5000);
     let count = 0;
     for (const r of data.rows || []) count += 1;
-    return { movements: count, truncated: count >= 999 };
+    return { movements: count, truncated: count >= 5000 };
   } catch (e) {
     return { error: e.message };
   }
@@ -153,7 +153,7 @@ async function buildPromoAnalytics(opts = {}) {
         ...aggregateDiscounts(discountsRaw.rows),
         truncated: discountsRaw.truncated,
         truncatedNote: discountsRaw.truncated
-          ? 'Показаны первые 999 строк скидок за период. После обновления BSL HTTP-сервиса (Формат(Лимит, "ЧГ=")) лимит поднимется до 100 000.'
+          ? 'Показаны первые 5000 строк скидок за период. После обновления BSL HTTP-сервиса (Формат(Лимит, "ЧГ=")) лимит поднимется до 100 000.'
           : null
       };
     }

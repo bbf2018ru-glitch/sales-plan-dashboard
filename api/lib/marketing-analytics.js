@@ -97,10 +97,10 @@ async function buildDiscountCannibalization(fromYM, toYM, opts = {}) {
   let truncatedMonths = 0;
 
   for (const ym of months) {
-    const data = await callRegister('ПредоставленныеСкидки', ym, ym, 999);
+    const data = await callRegister('ПредоставленныеСкидки', ym, ym, 5000);
     const rows = data.rows || [];
     totalRows += rows.length;
-    if (rows.length >= 999) truncatedMonths += 1;
+    if (rows.length >= 5000) truncatedMonths += 1;
     let monthTotal = 0;
     for (const r of rows) {
       const sum = parseRu(r['СуммаСкидки']);
@@ -138,7 +138,7 @@ async function buildDiscountCannibalization(fromYM, toYM, opts = {}) {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 15),
     truncationWarning: truncatedMonths > 0
-      ? `${truncatedMonths} мес. из ${months.length} обрезаны лимитом 999 строк — реальные суммы могут быть выше.`
+      ? `${truncatedMonths} мес. из ${months.length} обрезаны лимитом 5000 строк — реальные суммы могут быть выше.`
       : null
   };
 }
@@ -155,7 +155,7 @@ async function buildRfmSimple(fromYM, toYM) {
   const today = nowYM();
 
   for (const ym of months) {
-    const data = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 999);
+    const data = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 5000);
     const rows = data.rows || [];
     for (const r of rows) {
       const owner = (r['ВладелецДисконтнойКарты'] || '').trim();
@@ -461,7 +461,7 @@ async function buildCohortRetention(monthsBack = 6) {
   const cards = new Map();
   for (const ym of months) {
     try {
-      const data = await callRegister('Бонусы', ym, ym, 999);
+      const data = await callRegister('Бонусы', ym, ym, 5000);
       for (const r of data.rows || []) {
         const card = (r['БонуснаяКарта'] || '').trim();
         if (!card) continue;

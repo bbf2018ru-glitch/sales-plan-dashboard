@@ -41,7 +41,7 @@ async function buildCustomersRetention(fromYM, toYM) {
   const baselineMonths = rangeMonths(baseFrom, baseTo);
   for (const ym of baselineMonths) {
     try {
-      const d = await callRegister('Бонусы', ym, ym, 999);
+      const d = await callRegister('Бонусы', ym, ym, 5000);
       for (const r of d.rows || []) {
         const card = (r['БонуснаяКарта'] || '').trim();
         if (card) baselineCards.add(card);
@@ -55,7 +55,7 @@ async function buildCustomersRetention(fromYM, toYM) {
   const currentCards = new Map(); // card -> { firstSeenInPeriod, movements, sum }
   const periodMonths = rangeMonths(fromYM, toYM);
   for (const ym of periodMonths) {
-    const d = await callRegister('Бонусы', ym, ym, 999);
+    const d = await callRegister('Бонусы', ym, ym, 5000);
     for (const r of d.rows || []) {
       const card = (r['БонуснаяКарта'] || '').trim();
       if (!card) continue;
@@ -107,7 +107,7 @@ async function getMonthCards(ym) {
   return monthCardsCache.wrap('cards:' + ym, async () => {
     const set = new Set();
     try {
-      const d = await callRegister('Бонусы', ym, ym, 999);
+      const d = await callRegister('Бонусы', ym, ym, 5000);
       for (const r of d.rows || []) {
         const card = (r['БонуснаяКарта'] || '').trim();
         if (card) set.add(card);
@@ -188,9 +188,9 @@ async function getUdsMonthlyAggregate(ym) {
     const codes = new Map(); // code → { uses, revenue, bonusUsed }
     try {
       // 1) Получаем чеки с UDS-кодом
-      const d = await callDocument('ЧекККМ', ym, ym, 999);
+      const d = await callDocument('ЧекККМ', ym, ym, 5000);
       const rows = d.rows || [];
-      const truncated = rows.length >= 999;
+      const truncated = rows.length >= 5000;
       const chequeByNum = new Map(); // Номер → code
       for (const r of rows) {
         const code = (r['uds_КодСкидки'] || '').trim();
@@ -486,10 +486,10 @@ async function buildPromoDynamics(fromYM, toYM) {
   let truncatedMonths = 0;
 
   for (const ym of months) {
-    const data = await callRegister('ПредоставленныеСкидки', ym, ym, 999);
+    const data = await callRegister('ПредоставленныеСкидки', ym, ym, 5000);
     const rows = data.rows || [];
     totalRows += rows.length;
-    if (rows.length >= 999) truncatedMonths += 1;
+    if (rows.length >= 5000) truncatedMonths += 1;
     for (const r of rows) {
       const product = (r['Номенклатура'] || '').trim() || '—';
       const sum = parseRu(r['СуммаСкидки']);
@@ -527,7 +527,7 @@ async function buildPromoDynamics(fromYM, toYM) {
     totalRows,
     truncatedMonths,
     truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 строк — после обновления BSL лимит поднимется до 100k.`
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 строк — после обновления BSL лимит поднимется до 100k.`
       : null,
     topProducts,
     days,
@@ -560,10 +560,10 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
   let truncatedMonths = 0;
 
   for (const ym of months) {
-    const d = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 999);
+    const d = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 5000);
     const rows = d.rows || [];
     totalRows += rows.length;
-    if (rows.length >= 999) truncatedMonths += 1;
+    if (rows.length >= 5000) truncatedMonths += 1;
     for (const r of rows) {
       const card = (r['ДисконтнаяКарта'] || '').trim();
       const owner = (r['ВладелецДисконтнойКарты'] || '').trim();
@@ -585,7 +585,7 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
     totalRevenue: Number(totalRevenue.toFixed(2)),
     truncatedMonths,
     truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 строк — данные могут быть неполными.`
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 строк — данные могут быть неполными.`
       : null,
     topCards: arr.slice(0, 100).map(c => ({
       card: c.card,
@@ -612,9 +612,9 @@ async function buildPromoByAction(fromYM, toYM) {
   let truncatedMonths = 0;
 
   for (const ym of months) {
-    const d = await callRegister('ПредоставленныеСкидки', ym, ym, 999);
+    const d = await callRegister('ПредоставленныеСкидки', ym, ym, 5000);
     const rows = d.rows || [];
-    if (rows.length >= 999) truncatedMonths += 1;
+    if (rows.length >= 5000) truncatedMonths += 1;
     for (const r of rows) {
       const cond = (r['УсловиеСкидки'] || '').trim();
       if (!/акци/i.test(cond)) continue;
@@ -648,7 +648,7 @@ async function buildPromoByAction(fromYM, toYM) {
     totalDiscountSum: Number(promoRows.reduce((s, r) => s + r.sum, 0).toFixed(2)),
     truncatedMonths,
     truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 строк регистра — данные неполные.`
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 строк регистра — данные неполные.`
       : null,
     bslLimitNote: 'Имя конкретной акции (типа "Промокод СУШИ") пока не показывается — оно в ТЧ документа. Добавь endpoint /promo-by-action в BSL и здесь появится.',
     documents: docList.slice(0, 200)
@@ -662,10 +662,10 @@ async function buildUdsPromoCodes(fromYM, toYM) {
   let truncatedMonths = 0;
 
   for (const ym of months) {
-    const d = await callDocument('ЧекККМ', ym, ym, 999);
+    const d = await callDocument('ЧекККМ', ym, ym, 5000);
     const rows = d.rows || [];
     totalChecks += rows.length;
-    if (rows.length >= 999) truncatedMonths += 1;
+    if (rows.length >= 5000) truncatedMonths += 1;
     for (const r of rows) {
       const code = (r['uds_КодСкидки'] || '').trim();
       if (!code) continue;
@@ -698,7 +698,7 @@ async function buildUdsPromoCodes(fromYM, toYM) {
     uniqueCodes: byCode.size,
     truncatedMonths,
     truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 999 чеков — данные неполные. После обновления BSL лимит поднимется.`
+      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 чеков — данные неполные. После обновления BSL лимит поднимется.`
       : null,
     topCodes: Array.from(byCode.values())
       .sort((a, b) => b.totalSum - a.totalSum || b.uses - a.uses)
