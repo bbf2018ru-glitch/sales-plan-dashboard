@@ -2631,6 +2631,8 @@ async function init() {
       loadInsights();
       analyticsState.data = null;
       if (analyticsState.currentPage === 'analytics') await loadAnalytics();
+      // Маркетинг по каналам слушается этого же глобального периода
+      if (analyticsState.currentPage === 'marketing' && typeof mktLoadYoY === 'function') mktLoadYoY();
     });
 
     $('trendWindowBtns')?.addEventListener('click', e => {
@@ -4353,12 +4355,8 @@ function mktRender(){
   // SEO-бюджет: фикс 46 000 ₽/мес (агентство+контент+техничка), реальная цифра от Маши.
   var SEO_MONTHLY = 46000;
   var seoC = SEO_MONTHLY * idx.length;
-  document.getElementById('mktKpis').innerHTML =
-    mKpi(mNum(rev)+' ₽','Выручка') +
-    mKpi(mNum(smsC+ctxC+seoC)+' ₽','Платный маркетинг (SMS+контекст+SEO)') +
-    mKpi(mNum(smsS),'SMS отправлено ('+mNum(smsC)+' ₽)') +
-    mKpi(mNum(pur),'Покупок с рекламы ('+mNum(ctxC)+' ₽)') +
-    mKpi(mNum(seoC)+' ₽','SEO/контент ('+mNum(SEO_MONTHLY)+' ₽/мес × '+idx.length+')');
+  // Верхние KPI «Маркетинг по каналам» теперь живые (см. mktLoadYoY) и слушаются
+  // глобального периода слева. Здесь больше не рисуем (статика янв–май убрана).
   document.getElementById('mktSms').innerHTML = mTbl(
     ['Месяц','Рассылок','SMS отправлено','Стоимость, ₽','Цена SMS, ₽'],
     idx.map(function(i){ return [MKT.months[i], mNum(MKT.smsCnt[i]), mNum(MKT.smsSent[i]), mNum(MKT.smsCost[i]), MKT.smsSent[i]?mNum1(MKT.smsCost[i]/MKT.smsSent[i]):'—']; }),
@@ -4646,10 +4644,10 @@ function mktInit(){
   mktLoadYoY();
 }
 // Живой YoY-блок: тянет /api/marketing/channels за выбранный месяц (1С + год назад).
+// Период берём ГЛОБАЛЬНЫЙ — селектор «ПЕРИОД» слева в сайдбаре (state.period),
+// тот же, что рулит Дашбордом и Аналитикой. Свой диапазон-селектор маркетинга убран.
 function mktSelectedPeriod(){
-  var toEl=document.getElementById('mktTo');
-  var idx = toEl ? Number(toEl.value) : (MKT.months.length-1);
-  return '2026-' + String(idx+1).padStart(2,'0');
+  return state.period || ('2026-' + String(MKT.months.length).padStart(2,'0'));
 }
 function mktDeltaBadge(v, unit){
   if(v===null||v===undefined) return '<span class="mkt-yoy-d mkt-yoy-na">нет базы</span>';
@@ -4666,10 +4664,26 @@ function mktYoYCard(label, curStr, prevStr, delta, unit){
 function mktLoadYoY(){
   var el=document.getElementById('mktYoY'); if(!el) return;
   var period=mktSelectedPeriod();
+  var echo=document.getElementById('mktPeriodEcho'); if(echo) echo.textContent=period;
   el.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
+  var kpiEl=document.getElementById('mktKpis');
+  if(kpiEl) kpiEl.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
   fetchJson('/api/marketing/channels?period='+period).then(function(d){
-    if(!d || d.error){ el.innerHTML='<div class="mkt-yoy-load">Нет данных: '+((d&&d.error)||'ошибка')+'</div>'; return; }
+    if(!d || d.error){
+      var msg='<div class="mkt-yoy-load">Нет данных за период: '+((d&&d.error)||'ошибка')+'</div>';
+      el.innerHTML=msg; if(kpiEl) kpiEl.innerHTML=msg; return;
+    }
     var rub=function(n){return mNum(n)+' ₽';};
+    // Верхние KPI «Маркетинг по каналам» — живые из 1С за выбранный (слева) период.
+    if(kpiEl){
+      kpiEl.innerHTML =
+        mKpi(rub(d.revenue.cur),'Выручка') +
+        mKpi(mNum(d.cheques.cur),'Чеков') +
+        mKpi(rub(d.avgCheck.cur),'Средний чек') +
+        mKpi(mNum1(d.cardPct.cur)+' %','Карта лояльности в чеках') +
+        mKpi(rub(d.bonus.cur),'Оплачено бонусами') +
+        mKpi((d.sweet&&d.sweet.cur?d.sweet.cur.cards:0)+' карт','Сладкий чек ('+(d.sweet&&d.sweet.cur?d.sweet.cur.points:0)+' б.)');
+    }
     var cards=[
       mktYoYCard('Выручка', rub(d.revenue.cur), rub(d.revenue.prev), d.revenue.deltaPct),
       mktYoYCard('Чеков', mNum(d.cheques.cur), mNum(d.cheques.prev), d.cheques.deltaPct),

@@ -1232,10 +1232,9 @@
           <!-- Липкая шапка маркетинга: период + под-табы (видны во всех группах) -->
           <div class="mkt-topbar">
             <div class="mkt-period">
-              <span>Период с</span>
-              <select id="mktFrom" class="mkt-sel"></select>
-              <span>по</span>
-              <select id="mktTo" class="mkt-sel"></select>
+              <span class="muted" style="font-size:12.5px">📅 Период берётся из селектора «ПЕРИОД» слева в сайдбаре · <b id="mktPeriodEcho">—</b></span>
+              <select id="mktFrom" class="mkt-sel" style="display:none"></select>
+              <select id="mktTo" class="mkt-sel" style="display:none"></select>
               <button id="mktExportBtn" class="mkt-export" type="button">⬇ Экспорт в Excel</button>
             </div>
             <div class="analytics-tabs mkt-tabs" id="mktTabs" role="tablist" aria-label="Разделы маркетинга">
@@ -1252,8 +1251,8 @@
           </div>
 
           <section class="section" id="mkt-s-kpi" data-mgroup="overview">
-            <div class="section-label">Маркетинг по каналам <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">Данные за янв–май 2026 (1С, Яндекс.Метрика/Директ, 2ГИС). Выбери период вверху — таблицы и итоги пересчитаются. *Май — неполный (до 26.05).</div>
+            <div class="section-label">Маркетинг по каналам <span class="mkt-scope dyn" title="Живые данные из 1С за выбранный слева период">live · за месяц</span></div>
+            <div class="section-hint">Живые данные из 1С за период, выбранный в селекторе «ПЕРИОД» слева в сайдбаре. Выручка, чеки, средний чек, доля карты лояльности, бонусы, «Сладкий чек» — реально за выбранный месяц.</div>
             <div class="mkt-kpis" id="mktKpis"></div>
             <div class="section-label" style="margin-top:20px">За месяц · сравнение с прошлым годом (YoY) <span class="mkt-scope dyn" title="Живые данные из 1С, обновляются на сервере автоматически">live</span></div>
             <div class="section-hint" id="mktYoYHint">Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК).</div>
