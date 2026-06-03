@@ -4531,11 +4531,12 @@ function renderSmsAttribution(sa){
         var head='<div><b style="white-space:nowrap">'+(c.firstDate||'')+'</b>'+rep+(c.endDate?' <span style="color:var(--muted);font-size:10px">→ до '+c.endDate+'</span>':'')+'</div>'+
           '<div style="font-size:11px;max-width:360px">'+(c.text?esc(c.text):'')+'</div>';
         var offer=(typeBadge[c.type]||c.type||'')+'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(c.product||'')+'</div>';
+        var sweet = (c.sweetReg!=null) ? '<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(c.sweetReg)+' рег. в «Сладком чеке»</div>' : '';
         if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td></tr>';
-        if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td colspan="3" style="font-size:11px;color:var(--muted)">переходы по ссылке — нужна статистика clck.ru (не подключено)</td></tr>';
+        if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td></tr>';
         var cc=convColor(c.conversionPct);
         return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td>'+
-          '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div></td>'+
+          '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div>'+sweet+'</td>'+
           '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td>'+
           '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td></tr>';
       }).join('')+'</tbody></table></div>';

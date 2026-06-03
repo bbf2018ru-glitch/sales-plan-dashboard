@@ -118,6 +118,19 @@ function anyPurchaseQuery(dts, from, to) {
     + ` ГДЕ П.Ссылка.Дата В (${inList})`;
 }
 
+// Регистрации в «Сладком чеке» среди получателей: карты, чьё ПЕРВОЕ участие в регистре
+// СладкийЧек пришлось на/после даты рассылки (ссылка вела на страницу регистрации).
+function sweetRegQuery(dts, fromDay) {
+  const inList = dts.map(dtLit).join(', ');
+  return 'ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Рег ИЗ ('
+    + ' ВЫБРАТЬ П.Получатель КАК К, МИНИМУМ(СЧ.Период) КАК Перв'
+    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
+    + ' ВНУТРЕННЕЕ СОЕДИНЕНИЕ РегистрНакопления.СладкийЧек КАК СЧ ПО СЧ.БонуснаяКарта = П.Получатель'
+    + ` ГДЕ П.Ссылка.Дата В (${inList})`
+    + ' СГРУППИРОВАТЬ ПО П.Получатель'
+    + ` ИМЕЮЩИЕ МИНИМУМ(СЧ.Период) >= ${fromDay}) КАК Т`;
+}
+
 function row1(res) {
   const r = (res && res.rows && res.rows[0]) || {};
   const recipients = upp.parseRu(r.Получателей), buyers = upp.parseRu(r.Купили), revenue = upp.parseRu(r.Выручка);
@@ -165,13 +178,19 @@ async function compute(period) {
       } else if (offer.hasLink) {
         // Тип B: ссылка — переходы из Метрики. clck.ru/код→clckid→визиты резолвит серверный
         // скрейпер (браузером, сервер ловит капчу) и кладёт в sms-clicks.json.byCode[код].
-        let clicks = null;
+        let clicks = null, dest = '';
         const cm = /clck\.ru\/([a-z0-9]+)/i.exec(g.text);
         if (cm && smsClicks.byCode && smsClicks.byCode[cm[1]] != null) clicks = smsClicks.byCode[cm[1]];
+        if (cm && smsClicks.codeToUrl) dest = smsClicks.codeToUrl[cm[1]] || '';
+        // Если ссылка ведёт на /for_clients/ (регистрация в Сладком чеке) — считаем регистрации.
+        let sweetReg = null;
+        if (/for_clients/i.test(dest)) {
+          try { const sr = await upp.callQuery(sweetRegQuery(g.dts, dayLit(first))); sweetReg = upp.parseRu((sr.rows && sr.rows[0] || {}).Рег); } catch (_) {}
+        }
         if (clicks != null) {
-          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: g.sends, buyers: clicks, revenue: null, conversionPct: g.sends ? Math.round(clicks / g.sends * 1000) / 10 : 0, avgCheck: null, isClicks: true });
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: g.sends, buyers: clicks, revenue: null, conversionPct: g.sends ? Math.round(clicks / g.sends * 1000) / 10 : 0, avgCheck: null, isClicks: true, dest, sweetReg });
         } else {
-          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true });
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true, dest, sweetReg });
         }
       } else {
         // Тип C: нет срока и ссылки — запасное окно, любая покупка (оценка).
