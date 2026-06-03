@@ -4491,12 +4491,14 @@ function renderSmsAttribution(sa){
   }
   // По каждой рассылке.
   if(camps.length){
+    var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
     html+='<div class="mkt-chart-t" style="margin-top:14px">По каждой рассылке ('+camps.length+') · окно покупки +'+(sa.windowDays||14)+' дней</div>'+
-      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата рассылки</th><th class="num">Получателей</th><th class="num">Купили</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Ср. чек ₽</th></tr></thead><tbody>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата рассылки</th><th>Текст рассылки</th><th class="num">Получателей</th><th class="num">Купили</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Ср. чек ₽</th></tr></thead><tbody>'+
       camps.map(function(c){
-        if(c.error) return '<tr><td>'+(c.date||'')+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="4" style="color:var(--muted);text-align:left">— ошибка: '+c.error.slice(0,40)+'</td></tr>';
+        var txt='<span style="font-size:11px">'+(c.text?esc(c.text):'<span style="color:var(--muted)">—</span>')+'</span>';
+        if(c.error) return '<tr><td style="white-space:nowrap">'+(c.date||'')+'</td><td>'+txt+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="4" style="color:var(--muted);text-align:left">— ошибка: '+c.error.slice(0,40)+'</td></tr>';
         var cc=convColor(c.conversionPct);
-        return '<tr><td style="white-space:nowrap">'+(c.date||'')+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num">'+mNum(c.buyers)+'</td><td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td><td class="num">'+mNum(c.revenue)+'</td><td class="num">'+mNum(c.avgCheck)+'</td></tr>';
+        return '<tr><td style="white-space:nowrap">'+(c.date||'')+'</td><td style="max-width:340px">'+txt+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num">'+mNum(c.buyers)+'</td><td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td><td class="num">'+mNum(c.revenue)+'</td><td class="num">'+mNum(c.avgCheck)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок за период не найдено.</div>';

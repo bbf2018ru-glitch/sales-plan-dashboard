@@ -45,6 +45,7 @@ function monthBounds(period) {
 function campaignListQuery(period) {
   const b = monthBounds(period);
   return 'ВЫБРАТЬ П.Ссылка.Дата КАК Дата, П.Ссылка.Тема КАК Тема,'
+    + ' МАКСИМУМ(ВЫРАЗИТЬ(П.Ссылка.ТекстПисьма КАК СТРОКА(300))) КАК Текст,'
     + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей'
     + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
     + ` ГДЕ П.Ссылка.Дата >= ДАТАВРЕМЯ(${b.y},${b.m},1) И П.Ссылка.Дата < ДАТАВРЕМЯ(${b.ny},${b.nm},1)`
@@ -97,7 +98,7 @@ async function compute(period) {
   if (!list || !list.rows) return { period, error: 'нет ответа 1С', campaigns: [] };
   let camps = list.rows
     .filter((r) => MARKETING_RE.test(r.Тема || ''))
-    .map((r) => ({ dt: parseDt(r.Дата), dateStr: r.Дата, theme: r.Тема, listRecipients: upp.parseRu(r.Получателей) }))
+    .map((r) => ({ dt: parseDt(r.Дата), dateStr: r.Дата, theme: r.Тема, text: (r.Текст || '').trim(), listRecipients: upp.parseRu(r.Получателей) }))
     .filter((c) => c.dt)
     .slice(0, MAX_CAMPAIGNS);
 
@@ -111,9 +112,9 @@ async function compute(period) {
   for (const c of camps) {
     try {
       const a = row1(await upp.callQuery(campaignQuery(c.dt), { timeoutMs: 40000 }));
-      campaigns.push({ date: c.dateStr, theme: c.theme, ...a });
+      campaigns.push({ date: c.dateStr, theme: c.theme, text: c.text, ...a });
     } catch (e) {
-      campaigns.push({ date: c.dateStr, theme: c.theme, recipients: c.listRecipients, buyers: null, revenue: null, conversionPct: null, avgCheck: null, error: e.message });
+      campaigns.push({ date: c.dateStr, theme: c.theme, text: c.text, recipients: c.listRecipients, buyers: null, revenue: null, conversionPct: null, avgCheck: null, error: e.message });
     }
   }
 
