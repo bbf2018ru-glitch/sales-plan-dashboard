@@ -43,8 +43,8 @@ async function compute(period) {
   const gis = readExt('2gis.json');
   // SMS-затраты берём из детального расчёта (по УНИКАЛЬНЫМ получателям, с дедупом повторных
   // отправок) — чтобы бюджет совпадал с блоком «SMS-рассылки» и не завышался дублями.
-  let smsReach = 0, smsCostFromAtt = null;
-  try { const sa = await smsAttribution.getSmsAttribution(period); if (sa && sa.totals) { smsReach = sa.totals.recipients || 0; smsCostFromAtt = sa.totals.cost; } } catch (_) {}
+  let smsReach = 0, smsSent = 0, smsCostFromAtt = null;
+  try { const sa = await smsAttribution.getSmsAttribution(period); if (sa && sa.totals) { smsReach = sa.totals.recipients || 0; smsSent = sa.totals.sends || 0; smsCostFromAtt = sa.totals.cost; } } catch (_) {}
 
   const directSpend = (direct && direct.totals && direct.totals.spend) || 0;
   const directConv = (direct && direct.totals && direct.totals.conversions) || 0;
@@ -66,8 +66,8 @@ async function compute(period) {
   });
   ch.push({
     key: 'sms', name: 'SMS-рассылки (Реклама)', cost: smsCost,
-    costNote: smsReach + ' уник. получателей × ' + c.smsPrice + ' ₽ (без дублей-ресендов)',
-    result: smsReach + ' уник. получателей', cpr: null, live: smsReach > 0
+    costNote: smsSent + ' отправок (с повторами) × ' + c.smsPrice + ' ₽',
+    result: smsReach + ' уник. получателей', cpr: null, live: smsSent > 0
   });
   ch.push({
     key: 'gis', name: '2ГИС — приоритет в выдаче', cost: c.gisMonthly,
