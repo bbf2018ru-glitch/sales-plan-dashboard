@@ -4469,29 +4469,37 @@ function renderPaidLive(d){
     '<b>SMS — атрибуция к покупкам подключена.</b> Связь рассылок с чеками по карте лояльности — в разделе «Каналы → SMS-рассылки».</div>';
   el.innerHTML=html;
 }
-// SMS-атрибуция: рендер живых данных /api/marketing/sms-attribution за месяц.
+// SMS-атрибуция: рендер по каждой кампании «Реклама» + дедуплицированный итог.
 function renderSmsAttribution(sa){
   var el=document.getElementById('mktSmsAttr'); if(!el) return;
   if(!sa || sa.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных атрибуции: '+((sa&&sa.error)||'ошибка')+'</div>'; return; }
   var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
-  var t=sa.marketingTotals||{recipients:0,buyers:0,revenue:0,conversionPct:0,avgCheck:0};
-  var html='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:6px">'+
-    kpi(mNum(t.recipients),'Получателей с картой')+
-    kpi(mNum(t.buyers),'Купили в окне')+
-    kpi('<span style="color:'+(t.conversionPct>=10?'#10a05a':(t.conversionPct>=3?'#b8860b':'#e0466a'))+'">'+mNum1(t.conversionPct)+' %</span>','Конверсия')+
-    kpi(mNum(t.revenue)+' ₽','Выручка от получателей')+
-    kpi(mNum(t.avgCheck)+' ₽','Средний чек')+
-    '</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Маркетинговые рассылки за '+(sa.window||sa.period)+'. KPI — только маркетинг (триггерные и аномалии в таблице ниже отдельно).</div>';
-  var themes=(sa.themes||[]);
-  if(themes.length){
-    var kindLabel={marketing:'<span style="color:#10a05a">маркетинг</span>', transactional:'<span style="color:var(--muted)">триггер/транз.</span>', anomaly:'<span style="color:#e0466a">аномалия (опт)</span>'};
-    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (тема)</th><th>Тип</th><th class="num">Получателей</th><th class="num">Купили</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Ср. чек ₽</th></tr></thead><tbody>'+
-      themes.map(function(r){
-        var convC=r.kind!=='marketing'?'' : (r.conversionPct>=10?'color:#10a05a':(r.conversionPct>=3?'color:#b8860b':'color:#e0466a'));
-        var rev=r.kind==='anomaly'?'<span title="оптовая выдача — не розничная атрибуция" style="color:#e0466a">'+mNum(r.revenue)+' ⚠️</span>':mNum(r.revenue);
-        return '<tr'+(r.kind==='marketing'?' style="font-weight:600"':'')+'><td>'+r.theme+'</td><td style="font-size:11px">'+(kindLabel[r.kind]||r.kind)+'</td><td class="num">'+mNum(r.recipients)+'</td><td class="num">'+mNum(r.buyers)+'</td><td class="num" style="'+convC+'">'+mNum1(r.conversionPct)+' %</td><td class="num">'+rev+'</td><td class="num">'+mNum(r.avgCheck)+'</td></tr>';
+  var convColor=function(p){ return p>=10?'#10a05a':(p>=3?'#b8860b':'#e0466a'); };
+  var camps=sa.campaigns||[];
+  var t=sa.total;
+  var html='';
+  // Дедуплицированный итог по всем рассылкам «Реклама» за месяц.
+  if(t){
+    html+='<div class="mkt-chart-t">Итог по рекламным рассылкам · '+sa.period+' (уникальные карты)</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:8px 0 4px">'+
+      kpi(mNum(t.recipients),'Охват (уник. карт)')+
+      kpi(mNum(t.buyers),'Купили')+
+      kpi('<span style="color:'+convColor(t.conversionPct)+'">'+mNum1(t.conversionPct)+' %</span>','Конверсия')+
+      kpi(mNum(t.revenue)+' ₽','Выручка')+
+      kpi(mNum(t.avgCheck)+' ₽','Средний чек')+
+      '</div>';
+  }
+  // По каждой рассылке.
+  if(camps.length){
+    html+='<div class="mkt-chart-t" style="margin-top:14px">По каждой рассылке ('+camps.length+') · окно покупки +'+(sa.windowDays||14)+' дней</div>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата рассылки</th><th class="num">Получателей</th><th class="num">Купили</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Ср. чек ₽</th></tr></thead><tbody>'+
+      camps.map(function(c){
+        if(c.error) return '<tr><td>'+(c.date||'')+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="4" style="color:var(--muted);text-align:left">— ошибка: '+c.error.slice(0,40)+'</td></tr>';
+        var cc=convColor(c.conversionPct);
+        return '<tr><td style="white-space:nowrap">'+(c.date||'')+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num">'+mNum(c.buyers)+'</td><td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td><td class="num">'+mNum(c.revenue)+'</td><td class="num">'+mNum(c.avgCheck)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
+  } else {
+    html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок за период не найдено.</div>';
   }
   if(sa.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+sa.note+'</div>';
   el.innerHTML=html;
