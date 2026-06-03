@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const upp = require('./upp-client');
+const smsAttribution = require('./sms-attribution');
 
 const EXT_DIR = process.env.MARKETING_DATA_DIR || '/opt/marketing-data';
 const cache = upp.makeCache(6 * 60 * 60 * 1000);
@@ -35,27 +36,15 @@ function bounds(period) {
 }
 
 // Кол-во отправленных маркетинговых SMS («Реклама») за месяц (1 строка Получатели = 1 SMS).
-async function smsSentMarketing(period) {
-  const b = bounds(period);
-  const q = 'ВЫБРАТЬ П.Ссылка.Тема КАК Тема, КОЛИЧЕСТВО(*) КАК Строк'
-    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
-    + ` ГДЕ П.Ссылка.Дата >= ДАТАВРЕМЯ(${b.y},${b.m},1) И П.Ссылка.Дата < ДАТАВРЕМЯ(${b.ny},${b.nm},1)`
-    + ' СГРУППИРОВАТЬ ПО П.Ссылка.Тема';
-  try {
-    const r = await upp.callQuery(q, { timeoutMs: 40000 });
-    const rows = (r && r.rows) || [];
-    const mkt = rows.filter((x) => /реклам|акци|подар|бонус|промо|рассылк/i.test(x.Тема || ''));
-    const all = rows.reduce((s, x) => s + upp.parseRu(x.Строк), 0);
-    return { marketing: mkt.reduce((s, x) => s + upp.parseRu(x.Строк), 0), all };
-  } catch (_) { return { marketing: 0, all: 0, error: true }; }
-}
-
 async function compute(period) {
   const c = costs();
   const direct = readExt('direct.json');
   const metrika = readExt('metrika.json');
   const gis = readExt('2gis.json');
-  const sms = await smsSentMarketing(period);
+  // SMS-затраты берём из детального расчёта (по УНИКАЛЬНЫМ получателям, с дедупом повторных
+  // отправок) — чтобы бюджет совпадал с блоком «SMS-рассылки» и не завышался дублями.
+  let smsReach = 0, smsCostFromAtt = null;
+  try { const sa = await smsAttribution.getSmsAttribution(period); if (sa && sa.totals) { smsReach = sa.totals.recipients || 0; smsCostFromAtt = sa.totals.cost; } } catch (_) {}
 
   const directSpend = (direct && direct.totals && direct.totals.spend) || 0;
   const directConv = (direct && direct.totals && direct.totals.conversions) || 0;
@@ -64,7 +53,7 @@ async function compute(period) {
   const seoVisits = (seoSrc && seoSrc.visits) || 0;
   const gisImpr = (gis && gis.appearance && gis.appearance.impressions) || 0;
 
-  const smsCost = Math.round(sms.marketing * c.smsPrice);
+  const smsCost = smsCostFromAtt != null ? smsCostFromAtt : 0;
   const contextCost = Math.round(directSpend + c.directAgency);
 
   const ch = [];
@@ -77,8 +66,8 @@ async function compute(period) {
   });
   ch.push({
     key: 'sms', name: 'SMS-рассылки (Реклама)', cost: smsCost,
-    costNote: sms.marketing + ' отправлено × ' + c.smsPrice + ' ₽' + (sms.error ? ' (оценка)' : ''),
-    result: sms.marketing + ' SMS', cpr: null, live: true
+    costNote: smsReach + ' уник. получателей × ' + c.smsPrice + ' ₽ (без дублей-ресендов)',
+    result: smsReach + ' уник. получателей', cpr: null, live: smsReach > 0
   });
   ch.push({
     key: 'gis', name: '2ГИС — приоритет в выдаче', cost: c.gisMonthly,
