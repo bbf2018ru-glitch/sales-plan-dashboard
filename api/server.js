@@ -1630,6 +1630,47 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // M2M-прокси к 2ГИС: скрапит список филиалов бренда (id+address+rating).
+    // Используется maria-crew для авто-сопоставления своих 18 точек с карточками 2ГИС.
+    // Сам скрейпинг выполняет /opt/2gis-scraper/discover-branches.js (playwright).
+    if (pathname === '/api/upp/proxy/gis2-branches' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const orgId = String(parsedUrl.searchParams.get('org') || '1548649242829424');
+      const city = String(parsedUrl.searchParams.get('city') || 'irkutsk');
+      try {
+        const { execFile } = require('node:child_process');
+        const out = await new Promise((resolve, reject) => {
+          execFile('node', ['/opt/2gis-scraper/discover-branches.js', orgId, city], { timeout: 180000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error(`gis2 scraper err: ${err.message}; stderr=${stderr}`));
+            resolve(stdout);
+          });
+        });
+        try { sendJson(res, 200, JSON.parse(out)); }
+        catch (_) { sendJson(res, 502, { error: 'invalid JSON from scraper', raw: out.slice(0, 500) }); }
+      } catch (e) { sendJson(res, 502, { error: e.message || 'gis2 scraper error' }); }
+      return;
+    }
+
+    // M2M-прокси к 2ГИС: рейтинг по id карточки. Тонкий враппер над get-rating.js.
+    if (pathname === '/api/upp/proxy/gis2-rating' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const id = String(parsedUrl.searchParams.get('id') || '');
+      const city = String(parsedUrl.searchParams.get('city') || 'irkutsk');
+      if (!id) { sendJson(res, 400, { error: 'id required' }); return; }
+      try {
+        const { execFile } = require('node:child_process');
+        const out = await new Promise((resolve, reject) => {
+          execFile('node', ['/opt/2gis-scraper/get-rating.js', id, city], { timeout: 60000 }, (err, stdout, stderr) => {
+            if (err) return reject(new Error(`gis2 rating err: ${err.message}; stderr=${stderr}`));
+            resolve(stdout);
+          });
+        });
+        try { sendJson(res, 200, JSON.parse(out)); }
+        catch (_) { sendJson(res, 502, { error: 'invalid JSON from scraper', raw: out.slice(0, 500) }); }
+      } catch (e) { sendJson(res, 502, { error: e.message || 'gis2 rating error' }); }
+      return;
+    }
+
     // ── 1С Diagnostic / Explorer ──────────────────────────────────────────────
     if (pathname === '/api/ingest/upp-diagnostic' && req.method === 'POST') {
       if (!requireApiKey(req, res)) return;
