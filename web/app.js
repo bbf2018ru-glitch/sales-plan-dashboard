@@ -1372,7 +1372,10 @@ async function loadStoreNotes() {
   block.classList.remove('hidden');
   try {
     const data = await fetchJson(`/api/comments?storeId=${encodeURIComponent(state.selectedStoreId)}`);
-    const notes = (data.comments || []).slice(0, 20);
+    const notes = (data.comments || [])
+      .slice()
+      .sort((a, b) => new Date(b.eventDate || b.createdAt || 0) - new Date(a.eventDate || a.createdAt || 0)) // новые сверху
+      .slice(0, 20);
     listEl.innerHTML = notes.length
       ? notes.map(n => `
           <div class="store-note">
@@ -1425,7 +1428,10 @@ function renderComments() {
     el.innerHTML = '<div class="empty-state" style="padding:12px 0">Нет заметок за этот период.</div>';
     return;
   }
-  el.innerHTML = state.comments.map(c => `
+  const sorted = state.comments
+    .slice()
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)); // новые сверху
+  el.innerHTML = sorted.map(c => `
     <div class="comment-card">
       <div class="comment-header">
         <span class="comment-author">${c.author || 'Менеджер'}</span>

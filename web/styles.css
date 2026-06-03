@@ -1073,9 +1073,20 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 
 /* ── Tables ───────────────────────────────────────────────────────── */
-.table-wrap { overflow-x: auto; }
+/* Большой блок = ограниченная высота + скролл ВНУТРИ + липкая шапка:
+   быстро листаешь содержимое, следующий блок сразу под ним. */
+.table-wrap { overflow-x: auto; overflow-y: auto; max-height: 62vh; }
+.table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--glass-strong);
+}
 
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+/* Списки заметок/событий — тоже большие блоки: кап высоты + скролл внутри */
+.store-notes-list, #commentsList { max-height: 42vh; overflow-y: auto; }
 
 th {
   padding: 11px 14px;
@@ -2811,6 +2822,10 @@ table.num-table th {
 /* ── Print: collapse to clean white ───────────────────────────────── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* при печати показываем блоки целиком — капы/скролл/липкость отменяем */
+  .table-wrap, .store-notes-list, #commentsList { max-height: none !important; overflow: visible !important; }
+  .table-wrap thead th { position: static !important; }
 
   body::before { display: none !important; }
   body { background: #fff !important; }
