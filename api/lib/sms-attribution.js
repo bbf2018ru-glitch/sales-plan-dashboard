@@ -17,8 +17,32 @@
 //
 // Перформанс: окна — КОНСТАНТЫ на запрос (per-row ДОБАВИТЬКДАТЕ в JOIN = таймаут).
 
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const upp = require('./upp-client');
 const cache = upp.makeCache(6 * 60 * 60 * 1000);
+const EXT_DIR = process.env.MARKETING_DATA_DIR || '/opt/marketing-data';
+function readExt(file) { try { return JSON.parse(fs.readFileSync(EXT_DIR + '/' + file, 'utf8')); } catch (_) { return null; } }
+
+// Резолв короткой ссылки clck.ru/КОД → clckid (метка визита на maria-irk.ru, по ней
+// Метрика считает переходы). Берём из первого редиректа (Location → sba.yandex.ru/...clckid=).
+const _clckidCache = new Map();
+function resolveClckid(code) {
+  if (_clckidCache.has(code)) return Promise.resolve(_clckidCache.get(code));
+  return new Promise((resolve) => {
+    const req = https.request({ hostname: 'clck.ru', path: '/' + code, method: 'GET', timeout: 8000 }, (res) => {
+      const loc = res.headers.location || '';
+      const m = /clckid%3D([a-z0-9]+)|clckid=([a-z0-9]+)/i.exec(loc);
+      const id = m ? (m[1] || m[2]) : null;
+      _clckidCache.set(code, id); resolve(id);
+      res.resume();
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.end();
+  });
+}
 const FALLBACK_DAYS = 14;
 const MIN_RECIPIENTS = 100;
 const MAX_CAMPAIGNS = 30;
@@ -119,6 +143,7 @@ function row1(res) {
 }
 
 async function compute(period) {
+  const smsClicks = readExt('sms-clicks.json') || { byClckid: {} };
   const list = await upp.callQuery(campaignListQuery(period));
   if (!list || !list.rows) return { period, error: 'нет ответа 1С', campaigns: [] };
 
@@ -156,8 +181,15 @@ async function compute(period) {
         const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true)), { timeoutMs: 50000 }));
         campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)', ...a });
       } else if (offer.hasLink) {
-        // Тип B: ссылка — переходы (нужна статистика clck.ru).
-        campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы (clck.ru — не подключено)', recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true });
+        // Тип B: ссылка — переходы из Метрики (clck.ru/код → clckid → визиты /for_clients/?clckid=).
+        let clicks = null, clckid = null;
+        const cm = /clck\.ru\/([a-z0-9]+)/i.exec(g.text);
+        if (cm) { clckid = await resolveClckid(cm[1]); if (clckid && smsClicks.byClckid && smsClicks.byClckid[clckid] != null) clicks = smsClicks.byClckid[clckid]; }
+        if (clicks != null) {
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: g.sends, buyers: clicks, revenue: null, conversionPct: g.sends ? Math.round(clicks / g.sends * 1000) / 10 : 0, avgCheck: null, isClicks: true });
+        } else {
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true });
+        }
       } else {
         // Тип C: нет срока и ссылки — запасное окно, любая покупка (оценка).
         const to = plusDays(first, FALLBACK_DAYS);
@@ -171,7 +203,7 @@ async function compute(period) {
 
   return {
     period, campaigns, campaignsCount: campaigns.length,
-    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — переходы по clck.ru (подключим, когда дашь доступ); без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Повторные отправки одной рассылки схлопнуты. Только «Реклама»/«Акция».',
+    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — ПЕРЕХОДЫ по ссылке из Яндекс.Метрики (ссылка ведёт на maria-irk.ru с меткой clckid, переходы считаются по странице входа); без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Повторные отправки одной рассылки схлопнуты. Только «Реклама»/«Акция».',
     caveat: '⚠️ Цифры завышены базовым уровнем (постоянные клиенты покупают и без SMS). Чистый прирост даст контрольная группа (холдаут ~10%) — следующий этап.',
     refreshedAt: new Date().toISOString()
   };
