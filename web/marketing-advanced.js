@@ -48,33 +48,57 @@
         return `${sy}-${String(fm).padStart(2, '0')}`;
       })();
       const data = await fetchJson(`/api/marketing/rfm?from=${from}&to=${to}`);
-      const segs = data.segments || data || {};
-      const items = [
-        { key: 'champions', label: 'Чемпионы', emoji: '🏆', color: '#22c55e', desc: 'Часто, недавно, много' },
-        { key: 'loyal',     label: 'Активные', emoji: '💚', color: '#3b82f6', desc: 'Регулярные клиенты' },
-        { key: 'sleeping',  label: 'Спящие',   emoji: '😴', color: '#f59e0b', desc: 'Раньше покупали, давно нет' },
-        { key: 'cold',      label: 'Холодные', emoji: '❄️', color: '#94a3b8', desc: 'Купили 1 раз и ушли' },
-      ];
-      const total = items.reduce((s, x) => s + (segs[x.key]?.count || 0), 0) || 1;
+      const segments = data.segments || [];
+      if (!segments.length) {
+        el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Нет данных RFM за период.</div>';
+        return;
+      }
+      // Палитра + эмодзи по имени сегмента
+      const meta = {
+        'VIP':           { emoji: '🏆', color: '#22c55e', desc: 'Часто, много, недавно' },
+        'Постоянные':    { emoji: '💚', color: '#3b82f6', desc: 'Регулярные покупки' },
+        'Уходящие VIP':  { emoji: '⚠️', color: '#f59e0b', desc: 'Были VIP, последний раз давно' },
+        'Спящие':        { emoji: '😴', color: '#a855f7', desc: 'Не покупали последние месяцы' },
+        'Прочие':        { emoji: '🟦', color: '#94a3b8', desc: 'Разовые / нерегулярные' },
+      };
+      const total = data.total || segments.reduce((s, x) => s + (x.count || 0), 0) || 1;
+      const ordered = segments.slice().sort((a, b) => (b.monetary || 0) - (a.monetary || 0));
       el.innerHTML =
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">' +
-        items.map(it => {
-          const s = segs[it.key] || { count: 0, avg: 0 };
-          const share = (s.count / total);
-          return `<div style="padding:14px;border:1px solid var(--line,#e2e8f0);border-radius:10px;background:var(--paper,#fff)">
-            <div style="font-size:24px">${it.emoji}</div>
-            <div style="font-weight:600;color:${it.color}">${it.label}</div>
-            <div style="font-size:28px;font-weight:700;margin:4px 0">${s.count?.toLocaleString('ru-RU') ?? 0}</div>
+        `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">` +
+        ordered.map(s => {
+          const m = meta[s.segment] || { emoji: '🟦', color: '#94a3b8', desc: '' };
+          const share = (s.count || 0) / total;
+          return `<div style="padding:14px;border:1px solid var(--line,#e2e8f0);border-radius:10px;background:var(--paper,#fff);border-top:3px solid ${m.color}">
+            <div style="font-size:24px">${m.emoji}</div>
+            <div style="font-weight:600;color:${m.color}">${esc(s.segment)}</div>
+            <div style="font-size:28px;font-weight:700;margin:4px 0">${(s.count || 0).toLocaleString('ru-RU')}</div>
             <div style="font-size:12px;color:var(--muted,#64748b)">${fmtPct(share)} клиентов</div>
-            <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">${it.desc}</div>
-            <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">Средний чек: ${fmtMoney(s.avg)} ₽</div>
+            <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">${esc(m.desc)}</div>
+            <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">Чек: ${fmtMoney(s.avgMonetary || 0)} ₽ · Выручка ${fmtMoney(s.monetary || 0)} ₽</div>
           </div>`;
         }).join('') +
         '</div>' +
-        `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Период анализа: ${from} … ${to} (6 месяцев)</div>`;
+        `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Всего клиентов: ${total.toLocaleString('ru-RU')} · Период: ${from} … ${to} (6 мес)</div>` +
+        (data.topVIP && data.topVIP.length ? renderTopVip(data.topVIP) : '');
     } catch (e) {
       el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить RFM: ${esc(e.message)}</div>`;
     }
+  }
+
+  function renderTopVip(list) {
+    const rows = list.slice(0, 10).map((v, i) => `<tr>
+      <td>${i + 1}</td>
+      <td>${esc(v.name || '')}</td>
+      <td style="text-align:right">${fmtMoney(v.monetary || 0)} ₽</td>
+      <td style="text-align:right">${(v.frequency || 0).toLocaleString('ru-RU')}</td>
+    </tr>`).join('');
+    return `<div style="margin-top:14px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px">Топ-10 VIP клиентов</div>
+      <div class="table-wrap"><table style="width:100%;font-size:13px">
+        <thead><tr><th>#</th><th>Клиент</th><th style="text-align:right">Выручка</th><th style="text-align:right">Покупок</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
   }
 
   // ─── Когорты ────────────────────────────────────────────────────────────────
