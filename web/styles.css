@@ -3323,7 +3323,7 @@ body.plan-incomplete .spark-fill {
 
 /* ─── Mobile compact mode — упрощённый дашборд на узких экранах ──────── */
 .mobile-toggle-bar {
-  display: none;
+  display: flex;                /* виден и на десктопе — «Краткий/Полный вид» */
   padding: 10px 14px;
   background: var(--bg-soft, rgba(0,0,0,.04));
   border-radius: 12px;
@@ -3343,6 +3343,21 @@ body.plan-incomplete .spark-fill {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* Краткий вид (на ВСЕХ ширинах, вкл. десктоп): прячем второстепенные секции
+   дашборда, оставляя hero + KPI + таблицу точек. Скоуп #page-dashboard —
+   страницы Аналитика/Маркетинг не затрагиваются. Навигацию не прячем. */
+body.mobile-compact #dash-s-forecast,
+body.mobile-compact #dash-s-ai,
+body.mobile-compact #aiNarrativeSection,
+body.mobile-compact #marketTrendsSection,
+body.mobile-compact #commentsSection,
+body.mobile-compact #storeDetailSection,
+body.mobile-compact #dash-s-notes,
+body.mobile-compact #dashNav,
+body.mobile-compact #page-dashboard .panel-grid {
+  display: none !important;
 }
 
 @media (max-width: 640px) {
