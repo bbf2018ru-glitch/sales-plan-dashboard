@@ -4525,21 +4525,30 @@ function renderSmsAttribution(sa){
   var html='';
   if(sa.caveat) html+='<div class="mkt-comp-ins" style="margin-bottom:10px;font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:8px 10px;border-radius:6px">'+sa.caveat+'</div>';
   if(camps.length){
-    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (дата · текст)</th><th>Оффер</th><th class="num">Получателей</th><th class="num">Купили / перешли</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th></tr></thead><tbody>'+
+    var t=sa.totals||{};
+    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (дата · текст)</th><th>Оффер</th><th class="num">Отправлено</th><th class="num">Купили / перешли</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Затраты ₽</th></tr></thead><tbody>'+
       camps.map(function(c){
         var rep = c.sendsCount>1 ? ' <span style="color:#e0466a;font-size:10px" title="повторных отправок одной рассылки">×'+c.sendsCount+'</span>' : '';
         var head='<div><b style="white-space:nowrap">'+(c.firstDate||'')+'</b>'+rep+(c.endDate?' <span style="color:var(--muted);font-size:10px">→ до '+c.endDate+'</span>':'')+'</div>'+
-          '<div style="font-size:11px;max-width:360px">'+(c.text?esc(c.text):'')+'</div>';
+          '<div style="font-size:11px;max-width:340px">'+(c.text?esc(c.text):'')+'</div>';
         var offer=(typeBadge[c.type]||c.type||'')+'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(c.product||'')+'</div>';
         var sweet = (c.sweetReg!=null) ? '<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(c.sweetReg)+' рег. в «Сладком чеке»</div>' : '';
-        if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td></tr>';
-        if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td></tr>';
+        var costCell='<td class="num">'+mNum(c.cost)+'</td>';
+        if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.sends)+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td>'+costCell+'</tr>';
+        if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.sends)+'</td><td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td>'+costCell+'</tr>';
         var cc=convColor(c.conversionPct);
-        return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td>'+
+        return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.sends)+'</td>'+
           '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div>'+sweet+'</td>'+
           '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td>'+
-          '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td></tr>';
-      }).join('')+'</tbody></table></div>';
+          '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td>'+costCell+'</tr>';
+      }).join('')+
+      '<tr class="mkt-total"><td><b>Итого</b></td><td></td>'+
+        '<td class="num"><b>'+mNum(t.sends||0)+'</b></td>'+
+        '<td class="num"><b>'+mNum(t.buyers||0)+'</b> <span style="font-size:10px;color:var(--muted)">покуп.+перех.</span>'+(t.sweetReg?'<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
+        '<td class="num">'+mNum1(t.conversionPct||0)+' %</td>'+
+        '<td class="num"><b>'+mNum(t.revenue||0)+'</b></td>'+
+        '<td class="num"><b>'+mNum(t.cost||0)+'</b></td></tr>'+
+      '</tbody></table></div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок («Реклама»/«Акция») за период не найдено.</div>';
   }

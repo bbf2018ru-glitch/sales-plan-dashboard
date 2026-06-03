@@ -203,9 +203,19 @@ async function compute(period) {
     }
   }
 
+  // Затраты на каждую рассылку = всего отправок × цена SMS (env MKT_SMS_PRICE, дефолт 8.5).
+  const smsPrice = Number(process.env.MKT_SMS_PRICE) || 8.5;
+  campaigns.forEach((c) => { c.cost = Math.round((c.sends || 0) * smsPrice); });
+  const sum = (k) => campaigns.reduce((s, c) => s + (c[k] || 0), 0);
+  const totals = {
+    sends: sum('sends'), cost: sum('cost'), revenue: sum('revenue'),
+    buyers: sum('buyers'), sweetReg: sum('sweetReg'), smsPrice,
+    conversionPct: sum('sends') ? Math.round(sum('buyers') / sum('sends') * 1000) / 10 : 0
+  };
+
   return {
-    period, campaigns, campaignsCount: campaigns.length,
-    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — ПЕРЕХОДЫ по ссылке из Яндекс.Метрики (ссылка ведёт на maria-irk.ru с меткой clckid, переходы считаются по странице входа); без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Повторные отправки одной рассылки схлопнуты. Только «Реклама»/«Акция».',
+    period, campaigns, campaignsCount: campaigns.length, totals, smsPrice,
+    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — ПЕРЕХОДЫ по ссылке из Яндекс.Метрики (ссылка ведёт на maria-irk.ru с меткой clckid, переходы считаются по странице входа); без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Повторные отправки одной рассылки схлопнуты. Только «Реклама»/«Акция». Затраты = всего отправок × ' + smsPrice + ' ₽. Итого «купили/перешли» — смешанная сумма (покупки + переходы).',
     caveat: '⚠️ Цифры завышены базовым уровнем (постоянные клиенты покупают и без SMS). Чистый прирост даст контрольная группа (холдаут ~10%) — следующий этап.',
     refreshedAt: new Date().toISOString()
   };
