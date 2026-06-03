@@ -1896,9 +1896,10 @@ function initMobileCompact() {
       : '<b>Полный режим</b> · все блоки';
   };
 
-  // Дефолт на мобильном: compact. На десктопе: full.
+  // Дефолт «Краткий вид» везде (десктоп + мобайл) — приоритет «5 секунд».
+  // Выбор пользователя персистится в localStorage и переопределяет дефолт.
   const stored = localStorage.getItem(MOBILE_KEY);
-  const initial = stored === null ? isMobile() : stored === '1';
+  const initial = stored === null ? true : stored === '1';
   apply(initial);
 
   btn.addEventListener('click', () => {
