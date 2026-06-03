@@ -4526,32 +4526,31 @@ function renderSmsAttribution(sa){
   if(sa.caveat) html+='<div class="mkt-comp-ins" style="margin-bottom:10px;font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:8px 10px;border-radius:6px">'+sa.caveat+'</div>';
   if(camps.length){
     var t=sa.totals||{};
-    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (дата · текст)</th><th>Оффер</th><th class="num">Отправлено</th><th class="num">Купили / перешли</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Затраты ₽</th></tr></thead><tbody>'+
+    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (дата · текст)</th><th>Оффер</th><th class="num">Получателей</th><th class="num">Купили / перешли</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Затраты ₽</th></tr></thead><tbody>'+
       camps.map(function(c){
-        var rep = c.sendsCount>1 ? ' <span style="color:#e0466a;font-size:10px" title="отправлено '+c.sendsCount+' раза одним и тем же людям — повтор">×'+c.sendsCount+'</span>' : '';
-        var head='<div><b style="white-space:nowrap">'+(c.firstDate||'')+'</b>'+rep+(c.endDate?' <span style="color:var(--muted);font-size:10px">→ до '+c.endDate+'</span>':'')+'</div>'+
+        var head='<div><b style="white-space:nowrap">'+(c.firstDate||'')+'</b>'+(c.endDate?' <span style="color:var(--muted);font-size:10px">→ до '+c.endDate+'</span>':'')+'</div>'+
           '<div style="font-size:11px;max-width:340px">'+(c.text?esc(c.text):'')+'</div>';
         var offer=(typeBadge[c.type]||c.type||'')+'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(c.product||'')+'</div>';
         var sweet = (c.sweetReg!=null) ? '<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(c.sweetReg)+' рег. в «Сладком чеке»</div>' : '';
-        // Отправлено (всего) + уникальных подстрокой, если были повторы
-        var sentCell='<td class="num">'+mNum(c.sends)+(c.dupSends>0?'<div style="font-size:10px;color:var(--muted)">уник. '+mNum(c.recipients)+'</div>':'')+'</td>';
-        // Затраты + переплата на повторных отправках
-        var costCell='<td class="num">'+mNum(c.cost)+(c.dupCost>0?'<div style="font-size:10px;color:#e0466a" title="лишние отправки тем же людям">↑ '+mNum(c.dupCost)+' повторы</div>':'')+'</td>';
+        // Получателей = уникальные (чисто). Сноска про дубли-повторы, если были.
+        var dupNote = c.dupSends>0 ? '<div style="font-size:10px;color:#e0466a" title="система отправила рассылку повторно тем же людям">по факту ×'+c.sendsCount+' ('+mNum(c.sends)+' отпр.)</div>' : '';
+        var sentCell='<td class="num">'+mNum(c.recipients)+dupNote+'</td>';
+        var costCell='<td class="num">'+mNum(c.cost)+(c.dupCost>0?'<div style="font-size:10px;color:#e0466a">+'+mNum(c.dupCost)+'₽ на дубли</div>':'')+'</td>';
         if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+'<td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td>'+costCell+'</tr>';
         if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+'<td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td>'+costCell+'</tr>';
         var cc=convColor(c.conversionPct);
         var liftLine = (c.liftPct!=null) ? '<div style="font-size:10px;color:'+(c.liftPct>0?'#10a05a':'#e0466a')+'">прирост '+(c.liftPct>0?'+':'')+mNum1(c.liftPct)+' п.п.'+(c.incremental?' · ≈'+mNum(c.incremental)+' доп.':'')+'</div>' : '';
         return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+
-          '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+' (из '+mNum(c.recipients)+' уник.)</div>'+sweet+'</td>'+
+          '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div>'+sweet+'</td>'+
           '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %'+liftLine+'</td>'+
           '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td>'+costCell+'</tr>';
       }).join('')+
       '<tr class="mkt-total"><td><b>Итого</b></td><td></td>'+
-        '<td class="num"><b>'+mNum(t.sends||0)+'</b><div style="font-size:10px;color:var(--muted)">уник. '+mNum(t.recipients||0)+'</div></td>'+
+        '<td class="num"><b>'+mNum(t.recipients||0)+'</b>'+((t.sends||0)>(t.recipients||0)?'<div style="font-size:10px;color:#e0466a">по факту '+mNum(t.sends)+' отпр.</div>':'')+'</td>'+
         '<td class="num"><b>'+mNum(t.buyers||0)+'</b> <span style="font-size:10px;color:var(--muted)">покуп.+перех.</span>'+(t.sweetReg?'<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
         '<td class="num">'+mNum1(t.conversionPct||0)+' %'+(t.incremental?'<div style="font-size:10px;color:#10a05a">≈'+mNum(t.incremental)+' доп. покупок</div>':'')+'</td>'+
         '<td class="num"><b>'+mNum(t.revenue||0)+'</b>'+(t.incRevenue?'<div style="font-size:10px;color:#10a05a">≈'+mNum(t.incRevenue)+' прирост</div>':'')+'</td>'+
-        '<td class="num"><b>'+mNum(t.cost||0)+'</b>'+(t.dupCost?'<div style="font-size:10px;color:#e0466a">↑ '+mNum(t.dupCost)+' на повторы</div>':'')+'</td></tr>'+
+        '<td class="num"><b>'+mNum(t.cost||0)+'</b>'+(t.dupCost?'<div style="font-size:10px;color:#e0466a">+'+mNum(t.dupCost)+'₽ на дубли (глюк)</div>':'')+'</td></tr>'+
       '</tbody></table></div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок («Реклама»/«Акция») за период не найдено.</div>';

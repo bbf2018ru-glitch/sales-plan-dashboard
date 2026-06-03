@@ -66,8 +66,8 @@ async function compute(period) {
   });
   ch.push({
     key: 'sms', name: 'SMS-рассылки (Реклама)', cost: smsCost,
-    costNote: smsSent + ' отправок (с повторами) × ' + c.smsPrice + ' ₽',
-    result: smsReach + ' уник. получателей', cpr: null, live: smsSent > 0
+    costNote: smsReach + ' уник. получателей × ' + c.smsPrice + ' ₽ (чисто, без дублей-повторов)',
+    result: smsReach + ' уник. получателей', cpr: null, live: smsReach > 0
   });
   ch.push({
     key: 'gis', name: '2ГИС — приоритет в выдаче', cost: c.gisMonthly,
