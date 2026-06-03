@@ -6,6 +6,8 @@
 // Так env-переменные подхватываются даже если этот модуль импортирован раньше
 // чем loadProjectEnv() отработал.
 
+const http = require('http');
+const https = require('https');
 const { fetchUppPackage } = require('./upp-pull');
 
 function base() {
@@ -109,6 +111,44 @@ async function callCatalog(name, limit = 999) {
   return fetchUppPackage({ url, ...authOpts() });
 }
 
+// /query_post — УНИВЕРСАЛЬНЫЙ read-only исполнитель запросов 1С (ВЫБРАТЬ).
+// POST: текст запроса в теле (GET /query_get режет IIS 404.15 на длине). Возвращает
+// {rowsCount, columns, rows} (значения — строки). Тяжёлые запросы по ЧекККМ — до ~10с,
+// поэтому увеличенный таймаут. Только ВЫБРАТЬ, роль «Только чтение» на стороне 1С.
+function callQuery(queryText, { timeoutMs = 100000 } = {}) {
+  const b = base();
+  if (!b) throw new Error('UPP_PULL_URL не настроен');
+  const target = new URL(b + '/query_post');
+  const isHttps = target.protocol === 'https:';
+  const lib = isHttps ? https : http;
+  const body = Buffer.from(String(queryText), 'utf8');
+  const headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Length': body.length
+  };
+  const { username, password } = authOpts();
+  if (username) headers['Authorization'] = 'Basic ' + Buffer.from(`${username}:${password || ''}`).toString('base64');
+  return new Promise((resolve, reject) => {
+    const req = lib.request({
+      protocol: target.protocol, hostname: target.hostname,
+      port: target.port || (isHttps ? 443 : 80),
+      path: target.pathname, method: 'POST', headers
+    }, (res) => {
+      let raw = '';
+      res.on('data', (c) => { raw += c; });
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 400) { reject(new Error(`UPP /query HTTP ${res.statusCode}: ${raw.slice(0, 300)}`)); return; }
+        try { resolve(JSON.parse(raw)); }
+        catch (_) { reject(new Error(`UPP /query вернул не-JSON: ${raw.slice(0, 200)}`)); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('UPP /query timeout')));
+    req.write(body); req.end();
+  });
+}
+
 // ─── Простой in-memory cache с TTL ──────────────────────────────────────
 function makeCache(ttlMs = 5 * 60 * 1000) {
   const m = new Map();
@@ -157,5 +197,6 @@ module.exports = {
   callSalesDetail,
   callStoresDetail,
   callPull,
+  callQuery,
   makeCache
 };

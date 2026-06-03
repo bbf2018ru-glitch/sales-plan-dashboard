@@ -17,6 +17,7 @@ const { askAiChat, buildSuggestions } = require('./lib/ai-chat');
 const { getMarketTrends } = require('./lib/market-trends');
 const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
+const smsAttribution = require('./lib/sms-attribution');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -849,6 +850,16 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await marketingChannels.getChannels(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // ── SMS-атрибуция: рассылки → покупки по карте (живой /query 1С) ──
+    // Открыт без авторизации (как summary/channels). Тяжёлый запрос (~9с) кэшируется на 6ч.
+    if (pathname === '/api/marketing/sms-attribution' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await smsAttribution.getSmsAttribution(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
