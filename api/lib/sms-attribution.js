@@ -131,6 +131,13 @@ function sweetRegQuery(dts, fromDay) {
     + ` ИМЕЮЩИЕ МИНИМУМ(СЧ.Период) >= ${fromDay}) КАК Т`;
 }
 
+// Уникальных получателей (карт) по набору дат-отправок — для базы затрат (без дублей-ресендов).
+function uniqueRecipQuery(dts) {
+  const inList = dts.map(dtLit).join(', ');
+  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК У ИЗ Документ.SMSСообщение.Получатели КАК П'
+    + ` ГДЕ П.Ссылка.Дата В (${inList})`;
+}
+
 function row1(res) {
   const r = (res && res.rows && res.rows[0]) || {};
   const recipients = upp.parseRu(r.Получателей), buyers = upp.parseRu(r.Купили), revenue = upp.parseRu(r.Выручка);
@@ -182,15 +189,18 @@ async function compute(period) {
         const cm = /clck\.ru\/([a-z0-9]+)/i.exec(g.text);
         if (cm && smsClicks.byCode && smsClicks.byCode[cm[1]] != null) clicks = smsClicks.byCode[cm[1]];
         if (cm && smsClicks.codeToUrl) dest = smsClicks.codeToUrl[cm[1]] || '';
+        // Уникальный охват (без дублей-ресендов) — для конверсии и затрат.
+        let uniq = g.sends;
+        try { uniq = upp.parseRu((await upp.callQuery(uniqueRecipQuery(g.dts))).rows[0].У) || g.sends; } catch (_) {}
         // Если ссылка ведёт на /for_clients/ (регистрация в Сладком чеке) — считаем регистрации.
         let sweetReg = null;
         if (/for_clients/i.test(dest)) {
           try { const sr = await upp.callQuery(sweetRegQuery(g.dts, dayLit(first))); sweetReg = upp.parseRu((sr.rows && sr.rows[0] || {}).Рег); } catch (_) {}
         }
         if (clicks != null) {
-          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: g.sends, buyers: clicks, revenue: null, conversionPct: g.sends ? Math.round(clicks / g.sends * 1000) / 10 : 0, avgCheck: null, isClicks: true, dest, sweetReg });
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: uniq, buyers: clicks, revenue: null, conversionPct: uniq ? Math.round(clicks / uniq * 1000) / 10 : 0, avgCheck: null, isClicks: true, dest, sweetReg });
         } else {
-          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true, dest, sweetReg });
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients: uniq, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true, dest, sweetReg });
         }
       } else {
         // Тип C: нет срока и ссылки — запасное окно, любая покупка (оценка).
@@ -203,19 +213,22 @@ async function compute(period) {
     }
   }
 
-  // Затраты на каждую рассылку = всего отправок × цена SMS (env MKT_SMS_PRICE, дефолт 8.5).
+  // Затраты = УНИКАЛЬНЫЕ получатели × цена SMS (env MKT_SMS_PRICE, дефолт 8.5).
+  // Повторные отправки одной рассылки (×N на тех же людей) НЕ умножают затраты — считаем охват
+  // по уникальным картам/телефонам. (Если оператор берёт за каждую отправку — реальные затраты
+  // могут быть выше, но как «бюджет на охват» это корректнее.)
   const smsPrice = Number(process.env.MKT_SMS_PRICE) || 8.5;
-  campaigns.forEach((c) => { c.cost = Math.round((c.sends || 0) * smsPrice); });
+  campaigns.forEach((c) => { c.cost = Math.round((c.recipients || 0) * smsPrice); });
   const sum = (k) => campaigns.reduce((s, c) => s + (c[k] || 0), 0);
   const totals = {
-    sends: sum('sends'), cost: sum('cost'), revenue: sum('revenue'),
+    sends: sum('sends'), recipients: sum('recipients'), cost: sum('cost'), revenue: sum('revenue'),
     buyers: sum('buyers'), sweetReg: sum('sweetReg'), smsPrice,
-    conversionPct: sum('sends') ? Math.round(sum('buyers') / sum('sends') * 1000) / 10 : 0
+    conversionPct: sum('recipients') ? Math.round(sum('buyers') / sum('recipients') * 1000) / 10 : 0
   };
 
   return {
     period, campaigns, campaignsCount: campaigns.length, totals, smsPrice,
-    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — ПЕРЕХОДЫ по ссылке из Яндекс.Метрики (ссылка ведёт на maria-irk.ru с меткой clckid, переходы считаются по странице входа); без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Повторные отправки одной рассылки схлопнуты. Только «Реклама»/«Акция». Затраты = всего отправок × ' + smsPrice + ' ₽. Итого «купили/перешли» — смешанная сумма (покупки + переходы).',
+    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — ПЕРЕХОДЫ по ссылке из Яндекс.Метрики; без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Только «Реклама»/«Акция». Затраты = УНИКАЛЬНЫЕ получатели × ' + smsPrice + ' ₽ (повторные отправки ×N на тех же людей охват и затраты НЕ увеличивают). Итого «купили/перешли» — смешанная сумма (покупки + переходы).',
     caveat: '⚠️ Цифры завышены базовым уровнем (постоянные клиенты покупают и без SMS). Чистый прирост даст контрольная группа (холдаут ~10%) — следующий этап.',
     refreshedAt: new Date().toISOString()
   };
