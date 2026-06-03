@@ -777,12 +777,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/analytics/production-kg' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
-      const from = parsedUrl.searchParams.get('from');
-      const to = parsedUrl.searchParams.get('to');
+      // Открыт как весь дашборд. Живой выпуск в кг через /query 1С (./lib/production-kg),
+      // по выбранному месяцу. Старый DB-вариант был пуст (РН.ВыпускПродукции).
       try {
-        sendJson(res, 200, await getProductionKg({ from, to }));
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await productionKg.getProductionKg(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
@@ -861,15 +860,6 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await smsAttribution.getSmsAttribution(period));
-      } catch (e) { sendJson(res, 500, { error: e.message }); }
-      return;
-    }
-
-    // ── Выпуск продукции в кг (production-kg) через /query 1С ──
-    if (pathname === '/api/analytics/production-kg' && req.method === 'GET') {
-      try {
-        const period = monthKey(parsedUrl.searchParams.get('period'));
-        sendJson(res, 200, await productionKg.getProductionKg(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
