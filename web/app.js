@@ -4895,29 +4895,13 @@ function mktLoadYoY(){
       }
       if (pHint) {
         var active = (pj.partners||[]).filter(function(p){return p.active!==false;}).length;
-        var setupHTML = '<details style="margin-top:12px;background:#fff8e6;padding:10px;border-radius:6px;border:1px solid #f0d27a"><summary style="font-weight:600;cursor:pointer;color:#8b6a14">⚠️ Колонка «Переходов» = 0 — нужно подключить трекинг (5 мин)</summary>' +
-          '<div style="margin-top:10px;font-size:12px;line-height:1.6">' +
-          '<b>Шаг 1.</b> Создай цель в Метрике (<a href="https://metrika.yandex.ru/settings/goals?id=43949414" target="_blank">прямая ссылка</a>):<br>' +
-          '&nbsp;&nbsp;«Добавить цель» → тип <b>JavaScript-событие</b> → Название <code>Клик по партнёру</code>, Идентификатор <code>partner_click</code><br><br>' +
-          '<b>Шаг 2.</b> Вставь в <code>/local/templates/&lt;твой шаблон&gt;/footer.php</code> перед <code>&lt;/body&gt;</code> через Bitrix-fileman:<br>' +
-          '<pre style="background:#1e1e1e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:11px;overflow-x:auto;margin:8px 0">&lt;script&gt;\n' +
-          'document.addEventListener(\'click\', function(e) {\n' +
-          '  // Партнёрская ссылка: либо с utm_campaign, либо с data-partner, либо в блоке преференций\n' +
-          '  var a = e.target.closest(\'a[href*="utm_"], a[data-partner], .b-privilege a, .privilege a\');\n' +
-          '  if (!a) return;\n' +
-          '  // partner-ID: данные сайта или домен ссылки (уникален для каждого)\n' +
-          '  var partner = a.getAttribute(\'data-partner\');\n' +
-          '  try { if (!partner) partner = new URL(a.href).hostname.replace(/^www\\./, \'\'); } catch(_){}\n' +
-          '  if (!partner) return;\n' +
-          '  if (typeof ym === \'function\') {\n' +
-          '    ym(43949414, \'reachGoal\', \'partner_click\', { partner: partner });\n' +
-          '  }\n' +
-          '}, true);\n' +
-          '&lt;/script&gt;</pre>' +
-          '<b>Шаг 3.</b> Через 24ч в дашборде колонка «Переходов» заполнится автоматически.<br><br>' +
-          'Если не знаешь какой именно шаблон активен — в Bitrix-fileman зайди в <code>/local/templates/</code>, активный шаблон в <b>Контент → Структура сайта → Управление структурой</b>.</div>' +
-          '</details>';
-        pHint.innerHTML = 'Всего <b>'+pj.total+'</b> партнёров · активных <b>'+active+'</b>. Источник: Bitrix CMS iblock 88. Обновлено: '+(pj.scrapedAt?new Date(pj.scrapedAt).toLocaleString('ru-RU'):'?')+'.' + setupHTML;
+        var withClicks = (pj.partners||[]).filter(function(p){return (p.metrikaClicks||0)>0;}).length;
+        var totalClicks = (pj.partners||[]).reduce(function(s,p){return s+(p.metrikaClicks||0);},0);
+        var clicksUpd = pj.metrikaClicksUpdatedAt ? new Date(pj.metrikaClicksUpdatedAt).toLocaleString('ru-RU') : null;
+        var trackNote = clicksUpd
+          ? '<div style="margin-top:10px;font-size:12px;background:#eafaf0;padding:8px 10px;border-radius:6px;border:1px solid #b6e6c9;color:#0a6b3a">✓ <b>Трекинг переходов включён.</b> Цель <code>partner_click</code> в Метрике + JS на сайте; клики копятся и матчатся к партнёру по домену ссылки. Сейчас: <b>'+mNum(totalClicks)+'</b> переходов у <b>'+withClicks+'</b> партнёров за '+(pj.metrikaClicksPeriod||'последние 30 дней')+'. Обновляется ежедневно (скрейп Метрики). Данные '+clicksUpd+'.</div>'
+          : '<div style="margin-top:10px;font-size:12px;color:var(--muted)">Переходы появятся после ближайшего скрейпа Метрики.</div>';
+        pHint.innerHTML = 'Всего <b>'+pj.total+'</b> партнёров · активных <b>'+active+'</b>. Источник: Bitrix CMS iblock 88. Обновлено: '+(pj.scrapedAt?new Date(pj.scrapedAt).toLocaleString('ru-RU'):'?')+'.' + trackNote;
       }
     }
 
