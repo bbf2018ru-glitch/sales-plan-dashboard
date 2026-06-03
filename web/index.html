@@ -1317,14 +1317,12 @@
             <div class="section-label">SMS-рассылки — атрибуция к покупкам <span class="mkt-scope dyn" title="Живой JOIN получателей рассылки с чеками по карте лояльности за выбранный месяц (1С /query)">live · за месяц</span></div>
             <div class="section-hint">Связываем получателей SMS с покупками <b>по карте лояльности</b>: получатель купил по той же карте в окне «месяц рассылки + 14 дней». Источник — 1С (Документ.SMSСообщение ⋈ ЧекККМ). Атрибутируются только рассылки с картой; рассылки по телефону без карты — нет.</div>
             <div id="mktSmsAttr"></div>
-            <div class="section-label" style="margin-top:22px">Объёмы рассылок помесячно <span class="mkt-scope fix" title="Историческая сводка из 1С">сводка</span></div>
-            <div id="mktSms" class="table-wrap"></div>
           </section>
 
           <section class="section" id="mkt-s-ctx" data-mgroup="channels">
             <div class="section-label">Контекстная реклама (Яндекс.Директ) <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">Я.Директ <b>ведёт агентство</b> — кабинет под их логином. <b>Сумма заказов и ДРР</b> — оценка через 1С: <code>покупок × средний чек месяца</code>. Точная атрибуция «реклама → чек» требует UTM-cookie на сайте или Метрика-цели на покупку. Покупки и расход — фактические из MKT.</div>
-            <div id="mktCtx" class="table-wrap"></div>
+            <div class="section-hint">Я.Директ <b>ведёт агентство</b> (кабинет porg-mcw4s7ni). Live-данные за текущий месяц — ниже (скрейп кабинета). Помесячная история подключается.</div>
+            <div id="mktCtxMonthly" class="table-wrap"></div>
             <div id="mktDirectLive" class="mkt-comp-ins" style="margin-top:12px"></div>
           </section>
 
@@ -1505,6 +1503,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=101"></script>
+    <script src="/app.js?v=102"></script>
   </body>
 </html>
