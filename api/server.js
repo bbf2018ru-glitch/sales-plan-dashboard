@@ -1843,12 +1843,18 @@ const server = http.createServer(async (req, res) => {
         + ' КОЛИЧЕСТВО(Чек.Ссылка) КАК Чеков ИЗ Документ.ЧекККМ КАК Чек'
         + ` ГДЕ Чек.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Чек.Дата < ДАТАВРЕМЯ(${ny},${nm},1) И Чек.Проведен`
         + ' СГРУППИРОВАТЬ ПО Чек.ВидОперации';
+      const byStoreQ = 'ВЫБРАТЬ Чек.Склад.Код КАК Код, Чек.Склад.Наименование КАК Имя, Чек.ВидОперации КАК Вид,'
+        + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК СуммаДок, КОЛИЧЕСТВО(Чек.Ссылка) КАК Чеков'
+        + ' ИЗ Документ.ЧекККМ КАК Чек'
+        + ` ГДЕ Чек.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Чек.Дата < ДАТАВРЕМЯ(${ny},${nm},1) И Чек.Проведен`
+        + ' СГРУППИРОВАТЬ ПО Чек.Склад.Код, Чек.Склад.Наименование, Чек.ВидОперации';
       try {
-        const [r, h] = await Promise.all([
+        const [r, h, bs] = await Promise.all([
           upp.callQuery(lineQ, { timeoutMs: 120000 }),
-          upp.callQuery(hdrQ, { timeoutMs: 120000 })
+          upp.callQuery(hdrQ, { timeoutMs: 120000 }),
+          upp.callQuery(byStoreQ, { timeoutMs: 120000 })
         ]);
-        sendJson(res, 200, { period, target_dashboard_fact: 28751605.94, lineByVid: r.rows || r, hdrByVid: h.rows || h });
+        sendJson(res, 200, { period, target_dashboard_fact: 28751605.94, lineByVid: r.rows || r, hdrByVid: h.rows || h, byStore: bs.rows || bs });
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
