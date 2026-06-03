@@ -7,6 +7,11 @@ const { normalizeUppPayload, validateNormalizedUppPayload } = require('../lib/up
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'sql', 'init.sql');
 const SAMPLE_PATH = path.join(__dirname, '..', '..', 'data', 'sample-db.json');
 
+// Кэш снимка БД (getDb читает ВСЮ базу — stores/plans/sales/... + normalizeDb,
+// 4-8с на запрос). Кэшируем на 30с: дашборд-данные меняются только при ингесте
+// (~раз в 15 мин), а нагрузка из множества запросов больше не валит БД.
+const DB_CACHE_TTL_MS = Number(process.env.DB_CACHE_TTL_MS) || 30000;
+
 class PostgresStore {
   constructor(options) {
     this.connectionString = options.connectionString;
@@ -137,6 +142,7 @@ class PostgresStore {
       `update stores set name = $2 where id = $1 returning id, name`,
       [String(id), String(name)]
     );
+    this._invalidateDb();
     return r.rows[0] || null;
   }
 
@@ -207,7 +213,26 @@ class PostgresStore {
 
   async getDb() {
     await this.init();
+    const now = Date.now();
+    if (this._dbCache && (now - this._dbCacheAt) < DB_CACHE_TTL_MS) return this._dbCache;
+    // single-flight: конкурентные вызовы при холодном кэше ждут ОДНУ загрузку
+    // (иначе stampede — 10 запросов = 10 полных чтений БД = коллапс).
+    if (this._dbLoading) return this._dbLoading;
+    this._dbLoading = (async () => {
+      try {
+        const result = await this._loadDb();
+        this._dbCache = result;
+        this._dbCacheAt = Date.now();
+        return result;
+      } finally { this._dbLoading = null; }
+    })();
+    return this._dbLoading;
+  }
 
+  // Сброс кэша снимка БД — вызывать после записи в stores/plans/sales/products.
+  _invalidateDb() { this._dbCache = null; this._dbCacheAt = 0; }
+
+  async _loadDb() {
     const [stores, products, plans, sales, users, userStores, cheques] = await Promise.all([
       this.pool.query('select id, name, region, source, format from stores order by name'),
       this.pool.query('select id, name, category from products order by name'),
@@ -556,6 +581,7 @@ class PostgresStore {
       );
 
       await client.query('commit');
+      this._invalidateDb();   // новые данные ингеста должны появиться сразу, мимо TTL
       return run.rows[0];
     } catch (error) {
       await client.query('rollback');
