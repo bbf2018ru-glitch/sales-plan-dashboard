@@ -306,6 +306,7 @@ function renderTrendChart(summary) {
 function renderAiNarrative(text) {
   const section = $('aiNarrativeSection');
   const textEl = $('aiNarrativeText');
+  const toggle = $('aiNarrativeToggle');
   if (!section || !textEl) return;
   if (!text || !String(text).trim()) {
     section.classList.add('hidden');
@@ -313,6 +314,23 @@ function renderAiNarrative(text) {
   }
   textEl.innerHTML = escapeHtml(String(text)).replace(/\n/g, '<br>');
   section.classList.remove('hidden');
+  // По умолчанию свёрнут (2 строки) — чтобы KPI были над сгибом («5 секунд»)
+  section.classList.add('collapsed');
+  if (toggle) {
+    toggle.textContent = 'Развернуть';
+    // кнопку показываем только если текст реально длиннее 2 строк
+    requestAnimationFrame(() => {
+      const overflowing = textEl.scrollHeight > textEl.clientHeight + 2;
+      toggle.classList.toggle('hidden', !overflowing);
+    });
+    if (!toggle.dataset.wired) {
+      toggle.dataset.wired = '1';
+      toggle.addEventListener('click', () => {
+        const collapsed = section.classList.toggle('collapsed');
+        toggle.textContent = collapsed ? 'Развернуть' : 'Свернуть';
+      });
+    }
+  }
 }
 
 // ── Ритм недели — heatmap средней выручки по дням недели ────────────────────

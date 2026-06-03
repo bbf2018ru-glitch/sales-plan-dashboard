@@ -2596,6 +2596,26 @@ table.num-table th {
 }
 .ai-narrative-text { font-size: 14px; line-height: 1.55; color: var(--ink); }
 .ai-narrative-text b { font-weight: 600; }
+/* Сворачиваемый AI-нарратив (по умолчанию свёрнут — KPI над сгибом) */
+.ai-narrative-section.collapsed .ai-narrative-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ai-narrative-toggle {
+  margin-top: var(--space-1);
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ai-narrative-toggle:hover { text-decoration: underline; }
+.ai-narrative-toggle.hidden { display: none; }
 
 /* Иконка-подсказка ⓘ в KPI labels */
 .kpi-tip-icon {

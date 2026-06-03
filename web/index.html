@@ -16,7 +16,7 @@
     <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-cyrillic.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-latin.woff2" crossorigin />
     <link rel="stylesheet" href="/fonts.css?v=1" />
-    <link rel="stylesheet" href="/styles.css?v=61" />
+    <link rel="stylesheet" href="/styles.css?v=62" />
   </head>
   <body>
 
@@ -196,6 +196,15 @@
 
         <section id="summaryHero" class="summary-hero hidden"></section>
 
+        <!-- Итоги периода (KPI) — сразу под hero, приоритет «5 секунд» -->
+        <section class="section" id="dash-s-kpi">
+          <div class="block-head">
+            <div class="section-label">Итоги периода</div>
+            <span class="bp-mount no-print" data-bp="kpi"></span>
+          </div>
+          <div id="kpis" class="kpi-grid"></div>
+        </section>
+
         <!-- AI-нарратив: краткое объяснение «что происходит» в 2-3 предложениях -->
         <section id="aiNarrativeSection" class="ai-narrative-section hidden">
           <div class="ai-narrative-card">
@@ -203,6 +212,7 @@
             <div class="ai-narrative-body">
               <div class="ai-narrative-label">Маша рассказывает</div>
               <div id="aiNarrativeText" class="ai-narrative-text"></div>
+              <button id="aiNarrativeToggle" class="ai-narrative-toggle no-print" type="button">Развернуть</button>
             </div>
           </div>
         </section>
@@ -217,15 +227,6 @@
           <a href="#dash-s-stores">По точкам</a>
           <a href="#dash-s-notes">Заметки</a>
         </nav>
-
-        <!-- 1. Итоги периода (KPI) -->
-        <section class="section" id="dash-s-kpi">
-          <div class="block-head">
-            <div class="section-label">Итоги периода</div>
-            <span class="bp-mount no-print" data-bp="kpi"></span>
-          </div>
-          <div id="kpis" class="kpi-grid"></div>
-        </section>
 
         <!-- 2. Прогноз и ритм -->
         <section class="section" id="dash-s-forecast">
@@ -1500,6 +1501,6 @@
       </form>
     </div>
 
-    <script src="/app.js?v=96"></script>
+    <script src="/app.js?v=97"></script>
   </body>
 </html>
