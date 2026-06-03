@@ -81,31 +81,45 @@ function fmtAxis(v) {
 
 // ── HTTP ───────────────────────────────────────────────────────────────────
 async function fetchJson(path, opts = {}) {
-  const headers = { ...(opts.headers || {}) };
-  if (state.sessionToken) headers['X-Session-Token'] = state.sessionToken;
-  if (state.userToken) headers['X-User-Token'] = state.userToken;
-  opts.headers = headers;
-  // credentials: 'same-origin' — отправляем httpOnly auth-cookies (новая модель,
-  // вытесняет передачу токенов в URL/localStorage)
-  if (!opts.credentials) opts.credentials = 'same-origin';
-  // Жёсткий таймаут 90 сек чтобы fetch не висел вечно при сетевых заминках —
-  // иначе UI стопорится и кнопки не реагируют
-  const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), 90000);
-  opts.signal = ac.signal;
-  try {
-    const res = await fetch(path, opts);
-    if (!res.ok) {
+  // Ретраи на транзиентные сбои (5xx / сеть / таймаут) — бэкенд иногда таймаутит
+  // на запросе к 1С/БД. Повторяем ТОЛЬКО идемпотентные GET/HEAD: мутации
+  // (POST/PUT/DELETE) не повторяем, чтобы не было двойной записи. 4xx не ретраим.
+  const method = (opts.method || 'GET').toUpperCase();
+  const idempotent = method === 'GET' || method === 'HEAD';
+  const maxAttempts = idempotent ? 3 : 1;
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const headers = { ...(opts.headers || {}) };
+    if (state.sessionToken) headers['X-Session-Token'] = state.sessionToken;
+    if (state.userToken) headers['X-User-Token'] = state.userToken;
+    // credentials: 'same-origin' — отправляем httpOnly auth-cookies
+    const o = { ...opts, headers, credentials: opts.credentials || 'same-origin' };
+    // Жёсткий таймаут 90 сек чтобы fetch не висел вечно при сетевых заминках
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 90000);
+    o.signal = ac.signal;
+    try {
+      const res = await fetch(path, o);
+      if (res.ok) return await res.json();
       const b = await res.json().catch(() => ({ error: 'Ошибка запроса' }));
-      throw new Error(b.error || 'Ошибка запроса');
+      const err = new Error(b.error || 'Ошибка запроса');
+      err.status = res.status;
+      err.retriable = idempotent && res.status >= 500; // транзиентные серверные
+      throw err;
+    } catch (e) {
+      lastErr = (e.name === 'AbortError')
+        ? Object.assign(new Error('Таймаут запроса (90 сек)'), { retriable: idempotent })
+        : e;
+      // сетевой сбой fetch (TypeError «Failed to fetch») не имеет .status
+      if (lastErr.retriable === undefined) lastErr.retriable = idempotent && lastErr.status === undefined;
+      if (!lastErr.retriable || attempt === maxAttempts) throw lastErr;
+      console.warn(`[fetchJson] ${path} — попытка ${attempt}/${maxAttempts} не удалась (${lastErr.message}), повтор…`);
+    } finally {
+      clearTimeout(t);
     }
-    return await res.json();
-  } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Таймаут запроса (90 сек)');
-    throw e;
-  } finally {
-    clearTimeout(t);
+    await new Promise(r => setTimeout(r, attempt * 700)); // бэкофф 0.7с, 1.4с
   }
+  throw lastErr || new Error('Ошибка запроса');
 }
 
 // ── PIN Auth ───────────────────────────────────────────────────────────────
@@ -2671,7 +2685,13 @@ async function init() {
 
     setInterval(loadSummary, 30000);
   } catch (err) {
-    document.body.innerHTML = `<main style="padding:48px;text-align:center;color:#dc2626">Ошибка загрузки: ${err.message}</main>`;
+    document.body.innerHTML = `
+      <main style="padding:56px 24px;text-align:center;color:var(--ink,#e5e5e5);font-family:system-ui">
+        <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:6px">Не удалось загрузить данные</div>
+        <div style="color:#dc2626;margin-bottom:22px">${err.message}</div>
+        <button onclick="location.reload()" style="background:#c14456;color:#fff;border:none;padding:11px 24px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer">Повторить</button>
+      </main>`;
   }
 }
 
