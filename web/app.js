@@ -5000,47 +5000,73 @@ function mktLoadYoY(){
       }
     }
 
-    // Блогеры (из Google Sheets через bloggers.json) — render таблица + KPI
+    // Блогеры (из Google Sheets через bloggers.json) — KPI считаем КЛИЕНТСКИ из очищенных
+    // строк (серверный summary.total включает строку-заголовок из таблицы → +1). var-имена
+    // уникальные (bl*) — этот .then одна function-scope, не затенять внешние.
     if (d.external && d.external.bloggers) {
       var bj = d.external.bloggers;
-      // ВНИМАНИЕ: весь этот .then — одна function-scope. НЕ объявлять тут var с именами
-      // внешних переменных колбэка (el=#mktYoY и т.п.) — var-хойстинг затенит их на всю
-      // функцию, и верхний блок молча зависнет на «Загрузка». Поэтому bloggersKpiEl, не kpiEl.
       var bloggersKpiEl = document.getElementById('mktBloggersKpi');
-      var tblEl = document.getElementById('mktBloggers');
-      var hintEl = document.getElementById('mktBloggersHint');
-      if (bloggersKpiEl && bj.summary) {
-        var s = bj.summary;
-        bloggersKpiEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.total)+'</div><div class="mkt-l">Блогеров в работе</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalSubscribers)+'</div><div class="mkt-l">Совокупная аудитория</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalDepositRub)+' ₽</div><div class="mkt-l">Депозит выдано (общая)</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum1(s.postRate)+' %</div><div class="mkt-l">Доля выложивших</div></div>'+
+      var blTblEl = document.getElementById('mktBloggers');
+      var blHintEl = document.getElementById('mktBloggersHint');
+      // Отсев строки-заголовка таблицы Google Sheets («Адрес»/«забрали карту»/«Выложено»/«Статистика»)
+      // и пустых строк без хэндла.
+      var blIsHeader = function(b){
+        if(!b || !b.handle) return true;
+        if(/^блоегр|^блогер$/i.test(String(b.handle).trim())) return true;
+        if(b.pickupAddress==='Адрес' || b.pickupDate==='забрали карту' || b.posted==='Выложено' || b.stats==='Статистика') return true;
+        return false;
+      };
+      var blRows = (bj.bloggers||[]).filter(function(b){return !blIsHeader(b);});
+      var blPosted = function(b){ return /сторис|рилс|reels|пост|выложил/i.test(String(b.posted||'')); };
+      var blPicked = function(b){ var p=String(b.pickupDate||''); return p && !/не\s*забрал/i.test(p); };
+      // Агрегаты
+      var blTotal = blRows.length;
+      var blSubs = blRows.reduce(function(s,b){return s+(b.subscribers||0);},0);
+      var blDep = blRows.reduce(function(s,b){return s+(b.depositRub||0);},0);
+      var blPostedN = blRows.filter(blPosted).length;
+      var blPickedN = blRows.filter(blPicked).length;
+      // Взяли карту (депозит), но не выложили → потраченные впустую ₽
+      var blWasted = blRows.filter(function(b){return blPicked(b) && !blPosted(b) && (b.depositRub||0)>0;});
+      var blWastedSum = blWasted.reduce(function(s,b){return s+(b.depositRub||0);},0);
+      var blClickers = blRows.filter(function(b){return (b.clicks||0)>0;});
+      var blClicks = blClickers.reduce(function(s,b){return s+(b.clicks||0);},0);
+      var blClickDep = blClickers.reduce(function(s,b){return s+(b.depositRub||0);},0);
+      var blCpc = blClicks ? Math.round(blClickDep/blClicks) : 0;
+      var blPostRate = blTotal ? Math.round(blPostedN/blTotal*1000)/10 : 0;
+      if (bloggersKpiEl) {
+        bloggersKpiEl.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blTotal)+'</div><div class="mkt-l">Блогеров в работе</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blSubs)+'</div><div class="mkt-l">Совокупная аудитория</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blDep)+' ₽</div><div class="mkt-l">Депозит выдано</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blPostedN)+' · '+mNum1(blPostRate)+' %</div><div class="mkt-l">Выложили (сторис/рилс)</div></div>'+
           '</div>'+
           '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.pickedUp)+' / '+mNum(s.total)+'</div><div class="mkt-l">Забрали карту ('+mNum1(s.pickupRate)+'%)</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.posted)+'</div><div class="mkt-l">Выложили (фактически)</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(s.totalClicks||0)+'</div><div class="mkt-l">Переходов к нам (из '+mNum(s.withClicks||0)+' блогеров с метрикой)</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+(s.cpcRub?mNum(s.cpcRub)+' ₽':'—')+'</div><div class="mkt-l">CPC (депозит ÷ переходы)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blPickedN)+' / '+mNum(blTotal)+'</div><div class="mkt-l">Забрали карту</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v" style="'+(blWasted.length?'color:#e0466a':'')+'">'+mNum(blWasted.length)+' · '+mNum(blWastedSum)+' ₽</div><div class="mkt-l">Взяли, но не выложили (впустую)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blClicks)+'</div><div class="mkt-l">Переходов к нам (из '+mNum(blClickers.length)+' с метрикой)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+(blCpc?mNum(blCpc)+' ₽':'—')+'</div><div class="mkt-l">CPC (депозит ÷ переходы, по замеренным)</div></div>'+
           '</div>';
       }
-      if (tblEl && bj.bloggers) {
-        var bs = bj.bloggers.slice().sort(function(a,b){return (b.subscribers||0)-(a.subscribers||0);});
-        tblEl.innerHTML = '<table style="font-size:12px"><thead><tr><th>Блогер</th><th class="num">Подписчиков</th><th class="num">Депозит ₽</th><th>Точка выдачи</th><th>Забрали</th><th>Выложено</th><th class="num">Переходов</th><th>Комментарий</th></tr></thead><tbody>'+
-          bs.map(function(b){
+      if (blTblEl) {
+        var blSorted = blRows.slice().sort(function(a,b){return (b.subscribers||0)-(a.subscribers||0);});
+        blTblEl.innerHTML = '<table style="font-size:12px"><thead><tr><th>Блогер</th><th class="num">Подписчиков</th><th class="num">Депозит ₽</th><th>Точка выдачи</th><th>Забрали</th><th>Выложено</th><th class="num">Переходов</th><th>Комментарий</th></tr></thead><tbody>'+
+          blSorted.map(function(b){
             var subs = b.subscribers ? mNum(b.subscribers) : '<span style="color:var(--muted)">?</span>';
             var dep = b.depositRub ? mNum(b.depositRub) : '—';
             var pickup = (b.pickupDate||'').slice(0,30);
-            var pickC = /не\s+забрала/i.test(pickup) ? 'color:#e0466a' : '';
+            var pickC = /не\s*забрал/i.test(pickup) ? 'color:#e0466a' : '';
             var posted = (b.posted||'').slice(0,30);
-            var postC = posted && /сторис|рилс/i.test(posted) ? 'color:#10a05a' : 'color:var(--muted)';
+            var didPost = blPosted(b);
+            var postC = didPost ? 'color:#10a05a' : 'color:var(--muted)';
+            // подсветка строки: взял депозит и не выложил
+            var rowBg = (blPicked(b) && !didPost && (b.depositRub||0)>0) ? ' style="background:rgba(224,70,106,.07)"' : '';
             var cl = b.clicks!=null ? mNum(b.clicks) : '<span style="color:var(--muted)">—</span>';
             var notes = (b.notes||'').slice(0,50);
-            return '<tr><td><b>'+b.handle+'</b></td><td class="num">'+subs+'</td><td class="num">'+dep+'</td><td style="font-size:11px">'+(b.pickupAddress||'').slice(0,30)+'</td><td style="font-size:11px;'+pickC+'">'+pickup+'</td><td style="font-size:11px;'+postC+'">'+posted+'</td><td class="num">'+cl+'</td><td style="font-size:11px;color:var(--muted)">'+notes+'</td></tr>';
+            return '<tr'+rowBg+'><td><b>'+b.handle+'</b></td><td class="num">'+subs+'</td><td class="num">'+dep+'</td><td style="font-size:11px">'+(b.pickupAddress||'').slice(0,30)+'</td><td style="font-size:11px;'+pickC+'">'+pickup+'</td><td style="font-size:11px;'+postC+'">'+(posted||(didPost?'':'<span style="color:#e0466a">не выложил</span>'))+'</td><td class="num">'+cl+'</td><td style="font-size:11px;color:var(--muted)">'+notes+'</td></tr>';
           }).join('')+'</tbody></table>';
       }
-      if (hintEl && bj.scrapedAt) {
-        hintEl.innerHTML = 'Источник: '+(bj.url?'<a href="'+bj.url+'" target="_blank">Google Sheets</a>':'таблица')+'. Обновлено: '+new Date(bj.scrapedAt).toLocaleString('ru-RU')+'. Колонка «Переходов» — из текста «N переходов» в столбце «Статистика» твоей таблицы (где удалось вытащить число).';
+      if (blHintEl) {
+        blHintEl.innerHTML = 'Источник: '+(bj.url?'<a href="'+bj.url+'" target="_blank">Google Sheets</a>':'таблица')+' (ручная таблица). Обновлено: '+(bj.scrapedAt?new Date(bj.scrapedAt).toLocaleString('ru-RU'):'?')+'. Розовым — взяли карту/депозит, но не выложили сторис. «Переходов» — из текста колонки «Статистика» (где есть число); CPC считается только по блогерам с замеренными переходами.';
       }
     }
 
