@@ -4429,50 +4429,31 @@ function mktRender(){
   // живого помесячного SMS нет (атрибуция). Вместо них — live-показатели в #mktPaidLive
   // (рендерится из d.external в mktLoadYoY, см. renderPaidLive).
 }
-// Платные каналы — текущие live-показатели (снимок скрейпа, НЕ за выбранный месяц).
-function renderPaidLive(d){
+// Платные каналы — затраты и отдача (бюджет маркетинга) из /api/marketing/paid-costs.
+function renderPaidCosts(pc){
   var el=document.getElementById('mktPaidLive'); if(!el) return;
-  var ext=(d&&d.external)||{}, dir=ext.direct, gis=ext.gis;
+  if(!pc || pc.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных по затратам: '+((pc&&pc.error)||'ошибка')+'</div>'; return; }
+  var ch=pc.channels||[];
   var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
-  var html='';
-  // Я.Директ — воронка месяца (на дату скрейпа)
-  if(dir && dir.totals && dir.totals.spend){
-    var t=dir.totals, st=dir.scrapedAt?new Date(dir.scrapedAt).toLocaleDateString('ru-RU'):'—';
-    var cpaC=t.cpa==null?'':(t.cpa<=300?'color:#10a05a':(t.cpa<=800?'color:#b8860b':'color:#e0466a'));
-    html+='<div class="mkt-chart-t">Я.Директ — за месяц (скрейп '+st+')'+(dir.sessionExpired?' <span style="color:#e0466a;font-size:11px">⚠️ сессия протухла</span>':'')+'</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0">'+
-      kpi(mNum(t.spend)+' ₽','Расход')+
-      kpi(mNum(t.conversions||0),'Покупок (конверсий)')+
-      kpi('<span style="'+cpaC+'">'+(t.cpa==null?'—':mNum(t.cpa)+' ₽')+'</span>','CPA')+
-      kpi((dir.balance!=null?mNum(dir.balance)+' ₽':'—'),'Баланс кабинета')+
-      '</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0">'+
-      kpi(mNum(t.clicks||0),'Клики')+
-      kpi(mNum(t.impressions||0),'Показы')+
-      kpi((t.ctrPct==null?'—':mNum1(t.ctrPct)+' %'),'CTR')+
-      kpi((t.cpc==null?'—':mNum1(t.cpc)+' ₽'),'CPC')+
-      '</div>';
-    if(dir.balance!=null && t.spend>0 && dir.balance<t.spend) html+='<div style="font-size:12px;color:#e0466a;margin-top:2px">⚠️ Баланс ('+mNum(dir.balance)+' ₽) меньше месячного расхода — реклама может встать, пополнить.</div>';
-  } else {
-    html+='<div style="font-size:12px;color:var(--muted)">Я.Директ — данные ещё не собраны (скрейп по расписанию).</div>';
-  }
-  // 2ГИС — присутствие в выдаче (на дату скрейпа)
-  if(gis && gis.appearance){
-    var a=gis.appearance, gst=gis.scrapedAt?new Date(gis.scrapedAt).toLocaleDateString('ru-RU'):'—';
-    var posC=a.positionAvg==null?'':(a.positionAvg<=5?'color:#10a05a':(a.positionAvg<=15?'color:#b8860b':'color:#e0466a'));
-    var topAct=(gis.actions||[]).slice(0,1).map(function(x){return x.name+' '+mNum1(x.pct)+'%';})[0]||'—';
-    html+='<div class="mkt-chart-t" style="margin-top:14px">2ГИС — присутствие в выдаче (скрейп '+gst+')</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0">'+
-      kpi(mNum(a.impressions||0),'Показы/мес')+
-      kpi('<span style="'+posC+'">'+(a.positionAvg!=null?a.positionAvg:'—')+'</span>','Средняя позиция')+
-      kpi((a.positionMin||'?')+'–'+(a.positionMax||'?'),'Диапазон позиций')+
-      kpi((gis.reviews&&gis.reviews.total!=null?mNum(gis.reviews.total):'—'),'Свежих отзывов')+
-      '</div>'+
-      '<div style="font-size:12px;color:var(--muted)">Топ-действие на карточке: '+topAct+'. Детальнее — раздел «Каналы → 2ГИС».</div>';
-  }
-  // SMS — отдача теперь считается (см. «Каналы → SMS-рассылки»)
-  html+='<div class="mkt-comp-ins" style="margin-top:14px;font-size:12px">'+
-    '<b>SMS — атрибуция к покупкам подключена.</b> Связь рассылок с чеками по карте лояльности — в разделе «Каналы → SMS-рассылки».</div>';
+  var share=function(c){ return pc.totalMonthly?Math.round(c/pc.totalMonthly*100):0; };
+  var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px">'+
+    kpi('<b>'+mNum(pc.totalMonthly)+' ₽</b>','Платный маркетинг / мес (итого)')+
+    kpi(mNum(ch.length),'Каналов')+
+    kpi(mNum((ch.find(function(x){return x.key==='context';})||{}).cost||0)+' ₽','Самый дорогой: контекст')+
+    '</div>'+
+    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Канал</th><th class="num">Затраты/мес ₽</th><th class="num">Доля</th><th>Что даёт</th><th>Стоимость результата</th></tr></thead><tbody>'+
+    ch.map(function(c){
+      var liveBadge = c.live ? '' : ' <span style="font-size:10px;color:var(--muted)">фикс</span>';
+      var res = c.live ? c.result : '<span style="color:var(--muted)">'+c.result+'</span>';
+      return '<tr><td><b>'+c.name+'</b>'+liveBadge+'<div style="font-size:10px;color:var(--muted)">'+(c.costNote||'')+'</div></td>'+
+        '<td class="num">'+mNum(c.cost)+'</td>'+
+        '<td class="num">'+share(c.cost)+' %</td>'+
+        '<td style="font-size:11px">'+res+'</td>'+
+        '<td style="font-size:11px">'+(c.cpr||'<span style="color:var(--muted)">—</span>')+'</td></tr>';
+    }).join('')+
+    '<tr class="mkt-total"><td><b>Итого / мес</b></td><td class="num"><b>'+mNum(pc.totalMonthly)+'</b></td><td class="num">100 %</td><td colspan="2"></td></tr>'+
+    '</tbody></table></div>';
+  if(pc.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+pc.note+'</div>';
   el.innerHTML=html;
 }
 // SMS-атрибуция: рендер по каждой кампании «Реклама» + дедуплицированный итог.
@@ -4897,8 +4878,13 @@ function mktLoadYoY(){
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
     // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
     try { renderAlerts(d, period); } catch(_){}
-    // Платные каналы — live-показатели Директа/2ГИС (снимок скрейпа).
-    try { renderPaidLive(d); } catch(_){}
+    // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
+    var paidEl=document.getElementById('mktPaidLive');
+    if(paidEl){
+      paidEl.innerHTML='<div class="mkt-yoy-load">Считаю бюджет платных каналов…</div>';
+      fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ renderPaidCosts(pc); })
+        .catch(function(e){ paidEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Бюджет недоступен: '+e.message+'</div>'; });
+    }
     // SMS-атрибуция за выбранный месяц — отдельный (тяжёлый ~9с, кэш 6ч) эндпоинт.
     var smsAttrEl=document.getElementById('mktSmsAttr');
     if(smsAttrEl){

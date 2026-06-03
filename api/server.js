@@ -19,6 +19,7 @@ const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
 const smsAttribution = require('./lib/sms-attribution');
 const productionKg = require('./lib/production-kg');
+const paidCosts = require('./lib/paid-costs');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -850,6 +851,15 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await marketingChannels.getChannels(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // ── Платные каналы: затраты + отдача (бюджет маркетинга) ──
+    if (pathname === '/api/marketing/paid-costs' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await paidCosts.getPaidCosts(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
