@@ -3,7 +3,7 @@
 // Кэш + фоновое обновление в server.js делают данные свежими 24/7 без участия ПК.
 
 const fs = require('fs');
-const { callSalesDetail, callRegister, callCatalog, callPull, callStoresDetail, parseRu, parseRuDate, nowYM, makeCache } = require('./upp-client');
+const { callSalesDetail, callRegister, callCatalog, callPull, callStoresDetail, callQuery, parseRu, parseRuDate, nowYM, makeCache } = require('./upp-client');
 
 // Данные не-1С источников (2ГИС/Директ/Метрика) пишутся скрейперами по cron
 // в /opt/marketing-data/*.json. API только читает их (без скрейпинга в рантайме).
@@ -70,6 +70,36 @@ async function aggSales(period) {
   return monthCache.wrap('agg:' + period, () => _aggSalesUncached(period));
 }
 
+// Нетто-выручка = Σ ЧекККМ.СуммаДокумента (продажа) − Σ СуммаДокумента (возврат), по Склад.Код.
+// ВАЖНО: sales-detail суммирует Товары.Сумма — это БРУТТО (до вычета оплаты бонусами и
+// подарочными сертификатами) И прибавляет возвраты как плюс, поэтому завышает выручку на
+// ~5%. СуммаДокумента = реально оплачено = Товары.Сумма − ОплатаБонусами − ОплатаСертификатами
+// (проверено: совпадает с план/факт дашборда до рубля по каждой точке). Запрос лёгкий —
+// агрегат в 1С, на выходе ~20 строк (точка×ВидОперации).
+async function netRevenueByStore(period) {
+  const [y, m] = period.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  const q = 'ВЫБРАТЬ Чек.Склад.Код КАК Код, Чек.ВидОперации КАК Вид,'
+    + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК Выручка, КОЛИЧЕСТВО(Чек.Ссылка) КАК Чеков'
+    + ' ИЗ Документ.ЧекККМ КАК Чек'
+    + ` ГДЕ Чек.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Чек.Дата < ДАТАВРЕМЯ(${ny},${nm},1) И Чек.Проведен`
+    + ' СГРУППИРОВАТЬ ПО Чек.Склад.Код, Чек.ВидОперации';
+  const r = await callQuery(q, { timeoutMs: 100000 });
+  const byStore = new Map(); // код → { revenue, cheques }  (нетто продажа−возврат)
+  let revenue = 0, cheques = 0;
+  for (const row of (r.rows || [])) {
+    const code = String(row['Код'] || '').trim();
+    const isReturn = /возврат/i.test(String(row['Вид'] || ''));
+    const sum = parseRu(row['Выручка']);
+    const cnt = parseRu(row['Чеков']);
+    if (!byStore.has(code)) byStore.set(code, { revenue: 0, cheques: 0 });
+    const s = byStore.get(code);
+    if (isReturn) { s.revenue -= sum; revenue -= sum; }       // возврат уменьшает выручку
+    else { s.revenue += sum; s.cheques += cnt; revenue += sum; cheques += cnt; } // чеки = только продажи
+  }
+  return { revenue: Math.round(revenue), cheques, byStore };
+}
+
 // Агрегаты продаж за период из sales-detail (по чекам + по товарам + по точкам, в одном проходе)
 async function _aggSalesUncached(period) {
   const d = await callSalesDetail(period);
@@ -109,19 +139,38 @@ async function _aggSalesUncached(period) {
       const p = products.get(pc); p.sum += parseRu(r.sum); p.qty += parseRu(r.qty);
     }
   }
-  let revenue = 0, withCard = 0;
-  for (const c of cheque.values()) { revenue += c.sum; if (c.hasCard) withCard += 1; }
-  const cheques = cheque.size;
-  // финализируем byStore: Set'ы -> числа
-  const byStore = new Map();
+  // БРУТТО из sales-detail (Товары.Сумма) — оставляем ТОЛЬКО для cardPct (доля чеков с
+  // картой) и подушки на случай сбоя нетто-запроса. Выручку/чеки берём из netRevenueByStore.
+  let grossRevenue = 0, withCard = 0;
+  for (const c of cheque.values()) { grossRevenue += c.sum; if (c.hasCard) withCard += 1; }
+  const grossCheques = cheque.size;
+  // cardPct (доля чеков с бонусной картой) — от sales-detail (на сумму не влияет, корректно).
+  const cardPctByStore = new Map();
   for (const [sc, s] of storeAcc) {
     const ch = s.cheques.size;
-    byStore.set(sc, {
-      revenue: Math.round(s.revenue),
-      cheques: ch,
-      avgCheck: ch ? Math.round(s.revenue / ch) : 0,
+    cardPctByStore.set(sc, {
       cardPct: ch ? Math.round((s.withCard.size / ch) * 1000) / 10 : 0,
       bonus: Math.round(s.bonus)
+    });
+  }
+  // Нетто-выручка/чеки из ЧекККМ.СуммаДокумента (продажа−возврат) — авторитетный источник.
+  let net = null;
+  try { net = await netRevenueByStore(period); }
+  catch (e) { console.log(`[marketing-channels] netRevenue ${period} fail: ${e.message}`); }
+  const revenue = net ? net.revenue : Math.round(grossRevenue);
+  const cheques = net ? net.cheques : grossCheques;
+  const cardPctTotal = grossCheques ? Math.round((withCard / grossCheques) * 1000) / 10 : 0;
+  // byStore: список точек — из нетто (чистый, без фантомов), карта/бонусы — из sales-detail.
+  const byStore = new Map();
+  const netStores = net ? net.byStore : new Map([...storeAcc].map(([sc, s]) => [sc, { revenue: Math.round(s.revenue), cheques: s.cheques.size }]));
+  for (const [sc, ns] of netStores) {
+    const extra = cardPctByStore.get(sc) || { cardPct: 0, bonus: 0 };
+    byStore.set(sc, {
+      revenue: Math.round(ns.revenue),
+      cheques: ns.cheques,
+      avgCheck: ns.cheques ? Math.round(ns.revenue / ns.cheques) : 0,
+      cardPct: extra.cardPct,
+      bonus: extra.bonus
     });
   }
   // chequeBonus: Map(chequeNo → суммарная оплата бонусами в этом чеке)
@@ -129,10 +178,10 @@ async function _aggSalesUncached(period) {
   const chequeBonus = new Map();
   for (const [cn, c] of cheque) chequeBonus.set(cn, Math.round(c.bonus || 0));
   return {
-    revenue: Math.round(revenue),
+    revenue,
     cheques,
     avgCheck: cheques ? Math.round(revenue / cheques) : 0,
-    cardPct: cheques ? Math.round((withCard / cheques) * 1000) / 10 : 0,
+    cardPct: cardPctTotal,
     bonus: Math.round(bonus),
     products,
     byStore,

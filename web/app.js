@@ -4454,8 +4454,12 @@ function renderSalesMonthly(d){
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
     return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.revenue)+'</td><td class="num">'+mNum(m.cheques)+'</td><td class="num">'+mNum(m.avgCheck||(m.cheques?m.revenue/m.cheques:0))+'</td><td class="num">'+mNum1(m.cardPct||0)+' %</td><td class="num">'+mNum(m.bonus||0)+'</td></tr>';
   }).reverse().join('');
-  el.innerHTML='<table><thead><tr><th>Месяц</th><th class="num">Выручка, ₽</th><th class="num">Чеков</th><th class="num">Ср. чек, ₽</th><th class="num">Карта лоял.</th><th class="num">Бонусами, ₽</th></tr></thead><tbody>'+rows+
-    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum(chq)+'</td><td class="num">'+mNum(chq?rev/chq:0)+'</td><td class="num">'+mNum1(chq?cardW/chq:0)+' %</td><td class="num">'+mNum(bon)+'</td></tr></tbody></table>';
+  el.innerHTML='<table><thead><tr><th>Месяц</th><th class="num">Выручка, ₽</th><th class="num">Чеков</th><th class="num">Ср. чек, ₽</th><th class="num">Чеков с картой</th><th class="num">Бонусами, ₽</th></tr></thead><tbody>'+rows+
+    '<tr class="mkt-total"><td>Итого '+ms.length+' мес</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum(chq)+'</td><td class="num">'+mNum(chq?rev/chq:0)+'</td><td class="num">'+mNum1(chq?cardW/chq:0)+' %</td><td class="num">'+mNum(bon)+'</td></tr></tbody></table>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">'+
+    '<b>Выручка</b> — фактически оплачено (СуммаДокумента 1С: за вычетом возвратов, оплаты бонусами и подарочными сертификатами). Совпадает с планом/фактом на главном дашборде.<br>'+
+    '<b>Чеков с картой</b> — доля чеков, где просканирована бонусная карта. Это НЕ «Сладкий чек»: тот блок выше — отдельная геймификация (баллы за задания), и «активных карт» там — только участники заданий за месяц, а не все держатели карт.'+
+    '</div>';
 }
 // Я.Директ помесячно — live-история из кабинета porg-mcw4s7ni (scrape-direct-history.js).
 function renderDirectMonthly(d){
@@ -5136,8 +5140,9 @@ function mktLoadYoY(){
         var tasksArr = Object.entries(tasks).map(function(e){ return { name:e[0], events: typeof e[1]==='object'?(e[1].events||0):e[1], points: typeof e[1]==='object'?(e[1].points||0):0 }; }).sort(function(a,b){return b.events-a.events;});
         var totalEv = tasksArr.reduce(function(s,t){return s+t.events;},0) || 1;
         swEl.innerHTML = '<div class="mkt-chart-t">Live за '+(d.monthName||'')+' — задания (из регистра СладкийЧек)</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin:2px 0 8px">«Сладкий чек» — отдельная геймификация (баллы за задания), а не общая программа лояльности. Карты ниже — только участники заданий за месяц, не все держатели бонусных карт (их доля — в таблице «Чеков с картой» ниже).</div>'+
           '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0">'+
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.cards||0)+'</div><div class="mkt-l">Активных карт</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.cards||0)+'</div><div class="mkt-l">Карт в заданиях</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.events||0)+'</div><div class="mkt-l">Выполнений заданий</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(sc.points||0)+'</div><div class="mkt-l">Баллов начислено</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+(sp.cards?mNum(sp.cards):'—')+'</div><div class="mkt-l">Карт год назад</div></div>'+
