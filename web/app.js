@@ -4537,16 +4537,17 @@ function renderSmsAttribution(sa){
         if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td>'+costCell+'</tr>';
         if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td>'+costCell+'</tr>';
         var cc=convColor(c.conversionPct);
+        var liftLine = (c.liftPct!=null) ? '<div style="font-size:10px;color:'+(c.liftPct>0?'#10a05a':'#e0466a')+'">прирост '+(c.liftPct>0?'+':'')+mNum1(c.liftPct)+' п.п.'+(c.incremental?' · ≈'+mNum(c.incremental)+' доп.':'')+'</div>' : '';
         return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td>'+
           '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div>'+sweet+'</td>'+
-          '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td>'+
+          '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %'+liftLine+'</td>'+
           '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td>'+costCell+'</tr>';
       }).join('')+
       '<tr class="mkt-total"><td><b>Итого</b></td><td></td>'+
         '<td class="num"><b>'+mNum(t.recipients||0)+'</b></td>'+
         '<td class="num"><b>'+mNum(t.buyers||0)+'</b> <span style="font-size:10px;color:var(--muted)">покуп.+перех.</span>'+(t.sweetReg?'<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
-        '<td class="num">'+mNum1(t.conversionPct||0)+' %</td>'+
-        '<td class="num"><b>'+mNum(t.revenue||0)+'</b></td>'+
+        '<td class="num">'+mNum1(t.conversionPct||0)+' %'+(t.incremental?'<div style="font-size:10px;color:#10a05a">≈'+mNum(t.incremental)+' доп. покупок</div>':'')+'</td>'+
+        '<td class="num"><b>'+mNum(t.revenue||0)+'</b>'+(t.incRevenue?'<div style="font-size:10px;color:#10a05a">≈'+mNum(t.incRevenue)+' прирост</div>':'')+'</td>'+
         '<td class="num"><b>'+mNum(t.cost||0)+'</b></td></tr>'+
       '</tbody></table></div>';
   } else {

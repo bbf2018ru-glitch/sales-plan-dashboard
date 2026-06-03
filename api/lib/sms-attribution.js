@@ -144,6 +144,16 @@ function row1(res) {
   return { recipients, buyers, revenue, conversionPct: recipients ? Math.round(buyers / recipients * 1000) / 10 : 0, avgCheck: buyers ? Math.round(revenue / buyers) : 0 };
 }
 
+// Прирост к собственному базовому уровню (квази-контроль без потери охвата):
+// сравнение конверсии в окне оффера с конверсией ТЕХ ЖЕ получателей в равный период ДО.
+function liftOf(offerRow, baselineRow) {
+  const baselinePct = baselineRow.conversionPct;
+  const liftPct = Math.round((offerRow.conversionPct - baselinePct) * 10) / 10;
+  const incremental = Math.max(0, Math.round(liftPct / 100 * offerRow.recipients));
+  const incRevenue = offerRow.avgCheck ? incremental * offerRow.avgCheck : 0;
+  return { baselinePct, baselineBuyers: baselineRow.buyers, liftPct, incremental, incRevenue };
+}
+
 async function compute(period) {
   const smsClicks = readExt('sms-clicks.json') || { byClckid: {} };
   const list = await upp.callQuery(campaignListQuery(period));
@@ -177,11 +187,17 @@ async function compute(period) {
       if (offer.end && !offer.isAll && offer.products.length) {
         // Тип A: продукт + срок.
         const a = row1(await upp.callQuery(categoryQuery(g.dts, dayLit(first), dayLit(offer.end, true), offer.products), { timeoutMs: 50000 }));
-        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории', ...a });
+        const Ld = Math.max(1, Math.round((Date.UTC(offer.end.y, offer.end.m - 1, offer.end.d) - Date.UTC(first.y, first.m - 1, first.d)) / 86400000));
+        let lift = {};
+        try { const bl = row1(await upp.callQuery(categoryQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), offer.products), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
+        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории', ...a, ...lift });
       } else if (offer.end && offer.isAll) {
         // Тип A «всё» + срок: любая покупка в окне.
         const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true)), { timeoutMs: 50000 }));
-        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)', ...a });
+        const Ld = Math.max(1, Math.round((Date.UTC(offer.end.y, offer.end.m - 1, offer.end.d) - Date.UTC(first.y, first.m - 1, first.d)) / 86400000));
+        let lift = {};
+        try { const bl = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first)), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
+        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)', ...a, ...lift });
       } else if (offer.hasLink) {
         // Тип B: ссылка — переходы из Метрики. clck.ru/код→clckid→визиты резолвит серверный
         // скрейпер (браузером, сервер ловит капчу) и кладёт в sms-clicks.json.byCode[код].
@@ -223,13 +239,14 @@ async function compute(period) {
   const totals = {
     sends: sum('sends'), recipients: sum('recipients'), cost: sum('cost'), revenue: sum('revenue'),
     buyers: sum('buyers'), sweetReg: sum('sweetReg'), smsPrice,
+    incremental: sum('incremental'), incRevenue: sum('incRevenue'),
     conversionPct: sum('recipients') ? Math.round(sum('buyers') / sum('recipients') * 1000) / 10 : 0
   };
 
   return {
     period, campaigns, campaignsCount: campaigns.length, totals, smsPrice,
     methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — ПЕРЕХОДЫ по ссылке из Яндекс.Метрики; без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Только «Реклама»/«Акция». Затраты = УНИКАЛЬНЫЕ получатели × ' + smsPrice + ' ₽ (повторные отправки ×N на тех же людей охват и затраты НЕ увеличивают). Итого «купили/перешли» — смешанная сумма (покупки + переходы).',
-    caveat: '⚠️ Цифры завышены базовым уровнем (постоянные клиенты покупают и без SMS). Чистый прирост даст контрольная группа (холдаут ~10%) — следующий этап.',
+    caveat: '«Прирост» = конверсия в окне оффера МИНУС обычный уровень тех же получателей за равный период ДО рассылки (квази-контроль, без потери охвата). Это и есть покупки БЛАГОДАРЯ акции, а не базовый уровень. Оговорка: на прирост влияет сезонность (настоящий рандомизированный холдаут точнее, но требует не слать части клиентов — от него отказались ради охвата).',
     refreshedAt: new Date().toISOString()
   };
 }
