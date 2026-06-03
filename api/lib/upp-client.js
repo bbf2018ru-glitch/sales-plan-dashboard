@@ -135,9 +135,11 @@ function callQuery(queryText, { timeoutMs = 100000 } = {}) {
       port: target.port || (isHttps ? 443 : 80),
       path: target.pathname, method: 'POST', headers
     }, (res) => {
-      let raw = '';
-      res.on('data', (c) => { raw += c; });
+      // Buffer.concat + decode один раз — иначе кириллица на границе чанка бьётся в `�`.
+      const chunks = [];
+      res.on('data', (c) => { chunks.push(c); });
       res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode && res.statusCode >= 400) { reject(new Error(`UPP /query HTTP ${res.statusCode}: ${raw.slice(0, 300)}`)); return; }
         try { resolve(JSON.parse(raw)); }
         catch (_) { reject(new Error(`UPP /query вернул не-JSON: ${raw.slice(0, 200)}`)); }

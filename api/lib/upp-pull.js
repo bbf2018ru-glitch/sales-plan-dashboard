@@ -39,9 +39,15 @@ function fetchUppPackageOnce({ url, username, password, period, timeoutMs }) {
       method: 'GET',
       headers
     }, (res) => {
-      let raw = '';
-      res.on('data', (chunk) => { raw += chunk; });
+      // Копим Buffer'ы и декодируем ОДИН раз в конце. Раньше было `raw += chunk`,
+      // что декодирует каждый TCP-чанк отдельно — многобайтовый UTF-8 символ
+      // (кириллица), попавший на границу чанка, бился на два `�`. На больших
+      // ответах (/sales-detail, 78k+ строк, мегабайты) это рандомно портило
+      // storeCode/cardCode/суммы → фантомные точки и искажённая выручка.
+      const chunks = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode && res.statusCode >= 400) {
           reject(new Error(`UPP HTTP ${res.statusCode}: ${raw.slice(0, 300)}`));
           return;

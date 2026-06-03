@@ -1818,6 +1818,27 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ВРЕМЕННЫЙ диагностический зонд: разбивка ЧекККМ по ВидОперации за период.
+    // Нужен чтобы понять, как sales-detail обходится с возвратами (вкл./искл.).
+    // TODO: удалить после диагностики возвратов.
+    if (pathname === '/api/admin/returns-probe' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      const upp = require('./lib/upp-client');
+      const period = parsedUrl.searchParams.get('period') || marketingChannels && new Date().toISOString().slice(0, 7);
+      const [y, m] = period.split('-').map(Number);
+      const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+      const range = `Т.Ссылка.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Т.Ссылка.Дата < ДАТАВРЕМЯ(${ny},${nm},1)`;
+      const lineQ = 'ВЫБРАТЬ Т.Ссылка.ВидОперации КАК Вид, СУММА(ЕСТЬNULL(Т.Сумма,0)) КАК Сумма,'
+        + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка) КАК Чеков ИЗ Документ.ЧекККМ.Товары КАК Т'
+        + ` ГДЕ ${range} И Т.Ссылка.Проведен СГРУППИРОВАТЬ ПО Т.Ссылка.ВидОперации`;
+      try {
+        const r = await upp.callQuery(lineQ, { timeoutMs: 120000 });
+        sendJson(res, 200, { period, lineByVid: r.rows || r });
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Static ────────────────────────────────────────────────────────────────
     serveStatic(res, pathname);
 

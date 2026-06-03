@@ -285,6 +285,7 @@ async function compute(period) {
     external: {
       gis: readExternal('2gis.json'),
       direct: readExternal('direct.json'),
+      directHistory: readExternal('direct-history.json'),
       metrika: readExternal('metrika.json'),
       metrikaHistory: readExternal('metrika-history.json'),
       seo: readExternal('seo.json'),
