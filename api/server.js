@@ -304,6 +304,15 @@ async function getScopedDb(req) {
   return { db: scopeDbForUser(db, user), user };
 }
 
+// Кэш результата dashboard summary. aggregateDashboard — тяжёлый CPU на весь
+// датасет (×2 при compare), из-за чего эндпоинт занимал 4-8с и валился под
+// нагрузкой. Ключ привязан к версии снимка БД (store.getDbStamp): при ингесте
+// версия меняется → кэш авто-сбрасывается. Single-flight гасит stampede при
+// холодном кэше (конкурентные запросы ждут одну вычислялку).
+const dashSummaryCache = new Map();
+const dashSummaryInflight = new Map();
+let dashSummaryStamp = -1;
+
 // ── Telegram alerts ───────────────────────────────────────────────────────────
 function sendTelegramAlert(text) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
@@ -559,25 +568,45 @@ const server = http.createServer(async (req, res) => {
 
     // ── Dashboard summary ─────────────────────────────────────────────────────
     if (pathname === '/api/dashboard/summary' && req.method === 'GET') {
-      const { db } = await getScopedDb(req);
       const period = monthKey(parsedUrl.searchParams.get('period'));
       const trendWindow = Number(parsedUrl.searchParams.get('trend_window')) || 12;
-      const summary = aggregateDashboard(db, period, { trendWindow });
-      // Сравнение с прошлым месяцем — лёгкий блок без полного аггрегата
-      if (parsedUrl.searchParams.get('compare') !== '0') {
-        try {
-          const [y, m] = period.split('-').map(Number);
-          const prevDate = new Date(Date.UTC(y, m - 2, 1));
-          const prevPeriod = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, '0')}`;
-          const prev = aggregateDashboard(db, prevPeriod, { trendWindow: 1 });
-          summary.prevPeriod = {
-            period: prevPeriod,
-            totals: prev.totals,
-            storesPercent: Object.fromEntries((prev.stores || []).map(s => [s.storeId, s.percent]))
-          };
-        } catch (_) {}
+      const compare = parsedUrl.searchParams.get('compare') !== '0';
+      const user = await resolveUser(req);
+      const rawDb = await store.getDb();                      // снимок кэшируется в store
+      const stamp = store.getDbStamp ? store.getDbStamp() : 0;
+      if (stamp !== dashSummaryStamp) { dashSummaryCache.clear(); dashSummaryInflight.clear(); dashSummaryStamp = stamp; }
+      const scopeKey = user ? `u${user.id}` : 'all';
+      const key = `${scopeKey}:${period}:${trendWindow}:${compare}`;
+      const cached = dashSummaryCache.get(key);
+      if (cached) { sendJson(res, 200, cached); return; }
+      if (dashSummaryInflight.has(key)) { sendJson(res, 200, await dashSummaryInflight.get(key)); return; }
+      const promise = (async () => {
+        const db = scopeDbForUser(rawDb, user);
+        const summary = aggregateDashboard(db, period, { trendWindow });
+        // Сравнение с прошлым месяцем — лёгкий блок без полного аггрегата
+        if (compare) {
+          try {
+            const [y, m] = period.split('-').map(Number);
+            const prevDate = new Date(Date.UTC(y, m - 2, 1));
+            const prevPeriod = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, '0')}`;
+            const prev = aggregateDashboard(db, prevPeriod, { trendWindow: 1 });
+            summary.prevPeriod = {
+              period: prevPeriod,
+              totals: prev.totals,
+              storesPercent: Object.fromEntries((prev.stores || []).map(s => [s.storeId, s.percent]))
+            };
+          } catch (_) {}
+        }
+        dashSummaryCache.set(key, summary);
+        return summary;
+      })();
+      dashSummaryInflight.set(key, promise);
+      try {
+        const summary = await promise;
+        sendJson(res, 200, summary);
+      } finally {
+        dashSummaryInflight.delete(key);
       }
-      sendJson(res, 200, summary);
       return;
     }
 

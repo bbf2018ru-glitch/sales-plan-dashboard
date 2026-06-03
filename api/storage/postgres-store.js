@@ -232,6 +232,9 @@ class PostgresStore {
   // Сброс кэша снимка БД — вызывать после записи в stores/plans/sales/products.
   _invalidateDb() { this._dbCache = null; this._dbCacheAt = 0; }
 
+  // Версия снимка (меняется при перезагрузке/инвалидации) — для result-кэшей выше.
+  getDbStamp() { return this._dbCacheAt || 0; }
+
   async _loadDb() {
     const [stores, products, plans, sales, users, userStores, cheques] = await Promise.all([
       this.pool.query('select id, name, region, source, format from stores order by name'),
