@@ -622,7 +622,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   padding: 14px 18px 24px;
   /* overflow-x:hidden убран — он делал .content scroll-контейнером и ломал
      position:sticky (под-навигация, sticky-метрики). Переполнение колонки
-     решено через minmax(0,1fr) в .shell. */
+     решено через minmax(0,1fr) в .shell + min-width:0 здесь — иначе широкая
+     таблица (24 колонки) раздувает грид-элемент и роняет адаптив на мобайле. */
+  min-width: 0;
   position: relative;
 }
 
@@ -4181,7 +4183,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
   .nav-backdrop.show{ opacity:1; pointer-events:auto; }
   body.nav-open{ overflow:hidden; }
   /* контент на всю ширину, место под гамбургер */
-  .shell{ grid-template-columns:1fr; }
+  .shell{ grid-template-columns:minmax(0,1fr); }
   .content{ padding-top:60px; }
   /* под-навигация: один скроллящийся ряд, не прячется под гамбургер */
   #dashNav, #mktNav{ flex-wrap:nowrap; overflow-x:auto; padding-left:56px; -webkit-overflow-scrolling:touch; }
