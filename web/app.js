@@ -4476,41 +4476,40 @@ function renderPaidCosts(pc){
   if(pc.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+pc.note+'</div>';
   el.innerHTML=html;
 }
-// SMS-атрибуция: рендер по каждой кампании «Реклама» + дедуплицированный итог.
+// SMS-атрибуция: по каждой маркетинговой рассылке, привязка к офферу (продукт+срок).
 function renderSmsAttribution(sa){
   var el=document.getElementById('mktSmsAttr'); if(!el) return;
   if(!sa || sa.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных атрибуции: '+((sa&&sa.error)||'ошибка')+'</div>'; return; }
-  var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
   var convColor=function(p){ return p>=10?'#10a05a':(p>=3?'#b8860b':'#e0466a'); };
+  var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var typeBadge={
+    'A':'<span style="font-size:10px;background:#eafaf0;color:#0a6b3a;padding:1px 6px;border-radius:3px">продукт+срок</span>',
+    'A*':'<span style="font-size:10px;background:#fff8e6;color:#8b6a14;padding:1px 6px;border-radius:3px">всё+срок</span>',
+    'B':'<span style="font-size:10px;background:#eef1ff;color:#3a4ba0;padding:1px 6px;border-radius:3px">ссылка</span>',
+    'C':'<span style="font-size:10px;background:#f0f0f0;color:#777;padding:1px 6px;border-radius:3px">оценка</span>'
+  };
   var camps=sa.campaigns||[];
-  var t=sa.total;
   var html='';
-  // Дедуплицированный итог по всем рассылкам «Реклама» за месяц.
-  if(t){
-    html+='<div class="mkt-chart-t">Итог по рекламным рассылкам · '+sa.period+' (уникальные карты)</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:8px 0 4px">'+
-      kpi(mNum(t.recipients),'Охват (уник. карт)')+
-      kpi(mNum(t.buyers),'Купили')+
-      kpi('<span style="color:'+convColor(t.conversionPct)+'">'+mNum1(t.conversionPct)+' %</span>','Конверсия')+
-      kpi(mNum(t.revenue)+' ₽','Выручка')+
-      kpi(mNum(t.avgCheck)+' ₽','Средний чек')+
-      '</div>';
-  }
-  // По каждой рассылке.
+  if(sa.caveat) html+='<div class="mkt-comp-ins" style="margin-bottom:10px;font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:8px 10px;border-radius:6px">'+sa.caveat+'</div>';
   if(camps.length){
-    var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
-    html+='<div class="mkt-chart-t" style="margin-top:14px">По каждой рассылке ('+camps.length+') · окно покупки +'+(sa.windowDays||14)+' дней</div>'+
-      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата рассылки</th><th>Текст рассылки</th><th class="num">Получателей</th><th class="num">Купили</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Ср. чек ₽</th></tr></thead><tbody>'+
+    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (дата · текст)</th><th>Оффер</th><th class="num">Получателей</th><th class="num">Купили / перешли</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th></tr></thead><tbody>'+
       camps.map(function(c){
-        var txt='<span style="font-size:11px">'+(c.text?esc(c.text):'<span style="color:var(--muted)">—</span>')+'</span>';
-        if(c.error) return '<tr><td style="white-space:nowrap">'+(c.date||'')+'</td><td>'+txt+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="4" style="color:var(--muted);text-align:left">— ошибка: '+c.error.slice(0,40)+'</td></tr>';
+        var rep = c.sendsCount>1 ? ' <span style="color:#e0466a;font-size:10px" title="повторных отправок одной рассылки">×'+c.sendsCount+'</span>' : '';
+        var head='<div><b style="white-space:nowrap">'+(c.firstDate||'')+'</b>'+rep+(c.endDate?' <span style="color:var(--muted);font-size:10px">→ до '+c.endDate+'</span>':'')+'</div>'+
+          '<div style="font-size:11px;max-width:360px">'+(c.text?esc(c.text):'')+'</div>';
+        var offer=(typeBadge[c.type]||c.type||'')+'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(c.product||'')+'</div>';
+        if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td></tr>';
+        if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td><td colspan="3" style="font-size:11px;color:var(--muted)">переходы по ссылке — нужна статистика clck.ru (не подключено)</td></tr>';
         var cc=convColor(c.conversionPct);
-        return '<tr><td style="white-space:nowrap">'+(c.date||'')+'</td><td style="max-width:340px">'+txt+'</td><td class="num">'+mNum(c.recipients)+'</td><td class="num">'+mNum(c.buyers)+'</td><td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td><td class="num">'+mNum(c.revenue)+'</td><td class="num">'+mNum(c.avgCheck)+'</td></tr>';
+        return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td>'+
+          '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div></td>'+
+          '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td>'+
+          '<td class="num">'+mNum(c.revenue)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   } else {
-    html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок за период не найдено.</div>';
+    html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок («Реклама»/«Акция») за период не найдено.</div>';
   }
-  if(sa.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+sa.note+'</div>';
+  if(sa.methodNote) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+sa.methodNote+'</div>';
   el.innerHTML=html;
 }
 // Выпуск продукции в кг — KPI + график 12 мес + топ продукции.

@@ -1,47 +1,72 @@
-// SMS-атрибуция: связывает рассылки (Документ.SMSСообщение) с покупками (ЧекККМ)
-// по карте лояльности через /query 1С. ПО КАЖДОЙ КАМПАНИИ (документу рассылки),
-// только маркетинговые («Реклама»).
+// SMS-атрибуция v2 — по каждой МАРКЕТИНГОВОЙ кампании, привязка к ОФФЕРУ.
 //
-// Механика: карта на чеке и у получателя — одна ссылка → JOIN
-// `Чек.ДисконтнаяКарта = Получатели.Получатель`. Тема — ПЕРЕЧИСЛЕНИЕ (по тексту не
-// фильтруется): берём список кампаний группировкой ПО документу и фильтруем «Реклама»
-// в Node по представлению.
+// Методика (согласована с Машей 2026-06-03):
+//  • Тип A (оффер «продукт + срок», напр. «-20% на торты до 10.06»): окно [дата рассылки …
+//    дата из текста], конверсия = получатель купил ИМЕННО эту категорию (ЧекККМ.Товары →
+//    Номенклатура.НоменклатурнаяГруппа) по карте лояльности в окне.
+//  • Тип A «всё» (оффер на всё + срок): любая покупка в окне (привязка слабее — пометка).
+//  • Тип B (ссылка без срока, напр. «Открой чек … clck.ru»): цель — переход по ссылке,
+//    НЕ покупка. Считается отдельно по статистике clck.ru (пока не подключено — пометка).
+//  • Тип C (нет ни срока, ни ссылки): запасное окно 14 дней, любая покупка (пометка «оценка»).
 //
-// ⚠️ Перформанс: per-row окно (ДОБАВИТЬКДАТЕ от даты SMS) в JOIN ON → таймаут (>115с).
-// Поэтому на каждую кампанию — отдельный запрос с КОНСТАНТНЫМ окном [дата рассылки … +14д]
-// (короткое окно → 1С сканирует мало чеков → ~0.2с). Это и корректно (покупки только
-// ПОСЛЕ конкретной рассылки), и быстро. Итог по всем — отдельный запрос с дедупом карт
-// (карта в нескольких рассылках считается один раз).
+// Дедуп: повторные отправки одной рассылки (одинаковый текст) схлопываются в одну
+// кампанию (охват = уникальные карты по всем отправкам). Только темы «Реклама»/«Акция».
+//
+// ⚠️ Базовый уровень: даже привязка к продукту завышена (постоянные клиенты покупают и так).
+// Точный прирост даст ТОЛЬКО контрольная группа (холдаут) — отдельный этап.
+//
+// Перформанс: окна — КОНСТАНТЫ на запрос (per-row ДОБАВИТЬКДАТЕ в JOIN = таймаут).
 
 const upp = require('./upp-client');
-
 const cache = upp.makeCache(6 * 60 * 60 * 1000);
-const WINDOW_DAYS = 14;
-const MIN_RECIPIENTS = 50;   // мелкие рассылки (<50 карт) пропускаем как шум
-const MAX_CAMPAIGNS = 40;    // потолок числа кампаний в ответе (по убыванию охвата)
+const FALLBACK_DAYS = 14;
+const MIN_RECIPIENTS = 100;
+const MAX_CAMPAIGNS = 30;
 
 const MARKETING_RE = /реклам|акци|подар|бонус|промо|рассылк/i;
+const LINK_RE = /https?:\/\/|clck\.ru|[a-zа-я0-9-]+\.(ru|com|ru\/)/i;
+
+// Словарь продукт → паттерны НоменклатурнаяГруппа (ПОДОБНО).
+const PRODUCTS = [
+  { kw: /торт/i, patterns: ['%торт%'], label: 'торты' },
+  { kw: /пирог/i, patterns: ['%пирог%'], label: 'пироги' },
+  { kw: /десерт|пирожн/i, patterns: ['%десерт%', '%пирожн%'], label: 'десерты' },
+  { kw: /кофе|капучино|латте/i, patterns: ['%кофе%'], label: 'кофе' },
+  { kw: /бенто/i, patterns: ['%бенто%'], label: 'бенто-торты' }
+];
+const ALL_RE = /на всё|на все|всё в марии|все в марии|весь ассортимент/i;
 
 function pad(n) { return String(n).padStart(2, '0'); }
-
-// "29.05.2026 12:25:27" → {y,m,d,hh,mm,ss}
 function parseDt(s) {
   const m = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?/.exec(String(s || ''));
   if (!m) return null;
   return { y: +m[3], m: +m[2], d: +m[1], hh: +(m[4] || 0), mm: +(m[5] || 0), ss: +(m[6] || 0) };
 }
 function dtLit(p) { return `ДАТАВРЕМЯ(${p.y},${p.m},${p.d},${p.hh},${p.mm},${p.ss})`; }
+function dayLit(p, endOfDay) { return `ДАТАВРЕМЯ(${p.y},${p.m},${p.d}${endOfDay ? ',23,59,59' : ''})`; }
 function plusDays(p, days) {
-  const dt = new Date(Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm, p.ss) + days * 86400000);
-  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate(), hh: dt.getUTCHours(), mm: dt.getUTCMinutes(), ss: dt.getUTCSeconds() };
+  const dt = new Date(Date.UTC(p.y, p.m - 1, p.d, p.hh || 0, p.mm || 0, p.ss || 0) + days * 86400000);
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
 }
 function monthBounds(period) {
   const [y, m] = period.split('-').map(Number);
   const next = m === 12 ? [y + 1, 1] : [y, m + 1];
   return { y, m, ny: next[0], nm: next[1] };
 }
+function normText(t) { return String(t || '').toLowerCase().replace(/[^a-zа-я0-9]+/gi, ' ').trim(); }
 
-// Список кампаний-рассылок за месяц (по документам), с темой и охватом.
+// Парс оффера из текста: срок «до DD.MM» + продукт(ы) + ссылка.
+function parseOffer(text, year) {
+  const t = String(text || '');
+  let end = null;
+  const dm = /до\s*(\d{1,2})[.\s]+(\d{1,2})/i.exec(t);
+  if (dm) { const d = +dm[1], mo = +dm[2]; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) end = { y: year, m: mo, d }; }
+  const hasLink = LINK_RE.test(t);
+  const prods = PRODUCTS.filter((p) => p.kw.test(t));
+  const isAll = ALL_RE.test(t) || (!prods.length);
+  return { end, hasLink, products: prods, isAll, text: t };
+}
+
 function campaignListQuery(period) {
   const b = monthBounds(period);
   return 'ВЫБРАТЬ П.Ссылка.Дата КАК Дата, П.Ссылка.Тема КАК Тема,'
@@ -54,86 +79,107 @@ function campaignListQuery(period) {
     + ' УПОРЯДОЧИТЬ ПО Получателей УБЫВ';
 }
 
-// Атрибуция одной кампании: окно [дата рассылки … +WINDOW_DAYS дней].
-function campaignQuery(dt) {
-  const from = dtLit(dt), to = dtLit(plusDays(dt, WINDOW_DAYS));
+// Условие категории: OR из ПОДОБНО по НоменклатурнаяГруппа.
+function categoryCond(products) {
+  const pats = products.reduce((a, p) => a.concat(p.patterns), []);
+  if (!pats.length) return null;
+  return '(' + pats.map((p) => `ВЫРАЗИТЬ(Т.Номенклатура.НоменклатурнаяГруппа.Наименование КАК СТРОКА(100)) ПОДОБНО "${p}"`).join(' ИЛИ ') + ')';
+}
+
+// Конверсия по КАТЕГОРИИ (ЧекККМ.Товары) для набора дат-отправок dts в окне [from..to].
+function categoryQuery(dts, from, to, products) {
+  const inList = dts.map(dtLit).join(', ');
+  const cat = categoryCond(products);
+  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей,'
+    + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ВЫБОР КОГДА Т.Ссылка ЕСТЬ НЕ NULL ТОГДА П.Получатель КОНЕЦ) КАК Купили,'
+    + ' СУММА(ЕСТЬNULL(Т.Сумма,0)) КАК Выручка'
+    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
+    + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ЧекККМ.Товары КАК Т ПО Т.Ссылка.ДисконтнаяКарта = П.Получатель'
+    + ` И Т.Ссылка.Дата >= ${from} И Т.Ссылка.Дата <= ${to}`
+    + (cat ? ' И ' + cat : '')
+    + ` ГДЕ П.Ссылка.Дата В (${inList})`;
+}
+
+// Конверсия по ЛЮБОЙ покупке (ЧекККМ header) — для «на всё» и Тип C.
+function anyPurchaseQuery(dts, from, to) {
+  const inList = dts.map(dtLit).join(', ');
   return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей,'
     + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ВЫБОР КОГДА Чек.Ссылка ЕСТЬ НЕ NULL ТОГДА П.Получатель КОНЕЦ) КАК Купили,'
     + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК Выручка'
     + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
     + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ЧекККМ КАК Чек ПО Чек.ДисконтнаяКарта = П.Получатель'
     + ` И Чек.Дата >= ${from} И Чек.Дата <= ${to}`
-    + ` ГДЕ П.Ссылка.Дата = ${dtLit(dt)}`;
-}
-
-// Дедуплицированный итог по нескольким кампаниям: уникальные карты охвата +
-// их покупки в общем окне [мин.дата … макс.дата+WINDOW_DAYS], каждый чек один раз.
-function totalQuery(dts) {
-  const inList = dts.map(dtLit).join(', ');
-  // Окно — от самой ранней рассылки до самой поздней + WINDOW_DAYS.
-  const sorted = dts.slice().sort((a, b) => (a.y - b.y) || (a.m - b.m) || (a.d - b.d));
-  const wFrom = dtLit(sorted[0]);
-  const wTo = dtLit(plusDays(sorted[sorted.length - 1], WINDOW_DAYS));
-  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ У.Карта) КАК Получателей,'
-    + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ВЫБОР КОГДА Чек.Ссылка ЕСТЬ НЕ NULL ТОГДА У.Карта КОНЕЦ) КАК Купили,'
-    + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК Выручка'
-    + ` ИЗ (ВЫБРАТЬ РАЗЛИЧНЫЕ П.Получатель КАК Карта ИЗ Документ.SMSСообщение.Получатели КАК П ГДЕ П.Ссылка.Дата В (${inList})) КАК У`
-    + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ЧекККМ КАК Чек ПО Чек.ДисконтнаяКарта = У.Карта'
-    + ` И Чек.Дата >= ${wFrom} И Чек.Дата <= ${wTo}`;
+    + ` ГДЕ П.Ссылка.Дата В (${inList})`;
 }
 
 function row1(res) {
   const r = (res && res.rows && res.rows[0]) || {};
   const recipients = upp.parseRu(r.Получателей), buyers = upp.parseRu(r.Купили), revenue = upp.parseRu(r.Выручка);
-  return {
-    recipients, buyers, revenue,
-    conversionPct: recipients ? Math.round(buyers / recipients * 1000) / 10 : 0,
-    avgCheck: buyers ? Math.round(revenue / buyers) : 0
-  };
+  return { recipients, buyers, revenue, conversionPct: recipients ? Math.round(buyers / recipients * 1000) / 10 : 0, avgCheck: buyers ? Math.round(revenue / buyers) : 0 };
 }
 
 async function compute(period) {
-  // 1) Список кампаний → только маркетинговые («Реклама» и т.п.).
   const list = await upp.callQuery(campaignListQuery(period));
   if (!list || !list.rows) return { period, error: 'нет ответа 1С', campaigns: [] };
-  let camps = list.rows
-    .filter((r) => MARKETING_RE.test(r.Тема || ''))
-    .map((r) => ({ dt: parseDt(r.Дата), dateStr: r.Дата, theme: r.Тема, text: (r.Текст || '').trim(), listRecipients: upp.parseRu(r.Получателей) }))
-    .filter((c) => c.dt)
+
+  // Только маркетинг + дедуп по нормализованному тексту.
+  const byText = new Map();
+  for (const r of list.rows) {
+    if (!MARKETING_RE.test(r.Тема || '')) continue;
+    const dt = parseDt(r.Дата); if (!dt) continue;
+    const key = normText(r.Текст) || ('doc-' + r.Дата);
+    if (!byText.has(key)) byText.set(key, { text: (r.Текст || '').trim(), theme: r.Тема, dts: [], sends: 0 });
+    const g = byText.get(key);
+    g.dts.push(dt); g.sends += upp.parseRu(r.Получателей);
+  }
+  let groups = Array.from(byText.values())
+    .sort((a, b) => b.sends - a.sends)
     .slice(0, MAX_CAMPAIGNS);
 
-  if (!camps.length) {
-    return { period, campaigns: [], total: row1(null), windowDays: WINDOW_DAYS,
-      note: 'За период нет маркетинговых рассылок («Реклама») от ' + MIN_RECIPIENTS + ' получателей.', refreshedAt: new Date().toISOString() };
-  }
-
-  // 2) По каждой кампании — атрибуция со своим окном (последовательно, ~0.2с каждая).
   const campaigns = [];
-  for (const c of camps) {
+  for (const g of groups) {
+    g.dts.sort((a, b) => Date.UTC(a.y, a.m - 1, a.d, a.hh, a.mm, a.ss) - Date.UTC(b.y, b.m - 1, b.d, b.hh, b.mm, b.ss));
+    const first = g.dts[0];
+    const offer = parseOffer(g.text, first.y);
+    const base = {
+      text: g.text, theme: g.theme, sends: g.sends, sendsCount: g.dts.length,
+      firstDate: `${pad(first.d)}.${pad(first.m)}.${first.y}`,
+      endDate: offer.end ? `${pad(offer.end.d)}.${pad(offer.end.m)}.${offer.end.y}` : null
+    };
     try {
-      const a = row1(await upp.callQuery(campaignQuery(c.dt), { timeoutMs: 40000 }));
-      campaigns.push({ date: c.dateStr, theme: c.theme, text: c.text, ...a });
+      if (offer.end && !offer.isAll && offer.products.length) {
+        // Тип A: продукт + срок.
+        const a = row1(await upp.callQuery(categoryQuery(g.dts, dayLit(first), dayLit(offer.end, true), offer.products), { timeoutMs: 50000 }));
+        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории', ...a });
+      } else if (offer.end && offer.isAll) {
+        // Тип A «всё» + срок: любая покупка в окне.
+        const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true)), { timeoutMs: 50000 }));
+        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)', ...a });
+      } else if (offer.hasLink) {
+        // Тип B: ссылка — переходы (нужна статистика clck.ru).
+        campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы (clck.ru — не подключено)', recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true });
+      } else {
+        // Тип C: нет срока и ссылки — запасное окно, любая покупка (оценка).
+        const to = plusDays(first, FALLBACK_DAYS);
+        const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(to, true)), { timeoutMs: 50000 }));
+        campaigns.push({ ...base, type: 'C', product: '—', metric: 'любая покупка, окно ' + FALLBACK_DAYS + 'д (оценка)', ...a });
+      }
     } catch (e) {
-      campaigns.push({ date: c.dateStr, theme: c.theme, text: c.text, recipients: c.listRecipients, buyers: null, revenue: null, conversionPct: null, avgCheck: null, error: e.message });
+      campaigns.push({ ...base, type: '?', error: e.message, recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null });
     }
   }
 
-  // 3) Дедуплицированный итог (уникальные карты по всем кампаниям).
-  let total;
-  try { total = row1(await upp.callQuery(totalQuery(camps.map((c) => c.dt)))); }
-  catch (_) { total = null; }
-
   return {
-    period, windowDays: WINDOW_DAYS, campaignsCount: campaigns.length,
-    campaigns, total,
-    note: 'По каждой рассылке «Реклама»: получатель купил по той же карте в окне [дата рассылки … +' + WINDOW_DAYS + ' дней]. Только получатели с картой лояльности. Итог дедуплицирован (карта в нескольких рассылках — один раз); сумма по строкам может быть выше итога из-за пересечения аудиторий.',
+    period, campaigns, campaignsCount: campaigns.length,
+    methodNote: 'Конверсия привязана к офферу: Тип A — купил ИМЕННО акционную категорию в окне [дата рассылки … срок из текста]; «всё»+срок — любая покупка в окне; ссылочные (Тип B) — переходы по clck.ru (подключим, когда дашь доступ); без срока/ссылки (Тип C) — окно ' + FALLBACK_DAYS + 'д, оценка. Повторные отправки одной рассылки схлопнуты. Только «Реклама»/«Акция».',
+    caveat: '⚠️ Цифры завышены базовым уровнем (постоянные клиенты покупают и без SMS). Чистый прирост даст контрольная группа (холдаут ~10%) — следующий этап.',
     refreshedAt: new Date().toISOString()
   };
 }
 
 function getSmsAttribution(period) {
   const p = period || upp.nowYM();
-  return cache.wrap('sms:' + p, () => compute(p));
+  return cache.wrap('sms2:' + p, () => compute(p));
 }
 
 module.exports = { getSmsAttribution };
