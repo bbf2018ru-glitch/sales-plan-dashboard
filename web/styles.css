@@ -4329,3 +4329,48 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
   .mkt-topbar .mkt-period { font-size: 13px; }
   .mkt-topbar .mkt-export { margin-left: 0; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   «Bento Premium» — премиальный материал блоков (тёмная тема).
+   Сплошные плитки получают мягкую глубину, крупный радиус, tone-акцент сверху,
+   hover-lift; hero — яркий сигнатурный градиент. Светлая тема не затрагивается.
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme=dark] .kpi,
+[data-theme=dark] .panel,
+[data-theme=dark] .hero-card,
+[data-theme=dark] .ai-narrative-card {
+  border-radius: 22px;
+  background: linear-gradient(180deg, #1b2030, #14171f);
+  border: 1px solid #2a3142;
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 18px 42px -22px rgba(0,0,0,.72);
+  transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s, border-color .25s;
+}
+[data-theme=dark] .kpi:hover,
+[data-theme=dark] .panel:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 1px 0 rgba(255,255,255,.09) inset, 0 28px 58px -22px rgba(0,0,0,.82);
+  border-color: #36405a;
+}
+/* KPI: крупнее цифра + tone-акцент сверху (статус-система) */
+[data-theme=dark] .kpi { position: relative; overflow: hidden; padding: 20px 18px; }
+[data-theme=dark] .kpi-value { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+[data-theme=dark] .kpi::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), transparent 70%); opacity: .5;
+}
+[data-theme=dark] .kpi.good::after { background: linear-gradient(90deg, var(--good), transparent 70%); opacity: .7; }
+[data-theme=dark] .kpi.warn::after { background: linear-gradient(90deg, var(--warn), transparent 70%); opacity: .7; }
+[data-theme=dark] .kpi.bad::after  { background: linear-gradient(90deg, var(--bad),  transparent 70%); opacity: .7; }
+[data-theme=dark] .kpi.neutral::after { opacity: .22; }
+[data-theme=dark] .kpi-grid { gap: 16px; }
+/* hero: яркий сигнатурный градиент (направление C) */
+[data-theme=dark] .hero-card {
+  background:
+    linear-gradient(135deg, rgba(255,92,122,.20), rgba(124,92,255,.14) 52%, transparent 78%),
+    linear-gradient(180deg, #1d2335, #14171f);
+  border: 1px solid #34304a;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme=dark] .kpi, [data-theme=dark] .panel { transition: none; }
+  [data-theme=dark] .kpi:hover, [data-theme=dark] .panel:hover { transform: none; }
+}

@@ -579,6 +579,36 @@ function renderSummaryHero(summary) {
   el.classList.remove('hidden');
 }
 
+// count-up: анимируем число внутри .kpi-value (0 → значение, easeOutCubic),
+// сохраняя суффикс (М ₽ / % / ...) и группировку. Финал — точная исходная строка.
+let _kpiAnimPeriod = null;
+function animateKpiNumbers() {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('#kpis .kpi-value').forEach(el => {
+    const raw = el.textContent.trim();
+    const m = raw.match(/^(-?[\d\s.,]+?)\s*([^\d]*)$/);
+    if (!m) return;
+    const numStr = m[1].replace(/\s/g, '').replace(',', '.');
+    const target = parseFloat(numStr);
+    if (!isFinite(target)) return;
+    const suffix = m[2] ? ' ' + m[2] : '';
+    const decimals = (numStr.split('.')[1] || '').length;
+    const dur = 650, start = performance.now();
+    const fmt = (v) => {
+      const [int, dec] = v.toFixed(decimals).split('.');
+      const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      return (dec ? grouped + '.' + dec : grouped) + suffix;
+    };
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      if (p < 1) { el.textContent = fmt(target * eased); requestAnimationFrame(step); }
+      else { el.textContent = raw; }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 function renderKpis(summary) {
   const f = summary.forecast;
   const t = summary.totals;
@@ -708,6 +738,9 @@ function renderKpis(summary) {
       <div class="kpi-value">${c.value}</div>
       ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
     </article>`).join('');
+
+  // count-up анимация цифр — только при первой отрисовке периода (не на 30с-рефреше)
+  if (_kpiAnimPeriod !== state.period) { _kpiAnimPeriod = state.period; animateKpiNumbers(); }
 
   // Bind click → expand/collapse
   $('kpis').querySelectorAll('[data-kpi-id]').forEach(card => {
