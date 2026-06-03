@@ -449,6 +449,18 @@ function serveStatic(res, pathname) {
   });
 }
 
+// ── Сеть безопасности процесса ────────────────────────────────────────────────
+// Каждый HTTP-запрос изолирован (внешний try/catch ниже + per-endpoint 500), но
+// стрэй-ошибка в фоновой задаче (планировщики upp-pull/отчёты/алерты, промисы
+// уведомлений) могла бы уронить процесс. Логируем и продолжаем обслуживать —
+// systemd остаётся бэкстопом при реально фатальном состоянии.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+
 // ── HTTP server ───────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);

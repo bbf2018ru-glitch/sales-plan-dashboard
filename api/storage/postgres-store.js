@@ -29,8 +29,46 @@ class PostgresStore {
     const needsSSL = !/sslmode=disable/i.test(this.connectionString);
     this.pool = new Pool({
       connectionString: this.connectionString,
-      ssl: needsSSL ? { rejectUnauthorized: false } : false
+      ssl: needsSSL ? { rejectUnauthorized: false } : false,
+      // Устойчивость к удалённой БД (Postgres СПб, другой ДЦ, через SSL):
+      max: 10,
+      keepAlive: true,                    // не дать NAT/файрволу уронить idle-соединение
+      keepAliveInitialDelayMillis: 10000,
+      connectionTimeoutMillis: 10000,     // не висим на установке соединения
+      idleTimeoutMillis: 30000,           // закрываем простаивающие (вместо протухания)
+      query_timeout: 90000,               // клиентский потолок (анти-зависание, как у фронта)
+      statement_timeout: 90000            // серверный потолок на запрос
     });
+
+    // Без обработчика ошибка idle-клиента (разрыв соединения с удалённой БД)
+    // всплывает как uncaught и может уронить процесс — логируем и продолжаем.
+    this.pool.on('error', (err) => {
+      console.error('[pg pool] idle client error:', err && err.message ? err.message : err);
+    });
+
+    // Ретрай на ТРАНЗИЕНТНЫЕ connection-сбои: протухшее/оборванное соединение к
+    // удалённой БД даёт ошибку на ПЕРВОМ запросе. Повторяем 1 раз и ТОЛЬКО для
+    // SELECT — чтобы исключить любой риск двойной записи (INSERT/UPDATE/DELETE).
+    const rawQuery = this.pool.query.bind(this.pool);
+    const TRANSIENT = /ECONNRESET|ETIMEDOUT|EPIPE|Connection terminated|connection terminated|server closed the connection|terminating connection|Client has encountered a connection error/i;
+    const isSelect = (q) => {
+      const text = typeof q === 'string' ? q : (q && q.text) || '';
+      return /^\s*(select|with)\b/i.test(text);
+    };
+    this.pool.query = async (...args) => {
+      try {
+        return await rawQuery(...args);
+      } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        const transient = TRANSIENT.test(msg) || ['57P01', '08006', '08003', '08000', '08001'].includes(e && e.code);
+        if (transient && isSelect(args[0])) {
+          console.warn('[pg pool] транзиентный сбой соединения на SELECT, повтор:', msg);
+          await new Promise(r => setTimeout(r, 300));
+          return await rawQuery(...args);
+        }
+        throw e;
+      }
+    };
 
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
     await this.pool.query(schema);
