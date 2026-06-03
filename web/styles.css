@@ -4370,7 +4370,34 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
     linear-gradient(180deg, #1d2335, #14171f);
   border: 1px solid #34304a;
 }
+/* распространяем материал на блоки Аналитики и Маркетинга
+   (аналитика уже на .panel; добавляем kpi-card и маркетинговые карточки) */
+[data-theme=dark] .kpi-card,
+[data-theme=dark] .mkt-chart,
+[data-theme=dark] .mkt-yoy-card {
+  border-radius: 18px;
+  background: linear-gradient(180deg, #1b2030, #14171f);
+  border: 1px solid #2a3142;
+  box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 14px 34px -22px rgba(0,0,0,.7);
+  transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s, border-color .25s;
+}
+[data-theme=dark] .kpi-card:hover,
+[data-theme=dark] .mkt-chart:hover,
+[data-theme=dark] .mkt-yoy-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 22px 46px -22px rgba(0,0,0,.8);
+  border-color: #36405a;
+}
+/* статус-карточки маркетинга — крупнее радиус + лёгкая глубина (тинт сохраняем) */
+[data-theme=dark] .mkt-comp-ins,
+[data-theme=dark] .mkt-alert {
+  border-radius: 16px;
+  box-shadow: 0 12px 30px -22px rgba(0,0,0,.6);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  [data-theme=dark] .kpi, [data-theme=dark] .panel { transition: none; }
-  [data-theme=dark] .kpi:hover, [data-theme=dark] .panel:hover { transform: none; }
+  [data-theme=dark] .kpi, [data-theme=dark] .panel,
+  [data-theme=dark] .kpi-card, [data-theme=dark] .mkt-chart, [data-theme=dark] .mkt-yoy-card { transition: none; }
+  [data-theme=dark] .kpi:hover, [data-theme=dark] .panel:hover,
+  [data-theme=dark] .kpi-card:hover, [data-theme=dark] .mkt-chart:hover, [data-theme=dark] .mkt-yoy-card:hover { transform: none; }
 }
