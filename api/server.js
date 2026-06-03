@@ -18,6 +18,7 @@ const { getMarketTrends } = require('./lib/market-trends');
 const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
 const smsAttribution = require('./lib/sms-attribution');
+const productionKg = require('./lib/production-kg');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
@@ -860,6 +861,15 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await smsAttribution.getSmsAttribution(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // ── Выпуск продукции в кг (production-kg) через /query 1С ──
+    if (pathname === '/api/analytics/production-kg' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await productionKg.getProductionKg(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

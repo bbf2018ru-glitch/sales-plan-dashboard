@@ -1374,6 +1374,16 @@
             </div>
           </section>
 
+          <section class="section" id="mkt-s-prodkg" data-mgroup="products">
+            <div class="section-label">Выпуск продукции, кг (производство) <span class="mkt-scope dyn" title="Документ.ОтчетПроизводстваЗаСмену из 1С через /query, за выбранный месяц + динамика 12 мес">live · за месяц</span></div>
+            <div class="section-hint">Сколько произведено в килограммах (Σ Количество × вес штуки). Источник — отчёты производства за смену в 1С. Помогает планировать загрузку цеха и сверять с продажами.</div>
+            <div id="mktProdKgKpi"></div>
+            <div class="mkt-2col" style="margin-top:12px">
+              <div><div class="mkt-chart-t">Динамика выпуска по месяцам, кг</div><div id="mktProdKgChart"></div></div>
+              <div><div class="mkt-chart-t">Топ продукции по кг (за месяц)</div><div id="mktProdKgTop" class="table-wrap"></div></div>
+            </div>
+          </section>
+
           <section class="section" id="mkt-s-seo" data-mgroup="channels">
             <div class="section-label">SEO / источники трафика сайта <span class="mkt-scope fix" title="Не зависит от выбора месяца — весь период янв–май">весь период</span></div>
             <div class="section-hint">Метрика maria-irk.ru. Органика — главный канал (~70 %), драйвер — рецепты в блоге. Канал НЕ бесплатный: SEO-ведение и контент стоят <b>46 тыс ₽/мес</b> (~230 тыс ₽ за янв–май 2026). Помесячная органика — через Metrika API (в планах); сейчас показаны итоги за период (не зависят от выбора месяца).</div>

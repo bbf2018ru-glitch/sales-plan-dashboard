@@ -4504,6 +4504,33 @@ function renderSmsAttribution(sa){
   if(sa.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+sa.note+'</div>';
   el.innerHTML=html;
 }
+// Выпуск продукции в кг — KPI + график 12 мес + топ продукции.
+function renderProductionKg(pk){
+  var el=document.getElementById('mktProdKgKpi'); if(!el) return;
+  if(!pk || pk.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных выпуска: '+((pk&&pk.error)||'ошибка')+'</div>'; return; }
+  var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
+  var c=pk.current||{kg:0,units:0,momPct:null};
+  var momStr = c.momPct==null ? '—' : '<span style="color:'+(c.momPct>=0?'#10a05a':'#e0466a')+'">'+(c.momPct>0?'+':'')+mNum1(c.momPct)+' %</span>';
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+
+    kpi(mNum(c.kg)+' кг','Выпуск за месяц')+
+    kpi(mNum(c.units)+' шт','Штук произведено')+
+    kpi(momStr,'К прошлому месяцу')+
+    '</div>';
+  // График по месяцам
+  var months=pk.months||[];
+  if(months.length){
+    mBars('mktProdKgChart', months.map(function(m){return m.label;}), months.map(function(m){return m.kg;}), 'var(--accent)', ' кг');
+  }
+  // Топ продукции по кг
+  var top=pk.topProducts||[];
+  var tEl=document.getElementById('mktProdKgTop');
+  if(tEl){
+    if(top.length){
+      tEl.innerHTML='<table><thead><tr><th>Продукция</th><th class="num">Кг</th><th class="num">Шт</th></tr></thead><tbody>'+
+        top.slice(0,20).map(function(r,i){ return '<tr><td>'+(i+1)+'. '+r.name+'</td><td class="num">'+mNum(r.kg)+'</td><td class="num">'+mNum(r.units)+'</td></tr>'; }).join('')+'</tbody></table>';
+    } else { tEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных за месяц.</div>'; }
+  }
+}
 function mktCsvN(n, dec){ return dec ? (Math.round(n*100)/100).toFixed(2).replace('.',',') : String(Math.round(n)); }
 function mktExport(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
@@ -4870,6 +4897,13 @@ function mktLoadYoY(){
       smsAttrEl.innerHTML='<div class="mkt-yoy-load">Считаю атрибуцию рассылок из 1С (~10 сек)…</div>';
       fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ renderSmsAttribution(sa); })
         .catch(function(e){ smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>'; });
+    }
+    // Выпуск продукции в кг — отдельный эндпоинт (1С /query).
+    var prodKgEl=document.getElementById('mktProdKgKpi');
+    if(prodKgEl){
+      prodKgEl.innerHTML='<div class="mkt-yoy-load">Загрузка выпуска из 1С…</div>';
+      fetchJson('/api/analytics/production-kg?period='+period).then(function(pk){ renderProductionKg(pk); })
+        .catch(function(e){ prodKgEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Выпуск недоступен: '+e.message+'</div>'; });
     }
     var hint=document.getElementById('mktYoYHint');
     if(hint){ var t=d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—';
