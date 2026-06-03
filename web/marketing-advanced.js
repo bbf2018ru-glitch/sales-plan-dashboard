@@ -84,21 +84,27 @@
     el.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Загрузка…</div>';
     try {
       const data = await fetchJson('/api/marketing/cohort-retention?months=6');
-      const cohorts = data.cohorts || data || [];
+      const cohorts = data.cohorts || [];
       if (!cohorts.length) {
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Нет данных для построения когорт.</div>';
         return;
       }
-      const months = cohorts[0]?.retention?.length || 6;
-      const head = '<tr><th>Месяц регистрации</th><th>Новых карт</th>' + Array.from({ length: months }, (_, i) => `<th>+${i + 1} мес</th>`).join('') + '</tr>';
+      // retention в API — массив объектов {offset, count, pct}. offset 0 = тот же месяц (100%).
+      // Показываем +1..+6 мес (offset 1..6).
+      const maxOffset = Math.max(0, ...cohorts.flatMap(c => (c.retention || []).map(r => r.offset)));
+      const offsets = Array.from({ length: maxOffset }, (_, i) => i + 1);
+      const head = '<tr><th>Месяц регистрации</th><th style="text-align:right">Новых карт</th>' +
+        offsets.map(o => `<th style="text-align:center">+${o} мес</th>`).join('') + '</tr>';
       const rows = cohorts.map(c => {
-        const tds = (c.retention || []).map(r => {
-          if (r == null) return '<td>—</td>';
-          const pct = Math.round(r * 100);
-          const bg = `hsl(${Math.round(120 * r)}deg 60% ${88 - r * 28}%)`;
-          return `<td style="background:${bg};text-align:center;font-weight:600">${pct}%</td>`;
+        const byOffset = new Map((c.retention || []).map(r => [r.offset, r]));
+        const tds = offsets.map(o => {
+          const r = byOffset.get(o);
+          if (!r || r.pct == null) return '<td style="color:var(--muted,#64748b);text-align:center">—</td>';
+          const ratio = Math.max(0, Math.min(1, r.pct / 100));
+          const bg = `hsl(${Math.round(120 * ratio)}deg 60% ${88 - ratio * 28}%)`;
+          return `<td style="background:${bg};text-align:center;font-weight:600" title="${r.count?.toLocaleString('ru-RU') ?? 0} карт">${r.pct.toFixed(1)}%</td>`;
         }).join('');
-        return `<tr><td>${esc(c.month)}</td><td style="text-align:right">${(c.size || 0).toLocaleString('ru-RU')}</td>${tds}</tr>`;
+        return `<tr><td>${esc(c.firstMonth || c.month || '')}</td><td style="text-align:right">${(c.total || c.size || 0).toLocaleString('ru-RU')}</td>${tds}</tr>`;
       }).join('');
       el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
     } catch (e) {
@@ -169,20 +175,27 @@
     el.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Загрузка…</div>';
     try {
       const data = await fetchJson(`/api/marketing/store-clusters?period=${currentPeriod()}`);
-      const clusters = data.clusters || data || [];
+      const clusters = data.clusters || [];
       if (!clusters.length) {
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Нет данных для кластеризации.</div>';
         return;
       }
-      const palette = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7'];
-      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">' +
-        clusters.map((cl, i) => `<div style="padding:12px;border:1px solid var(--line,#e2e8f0);border-radius:10px;border-left:4px solid ${palette[i % palette.length]}">
-          <div style="font-weight:600;margin-bottom:6px">${esc(cl.label || `Кластер ${i + 1}`)}</div>
-          <div style="font-size:11px;color:var(--muted,#64748b);margin-bottom:8px">${(cl.stores || []).length} точек</div>
-          <div style="font-size:12px;color:var(--muted,#64748b)">Сред. выручка: ${fmtMoney(cl.avgRevenue || 0)} ₽</div>
-          <div style="font-size:12px;color:var(--muted,#64748b)">Сред. чек: ${fmtMoney(cl.avgCheque || 0)} ₽</div>
-          <div style="font-size:11px;margin-top:6px;color:var(--muted,#64748b)">${(cl.stores || []).slice(0, 5).map(s => esc(s.name || s.storeName)).join(', ')}${(cl.stores || []).length > 5 ? '…' : ''}</div>
-        </div>`).join('') + '</div>';
+      const toneColors = { good: '#22c55e', warn: '#f59e0b', bad: '#ef4444', neutral: '#3b82f6' };
+      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">' +
+        clusters.map((cl, i) => {
+          const color = toneColors[cl.tone] || toneColors.neutral;
+          const stores = cl.stores || [];
+          const avg = cl.avg || {};
+          const totalFact = stores.reduce((s, x) => s + (Number(x.fact) || 0), 0);
+          return `<div style="padding:12px;border:1px solid var(--line,#e2e8f0);border-radius:10px;border-left:4px solid ${color}">
+            <div style="font-weight:600;margin-bottom:6px">${esc(cl.name || `Кластер ${i + 1}`)}</div>
+            <div style="font-size:11px;color:var(--muted,#64748b);margin-bottom:8px">${cl.count ?? stores.length} точек · ${fmtMoney(totalFact)} ₽ суммарно</div>
+            <div style="font-size:12px;color:var(--muted,#64748b)">Сред. чек: ${fmtMoney(avg.avgCheck || 0)} ₽</div>
+            ${avg.marginPct != null ? `<div style="font-size:12px;color:var(--muted,#64748b)">Маржа: ${avg.marginPct.toFixed(1)}%</div>` : ''}
+            ${avg.pctCompletion != null ? `<div style="font-size:12px;color:var(--muted,#64748b)">Выполн. плана: ${avg.pctCompletion.toFixed(1)}%</div>` : ''}
+            <div style="font-size:11px;margin-top:6px;color:var(--muted,#64748b)">${stores.slice(0, 5).map(s => esc(s.storeName || s.name || '')).join(', ')}${stores.length > 5 ? '…' : ''}</div>
+          </div>`;
+        }).join('') + '</div>';
     } catch (e) {
       el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
