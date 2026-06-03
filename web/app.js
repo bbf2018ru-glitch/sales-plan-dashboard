@@ -4463,9 +4463,36 @@ function renderPaidLive(d){
       '</div>'+
       '<div style="font-size:12px;color:var(--muted)">Топ-действие на карточке: '+topAct+'. Детальнее — раздел «Каналы → 2ГИС».</div>';
   }
-  // SMS — честная заглушка (помесячной отдачи нет до BSL-патча)
+  // SMS — отдача теперь считается (см. «Каналы → SMS-рассылки»)
   html+='<div class="mkt-comp-ins" style="margin-top:14px;font-size:12px">'+
-    '<b>SMS — помесячная отдача пока недоступна.</b> Расход по SMS есть в 1С, но связать рассылку с покупками (ROI) можно только после BSL-патча получателей. Агрегаты по месяцам — в разделе «Каналы → SMS-рассылки».</div>';
+    '<b>SMS — атрибуция к покупкам подключена.</b> Связь рассылок с чеками по карте лояльности — в разделе «Каналы → SMS-рассылки».</div>';
+  el.innerHTML=html;
+}
+// SMS-атрибуция: рендер живых данных /api/marketing/sms-attribution за месяц.
+function renderSmsAttribution(sa){
+  var el=document.getElementById('mktSmsAttr'); if(!el) return;
+  if(!sa || sa.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных атрибуции: '+((sa&&sa.error)||'ошибка')+'</div>'; return; }
+  var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
+  var t=sa.marketingTotals||{recipients:0,buyers:0,revenue:0,conversionPct:0,avgCheck:0};
+  var html='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:6px">'+
+    kpi(mNum(t.recipients),'Получателей с картой')+
+    kpi(mNum(t.buyers),'Купили в окне')+
+    kpi('<span style="color:'+(t.conversionPct>=10?'#10a05a':(t.conversionPct>=3?'#b8860b':'#e0466a'))+'">'+mNum1(t.conversionPct)+' %</span>','Конверсия')+
+    kpi(mNum(t.revenue)+' ₽','Выручка от получателей')+
+    kpi(mNum(t.avgCheck)+' ₽','Средний чек')+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Маркетинговые рассылки за '+(sa.window||sa.period)+'. KPI — только маркетинг (триггерные и аномалии в таблице ниже отдельно).</div>';
+  var themes=(sa.themes||[]);
+  if(themes.length){
+    var kindLabel={marketing:'<span style="color:#10a05a">маркетинг</span>', transactional:'<span style="color:var(--muted)">триггер/транз.</span>', anomaly:'<span style="color:#e0466a">аномалия (опт)</span>'};
+    html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (тема)</th><th>Тип</th><th class="num">Получателей</th><th class="num">Купили</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Ср. чек ₽</th></tr></thead><tbody>'+
+      themes.map(function(r){
+        var convC=r.kind!=='marketing'?'' : (r.conversionPct>=10?'color:#10a05a':(r.conversionPct>=3?'color:#b8860b':'color:#e0466a'));
+        var rev=r.kind==='anomaly'?'<span title="оптовая выдача — не розничная атрибуция" style="color:#e0466a">'+mNum(r.revenue)+' ⚠️</span>':mNum(r.revenue);
+        return '<tr'+(r.kind==='marketing'?' style="font-weight:600"':'')+'><td>'+r.theme+'</td><td style="font-size:11px">'+(kindLabel[r.kind]||r.kind)+'</td><td class="num">'+mNum(r.recipients)+'</td><td class="num">'+mNum(r.buyers)+'</td><td class="num" style="'+convC+'">'+mNum1(r.conversionPct)+' %</td><td class="num">'+rev+'</td><td class="num">'+mNum(r.avgCheck)+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }
+  if(sa.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+sa.note+'</div>';
   el.innerHTML=html;
 }
 function mktCsvN(n, dec){ return dec ? (Math.round(n*100)/100).toFixed(2).replace('.',',') : String(Math.round(n)); }
@@ -4828,6 +4855,13 @@ function mktLoadYoY(){
     try { renderAlerts(d, period); } catch(_){}
     // Платные каналы — live-показатели Директа/2ГИС (снимок скрейпа).
     try { renderPaidLive(d); } catch(_){}
+    // SMS-атрибуция за выбранный месяц — отдельный (тяжёлый ~9с, кэш 6ч) эндпоинт.
+    var smsAttrEl=document.getElementById('mktSmsAttr');
+    if(smsAttrEl){
+      smsAttrEl.innerHTML='<div class="mkt-yoy-load">Считаю атрибуцию рассылок из 1С (~10 сек)…</div>';
+      fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ renderSmsAttribution(sa); })
+        .catch(function(e){ smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>'; });
+    }
     var hint=document.getElementById('mktYoYHint');
     if(hint){ var t=d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—';
       hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.fromCache?' (из кэша)':'')+'.'; }

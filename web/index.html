@@ -1314,17 +1314,11 @@
           </section>
 
           <section class="section" id="mkt-s-sms" data-mgroup="channels">
-            <div class="section-label">SMS-рассылки <span class="mkt-scope dyn" title="Пересчитывается под выбранный период">за период</span></div>
-            <div class="section-hint">1С отчёт «Отправленные SMS». Таргетинг: реактивация спящих, топ-клиенты, новые, дни рождения. <b>Детализация по каждой рассылке</b> (текст, получатели, конверсия, даты действия скидки) — в плане BSL-патча 1С (новый endpoint <code>/sms-detail</code>). Сейчас показываем агрегаты помесячно.</div>
+            <div class="section-label">SMS-рассылки — атрибуция к покупкам <span class="mkt-scope dyn" title="Живой JOIN получателей рассылки с чеками по карте лояльности за выбранный месяц (1С /query)">live · за месяц</span></div>
+            <div class="section-hint">Связываем получателей SMS с покупками <b>по карте лояльности</b>: получатель купил по той же карте в окне «месяц рассылки + 14 дней». Источник — 1С (Документ.SMSСообщение ⋈ ЧекККМ). Атрибутируются только рассылки с картой; рассылки по телефону без карты — нет.</div>
+            <div id="mktSmsAttr"></div>
+            <div class="section-label" style="margin-top:22px">Объёмы рассылок помесячно <span class="mkt-scope fix" title="Историческая сводка из 1С">сводка</span></div>
             <div id="mktSms" class="table-wrap"></div>
-            <div class="mkt-comp-ins" style="margin-top:12px;font-size:12px">
-              <div class="mkt-chart-t">Что появится после BSL-патча</div>
-              <ul style="margin:6px 0 0;padding-left:20px;line-height:1.6">
-                <li><b>Каждая рассылка:</b> дата, текст SMS, количество получателей, расход, даты действия купона/скидки</li>
-                <li><b>Конверсия:</b> JOIN получателей рассылки с чеками в окне действия — кто купил, на какую сумму, ROI каждой рассылки</li>
-                <li><b>Сегмент-аналитика:</b> «спящие» vs «топ» vs «новые» — какой сегмент окупается лучше</li>
-              </ul>
-            </div>
           </section>
 
           <section class="section" id="mkt-s-ctx" data-mgroup="channels">
