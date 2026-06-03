@@ -18,31 +18,13 @@
 // Перформанс: окна — КОНСТАНТЫ на запрос (per-row ДОБАВИТЬКДАТЕ в JOIN = таймаут).
 
 const fs = require('fs');
-const http = require('http');
-const https = require('https');
 const upp = require('./upp-client');
 const cache = upp.makeCache(6 * 60 * 60 * 1000);
 const EXT_DIR = process.env.MARKETING_DATA_DIR || '/opt/marketing-data';
 function readExt(file) { try { return JSON.parse(fs.readFileSync(EXT_DIR + '/' + file, 'utf8')); } catch (_) { return null; } }
-
-// Резолв короткой ссылки clck.ru/КОД → clckid (метка визита на maria-irk.ru, по ней
-// Метрика считает переходы). Берём из первого редиректа (Location → sba.yandex.ru/...clckid=).
-const _clckidCache = new Map();
-function resolveClckid(code) {
-  if (_clckidCache.has(code)) return Promise.resolve(_clckidCache.get(code));
-  return new Promise((resolve) => {
-    const req = https.request({ hostname: 'clck.ru', path: '/' + code, method: 'GET', timeout: 8000 }, (res) => {
-      const loc = res.headers.location || '';
-      const m = /clckid%3D([a-z0-9]+)|clckid=([a-z0-9]+)/i.exec(loc);
-      const id = m ? (m[1] || m[2]) : null;
-      _clckidCache.set(code, id); resolve(id);
-      res.resume();
-    });
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
-    req.end();
-  });
-}
+// Переходы по ссылкам (Тип B) считает серверный скрейпер scrape-metrika-entry.js:
+// резолвит clck.ru/код→clckid реальным браузером (сервер ловит капчу) + визиты из Метрики
+// → sms-clicks.json.byCode[код]. Здесь только читаем готовый файл.
 const FALLBACK_DAYS = 14;
 const MIN_RECIPIENTS = 100;
 const MAX_CAMPAIGNS = 30;
@@ -181,10 +163,11 @@ async function compute(period) {
         const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true)), { timeoutMs: 50000 }));
         campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)', ...a });
       } else if (offer.hasLink) {
-        // Тип B: ссылка — переходы из Метрики (clck.ru/код → clckid → визиты /for_clients/?clckid=).
-        let clicks = null, clckid = null;
+        // Тип B: ссылка — переходы из Метрики. clck.ru/код→clckid→визиты резолвит серверный
+        // скрейпер (браузером, сервер ловит капчу) и кладёт в sms-clicks.json.byCode[код].
+        let clicks = null;
         const cm = /clck\.ru\/([a-z0-9]+)/i.exec(g.text);
-        if (cm) { clckid = await resolveClckid(cm[1]); if (clckid && smsClicks.byClckid && smsClicks.byClckid[clckid] != null) clicks = smsClicks.byClckid[clckid]; }
+        if (cm && smsClicks.byCode && smsClicks.byCode[cm[1]] != null) clicks = smsClicks.byCode[cm[1]];
         if (clicks != null) {
           campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: g.sends, buyers: clicks, revenue: null, conversionPct: g.sends ? Math.round(clicks / g.sends * 1000) / 10 : 0, avgCheck: null, isClicks: true });
         } else {
