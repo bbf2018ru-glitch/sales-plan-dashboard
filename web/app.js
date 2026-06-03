@@ -4504,7 +4504,7 @@ function renderSmsAttribution(sa){
         return '<tr><td>'+head+'</td><td>'+offer+'</td><td class="num">'+mNum(c.recipients)+'</td>'+
           '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div></td>'+
           '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %</td>'+
-          '<td class="num">'+mNum(c.revenue)+'</td></tr>';
+          '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок («Реклама»/«Акция») за период не найдено.</div>';
