@@ -4457,6 +4457,27 @@ function renderSalesMonthly(d){
   el.innerHTML='<table><thead><tr><th>Месяц</th><th class="num">Выручка, ₽</th><th class="num">Чеков</th><th class="num">Ср. чек, ₽</th><th class="num">Карта лоял.</th><th class="num">Бонусами, ₽</th></tr></thead><tbody>'+rows+
     '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum(chq)+'</td><td class="num">'+mNum(chq?rev/chq:0)+'</td><td class="num">'+mNum1(chq?cardW/chq:0)+' %</td><td class="num">'+mNum(bon)+'</td></tr></tbody></table>';
 }
+// Я.Директ помесячно — live-история из кабинета porg-mcw4s7ni (scrape-direct-history.js).
+function renderDirectMonthly(d){
+  var el=document.getElementById('mktCtxMonthly'); if(!el) return;
+  var dh=d&&d.external&&d.external.directHistory;
+  var ms=(dh&&dh.months||[]).filter(function(m){return m && m.spend;});
+  if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история Директа собирается скрейпером кабинета.</div>'; return; }
+  var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  var sp=0,im=0,cl=0,cv=0;
+  var rows=ms.map(function(m){ sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=m.conversions||0;
+    var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.daysCovered&&m.daysCovered<28?' (1–'+m.daysCovered+')':'');
+    var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:#10a05a':(m.cpa<=800?'color:#b8860b':'color:#e0466a'));
+    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.spend)+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+mNum(m.clicks)+'</td><td class="num">'+mNum1(m.ctrPct||0)+' %</td><td class="num">'+mNum(m.conversions)+'</td><td class="num">'+mNum1(m.crPct||0)+' %</td><td class="num">'+mNum1(m.cpc||0)+'</td><td class="num" style="'+cpaC+'">'+(m.cpa==null?'—':mNum(m.cpa))+'</td></tr>';
+  }).reverse().join('');
+  var tcpc=cl?Math.round(sp/cl*100)/100:0, tctr=im?Math.round(cl/im*1000)/10:0, tcpa=cv?Math.round(sp/cv):0, tcr=cl?Math.round(cv/cl*1000)/10:0;
+  var st=dh.scrapedAt?new Date(dh.scrapedAt).toLocaleString('ru-RU'):'—';
+  el.innerHTML='<div class="mkt-chart-t">Я.Директ помесячно <span class="mkt-scope dyn">live · кабинет</span></div>'+
+    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Расход ₽</th><th class="num">Показы</th><th class="num">Клики</th><th class="num">CTR</th><th class="num">Конв.</th><th class="num">CR</th><th class="num">CPC ₽</th><th class="num">CPA ₽</th></tr></thead><tbody>'+rows+
+    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(sp)+'</td><td class="num">'+mNum(im)+'</td><td class="num">'+mNum(cl)+'</td><td class="num">'+mNum1(tctr)+' %</td><td class="num">'+mNum(cv)+'</td><td class="num">'+mNum1(tcr)+' %</td><td class="num">'+mNum1(tcpc)+'</td><td class="num">'+mNum(tcpa)+'</td></tr>'+
+    '</tbody></table></div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Источник — отчёт «Перформанс-кампании» в кабинете Директа, помесячно. Конверсии — цели Я.Метрики в кабинете. Обновлено: '+st+(dh.sessionExpired?' · ⚠️ сессия протухла':'')+'.</div>';
+}
 // Платные каналы — затраты и отдача (бюджет маркетинга) из /api/marketing/paid-costs.
 function renderPaidCosts(pc){
   var el=document.getElementById('mktPaidLive'); if(!el) return;
@@ -4918,6 +4939,8 @@ function mktLoadYoY(){
     try { renderAlerts(d, period); } catch(_){}
     // Продажи и лояльность помесячно — live (заменили статику янв–май).
     try { renderSalesMonthly(d); } catch(_){}
+    // Я.Директ помесячно — live из кабинета (заменили статику).
+    try { renderDirectMonthly(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){
