@@ -31,10 +31,12 @@ class PostgresStore {
       connectionString: this.connectionString,
       ssl: needsSSL ? { rejectUnauthorized: false } : false,
       // Устойчивость к удалённой БД (Postgres СПб, другой ДЦ, через SSL):
-      max: 10,
+      // max=20 — чтобы фоновый прогрев кэша (promo-monthly/new-customers warm)
+      //   не выедал все коннекты и запросы дашборда не голодали.
+      max: 20,
       keepAlive: true,                    // не дать NAT/файрволу уронить idle-соединение
       keepAliveInitialDelayMillis: 10000,
-      connectionTimeoutMillis: 10000,     // не висим на установке соединения
+      connectionTimeoutMillis: 20000,     // терпеливо ждём коннект при насыщении пула (было 10с — давало быстрый отказ под warm-штормом)
       idleTimeoutMillis: 30000,           // закрываем простаивающие (вместо протухания)
       query_timeout: 90000,               // клиентский потолок (анти-зависание, как у фронта)
       statement_timeout: 90000            // серверный потолок на запрос
