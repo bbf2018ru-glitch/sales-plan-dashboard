@@ -2,7 +2,31 @@
    Bento Glass — Apple/visionOS-inspired theme for Maria · Sales
    ──────────────────────────────────────────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Шрифты self-hosted — см. /fonts.css (подключается в index.html перед этим файлом).
+   @import Google Fonts убран: был рендер-блокирующим и зависел от РФ-сети. */
+
+/* ── Type scale + spacing (тема-независимые токены) ──────────────── */
+:root {
+  /* типо-шкала */
+  --fs-2xs: 10px;
+  --fs-xs:  11px;
+  --fs-sm:  12px;
+  --fs-base:13px;
+  --fs-md:  14px;
+  --fs-lg:  16px;
+  --fs-xl:  20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 28px;
+  /* 8px-спейсинг */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+}
 
 /* ── Variables (default = dark glass) ─────────────────────────────── */
 :root, [data-theme=dark] {
@@ -605,7 +629,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .tab-content { display: block; }
 .tab-content.hidden { display: none !important; }
 
-.section { margin-bottom: 22px; }
+.section { margin-bottom: var(--space-6); }
 
 .section-label {
   font-size: 13px;
@@ -625,7 +649,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 
 .section-hint {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--muted);           /* было var(--hint) — описания плохо читались */
   margin-top: 4px;
   font-weight: 400;
@@ -708,7 +732,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 22px 24px;
+  padding: var(--space-6);
   box-shadow: var(--glow-card);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   backdrop-filter: blur(28px) saturate(180%);
@@ -739,7 +763,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .panel-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .panel-grid .panel:not(.panel-narrow) { min-width: 0; }
@@ -1237,7 +1261,7 @@ td.col-edit { text-align: center; }
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--accent);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
@@ -2409,8 +2433,8 @@ tfoot td { border-top: 1px solid var(--line); }
 .ins-sev  { font-size: 14px; font-weight: 700; }
 .ins-card.bad  .ins-sev { color: var(--bad); }
 .ins-card.warn .ins-sev { color: var(--warn); }
-.ins-headline { font-weight: 500; font-size: 13.5px; line-height: 1.4; }
-.ins-detail   { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.ins-headline { font-weight: 500; font-size: 14px; line-height: 1.4; }
+.ins-detail   { font-size: 13px; color: var(--muted); line-height: 1.55; }
 
 /* ─── Маркетинговая аналитика ────────────────────────────────────────────── */
 .mk-block { padding-bottom: 6px; }
@@ -2432,7 +2456,7 @@ tfoot td { border-top: 1px solid var(--line); }
 .mk-hero-warn { border-color: rgba(245,158,11,.30); }
 .mk-hero-bad  { border-color: rgba(239,68,68,.30); }
 .mk-hero-label {
-  font-size: 10.5px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--muted);
@@ -2474,7 +2498,7 @@ tfoot td { border-top: 1px solid var(--line); }
 .mk-action-hint {
   margin: 10px 16px 14px;
   padding: 10px 14px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
   background: rgba(110, 130, 200, 0.06);
   border-left: 3px solid var(--accent);
@@ -2611,7 +2635,7 @@ table.num-table th {
   margin-bottom: 6px;
 }
 .wc-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
-.weekday-hint { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.weekday-hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
 @media (max-width: 640px) {
   .weekday-grid { gap: 4px; }
@@ -2696,7 +2720,7 @@ table.num-table th {
 .ins-event.warn { border-left-color: var(--warn); }
 .ins-event-date { font-size: 11px; color: var(--muted); }
 .ins-event-name { font-weight: 500; font-size: 13px; margin-top: 2px; }
-.ins-event-note { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.ins-event-note { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
 
 /* ── Scrollbars ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -2886,13 +2910,13 @@ body.no-margin-data .cmp-row-margin {
   letter-spacing: -.01em;
 }
 .phb-text {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--muted);
   line-height: 1.55;
 }
 .phb-text code {
   font-family: "JetBrains Mono", "Consolas", monospace;
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: 5px;
   background: rgba(0,0,0,.18);
@@ -2959,7 +2983,7 @@ body.plan-incomplete .spark-fill {
 .hero-bad .hero-mood { background: rgba(239,68,68,.15); color: rgb(239,68,68); }
 .hero-great .hero-mood { background: rgba(34,197,94,.15); color: rgb(34,197,94); }
 .hero-sub {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--muted);
   margin-bottom: 12px;
 }
@@ -3372,7 +3396,7 @@ body.plan-incomplete .spark-fill {
   padding: 6px 10px;
   background: rgba(0,0,0,.04);
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .store-note-meta {
   font-size: 11px;
@@ -3503,7 +3527,7 @@ body.plan-incomplete .spark-fill {
   padding: 1px 6px;
   border-radius: 4px;
   font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 [data-theme=light] .ai-msg code { background: rgba(0,0,0,.06); }
 
@@ -3597,7 +3621,7 @@ body.plan-incomplete .spark-fill {
 [data-theme=light] .cmdk-item.active { background: rgba(181,41,74,.10); }
 
 .cmdk-item-title { font-size: 14px; font-weight: 500; color: #ecedf5; }
-.cmdk-item-sub { font-size: 11.5px; color: rgba(236,237,245,.55); }
+.cmdk-item-sub { font-size: 12px; color: rgba(236,237,245,.55); }
 [data-theme=light] .cmdk-item-title { color: #1a1530; }
 [data-theme=light] .cmdk-item-sub { color: rgba(26,21,48,.55); }
 .cmdk-empty {
@@ -3770,7 +3794,7 @@ body.plan-incomplete .spark-fill {
 }
 [data-theme=light] .drill-header { border-bottom-color: rgba(0,0,0,.08); }
 .drill-title { font-size: 18px; font-weight: 700; }
-.drill-sub { font-size: 12.5px; color: rgba(236,237,245,.55); margin-top: 4px; }
+.drill-sub { font-size: 13px; color: rgba(236,237,245,.55); margin-top: 4px; }
 [data-theme=light] .drill-sub { color: rgba(26,21,48,.55); }
 .drill-x {
   background: transparent; border: none; font-size: 26px;
@@ -3915,7 +3939,7 @@ body.plan-incomplete .spark-fill {
   gap: 8px;
   align-items: center;
   padding: 3px 0;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .kpi-detail-row .ki-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kpi-detail-row .ki-bar {
@@ -3965,7 +3989,7 @@ body.plan-incomplete .spark-fill {
 
 .kpi-note {
   display: inline-block;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
   padding: 1px 6px;
   margin-left: 4px;
@@ -4033,7 +4057,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
   box-shadow:0 6px 20px rgba(0,0,0,.18);
 }
 .mkt-nav a{
-  font-size:12.5px; line-height:1; text-decoration:none;
+  font-size:13px; line-height:1; text-decoration:none;
   color:var(--muted); padding:7px 11px; border-radius:9px;
   border:1px solid transparent; white-space:nowrap;
   transition:background .14s,color .14s,border-color .14s;
@@ -4050,7 +4074,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .mkt-scope{
   display:inline-block; vertical-align:middle;
   margin-left:8px; padding:2px 8px; border-radius:999px;
-  font-size:10.5px; font-weight:600; letter-spacing:.02em;
+  font-size:11px; font-weight:600; letter-spacing:.02em;
   text-transform:uppercase; white-space:nowrap; cursor:help;
 }
 .mkt-scope.dyn{ color:var(--accent); background:var(--accent-soft); }
@@ -4174,7 +4198,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
   background: transparent;
   border: none;
   color: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -4209,7 +4233,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
   gap: 8px;
 }
 .cmp-bar-lbl {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -4230,7 +4254,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .cmp-bar-fill.now  { background: var(--accent); }
 .cmp-bar-fill.prev { background: #a855f7; opacity: .65; }
 .cmp-bar-val {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--hint);
   white-space: nowrap;

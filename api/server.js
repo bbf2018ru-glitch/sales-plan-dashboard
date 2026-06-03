@@ -422,7 +422,9 @@ function serveStatic(res, pathname) {
       '.jpeg': 'image/jpeg',
       '.webp': 'image/webp',
       '.gif': 'image/gif',
-      '.webmanifest': 'application/manifest+json; charset=utf-8'
+      '.webmanifest': 'application/manifest+json; charset=utf-8',
+      '.woff2': 'font/woff2',
+      '.woff': 'font/woff'
     }[ext] || 'application/octet-stream';
     // HTML не кэшируем — иначе после деплоя пользователь видит старый
     // index.html с устаревшими ?v= параметрами для css/js.
