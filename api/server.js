@@ -916,9 +916,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── Маркетинговая аналитика — pack 1 (zombie/cannibalization/rfm/holiday-yoy) ──
+    // По решению пользователя 03.06.2026 — открыты без admin-guard (как channels):
+    // данные агрегатные, без персоналки. RFM показывает количества сегментов,
+    // не имена. Зомби-товары — по SKU/выручке. Когорты — по картам без расшифровки.
     if (pathname === '/api/marketing/zombie-products' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       try {
         const { db } = await getScopedDb(req);
         const period = monthKey(parsedUrl.searchParams.get('period'));
@@ -928,8 +929,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (pathname === '/api/marketing/discount-cannibalization' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       try {
         const from = parsedUrl.searchParams.get('from') || monthKey();
         const to = parsedUrl.searchParams.get('to') || from;
@@ -938,8 +937,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (pathname === '/api/marketing/rfm' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       try {
         const from = parsedUrl.searchParams.get('from') || monthKey();
         const to = parsedUrl.searchParams.get('to') || from;
@@ -948,8 +945,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (pathname === '/api/marketing/holiday-yoy' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       try {
         const { db } = await getScopedDb(req);
         const window = Number(parsedUrl.searchParams.get('window') || 60);
@@ -958,8 +953,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (pathname === '/api/marketing/store-clusters' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       try {
         const { db } = await getScopedDb(req);
         const period = monthKey(parsedUrl.searchParams.get('period'));
@@ -968,11 +961,58 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (pathname === '/api/marketing/cohort-retention' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       try {
         const monthsBack = Number(parsedUrl.searchParams.get('months') || 6);
         sendJson(res, 200, await marketing.getCohortRetention(monthsBack));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    // ── 2ГИС рейтинг — история по архиву /opt/marketing-data/archive/*/2gis-rating-latest.json ──
+    if (pathname === '/api/marketing/2gis-ratings-history' && req.method === 'GET') {
+      try {
+        const fs = require('node:fs');
+        const path = require('node:path');
+        const archiveDir = '/opt/marketing-data/archive';
+        const dates = fs.existsSync(archiveDir)
+          ? fs.readdirSync(archiveDir).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
+          : [];
+        const entries = [];
+        for (const date of dates) {
+          const file = path.join(archiveDir, date, '2gis-rating-latest.json');
+          if (!fs.existsSync(file)) continue;
+          try {
+            const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (j && Array.isArray(j.branches)) {
+              const ratings = j.branches.map(b => ({
+                id: b.id, address: b.address || null,
+                rating: typeof b.rating === 'number' ? b.rating : null,
+                ratingCount: typeof b.ratingCount === 'number' ? b.ratingCount : null,
+              }));
+              entries.push({ date, branches: ratings });
+            }
+          } catch (_) { /* пропускаем битый файл */ }
+        }
+        // Сегодняшний latest — добавляем тоже (его еще нет в архиве — закопирован завтра в 7:00)
+        try {
+          const todayFile = '/opt/marketing-data/2gis-rating-latest.json';
+          if (fs.existsSync(todayFile)) {
+            const j = JSON.parse(fs.readFileSync(todayFile, 'utf8'));
+            if (j && Array.isArray(j.branches)) {
+              const today = new Date().toISOString().slice(0, 10);
+              if (!entries.some(e => e.date === today)) {
+                entries.push({
+                  date: today,
+                  branches: j.branches.map(b => ({
+                    id: b.id, address: b.address || null,
+                    rating: typeof b.rating === 'number' ? b.rating : null,
+                    ratingCount: typeof b.ratingCount === 'number' ? b.ratingCount : null,
+                  })),
+                });
+              }
+            }
+          }
+        } catch (_) { /* skip */ }
+        sendJson(res, 200, { entries, count: entries.length });
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

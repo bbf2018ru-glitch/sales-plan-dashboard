@@ -1430,6 +1430,49 @@
             <div class="section-hint">Синтез по всем данным маркетинга и конкурентам — приоритеты для роста.</div>
             <div id="mktAI"></div>
           </section>
+
+          <!-- ── Advanced аналитика (открыта 03.06.2026) ─────────────────────── -->
+          <section class="section" id="mkt-s-rfm" data-mgroup="loyalty">
+            <div class="section-title">🎯 RFM-сегментация клиентов</div>
+            <div class="section-hint">Разбивка обладателей карт по 4 сегментам: Чемпионы / Активные / Спящие / Холодные. Считается по Recency × Frequency × Monetary за период.</div>
+            <div id="mktRfm"></div>
+          </section>
+
+          <section class="section" id="mkt-s-cohorts" data-mgroup="loyalty">
+            <div class="section-title">📉 Когортный retention карт лояльности</div>
+            <div class="section-hint">Какой % новых карт месяца N продолжает покупать через 1, 2, …, 6 месяцев. Идеальный индикатор удержания.</div>
+            <div id="mktCohorts"></div>
+          </section>
+
+          <section class="section" id="mkt-s-zombie" data-mgroup="products">
+            <div class="section-title">🧟 Зомби-товары</div>
+            <div class="section-hint">Товары с долей выручки &lt; 10% от прошлого периода — кандидаты на снятие с витрины или перезапуск.</div>
+            <div id="mktZombie" class="table-wrap"></div>
+          </section>
+
+          <section class="section" id="mkt-s-canniba" data-mgroup="products">
+            <div class="section-title">🍽 Каннибализация скидок</div>
+            <div class="section-hint">Когда акция на один товар «съедает» продажи похожего. Топ-пары товаров с обратной корреляцией.</div>
+            <div id="mktCanniba" class="table-wrap"></div>
+          </section>
+
+          <section class="section" id="mkt-s-clusters" data-mgroup="products">
+            <div class="section-title">🧭 Кластеры точек</div>
+            <div class="section-hint">k-means по выручке/среднему чеку/маржинальности. Группирует похожие точки — чтобы видеть «семьи» магазинов.</div>
+            <div id="mktClusters"></div>
+          </section>
+
+          <section class="section" id="mkt-s-holiday" data-mgroup="overview">
+            <div class="section-title">🎉 Праздники YoY</div>
+            <div class="section-hint">Ближайший праздник + прирост к прошлому году. Помогает прогнозировать пиковые дни.</div>
+            <div id="mktHoliday"></div>
+          </section>
+
+          <section class="section" id="mkt-s-gis-history" data-mgroup="channels">
+            <div class="section-title">📈 Тренд рейтинга 2ГИС по точкам</div>
+            <div class="section-hint">История ежедневных снимков рейтинга. Накапливается с 03.06.2026 — через ~неделю появятся первые тренды.</div>
+            <div id="mktGisHistory"></div>
+          </section>
         </div><!-- /#page-marketing -->
 
       </main>
@@ -1504,5 +1547,6 @@
     </div>
 
     <script src="/app.js?v=102"></script>
+    <script src="/marketing-advanced.js?v=1"></script>
   </body>
 </html>
