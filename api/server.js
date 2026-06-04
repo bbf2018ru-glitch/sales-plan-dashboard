@@ -1909,6 +1909,33 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // TEMP DEBUG: вытащить все поля последних 3 маркетинговых SMS — чтобы понять
+    // какой реквизит хранит «критерий отбора» / список получателей. Только для admin.
+    // Endpoint снимается после исследования.
+    if (pathname === '/api/admin/sms-fields-debug' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const upp = require('./lib/upp-client');
+        const q = 'ВЫБРАТЬ ПЕРВЫЕ 3 С.* ИЗ Документ.SMSСообщение КАК С '
+          + 'ГДЕ С.Дата >= ДАТАВРЕМЯ(2026,5,1) И С.Дата < ДАТАВРЕМЯ(2026,7,1) '
+          + 'УПОРЯДОЧИТЬ ПО С.Дата УБЫВ';
+        const r = await upp.callQuery(q, { timeoutMs: 60000 });
+        const rows = (r && r.rows) || [];
+        const sample = rows.map(row => {
+          const out = {};
+          for (const k of Object.keys(row)) {
+            const v = row[k];
+            const s = v == null ? null : String(v);
+            out[k] = s == null ? null : s.length > 200 ? s.slice(0, 200) + '…' : s;
+          }
+          return out;
+        });
+        sendJson(res, 200, { count: rows.length, allKeys: rows[0] ? Object.keys(rows[0]) : [], sample });
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     if (pathname === '/api/upp-explorer/object' && req.method === 'GET') {
       const user = await resolveUser(req);
       if (!user || user.role !== 'admin') {
