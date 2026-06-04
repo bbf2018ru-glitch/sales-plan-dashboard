@@ -528,16 +528,25 @@
     if (!container) return;
     const period = currentPeriod();
     const inner = await fetchPaidSmsData(period);
-    if (!inner) return;
-    // Сразу попробовать вставить (если данные paid-costs уже отрендерены).
-    insertSmsRowIfNeeded(container, inner);
-    // И повесить наблюдателя — app.js может перерисовать таблицу несколько раз
-    // (live-обновления, рестарт паданий paid-costs). Каждый перерендер съедает
-    // нашу строку — observer её ставит обратно.
+    if (inner) insertSmsRowIfNeeded(container, inner);
+    // Observer: реагирует на каждый перерендер таблицы (live-обновления и СМЕНА ПЕРИОДА).
+    // При смене периода кэш paidSmsState (lastPeriod) ≠ currentPeriod() → перетягиваем.
     if (!container.__smsObserverArmed) {
-      const obs = new MutationObserver(() => {
-        if (paidSmsState.html) insertSmsRowIfNeeded(container, paidSmsState.html);
-      });
+      let fetching = false;
+      const refresh = async () => {
+        const p = currentPeriod();
+        if (paidSmsState.lastPeriod === p && paidSmsState.html) {
+          insertSmsRowIfNeeded(container, paidSmsState.html);
+          return;
+        }
+        if (fetching) return; // защита от гонок
+        fetching = true;
+        try {
+          const html = await fetchPaidSmsData(p);
+          if (html) insertSmsRowIfNeeded(container, html);
+        } finally { fetching = false; }
+      };
+      const obs = new MutationObserver(refresh);
       obs.observe(container, { childList: true, subtree: true });
       container.__smsObserverArmed = true;
     }
