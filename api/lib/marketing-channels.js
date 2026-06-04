@@ -367,6 +367,7 @@ function externalBlock() {
     gis: readExternal('2gis.json'),
     gisHistory: readExternal('2gis-history.json'),
     gisDemand: parseGisDemand(),
+    gisCompetitors: readExternal('competitors-2gis.json'),
     direct: readExternal('direct.json'),
     directHistory: readExternal('direct-history.json'),
     metrika: readExternal('metrika.json'),

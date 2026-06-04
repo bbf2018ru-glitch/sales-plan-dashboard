@@ -4698,19 +4698,35 @@ var REVIEWS = {
   'Cake Home': { rating:'2ГИС 4,5 (335)', pros:'вкус, «лучший кофе в Иркутске», персонал, атмосфера', cons:'дорого/цены растут, суховато, неудобный вход и парковка, накладки с бронями' },
   'ЯХОНТ': { rating:'2ГИС 4,5 (141)', pros:'низкие цены, свежесть, ассортимент классики, скидки на ДР', cons:'СРЫВЫ ЗАКАЗОВ к дате (главное), кофе и сервис' }
 };
-function renderCompetitors(){
+function renderCompetitors(d){
   var el=document.getElementById('mktComp'); if(!el) return;
+  // live-рейтинги из 2ГИС-кабинета (раздел «Сравнение»), оверлей на совпадающие имена
+  var liveRat={}, gcAt=null;
+  var gc=d&&d.external&&d.external.gisCompetitors;
+  if(gc&&gc.companies){
+    gcAt=gc.scrapedAt;
+    var nameMap=[['стефан','Стефания'],['etika','Этика'],['этик','Этика'],['cake home','Cake Home'],['toti','Toti'],['la tarte','La tarte'],['яхонт','ЯХОНТ'],['мария','Мария']];
+    gc.companies.forEach(function(co){ var low=(co.name||'').toLowerCase();
+      var hit=nameMap.find(function(m){return low.indexOf(m[0])>=0;});
+      if(hit&&co.rating) liveRat[hit[1]]={rating:co.rating,reviews:co.reviews};
+    });
+  }
+  function ratOf(c){
+    var lr=liveRat[c.name];
+    if(lr) return '2ГИС <b>'+mNum1(lr.rating)+'</b>'+(lr.reviews?' ('+mNum(lr.reviews)+')':'')+' <span style="font-size:10px;color:#10a05a">live</span>';
+    return ((REVIEWS[c.name]||{}).rating)||c.rating;
+  }
   var cols=['Компания','Точки','Соцсети / подписчики','Рейтинг','Программа лояльности','Онлайн-заказ'];
   var th=cols.map(function(c){ return '<th>'+c+'</th>'; }).join('');
   var trs=COMPETITORS.map(function(c){
-    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+c.points+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+(((REVIEWS[c.name]||{}).rating)||c.rating)+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
+    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+c.points+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+ratOf(c)+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
   }).join('');
   function r(k,v){ return v?'<dt>'+k+'</dt><dd>'+v+'</dd>':''; }
   var cards=COMPETITORS.map(function(c){
     return '<div class="mkt-comp-card'+(c.us?' mkt-comp-us':'')+'">'+
       '<div class="mkt-comp-h">'+c.name+(c.us?' <span class="mkt-badge">это мы</span>':'')+'</div>'+
       (c.site?'<div class="mkt-comp-site"><a href="https://'+c.site+'" target="_blank" rel="noopener">'+c.site+'</a></div>':'')+
-      '<dl class="mkt-comp-dl">'+ r('Точки',c.points)+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',((REVIEWS[c.name]||{}).rating)||c.rating)+r('Хвалят (отзывы)',(REVIEWS[c.name]||{}).pros)+r('Ругают (отзывы)',(REVIEWS[c.name]||{}).cons)+
+      '<dl class="mkt-comp-dl">'+ r('Точки',c.points)+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',ratOf(c))+r('Хвалят (отзывы)',(REVIEWS[c.name]||{}).pros)+r('Ругают (отзывы)',(REVIEWS[c.name]||{}).cons)+
       (c.strong?'<dt class="ok">Сильные стороны</dt><dd>'+c.strong+'</dd>':'')+
       (c.weak?'<dt class="bad">Слабые стороны</dt><dd>'+c.weak+'</dd>':'')+ '</dl></div>';
   }).join('');
@@ -5010,6 +5026,8 @@ function mktLoadYoY(){
     try { renderDemand(d); } catch(_){}
     // Воронка лояльности — реальная mini-воронка из Метрики+1С (заменили выдуманную).
     try { renderFunnel(d); } catch(_){}
+    // Конкуренты — оверлей live-рейтингов 2ГИС (кабинет «Сравнение») на ресёрч-снимок.
+    try { renderCompetitors(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){
