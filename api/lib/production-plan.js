@@ -45,7 +45,12 @@ async function qStock() {
     + ` ИЗ РегистрНакопления.ТоварыНаСкладах.Остатки(, Склад.Код В (${wh})) КАК Ост`
     + ' СГРУППИРОВАТЬ ПО Ост.Склад.Код, Ост.Номенклатура.Код, Ост.Номенклатура.Наименование'
     + ' ИМЕЮЩИЕ СУММА(Ост.КоличествоОстаток) <> 0';
-  return (await upp.callQuery(q, { timeoutMs: 90000 })).rows || [];
+  const rows = (await upp.callQuery(q, { timeoutMs: 90000 })).rows || [];
+  // ЗАЩИТА ОТ ВЫДУМАННЫХ ДАННЫХ: остаток по 4 складам НИКОГДА не бывает пустым.
+  // Пустой ответ = сбой 1С/BSL. Без этого все остатки стали бы 0 → ложный план
+  // «производить всё». Бросаем ошибку → честное «нет данных», а не фейковый план.
+  if (rows.length === 0) throw new Error('1С вернула пустой остаток (0 строк) — данные недоступны; план не строится (защита от выдуманных данных)');
+  return rows;
 }
 async function qShipDaily(from, to) {
   const q = 'ВЫБРАТЬ НАЧАЛОПЕРИОДА(Т.Ссылка.Дата,ДЕНЬ) КАК День, Т.Номенклатура.Код КАК Код, Т.Номенклатура.Наименование КАК Имя,'
@@ -87,7 +92,7 @@ async function pressForDate(target) {
   const mDays = [addDays(target, -7), addDays(target, -14), addDays(target, -21)];
   const oT = addDays(target, 1);
   const oDays = [addDays(oT, -7), addDays(oT, -14), addDays(oT, -21)];
-  return { M: weekdayAvg(shipMap, mDays), O: weekdayAvg(shipMap, oDays), names };
+  return { M: weekdayAvg(shipMap, mDays), O: weekdayAvg(shipMap, oDays), names, shipRows: rows.length };
 }
 
 async function compute(dateStr, opts) {
@@ -187,11 +192,19 @@ async function compute(dateStr, opts) {
     ceh.push({ name, items, task: items.reduce((s, x) => s + x.task, 0), deficit: items.filter(x => x.task > 0).length });
   }
 
+  // Предупреждения о неполноте/контексте данных — чтобы НЕ принять прогноз/неполноту за факт.
+  const warnings = [];
+  if (press.shipRows === 0) warnings.push('Нет данных отгрузки в магазины за 3 недели до этой даты — прогноз спроса (Отгрузка завтра/послезавтра) недоступен. Показан только остаток; задания от спроса не строятся.');
+  const now = new Date();
+  const todayN = now.getUTCFullYear() * 10000 + (now.getUTCMonth() + 1) * 100 + now.getUTCDate();
+  const targetN = target.y * 10000 + target.m * 100 + target.d;
+  if (targetN < todayN) warnings.push('Дата в прошлом: остаток показан ТЕКУЩИЙ (из 1С сейчас), а не на выбранную дату — цифры остатка будут отличаться от того дня.');
+
   return {
     date: dateStr, weekday: weekdayRu(target), nextWeekday: weekdayRu(next),
-    yoy, ceh,
+    yoy, ceh, warnings,
     totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits), skippedNonPlan },
-    note: 'Онлайн-расчёт из 1С. Остаток — текущий; M/O — среднее отгрузки А00000130→магазины по дню недели за 3 нед. Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы/Выходные не учтены (ручные у Маши).',
+    note: 'Онлайн-расчёт из 1С. Остаток — текущий; «Отгрузка завтра/послезавтра» — ПРОГНОЗ (среднее отгрузки А00000130→магазины по дню недели за 3 нед). Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы/Выходные не учтены (ручные у Маши).',
     refreshedAt: new Date().toISOString()
   };
 }

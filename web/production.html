@@ -35,6 +35,9 @@
   @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
   .yoycol{color:var(--warn)}
   #err{color:var(--bad);padding:10px}
+  .warnbox{background:rgba(217,165,40,.12);border:1px solid #6b5518;color:#e8c35a;
+    border-radius:9px;padding:8px 12px;margin:6px 0;font-size:12.5px;line-height:1.45}
+  .fc{font-size:9px;color:var(--warn);font-weight:600;letter-spacing:.3px}
   .note{color:var(--muted);font-size:11px;margin-top:10px;line-height:1.5}
 </style>
 </head>
@@ -54,6 +57,7 @@
     </div>
   </header>
   <div class="kpis" id="kpis"></div>
+  <div id="warn"></div>
   <div id="err"></div>
   <div id="tbl"></div>
   <div class="note" id="note"></div>
@@ -76,13 +80,19 @@ function render(d){
   document.getElementById('sub').innerHTML='на <b>'+d.date+'</b> ('+d.weekday+') · послезавтра '+d.nextWeekday+
     ' · <span class="dot"></span>обновлено '+new Date(d.refreshedAt).toLocaleTimeString('ru');
   var t=d.totals||{};
+  // баннер предупреждений о неполноте/контексте данных (защита от «принять неполное за факт»)
+  var warns=(d.warnings||[]).slice();
+  if(t.skippedNonPlan) warns.push('Отброшено '+t.skippedNonPlan+' позиций не из планового списка (упаковка/брак/компоненты) — это норма, в план идут только продукты Маши.');
+  document.getElementById('warn').innerHTML = warns.length
+    ? warns.map(function(w){return '<div class="warnbox">⚠️ '+w+'</div>';}).join('') : '';
   document.getElementById('kpis').innerHTML=
     kpi(t.skus,'позиций')+kpi(t.deficitCount,'в дефиците',(t.deficitCount?'neg':''))+
     kpi(n1(t.taskUnits),'к выпуску, шт','task');
   var yoyTh = YOY? '<th class="yoycol">Год назад</th><th class="yoycol">Δ спрос</th>':'';
   var h='<div style="max-height:72vh;overflow:auto"><table><thead><tr>'+
     '<th>Наименование</th><th>ГП</th><th>Запас</th><th>Конт.</th><th>Сайт↓</th>'+
-    '<th>Отгр.<br>завтра</th><th>После-<br>завтра</th><th>Сайт<br>п/з</th>'+
+    '<th title="прогноз: среднее отгрузки по дню недели за 3 нед">Отгр.<br>завтра<br><span class="fc">прогноз</span></th>'+
+    '<th title="прогноз">После-<br>завтра<br><span class="fc">прогноз</span></th><th>Сайт<br>п/з</th>'+
     '<th>Остаток-<br>прогноз</th><th>ИТОГО</th><th>ЗАДАНИЕ</th>'+yoyTh+'</tr></thead><tbody>';
   (d.ceh||[]).forEach(function(c){
     var cols = YOY?13:11;
