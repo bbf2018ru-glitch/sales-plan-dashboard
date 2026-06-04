@@ -480,27 +480,51 @@
     // не дублируем, если уже вставили
     if (smsRow.nextElementSibling?.classList.contains('sms-texts-row')) return;
     const period = currentPeriod();
-    let sa;
+    // sms-attribution: тексты + получатели; sms-audience: распределение по RFM-сегментам
+    // на момент даты рассылки. Тянем параллельно, аудиторию мапим по firstDate.
+    let sa, aud;
     try { sa = await fetchJson('/api/marketing/sms-attribution?period=' + period); } catch (_) { return; }
+    try { aud = await fetchJson('/api/marketing/sms-audience?period=' + period); } catch (_) { aud = null; }
     const camps = (sa && sa.campaigns) || [];
     if (!camps.length) return;
+    const audMap = new Map();
+    for (const a of (aud?.campaigns || [])) audMap.set(a.firstDate + '|' + (a.text || '').slice(0, 50), a.audience);
     const colCount = smsRow.children.length || 5;
     const typeLabel = { 'A': 'продукт+срок', 'A*': 'всё+срок', 'B': 'ссылка', 'C': 'оценка' };
-    const rowsHtml = camps.map(c => `<tr>
-      <td style="white-space:nowrap;color:var(--muted,#64748b)">${esc(c.firstDate || '')}</td>
-      <td style="text-align:right">${(c.recipients || 0).toLocaleString('ru-RU')}</td>
-      <td><span style="font-size:10px;color:var(--muted,#64748b)">${esc(typeLabel[c.type] || c.type || '')}</span></td>
-      <td style="font-size:11px">${esc(c.text || '')}</td>
-    </tr>`).join('');
+    const audCell = (a) => {
+      if (!a || !a.total) return '<span style="color:var(--muted,#64748b)">—</span>';
+      const parts = [];
+      if (a.VIP) parts.push(`<span style="color:#a855f7" title="≤90д + ≥10к₽ за 365д">🏆 ${a.VIP} VIP</span>`);
+      if (a.active) parts.push(`<span style="color:#22c55e" title="покупка ≤90 дней">🟢 ${a.active} акт.</span>`);
+      if (a.sleeping) parts.push(`<span style="color:#f59e0b" title="покупка 90–365 дней назад">🟡 ${a.sleeping} спящ.</span>`);
+      if (a.cold) parts.push(`<span style="color:#94a3b8" title=">365д или не было покупок">⚪ ${a.cold} хол.</span>`);
+      return parts.join(' · ');
+    };
+    const rowsHtml = camps.map(c => {
+      const a = audMap.get(c.firstDate + '|' + (c.text || '').slice(0, 50));
+      return `<tr>
+        <td style="white-space:nowrap;color:var(--muted,#64748b);vertical-align:top">${esc(c.firstDate || '')}</td>
+        <td style="text-align:right;vertical-align:top">${(c.recipients || 0).toLocaleString('ru-RU')}</td>
+        <td style="vertical-align:top"><span style="font-size:10px;color:var(--muted,#64748b)">${esc(typeLabel[c.type] || c.type || '')}</span></td>
+        <td style="font-size:11px;vertical-align:top">
+          <div>${esc(c.text || '')}</div>
+          <div style="margin-top:4px;font-size:10px">${audCell(a)}</div>
+        </td>
+      </tr>`;
+    }).join('');
+    const audNote = aud
+      ? `<div style="font-size:10px;color:var(--muted,#64748b);margin-top:6px">Сегменты считаем на момент даты рассылки. VIP = покупка ≤90д + ≥10к₽ за 365д. Активный = покупка ≤90д. Спящий = 90–365д. Холодный = &gt;365д или без покупок (включая новых).</div>`
+      : `<div style="font-size:10px;color:var(--amber,#f59e0b);margin-top:6px">Аудитория ещё не подсчитана (запрос идёт в фоне ~30 сек, обнови страницу).</div>`;
     const insertRow = document.createElement('tr');
     insertRow.className = 'sms-texts-row';
     insertRow.innerHTML = `<td colspan="${colCount}" style="padding:0;background:#fafafa">
       <details style="padding:8px 12px">
         <summary style="cursor:pointer;font-size:12px;color:#555">📝 Содержание рассылок за месяц (${camps.length})</summary>
         <div style="margin-top:8px;overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">
-          <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст</th></tr></thead>
+          <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст / Аудитория</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table></div>
+        ${audNote}
       </details>
     </td>`;
     smsRow.parentNode.insertBefore(insertRow, smsRow.nextSibling);

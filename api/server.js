@@ -964,6 +964,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── SMS-аудитория: распределение получателей рассылки по RFM-сегментам ──
+    // на момент даты рассылки. Тяжёлый запрос (1 на кампанию × ~3-5с), кэш 6ч.
+    if (pathname === '/api/marketing/sms-audience' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        const smsAudience = require('./lib/sms-audience');
+        sendJson(res, 200, await smsAudience.getSmsAudience(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     if (pathname === '/api/marketing/sms-monthly' && req.method === 'GET') {
       // Помесячный обзор SMS (итоги из getSmsAttribution по месяцам, фоновый прогрев).
       try {
