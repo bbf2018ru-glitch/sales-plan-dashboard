@@ -92,10 +92,37 @@ function categoryCond(products) {
   return '(' + pats.map((p) => `ВЫРАЗИТЬ(Т.Номенклатура.НоменклатурнаяГруппа.Наименование КАК СТРОКА(100)) ПОДОБНО "${p}"`).join(' ИЛИ ') + ')';
 }
 
-// Склад готовой продукции (канал доставки). Для рассылок про ДОСТАВКУ покупки считаем
-// ТОЛЬКО по этому складу — иначе в атрибуцию попадает розничный «хвост» (получатель купил
-// в обычной точке, а не доставкой). Код проверен в 1С (Справочник.Склады).
-const DELIVERY_STORE = 'А00000011'; // «Склад готовой продукции»
+// Привязка рассылки к КОНКРЕТНОЙ точке/каналу. Если рассылка адресная (про доставку или
+// про конкретную точку), покупки считаем ТОЛЬКО по этому складу — иначе в атрибуцию падает
+// «хвост» (получатель купил в другом месте, а не по акции). Коды точек проверены в 1С.
+// Список курируемый и КОНСЕРВАТИВНЫЙ: только различимые названия-локации (без неоднозначных
+// «Сезон»/«Солнце»/«Новый рынок» — чтобы общие рассылки не привязывались ложно).
+const STORE_FILTERS = [
+  { kw: /доставк/i, code: 'А00000011', label: 'доставка · только склад ГП' },
+  { kw: /ядринцева/i, code: 'А00000131', label: 'только точка Ядринцева,90' },
+  { kw: /союз/i, code: 'ЦБ0000003', label: 'только точка Союз' },
+  { kw: /лермонтов/i, code: 'А00000116', label: 'только точка Лермонтова' },
+  { kw: /депутатск/i, code: 'А00000148', label: 'только точка Депутатская' },
+  { kw: /цимлянск/i, code: 'А00000093', label: 'только точка Цимлянская' },
+  { kw: /энергетик/i, code: 'А00000149', label: 'только точка Энергетиков' },
+  { kw: /юбилейн/i, code: 'А00000101', label: 'только точка Юбилейный' },
+  { kw: /ржанов/i, code: 'ЦБ0000014', label: 'только точка Ржанова' },
+  { kw: /пушкин/i, code: 'ЦБ0000001', label: 'только точка Пушкина' },
+  { kw: /декабрьск/i, code: 'А00000050', label: 'только точка Декабрьских Событий' },
+  { kw: /лисих/i, code: 'А00000167', label: 'только точка Нижняя Лисиха' },
+  { kw: /премьер/i, code: 'ЦБ0000013', label: 'только точка Премьер БЦ' },
+  { kw: /ангарск/i, code: 'А00000134', label: 'только точка Ангарск' },
+  { kw: /солнечн/i, code: 'А00000110', label: 'только точка Солнечный' }
+];
+// Возвращает {code,label} если рассылка адресная (доставка приоритетна; для точек — ровно
+// одна совпавшая, иначе считаем рассылку общей и не фильтруем).
+function detectStoreFilter(text) {
+  const t = String(text || '');
+  if (/доставк/i.test(t)) return STORE_FILTERS[0];
+  const hits = STORE_FILTERS.slice(1).filter((s) => s.kw.test(t));
+  const codes = [...new Set(hits.map((h) => h.code))];
+  return codes.length === 1 ? hits[0] : null;
+}
 
 // Подзапрос: УНИКАЛЬНЫЕ получатели кампании (по набору дат-отправок). Используется как
 // фильтр IN на стороне чеков — это убирает умножение выручки на число ресендов
@@ -106,24 +133,24 @@ function recipIn(dts) {
 
 // Конверсия по КАТЕГОРИИ (ЧекККМ.Товары) для набора дат-отправок dts в окне [from..to].
 // Считается со стороны ЧЕКОВ (распределённые получатели в IN) — без умножения на ресенды.
-function categoryQuery(dts, from, to, products, delivery) {
+function categoryQuery(dts, from, to, products, storeCode) {
   const cat = categoryCond(products);
   return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка.ДисконтнаяКарта) КАК Купили,'
     + ' СУММА(ЕСТЬNULL(Т.Сумма,0)) КАК Выручка'
     + ' ИЗ Документ.ЧекККМ.Товары КАК Т'
     + ` ГДЕ Т.Ссылка.Дата >= ${from} И Т.Ссылка.Дата <= ${to} И Т.Ссылка.Проведен`
     + (cat ? ' И ' + cat : '')
-    + (delivery ? ` И Т.Ссылка.Склад.Код = "${DELIVERY_STORE}"` : '')
+    + (storeCode ? ` И Т.Ссылка.Склад.Код = "${storeCode}"` : '')
     + ` И Т.Ссылка.ДисконтнаяКарта В ${recipIn(dts)}`;
 }
 
 // Конверсия по ЛЮБОЙ покупке (ЧекККМ header) — для «на всё» и Тип C.
-function anyPurchaseQuery(dts, from, to, delivery) {
+function anyPurchaseQuery(dts, from, to, storeCode) {
   return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Чек.ДисконтнаяКарта) КАК Купили,'
     + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК Выручка'
     + ' ИЗ Документ.ЧекККМ КАК Чек'
     + ` ГДЕ Чек.Дата >= ${from} И Чек.Дата <= ${to} И Чек.Проведен`
-    + (delivery ? ` И Чек.Склад.Код = "${DELIVERY_STORE}"` : '')
+    + (storeCode ? ` И Чек.Склад.Код = "${storeCode}"` : '')
     + ` И Чек.ДисконтнаяКарта В ${recipIn(dts)}`;
 }
 
@@ -194,26 +221,27 @@ async function compute(period) {
       firstDate: `${pad(first.d)}.${pad(first.m)}.${first.y}`,
       endDate: offer.end ? `${pad(offer.end.d)}.${pad(offer.end.m)}.${offer.end.y}` : null
     };
-    const isDelivery = /доставк/i.test(g.text);
+    const storeFilter = detectStoreFilter(g.text);   // адресная рассылка → фильтр по складу
+    const storeCode = storeFilter ? storeFilter.code : null;
+    const delNote = storeFilter ? ' · ' + storeFilter.label : '';
     // Уникальные получатели кампании — один раз (для конверсии и затрат, без дублей-ресендов).
     let recipients = g.sends;
     try { recipients = upp.parseRu((await upp.callQuery(uniqueRecipQuery(g.dts))).rows[0].У) || g.sends; } catch (_) {}
-    const delNote = isDelivery ? ' · доставка (только склад ГП)' : '';
     try {
       if (offer.end && !offer.isAll && offer.products.length) {
         // Тип A: продукт + срок.
-        const a = buyRow(recipients, await upp.callQuery(categoryQuery(g.dts, dayLit(first), dayLit(offer.end, true), offer.products, isDelivery), { timeoutMs: 50000 }));
+        const a = buyRow(recipients, await upp.callQuery(categoryQuery(g.dts, dayLit(first), dayLit(offer.end, true), offer.products, storeCode), { timeoutMs: 50000 }));
         const Ld = Math.max(1, Math.round((Date.UTC(offer.end.y, offer.end.m - 1, offer.end.d) - Date.UTC(first.y, first.m - 1, first.d)) / 86400000));
         let lift = {};
-        try { const bl = buyRow(recipients, await upp.callQuery(categoryQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), offer.products, isDelivery), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
-        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории' + delNote, isDelivery, ...a, ...lift });
+        try { const bl = buyRow(recipients, await upp.callQuery(categoryQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), offer.products, storeCode), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
+        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории' + delNote, storeFilter: storeFilter ? storeFilter.label : null, ...a, ...lift });
       } else if (offer.end && offer.isAll) {
         // Тип A «всё» + срок: любая покупка в окне.
-        const a = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true), isDelivery), { timeoutMs: 50000 }));
+        const a = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true), storeCode), { timeoutMs: 50000 }));
         const Ld = Math.max(1, Math.round((Date.UTC(offer.end.y, offer.end.m - 1, offer.end.d) - Date.UTC(first.y, first.m - 1, first.d)) / 86400000));
         let lift = {};
-        try { const bl = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), isDelivery), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
-        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)' + delNote, isDelivery, ...a, ...lift });
+        try { const bl = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), storeCode), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
+        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)' + delNote, storeFilter: storeFilter ? storeFilter.label : null, ...a, ...lift });
       } else if (offer.hasLink) {
         // Тип B: ссылка — переходы из Метрики. clck.ru/код→clckid→визиты резолвит серверный
         // скрейпер (браузером, сервер ловит капчу) и кладёт в sms-clicks.json.byCode[код].
@@ -234,8 +262,8 @@ async function compute(period) {
       } else {
         // Тип C: нет срока и ссылки — запасное окно, любая покупка (оценка).
         const to = plusDays(first, FALLBACK_DAYS);
-        const a = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(to, true), isDelivery), { timeoutMs: 50000 }));
-        campaigns.push({ ...base, type: 'C', product: '—', metric: 'любая покупка, окно ' + FALLBACK_DAYS + 'д (оценка)', ...a });
+        const a = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(to, true), storeCode), { timeoutMs: 50000 }));
+        campaigns.push({ ...base, type: 'C', product: '—', metric: 'любая покупка, окно ' + FALLBACK_DAYS + 'д (оценка)' + delNote, storeFilter: storeFilter ? storeFilter.label : null, ...a });
       }
     } catch (e) {
       campaigns.push({ ...base, type: '?', error: e.message, recipients, buyers: null, revenue: null, conversionPct: null, avgCheck: null });
