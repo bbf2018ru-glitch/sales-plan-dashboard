@@ -5,3 +5,5 @@ data/db.json
 data/sms-*.txt
 data/sms-*.csv
 
+
+docs/
