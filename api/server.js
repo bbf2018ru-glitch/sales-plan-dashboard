@@ -964,6 +964,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === '/api/marketing/sms-monthly' && req.method === 'GET') {
+      // Помесячный обзор SMS (итоги из getSmsAttribution по месяцам, фоновый прогрев).
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, smsAttribution.getSmsMonthly(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Маркетинговая аналитика — pack 1 (zombie/cannibalization/rfm/holiday-yoy) ──
     // По решению пользователя 03.06.2026 — открыты без admin-guard (как channels):
     // данные агрегатные, без персоналки. RFM показывает количества сегментов,

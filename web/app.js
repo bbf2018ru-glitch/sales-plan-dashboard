@@ -4577,6 +4577,27 @@ function renderSmsAttribution(sa){
   if(sa.methodNote) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+sa.methodNote+'</div>';
   el.innerHTML=html;
 }
+// SMS помесячно — итоги по месяцам (из тех же getSmsAttribution.totals, консистентно).
+function renderSmsMonthly(sm){
+  var el=document.getElementById('mktSmsMonthly'); if(!el) return;
+  if(!sm || !sm.months){ el.innerHTML=''; return; }
+  var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  var ready=sm.months.filter(function(m){return !m._pending;});
+  if(!ready.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячные итоги SMS прогреваются из 1С (~10 сек/мес). Обнови страницу через минуту.</div>'; return; }
+  var rec=0,cost=0,buy=0,rev=0;
+  var rows=sm.months.map(function(m){
+    var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
+    if(m._pending) return '<tr><td>'+lbl+'</td><td class="num" colspan="6" style="color:var(--muted);text-align:left">прогрев…</td></tr>';
+    rec+=m.recipients||0; cost+=m.cost||0; buy+=m.buyers||0; rev+=m.revenue||0;
+    var cc=m.conversionPct>=10?'#10a05a':(m.conversionPct>=3?'#b8860b':'#e0466a');
+    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.campaigns)+'</td><td class="num">'+mNum(m.recipients)+'</td><td class="num">'+mNum(m.cost)+'</td><td class="num">'+mNum(m.buyers)+'</td><td class="num">'+(m.revenue?mNum(m.revenue):'—')+'</td><td class="num" style="color:'+cc+'">'+mNum1(m.conversionPct||0)+' %</td></tr>';
+  }).reverse().join('');
+  var tconv=rec?Math.round(buy/rec*1000)/10:0;
+  el.innerHTML='<table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Рассылок</th><th class="num">Получателей</th><th class="num">Затраты ₽</th><th class="num">Купили/перешли</th><th class="num">Выручка ₽</th><th class="num">Конверсия</th></tr></thead><tbody>'+rows+
+    '<tr class="mkt-total"><td>Итого</td><td class="num">—</td><td class="num">'+mNum(rec)+'</td><td class="num">'+mNum(cost)+'</td><td class="num">'+mNum(buy)+'</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum1(tconv)+' %</td></tr>'+
+    '</tbody></table>'+
+    (sm.monthsPending?'<div style="font-size:11px;color:var(--muted);margin-top:4px">'+sm.monthsPending+' мес. ещё прогреваются (тяжёлый расчёт атрибуции). Обнови позже.</div>':'');
+}
 // Выпуск продукции в кг — KPI + график 12 мес + топ продукции.
 function renderProductionKg(pk){
   var el=document.getElementById('mktProdKgKpi'); if(!el) return;
@@ -5133,6 +5154,11 @@ function mktLoadYoY(){
       smsAttrEl.innerHTML='<div class="mkt-yoy-load">Считаю атрибуцию рассылок из 1С (~10 сек)…</div>';
       fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ _mktSms=sa; renderSmsAttribution(sa); })
         .catch(function(e){ smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>'; });
+    }
+    // SMS помесячно — обзор по месяцам (лёгкий: итоги из кэша sms-attribution + фон-прогрев).
+    var smsMEl=document.getElementById('mktSmsMonthly');
+    if(smsMEl){ smsMEl.innerHTML='<div class="mkt-yoy-load">Собираю помесячные итоги SMS…</div>';
+      fetchJson('/api/marketing/sms-monthly?period='+period).then(function(sm){ renderSmsMonthly(sm); }).catch(function(){ smsMEl.innerHTML=''; });
     }
     // «Сладкий чек» — детализация (участники/пришло/задания/покупки) из 1С, отдельный эндпоинт (~5с).
     fetchJson('/api/marketing/sweet-detail?period='+period).then(function(sd){ try{ renderSweetDetail(sd); }catch(_){} }).catch(function(){});

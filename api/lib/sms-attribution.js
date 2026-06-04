@@ -259,4 +259,31 @@ function getSmsAttribution(period) {
   return cache.wrap('sms2:' + p, () => compute(p));
 }
 
-module.exports = { getSmsAttribution };
+// Помесячный обзор SMS (Янв текущего года … выбранный месяц). Берёт ИТОГИ из того же
+// getSmsAttribution по каждому месяцу (полная консистентность с детальным блоком).
+// Некэшированные месяцы греются в фоне (non-blocking) — отдаём что есть сейчас.
+function getSmsMonthly(period) {
+  const p = period || upp.nowYM();
+  const [y, m] = p.split('-').map(Number);
+  const months = [];
+  for (let mm = 1; mm <= m; mm++) months.push(`${y}-${pad(mm)}`);
+  let pending = 0;
+  const out = months.map((ym) => {
+    const c = cache.getCached('sms2:' + ym);
+    if (!c) {
+      pending++;
+      if (!cache.isPending('sms2:' + ym)) getSmsAttribution(ym).then(() => {}).catch(() => {});
+      return { ym, _pending: true };
+    }
+    const t = c.totals || {};
+    return {
+      ym, campaigns: c.campaignsCount || 0,
+      recipients: t.recipients || 0, sends: t.sends || 0, cost: t.cost || 0,
+      buyers: t.buyers || 0, revenue: t.revenue || 0, conversionPct: t.conversionPct || 0,
+      sweetReg: t.sweetReg || 0, incremental: t.incremental || 0
+    };
+  });
+  return { period: p, months: out, monthsPending: pending, smsPrice: Number(process.env.MKT_SMS_PRICE) || 8.5 };
+}
+
+module.exports = { getSmsAttribution, getSmsMonthly };
