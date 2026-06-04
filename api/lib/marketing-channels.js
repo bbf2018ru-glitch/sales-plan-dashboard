@@ -331,26 +331,35 @@ async function compute(period) {
     promos,
     topProducts,
     categories,
-    external: {
-      gis: readExternal('2gis.json'),
-      gisHistory: readExternal('2gis-history.json'),
-      direct: readExternal('direct.json'),
-      directHistory: readExternal('direct-history.json'),
-      metrika: readExternal('metrika.json'),
-      metrikaHistory: readExternal('metrika-history.json'),
-      seo: readExternal('seo.json'),
-      prices: readExternal('prices.json'),
-      social: readExternal('social.json'),
-      bloggers: readExternal('bloggers.json'),
-      partners: readExternal('partners.json')
-    },
+    external: externalBlock(),
     refreshedAt: new Date().toISOString()
+  };
+}
+
+// Внешние JSON от скрейперов (2ГИС/Директ/Метрика/…) — дешёвые чтения файлов.
+// Читаем ВНЕ 6-часового кэша getChannels, чтобы обновления скрейперов (cron)
+// появлялись в дашборде сразу, а не через TTL.
+function externalBlock() {
+  return {
+    gis: readExternal('2gis.json'),
+    gisHistory: readExternal('2gis-history.json'),
+    direct: readExternal('direct.json'),
+    directHistory: readExternal('direct-history.json'),
+    metrika: readExternal('metrika.json'),
+    metrikaHistory: readExternal('metrika-history.json'),
+    seo: readExternal('seo.json'),
+    prices: readExternal('prices.json'),
+    social: readExternal('social.json'),
+    bloggers: readExternal('bloggers.json'),
+    partners: readExternal('partners.json')
   };
 }
 
 function getChannels(period) {
   const p = period || nowYM();
-  return cache.wrap('ch:' + p, () => compute(p));
+  const r = cache.wrap('ch:' + p, () => compute(p));
+  // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
+  return Object.assign({}, r, { external: externalBlock() });
 }
 
 // Фоновый прогрев кэша (вызывается из server.js по интервалу).
