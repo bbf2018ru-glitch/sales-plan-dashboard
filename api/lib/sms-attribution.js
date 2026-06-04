@@ -92,30 +92,39 @@ function categoryCond(products) {
   return '(' + pats.map((p) => `ВЫРАЗИТЬ(Т.Номенклатура.НоменклатурнаяГруппа.Наименование КАК СТРОКА(100)) ПОДОБНО "${p}"`).join(' ИЛИ ') + ')';
 }
 
+// Склад готовой продукции (канал доставки). Для рассылок про ДОСТАВКУ покупки считаем
+// ТОЛЬКО по этому складу — иначе в атрибуцию попадает розничный «хвост» (получатель купил
+// в обычной точке, а не доставкой). Код проверен в 1С (Справочник.Склады).
+const DELIVERY_STORE = 'А00000011'; // «Склад готовой продукции»
+
+// Подзапрос: УНИКАЛЬНЫЕ получатели кампании (по набору дат-отправок). Используется как
+// фильтр IN на стороне чеков — это убирает умножение выручки на число ресендов
+// (раньше JOIN П×Товары давал ×N для тех, кому рассылку слали несколько раз).
+function recipIn(dts) {
+  return '(ВЫБРАТЬ РАЗЛИЧНЫЕ П.Получатель КАК К ИЗ Документ.SMSСообщение.Получатели КАК П ГДЕ П.Ссылка.Дата В (' + dts.map(dtLit).join(', ') + '))';
+}
+
 // Конверсия по КАТЕГОРИИ (ЧекККМ.Товары) для набора дат-отправок dts в окне [from..to].
-function categoryQuery(dts, from, to, products) {
-  const inList = dts.map(dtLit).join(', ');
+// Считается со стороны ЧЕКОВ (распределённые получатели в IN) — без умножения на ресенды.
+function categoryQuery(dts, from, to, products, delivery) {
   const cat = categoryCond(products);
-  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей,'
-    + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ВЫБОР КОГДА Т.Ссылка ЕСТЬ НЕ NULL ТОГДА П.Получатель КОНЕЦ) КАК Купили,'
+  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка.ДисконтнаяКарта) КАК Купили,'
     + ' СУММА(ЕСТЬNULL(Т.Сумма,0)) КАК Выручка'
-    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
-    + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ЧекККМ.Товары КАК Т ПО Т.Ссылка.ДисконтнаяКарта = П.Получатель'
-    + ` И Т.Ссылка.Дата >= ${from} И Т.Ссылка.Дата <= ${to}`
+    + ' ИЗ Документ.ЧекККМ.Товары КАК Т'
+    + ` ГДЕ Т.Ссылка.Дата >= ${from} И Т.Ссылка.Дата <= ${to} И Т.Ссылка.Проведен`
     + (cat ? ' И ' + cat : '')
-    + ` ГДЕ П.Ссылка.Дата В (${inList})`;
+    + (delivery ? ` И Т.Ссылка.Склад.Код = "${DELIVERY_STORE}"` : '')
+    + ` И Т.Ссылка.ДисконтнаяКарта В ${recipIn(dts)}`;
 }
 
 // Конверсия по ЛЮБОЙ покупке (ЧекККМ header) — для «на всё» и Тип C.
-function anyPurchaseQuery(dts, from, to) {
-  const inList = dts.map(dtLit).join(', ');
-  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей,'
-    + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ВЫБОР КОГДА Чек.Ссылка ЕСТЬ НЕ NULL ТОГДА П.Получатель КОНЕЦ) КАК Купили,'
+function anyPurchaseQuery(dts, from, to, delivery) {
+  return 'ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Чек.ДисконтнаяКарта) КАК Купили,'
     + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК Выручка'
-    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
-    + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ЧекККМ КАК Чек ПО Чек.ДисконтнаяКарта = П.Получатель'
-    + ` И Чек.Дата >= ${from} И Чек.Дата <= ${to}`
-    + ` ГДЕ П.Ссылка.Дата В (${inList})`;
+    + ' ИЗ Документ.ЧекККМ КАК Чек'
+    + ` ГДЕ Чек.Дата >= ${from} И Чек.Дата <= ${to} И Чек.Проведен`
+    + (delivery ? ` И Чек.Склад.Код = "${DELIVERY_STORE}"` : '')
+    + ` И Чек.ДисконтнаяКарта В ${recipIn(dts)}`;
 }
 
 // Регистрации в «Сладком чеке» среди получателей: карты, чьё ПЕРВОЕ участие в регистре
@@ -138,9 +147,11 @@ function uniqueRecipQuery(dts) {
     + ` ГДЕ П.Ссылка.Дата В (${inList})`;
 }
 
-function row1(res) {
+// Получателей считаем отдельно (uniqueRecipQuery, уникальные карты-цели), покупки/выручку —
+// из запроса со стороны чеков. conversionPct = купили / уникальные получатели.
+function buyRow(recipients, res) {
   const r = (res && res.rows && res.rows[0]) || {};
-  const recipients = upp.parseRu(r.Получателей), buyers = upp.parseRu(r.Купили), revenue = upp.parseRu(r.Выручка);
+  const buyers = upp.parseRu(r.Купили), revenue = upp.parseRu(r.Выручка);
   return { recipients, buyers, revenue, conversionPct: recipients ? Math.round(buyers / recipients * 1000) / 10 : 0, avgCheck: buyers ? Math.round(revenue / buyers) : 0 };
 }
 
@@ -183,21 +194,26 @@ async function compute(period) {
       firstDate: `${pad(first.d)}.${pad(first.m)}.${first.y}`,
       endDate: offer.end ? `${pad(offer.end.d)}.${pad(offer.end.m)}.${offer.end.y}` : null
     };
+    const isDelivery = /доставк/i.test(g.text);
+    // Уникальные получатели кампании — один раз (для конверсии и затрат, без дублей-ресендов).
+    let recipients = g.sends;
+    try { recipients = upp.parseRu((await upp.callQuery(uniqueRecipQuery(g.dts))).rows[0].У) || g.sends; } catch (_) {}
+    const delNote = isDelivery ? ' · доставка (только склад ГП)' : '';
     try {
       if (offer.end && !offer.isAll && offer.products.length) {
         // Тип A: продукт + срок.
-        const a = row1(await upp.callQuery(categoryQuery(g.dts, dayLit(first), dayLit(offer.end, true), offer.products), { timeoutMs: 50000 }));
+        const a = buyRow(recipients, await upp.callQuery(categoryQuery(g.dts, dayLit(first), dayLit(offer.end, true), offer.products, isDelivery), { timeoutMs: 50000 }));
         const Ld = Math.max(1, Math.round((Date.UTC(offer.end.y, offer.end.m - 1, offer.end.d) - Date.UTC(first.y, first.m - 1, first.d)) / 86400000));
         let lift = {};
-        try { const bl = row1(await upp.callQuery(categoryQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), offer.products), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
-        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории', ...a, ...lift });
+        try { const bl = buyRow(recipients, await upp.callQuery(categoryQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), offer.products, isDelivery), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
+        campaigns.push({ ...base, type: 'A', product: offer.products.map((p) => p.label).join(', '), metric: 'покупка категории' + delNote, isDelivery, ...a, ...lift });
       } else if (offer.end && offer.isAll) {
         // Тип A «всё» + срок: любая покупка в окне.
-        const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true)), { timeoutMs: 50000 }));
+        const a = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(offer.end, true), isDelivery), { timeoutMs: 50000 }));
         const Ld = Math.max(1, Math.round((Date.UTC(offer.end.y, offer.end.m - 1, offer.end.d) - Date.UTC(first.y, first.m - 1, first.d)) / 86400000));
         let lift = {};
-        try { const bl = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first)), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
-        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)', ...a, ...lift });
+        try { const bl = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(plusDays(first, -Ld)), dayLit(first), isDelivery), { timeoutMs: 50000 })); lift = liftOf(a, bl); } catch (_) {}
+        campaigns.push({ ...base, type: 'A*', product: 'всё', metric: 'любая покупка (оффер на всё)' + delNote, isDelivery, ...a, ...lift });
       } else if (offer.hasLink) {
         // Тип B: ссылка — переходы из Метрики. clck.ru/код→clckid→визиты резолвит серверный
         // скрейпер (браузером, сервер ловит капчу) и кладёт в sms-clicks.json.byCode[код].
@@ -205,27 +221,24 @@ async function compute(period) {
         const cm = /clck\.ru\/([a-z0-9]+)/i.exec(g.text);
         if (cm && smsClicks.byCode && smsClicks.byCode[cm[1]] != null) clicks = smsClicks.byCode[cm[1]];
         if (cm && smsClicks.codeToUrl) dest = smsClicks.codeToUrl[cm[1]] || '';
-        // Уникальный охват (без дублей-ресендов) — для конверсии и затрат.
-        let uniq = g.sends;
-        try { uniq = upp.parseRu((await upp.callQuery(uniqueRecipQuery(g.dts))).rows[0].У) || g.sends; } catch (_) {}
         // Если ссылка ведёт на /for_clients/ (регистрация в Сладком чеке) — считаем регистрации.
         let sweetReg = null;
         if (/for_clients/i.test(dest)) {
           try { const sr = await upp.callQuery(sweetRegQuery(g.dts, dayLit(first))); sweetReg = upp.parseRu((sr.rows && sr.rows[0] || {}).Рег); } catch (_) {}
         }
         if (clicks != null) {
-          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients: uniq, buyers: clicks, revenue: null, conversionPct: uniq ? Math.round(clicks / uniq * 1000) / 10 : 0, avgCheck: null, isClicks: true, dest, sweetReg });
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходов по ссылке (Метрика)', recipients, buyers: clicks, revenue: null, conversionPct: recipients ? Math.round(clicks / recipients * 1000) / 10 : 0, avgCheck: null, isClicks: true, dest, sweetReg });
         } else {
-          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients: uniq, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true, dest, sweetReg });
+          campaigns.push({ ...base, type: 'B', product: 'переход по ссылке', metric: 'переходы — пока нет данных Метрики', recipients, buyers: null, revenue: null, conversionPct: null, avgCheck: null, linkPending: true, dest, sweetReg });
         }
       } else {
         // Тип C: нет срока и ссылки — запасное окно, любая покупка (оценка).
         const to = plusDays(first, FALLBACK_DAYS);
-        const a = row1(await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(to, true)), { timeoutMs: 50000 }));
+        const a = buyRow(recipients, await upp.callQuery(anyPurchaseQuery(g.dts, dayLit(first), dayLit(to, true), isDelivery), { timeoutMs: 50000 }));
         campaigns.push({ ...base, type: 'C', product: '—', metric: 'любая покупка, окно ' + FALLBACK_DAYS + 'д (оценка)', ...a });
       }
     } catch (e) {
-      campaigns.push({ ...base, type: '?', error: e.message, recipients: g.sends, buyers: null, revenue: null, conversionPct: null, avgCheck: null });
+      campaigns.push({ ...base, type: '?', error: e.message, recipients, buyers: null, revenue: null, conversionPct: null, avgCheck: null });
     }
   }
 
