@@ -336,6 +336,29 @@ async function compute(period) {
   };
 }
 
+// Поисковые запросы 2ГИС («Спрос») — из секции demand в 2gis-all-sections.json
+// (скрейп scrape-mkt.js, cron daily). Строки head вида «<запрос>\t<доля>%».
+function parseGisDemand() {
+  const all = readExternal('2gis-all-sections.json');
+  const head = all && all.demand && Array.isArray(all.demand.head) ? all.demand.head : null;
+  if (!head) return null;
+  const queries = [];
+  let period = null;
+  for (const line of head) {
+    const mp = /^([А-ЯЁ][а-яё]+\s+\d{4})$/.exec(String(line).trim()); // «Май 2026»
+    if (mp && !period) period = mp[1];
+    const mr = /^(\d{2}\.\d{2}\.\d{4}\s*[–-]\s*\d{2}\.\d{2}\.\d{4})$/.exec(String(line).trim());
+    if (mr) period = mr[1];
+    const m = /^(.+?)\t\s*([\d.,]+)\s*%$/.exec(String(line));
+    if (m) {
+      const pct = parseFloat(m[2].replace(',', '.'));
+      if (isFinite(pct)) queries.push({ q: m[1].trim(), pct });
+    }
+  }
+  if (!queries.length) return null;
+  return { period, queries, scrapedAt: all.scrapedAt || null };
+}
+
 // Внешние JSON от скрейперов (2ГИС/Директ/Метрика/…) — дешёвые чтения файлов.
 // Читаем ВНЕ 6-часового кэша getChannels, чтобы обновления скрейперов (cron)
 // появлялись в дашборде сразу, а не через TTL.
@@ -343,6 +366,7 @@ function externalBlock() {
   return {
     gis: readExternal('2gis.json'),
     gisHistory: readExternal('2gis-history.json'),
+    gisDemand: parseGisDemand(),
     direct: readExternal('direct.json'),
     directHistory: readExternal('direct-history.json'),
     metrika: readExternal('metrika.json'),

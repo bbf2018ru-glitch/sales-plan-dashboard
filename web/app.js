@@ -4886,12 +4886,25 @@ function renderAI(){ var el=document.getElementById('mktAI'); if(!el) return;
   el.innerHTML='<ol class="mkt-ai-list">'+AI_SUMMARY.map(function(x){return '<li><b>'+x[0]+'.</b> '+x[1]+'</li>';}).join('')+'</ol>';
 }
 var DEMAND_2GIS = [['мария',43.5],['мария, кафе-кондитерская',7.4],['торты',5.3],['кондитерские магазины',3.8],['кофейни',3.5],['кофе',3.1],['кондитерская',1.9],['мария кондитерская',1.8],['завтрак',1.2],['кофейня',1.1],['кондитерские',1.1],['торт',1.0],['выпечка',0.8],['кондитерские изделия',0.8],['бенто-торты',0.5],['прочее',20.3]];
-function renderDemand(){
+function renderDemand(d){
   var el=document.getElementById('mktDemand'); if(!el) return;
-  var max=DEMAND_2GIS[0][1];
-  el.innerHTML='<div class="table-wrap"><table><thead><tr><th>Запрос</th><th class="num">Доля</th><th>&nbsp;</th></tr></thead><tbody>'+
-    DEMAND_2GIS.map(function(r){ var w=Math.max(r[1]/max*100,2); return '<tr><td>'+r[0]+'</td><td class="num">'+mNum1(r[1])+' %</td><td style="width:40%"><div class="mkt-dbar" style="width:'+w.toFixed(0)+'%"></div></td></tr>'; }).join('')+'</tbody></table></div>'+
-    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод:</b> ~53 % запросов брендовые («мария» + варианты) — высокая узнаваемость. Родовой спрос (торты, кондитерские, кофейни, кофе, завтрак) — точки роста через SEO и карточку; заметная доля «кофе/кофейни/завтрак» подтверждает кафе-нишу.</div>';
+  // live: поисковые запросы 2ГИС из секции demand (scrape-mkt.js, cron daily)
+  var live=d&&d.external&&d.external.gisDemand;
+  var rows, period=null, isLive=false, st=null;
+  if(live&&live.queries&&live.queries.length){
+    rows=live.queries.map(function(x){return [x.q,x.pct];});
+    period=live.period; isLive=true; st=live.scrapedAt;
+  } else {
+    rows=DEMAND_2GIS;
+  }
+  // доля брендовых («мария»…) для вывода
+  var brand=rows.reduce(function(s,r){ return s + (/мари/i.test(r[0])?r[1]:0); },0);
+  var max=rows[0][1];
+  var scope=isLive ? ('live · 2ГИС'+(period?' · '+period:'')) : 'снимок · апрель 2026';
+  el.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">'+scope+(isLive&&st?' · обновлено '+new Date(st).toLocaleDateString('ru-RU'):'')+'</div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Запрос</th><th class="num">Доля</th><th>&nbsp;</th></tr></thead><tbody>'+
+    rows.map(function(r){ var w=Math.max(r[1]/max*100,2); return '<tr><td>'+r[0]+'</td><td class="num">'+mNum1(r[1])+' %</td><td style="width:40%"><div class="mkt-dbar" style="width:'+w.toFixed(0)+'%"></div></td></tr>'; }).join('')+'</tbody></table></div>'+
+    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод:</b> ~'+mNum1(brand)+' % запросов брендовые («мария» + варианты) — высокая узнаваемость. Родовой спрос (торты, кондитерские, кофейни, кофе, завтрак) — точки роста через SEO и карточку; заметная доля «кофе/кофейни/завтрак» подтверждает кафе-нишу.</div>';
 }
 var _mktInited=false;
 function mktInit(){
@@ -4967,6 +4980,8 @@ function mktLoadYoY(){
     try { renderDirectMonthly(d); } catch(_){}
     // 2ГИС присутствие в выдаче помесячно — live из кабинета (заменили статику).
     try { renderGisMonthly(d); } catch(_){}
+    // Спрос (поисковые запросы 2ГИС) — live из секции demand (заменили снимок апреля).
+    try { renderDemand(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){
