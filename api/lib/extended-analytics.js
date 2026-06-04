@@ -369,9 +369,13 @@ async function buildCakeOfMonthSeries(period) {
     const cached = mc.monthCache.getCached('agg:' + ym);
     let revenue = null, qty = null, sharePct = null;
     if (cached) {
+      // Карта товаров ЭТОГО месяца: сезонный торт (напр. декабрьский «Красный бархат»)
+      // отсутствует в pmap текущего периода → его код не матчился и продажи были 0.
+      let pmapM = pmap;
+      try { pmapM = await mc.getProductMap(ym); } catch (_) { /* фоллбэк на общий pmap */ }
       let catRev = 0, rev = 0, q = 0;
       for (const [code, v] of cached.products) {
-        const meta = pmap[code];
+        const meta = pmapM[code] || pmap[code];
         if (!meta) continue;
         const nm = String(meta.name || '');
         if (!TORT_RE.test(nm) && !TORT_RE.test(meta.group || '')) continue;
