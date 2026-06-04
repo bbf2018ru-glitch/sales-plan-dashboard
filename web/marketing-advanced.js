@@ -529,8 +529,6 @@
     const period = currentPeriod();
     const inner = await fetchPaidSmsData(period);
     if (inner) insertSmsRowIfNeeded(container, inner);
-    // Observer: реагирует на каждый перерендер таблицы (live-обновления и СМЕНА ПЕРИОДА).
-    // При смене периода кэш paidSmsState (lastPeriod) ≠ currentPeriod() → перетягиваем.
     if (!container.__smsObserverArmed) {
       let fetching = false;
       const refresh = async () => {
@@ -539,7 +537,7 @@
           insertSmsRowIfNeeded(container, paidSmsState.html);
           return;
         }
-        if (fetching) return; // защита от гонок
+        if (fetching) return;
         fetching = true;
         try {
           const html = await fetchPaidSmsData(p);
@@ -549,6 +547,88 @@
       const obs = new MutationObserver(refresh);
       obs.observe(container, { childList: true, subtree: true });
       container.__smsObserverArmed = true;
+    }
+  }
+
+  // ─── SMS-атрибуция → колонка «Аудитория» ───────────────────────────────────
+  // app.js рисует таблицу #mktSmsAttr (Рассылка/Оффер/Получ./Купили/.../Затраты).
+  // Дополняем: в КАЖДУЮ строку под текст добавляем распределение по сегментам.
+  // Данные берём из тех же sms-audience и мапим по «DD.MM.YYYY + первые 50 символов текста».
+  let smsAttrState = { audMap: null, lastPeriod: null };
+
+  function audCellHtml(a) {
+    if (!a || !a.total) return '<span style="color:var(--muted)">аудитория ещё считается…</span>';
+    const parts = [];
+    if (a.VIP) parts.push(`<span style="color:#a855f7" title="≤90д + ≥10к₽ за 365д">🏆 ${a.VIP} VIP</span>`);
+    if (a.active) parts.push(`<span style="color:#22c55e" title="покупка ≤90 дней">🟢 ${a.active} акт.</span>`);
+    if (a.sleeping) parts.push(`<span style="color:#f59e0b" title="покупка 90–365 дней назад">🟡 ${a.sleeping} спящ.</span>`);
+    if (a.cold) parts.push(`<span style="color:#94a3b8" title=">365д или не было покупок">⚪ ${a.cold} хол.</span>`);
+    return parts.join(' · ');
+  }
+
+  async function fetchSmsAudMap(period) {
+    if (smsAttrState.lastPeriod === period && smsAttrState.audMap) return smsAttrState.audMap;
+    let aud;
+    try { aud = await fetchJson('/api/marketing/sms-audience?period=' + period); } catch (_) { return null; }
+    const map = new Map();
+    for (const a of (aud?.campaigns || [])) {
+      map.set(a.firstDate + '|' + (a.text || '').slice(0, 50), a.audience);
+    }
+    smsAttrState = { audMap: map, lastPeriod: period };
+    return map;
+  }
+
+  function injectSmsAttrAudience(container, audMap) {
+    const tbody = container.querySelector('table tbody');
+    if (!tbody) return false;
+    let injected = 0;
+    Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+      if (tr.classList.contains('mkt-total')) return;
+      const firstCell = tr.querySelector('td');
+      if (!firstCell) return;
+      // не вставлять повторно
+      if (firstCell.querySelector('.sms-aud-line')) return;
+      const divs = firstCell.querySelectorAll('div');
+      if (divs.length < 2) return; // ожидаем: div(дата) + div(текст)
+      const dateDiv = divs[0];
+      const textDiv = divs[1];
+      const dateMatch = /\d{2}\.\d{2}\.\d{4}/.exec(dateDiv.textContent || '');
+      const textRaw = (textDiv.textContent || '').trim();
+      if (!dateMatch || !textRaw) return;
+      const key = dateMatch[0] + '|' + textRaw.slice(0, 50);
+      const a = audMap.get(key);
+      const line = document.createElement('div');
+      line.className = 'sms-aud-line';
+      line.style.cssText = 'font-size:10px;margin-top:4px';
+      line.innerHTML = audCellHtml(a);
+      firstCell.appendChild(line);
+      injected++;
+    });
+    return injected > 0;
+  }
+
+  async function enrichSmsAttrAudience() {
+    const container = document.getElementById('mktSmsAttr');
+    if (!container) return;
+    const period = currentPeriod();
+    const audMap = await fetchSmsAudMap(period);
+    if (audMap) injectSmsAttrAudience(container, audMap);
+    if (!container.__smsAttrObserverArmed) {
+      let fetching = false;
+      const refresh = async () => {
+        const p = currentPeriod();
+        const have = smsAttrState.lastPeriod === p && smsAttrState.audMap;
+        if (have) { injectSmsAttrAudience(container, smsAttrState.audMap); return; }
+        if (fetching) return;
+        fetching = true;
+        try {
+          const m = await fetchSmsAudMap(p);
+          if (m) injectSmsAttrAudience(container, m);
+        } finally { fetching = false; }
+      };
+      const obs = new MutationObserver(refresh);
+      obs.observe(container, { childList: true, subtree: true });
+      container.__smsAttrObserverArmed = true;
     }
   }
 
@@ -565,6 +645,7 @@
     loadGisHistory();
     loadSeoExtra();
     enrichPaidSms();
+    enrichSmsAttrAudience();
   }
 
   function tryHook() {
