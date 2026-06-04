@@ -1302,27 +1302,8 @@
             <div id="mktCakeHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
-          <section class="section" id="mkt-s-partners" data-mgroup="channels">
-            <div class="section-label">Партнёры — преференции в ЛК сайта <span class="mkt-scope dyn" title="Bitrix CMS инфоблок 88 «privilege»">из Bitrix</span></div>
-            <div class="section-hint">Компании-партнёры с преференциями для клиентов «Марии». Список из админки Bitrix (инфоблок 88). У каждого партнёра — UTM-метка для трекинга. <b>Количество переходов</b> появится после настройки целей в Метрике (по UTM-меткам или по `click` на ссылку с классом партнёра).</div>
-            <div id="mktPartners" class="table-wrap"></div>
-            <div id="mktPartnersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
-          </section>
-
-          <section class="section" id="mkt-s-bloggers" data-mgroup="channels">
-            <div class="section-label">Блогеры <span class="mkt-scope dyn" title="Из Google Sheets — обновляется при следующем скрейпе">из таблицы</span></div>
-            <div class="section-hint">Маркетинг через инфлюенсеров: депозит за упоминание / сторис / рилс. Источник — твоя таблица в Google Sheets (открыта по ссылке).</div>
-            <div id="mktBloggersKpi"></div>
-            <div id="mktBloggers" class="table-wrap"></div>
-            <div id="mktBloggersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
-          </section>
-
-          <section class="section" id="mkt-s-audiences" data-mgroup="channels">
-            <div class="section-label">Кому отправить рассылку — сегменты из 1С <span class="mkt-scope dyn" title="Живые сегменты: согласие на рассылку + телефон, бонусы из регистра Бонусы.Остатки. Кэш 6 часов.">live · сейчас</span></div>
-            <div class="section-hint">Готовые аудитории с рекомендованным текстом (≤70 знаков = 1 SMS-сегмент) и ценой отправки. CSV содержит телефоны и колонку SMS с подставленными бонусами/именем — грузится в рассыльщик 1С как есть. Сегменты с пометкой «оффер» требуют утверждения акции до отправки. Скачивание CSV — только под админом (персональные данные).</div>
-            <div id="mktAudiences"><div class="mkt-yoy-load">Считаю сегменты из 1С…</div></div>
-          </section>
-
+          <!-- ═══ КАНАЛЫ — порядок: по каналу сразу вся его аналитика, затем действия.
+               SMS → Директ → 2ГИС → SEO → Партнёры → Блогеры → Прочие (04.06.2026) ═══ -->
           <section class="section" id="mkt-s-sms" data-mgroup="channels">
             <div class="section-label">SMS-рассылки — атрибуция к покупкам <span class="mkt-scope dyn" title="Живой JOIN получателей рассылки с чеками по карте лояльности за выбранный месяц (1С /query)">live · за месяц</span></div>
             <div class="section-hint">Связываем получателей SMS с покупками <b>по карте лояльности</b>: получатель купил по той же карте в окне «месяц рассылки + 14 дней». Источник — 1С (Документ.SMSСообщение ⋈ ЧекККМ). Атрибутируются только рассылки с картой; рассылки по телефону без карты — нет.</div>
@@ -1330,6 +1311,12 @@
             <div id="mktSmsMonthly" class="table-wrap" style="margin-bottom:18px"></div>
             <div class="mkt-chart-t">Детально по рассылкам за выбранный месяц</div>
             <div id="mktSmsAttr"></div>
+          </section>
+
+          <section class="section" id="mkt-s-audiences" data-mgroup="channels">
+            <div class="section-label">Кому отправить рассылку — сегменты из 1С <span class="mkt-scope dyn" title="Живые сегменты: согласие на рассылку + телефон, бонусы из регистра Бонусы.Остатки. Кэш 6 часов.">live · сейчас</span></div>
+            <div class="section-hint">Готовые аудитории с рекомендованным текстом (≤70 знаков = 1 SMS-сегмент) и ценой отправки. CSV содержит телефоны и колонку SMS с подставленными бонусами/именем — грузится в рассыльщик 1С как есть. Сегменты с пометкой «оффер» требуют утверждения акции до отправки. Скачивание CSV — только под админом (персональные данные).</div>
+            <div id="mktAudiences"><div class="mkt-yoy-load">Считаю сегменты из 1С…</div></div>
           </section>
 
           <section class="section" id="mkt-s-ctx" data-mgroup="channels">
@@ -1346,6 +1333,18 @@
             <div id="mktGisLive" class="mkt-comp-ins" style="margin-top:12px"></div>
             <div id="mktGisStories" class="mkt-comp-ins" style="margin-top:14px"></div>
             <div id="mktGisReviews" style="margin-top:14px"></div>
+          </section>
+
+          <section class="section" id="mkt-s-demand" data-mgroup="channels">
+            <div class="section-label">Поисковые запросы (2ГИС) — что ищут, чтобы найти <span class="mkt-scope dyn" title="Live из кабинета 2ГИС, раздел «Поисковые запросы» (cron daily)">live · 2ГИС</span></div>
+            <div class="section-hint">Раздел «Поисковые запросы» кабинета 2ГИС — доля запросов, по которым находят карточку. Брендовые («мария» + варианты) vs родовой спрос (торты/кондитерские/кофе/завтрак). Период и обновление — над таблицей.</div>
+            <div id="mktDemand"></div>
+          </section>
+
+          <section class="section" id="mkt-s-gis-history" data-mgroup="channels">
+            <div class="section-title">📈 Тренд рейтинга 2ГИС по точкам</div>
+            <div class="section-hint">История ежедневных снимков рейтинга. Накапливается с 03.06.2026 — через ~неделю появятся первые тренды.</div>
+            <div id="mktGisHistory"></div>
           </section>
 
           <section class="section" id="mkt-s-sweet" data-mgroup="loyalty">
@@ -1406,10 +1405,25 @@
             <div id="mktFunnel"></div>
           </section>
 
-          <section class="section" id="mkt-s-demand" data-mgroup="channels">
-            <div class="section-label">Поисковые запросы (2ГИС) — что ищут, чтобы найти <span class="mkt-scope dyn" title="Live из кабинета 2ГИС, раздел «Поисковые запросы» (cron daily)">live · 2ГИС</span></div>
-            <div class="section-hint">Раздел «Поисковые запросы» кабинета 2ГИС — доля запросов, по которым находят карточку. Брендовые («мария» + варианты) vs родовой спрос (торты/кондитерские/кофе/завтрак). Период и обновление — над таблицей.</div>
-            <div id="mktDemand"></div>
+          <section class="section" id="mkt-s-seo-extra" data-mgroup="channels">
+            <div class="section-title">🔍 SEO: тренд + категории + сравнение конкурентов</div>
+            <div class="section-hint">Расширенная аналитика поверх блока выше: позиции Марии по группам запросов (торты/случаи/десерты/кофе/гео/бренд), агрегаты по 5 доменам и динамика по неделям из архива.</div>
+            <div id="mktSeoExtra"></div>
+          </section>
+
+          <section class="section" id="mkt-s-partners" data-mgroup="channels">
+            <div class="section-label">Партнёры — преференции в ЛК сайта <span class="mkt-scope dyn" title="Bitrix CMS инфоблок 88 «privilege»">из Bitrix</span></div>
+            <div class="section-hint">Компании-партнёры с преференциями для клиентов «Марии». Список из админки Bitrix (инфоблок 88). У каждого партнёра — UTM-метка для трекинга. <b>Количество переходов</b> появится после настройки целей в Метрике (по UTM-меткам или по `click` на ссылку с классом партнёра).</div>
+            <div id="mktPartners" class="table-wrap"></div>
+            <div id="mktPartnersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+          </section>
+
+          <section class="section" id="mkt-s-bloggers" data-mgroup="channels">
+            <div class="section-label">Блогеры <span class="mkt-scope dyn" title="Из Google Sheets — обновляется при следующем скрейпе">из таблицы</span></div>
+            <div class="section-hint">Маркетинг через инфлюенсеров: депозит за упоминание / сторис / рилс. Источник — твоя таблица в Google Sheets (открыта по ссылке).</div>
+            <div id="mktBloggersKpi"></div>
+            <div id="mktBloggers" class="table-wrap"></div>
+            <div id="mktBloggersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
           <section class="section" id="mkt-s-other" data-mgroup="channels">
@@ -1473,17 +1487,6 @@
             <div id="mktHoliday"></div>
           </section>
 
-          <section class="section" id="mkt-s-seo-extra" data-mgroup="channels">
-            <div class="section-title">🔍 SEO: тренд + категории + сравнение конкурентов</div>
-            <div class="section-hint">Расширенная аналитика поверх блока выше: позиции Марии по группам запросов (торты/случаи/десерты/кофе/гео/бренд), агрегаты по 5 доменам и динамика по неделям из архива.</div>
-            <div id="mktSeoExtra"></div>
-          </section>
-
-          <section class="section" id="mkt-s-gis-history" data-mgroup="channels">
-            <div class="section-title">📈 Тренд рейтинга 2ГИС по точкам</div>
-            <div class="section-hint">История ежедневных снимков рейтинга. Накапливается с 03.06.2026 — через ~неделю появятся первые тренды.</div>
-            <div id="mktGisHistory"></div>
-          </section>
         </div><!-- /#page-marketing -->
 
       </main>
