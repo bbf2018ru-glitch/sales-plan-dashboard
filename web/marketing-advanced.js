@@ -297,14 +297,16 @@
       }
       // Группируем по ID точки (а не по адресу): у master-карточек 2ГИС address=null,
       // но рейтинг есть — мы их теряли. Теперь показываем всех с rating != null.
+      // Адрес берём из САМОГО СВЕЖЕГО снимка: до 04.06.2026 скрейпер склеивал
+      // id и адреса по индексу и пары были перепутаны — старым адресам не верим.
       const byId = new Map();
-      for (const e of entries) {
+      for (const e of entries) { // entries отсортированы по дате ↑ — последняя запись победит
         for (const b of (e.branches || [])) {
           if (b.rating == null) continue;
           const key = b.id;
-          if (!byId.has(key)) byId.set(key, { id: b.id, address: b.address, history: [] });
+          if (!byId.has(key)) byId.set(key, { id: b.id, address: null, history: [] });
           const rec = byId.get(key);
-          if (!rec.address && b.address) rec.address = b.address; // подхватим, если в другой день распарсилось
+          if (b.address) rec.address = b.address; // последний (свежайший) адрес побеждает
           rec.history.push({ date: e.date, rating: b.rating, ratingCount: b.ratingCount });
         }
       }

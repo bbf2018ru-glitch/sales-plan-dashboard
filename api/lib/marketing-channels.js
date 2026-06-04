@@ -238,6 +238,68 @@ async function activePromos(asOf) {
   } catch (e) { return [{ error: e.message }]; }
 }
 
+// Использование акций — сколько людей пользовались и сколько купили.
+// Главная механика в УПП Маши: акция → виртуальные карты (ИнформационныеКарты.Акция)
+// → чеки с этой ДисконтнаяКарта. Поля ЧекККМ.КодСкидки/АкцияКодаСкидки в проде пустые
+// (проверено probe 04.06.2026), прямое Ч.Акция — единицы чеков, кофе-бонус — АкцияКофеБонус.
+// Окно: последние 92 дня (большинство акций короткие). Кэш 6ч — данные тяжёлые не по
+// объёму, а по числу запросов к 1С.
+const promoUsageCache = makeCache(6 * 60 * 60 * 1000, 'promo-usage');
+async function promoUsage() {
+  return promoUsageCache.wrap('all', async () => {
+    const since = new Date(Date.now() - 92 * 24 * 3600 * 1000);
+    const DT = `ДАТАВРЕМЯ(${since.getFullYear()},${since.getMonth() + 1},${since.getDate()})`;
+    const P = `Ч.Проведен И Ч.Дата >= ${DT}`;
+    const usage = new Map(); // name → {cheques, buyers, revenue, coffee, cardsTotal}
+    const get = (name) => {
+      if (!usage.has(name)) usage.set(name, { cheques: 0, buyers: 0, revenue: 0, coffee: 0, cardsTotal: 0 });
+      return usage.get(name);
+    };
+    // 1) Чеки по виртуальным картам акций — основной канал применения
+    const byCard = await callQuery(
+      `ВЫБРАТЬ Ч.ДисконтнаяКарта.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Чеков, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.ДисконтнаяКарта) КАК Карт, СУММА(Ч.СуммаДокумента) КАК Выручка ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${P} И Ч.ДисконтнаяКарта.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО Ч.ДисконтнаяКарта.Акция.Наименование`,
+      { timeoutMs: 120000 });
+    for (const r of byCard.rows || []) {
+      const u = get(String(r['Акция'] || '').trim());
+      u.cheques += parseRu(r['Чеков']) || 0;
+      u.buyers += parseRu(r['Карт']) || 0;
+      u.revenue += parseRu(r['Выручка']) || 0;
+    }
+    // 2) Прямая ссылка чека на акцию (редкая, но бывает — самовывоз-промокоды)
+    const direct = await callQuery(
+      `ВЫБРАТЬ Ч.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Чеков, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.ДисконтнаяКарта) КАК Карт, СУММА(Ч.СуммаДокумента) КАК Выручка ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${P} И Ч.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО Ч.Акция.Наименование`,
+      { timeoutMs: 120000 });
+    for (const r of direct.rows || []) {
+      const u = get(String(r['Акция'] || '').trim());
+      u.cheques += parseRu(r['Чеков']) || 0;
+      u.buyers += parseRu(r['Карт']) || 0;
+      u.revenue += parseRu(r['Выручка']) || 0;
+    }
+    // 3) Кофе-бонус (штампики на стакан): чеки + количество кофе
+    const coffee = await callQuery(
+      `ВЫБРАТЬ Ч.АкцияКофеБонус.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Чеков, СУММА(Ч.КоличествоКофеБонус) КАК Кофе, СУММА(Ч.СуммаДокумента) КАК Выручка ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${P} И Ч.АкцияКофеБонус <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО Ч.АкцияКофеБонус.Наименование`,
+      { timeoutMs: 120000 });
+    for (const r of coffee.rows || []) {
+      const u = get(String(r['Акция'] || '').trim());
+      u.cheques += parseRu(r['Чеков']) || 0;
+      u.coffee += parseRu(r['Кофе']) || 0;
+      u.revenue += parseRu(r['Выручка']) || 0;
+    }
+    // 4) Сколько карт создано по каждой акции (вся база — охват акции)
+    const cards = await callQuery(
+      `ВЫБРАТЬ К.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Карт ИЗ Справочник.ИнформационныеКарты КАК К ГДЕ НЕ К.ПометкаУдаления И НЕ К.ЭтоГруппа И К.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО К.Акция.Наименование`,
+      { timeoutMs: 120000 });
+    for (const r of cards.rows || []) {
+      get(String(r['Акция'] || '').trim()).cardsTotal = parseRu(r['Карт']) || 0;
+    }
+    return {
+      sinceDate: since.toISOString().slice(0, 10),
+      byPromo: [...usage.entries()].map(([name, u]) => ({ name, ...u, revenue: Math.round(u.revenue) }))
+        .sort((a, b) => b.cheques - a.cheques),
+    };
+  });
+}
+
 // Список месяцев от Январь прошлого года до выбранного включительно.
 // Для 2026-05 даёт 17 точек: 2025-01..2025-12 + 2026-01..2026-05.
 // Используется для трендового графика «полная динамика» c YoY-сериями.
@@ -265,8 +327,9 @@ async function compute(period) {
   // 1С отдаёт один месяц за ~100с. Поэтому 17 точек тянуть синхронно нельзя — TTFB упадёт в 502.
   // Вместо этого собираем серию из того что лежит в кэше СЕЙЧАС, а недостающие месяцы пинаем
   // в фон без await (aggSales кэширован per-month с дедупом одновременных запросов).
-  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards] = await Promise.all([
-    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
+  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards, promoUse] = await Promise.all([
+    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period),
+    promoUsage().catch(e => ({ error: e.message, byPromo: [] })),
   ]);
   const curSeries = [];
   for (const ym of curMonths) {
@@ -344,6 +407,7 @@ async function compute(period) {
       isNew: sweetPrev.cards === 0 && sweetPrev.points === 0
     },
     promos,
+    promoUsage: promoUse,
     loyaltyCards,
     topProducts,
     categories,
