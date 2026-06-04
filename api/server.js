@@ -733,8 +733,7 @@ const server = http.createServer(async (req, res) => {
 
     // UDS-промокоды детально: код × месяц × uses × revenue. Non-blocking.
     if (pathname === '/api/analytics/promo-codes-monthly' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      // Открыт как весь маркетинг-таб (PIN-сессия не admin) — матрица промокодов помесячно.
       const period = parsedUrl.searchParams.get('period');
       try {
         sendJson(res, 200, await getPromoCodesMonthly({ period }));
@@ -745,8 +744,7 @@ const server = http.createServer(async (req, res) => {
     // «Торт месяца» помесячно (автоопределение по всплеску продаж конкретного торта).
     // Не делает новых вызовов в 1С — читает кэш marketing-channels (aggSales).
     if (pathname === '/api/analytics/cake-of-month' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      // Открыт как весь маркетинг-таб (PIN-сессия не admin) — «торт месяца» помесячно.
       const period = parsedUrl.searchParams.get('period');
       try {
         sendJson(res, 200, await getCakeOfMonthSeries({ period }));
@@ -797,8 +795,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/analytics/uds-promocodes' && req.method === 'GET') {
-      const user = await resolveUser(req);
-      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      // Открыт как весь маркетинг-таб (PIN-сессия не admin) — свежие применения промокодов.
       const from = parsedUrl.searchParams.get('from');
       const to = parsedUrl.searchParams.get('to');
       try {
