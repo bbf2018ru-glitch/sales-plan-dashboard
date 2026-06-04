@@ -10,19 +10,25 @@
 // Считаем на момент ДАТЫ РАССЫЛКИ (не «сейчас») — иначе VIP в мае мог стать
 // спящим в июне и теряем картину «кому слали».
 //
-// Источник данных: тот же что и sms-attribution (берём набор кампаний из её
-// результата). Запрос на каждую кампанию тяжёлый (~3-5 сек), кэшируем 6 ч.
+// Чтобы согласоваться с блоком «SMS-атрибуция» — дедупим повторные отправки той же
+// рассылки тем же текстом ровно как там (normText + темы «Реклама/Акция»). Тогда
+// `audience.total` совпадает с `recipients` из sms-attribution. Не импортируем
+// функции напрямую, чтобы не цепляться к sms-attribution.js (его активно правит
+// параллельная сессия).
 
 const upp = require('./upp-client');
-const smsAttribution = require('./sms-attribution');
 const cache = upp.makeCache(6 * 60 * 60 * 1000);
 
-const VIP_REVENUE_THRESHOLD = 10000; // ₽ за 365 дней — порог для VIP
+const VIP_REVENUE_THRESHOLD = 10000;
+const MIN_RECIPIENTS = 100;
+const MAX_CAMPAIGNS = 30;
+const MARKETING_RE = /реклам|акци|подар|бонус|промо|рассылк/i;
 
 function pad(n) { return String(n).padStart(2, '0'); }
-function parseDateRu(s) {
-  const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(String(s || ''));
-  return m ? { y: +m[3], m: +m[2], d: +m[1] } : null;
+function parseDt(s) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?/.exec(String(s || ''));
+  if (!m) return null;
+  return { y: +m[3], m: +m[2], d: +m[1], hh: +(m[4] || 0), mm: +(m[5] || 0), ss: +(m[6] || 0) };
 }
 function dtLit(p) { return `ДАТАВРЕМЯ(${p.y},${p.m},${p.d},${p.hh || 0},${p.mm || 0},${p.ss || 0})`; }
 function dayLit(p) { return `ДАТАВРЕМЯ(${p.y},${p.m},${p.d})`; }
@@ -30,15 +36,28 @@ function plusDays(p, days) {
   const dt = new Date(Date.UTC(p.y, p.m - 1, p.d) + days * 86400000);
   return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
 }
-function parseDts(s) {
-  // sms-attribution возвращает firstDate как "DD.MM.YYYY", а ВСЕ dts нам тут не доступны —
-  // используем только первую дату (для сегментации это нормально: первая отправка задаёт
-  // момент анализа recency, дублирующие отправки в том же дне/неделе не меняют сегмент).
-  return parseDateRu(s);
+function monthBounds(period) {
+  const [y, m] = period.split('-').map(Number);
+  const next = m === 12 ? [y + 1, 1] : [y, m + 1];
+  return { y, m, ny: next[0], nm: next[1] };
+}
+function normText(t) { return String(t || '').toLowerCase().replace(/[^a-zа-я0-9]+/gi, ' ').trim(); }
+
+// Запрос списка отправок месяца — те же поля что в sms-attribution.
+function campaignListQuery(period) {
+  const b = monthBounds(period);
+  return 'ВЫБРАТЬ П.Ссылка.Дата КАК Дата, П.Ссылка.Тема КАК Тема,'
+    + ' МАКСИМУМ(ВЫРАЗИТЬ(П.Ссылка.ТекстПисьма КАК СТРОКА(300))) КАК Текст,'
+    + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей'
+    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
+    + ` ГДЕ П.Ссылка.Дата >= ДАТАВРЕМЯ(${b.y},${b.m},1) И П.Ссылка.Дата < ДАТАВРЕМЯ(${b.ny},${b.nm},1)`
+    + ' СГРУППИРОВАТЬ ПО П.Ссылка, П.Ссылка.Дата, П.Ссылка.Тема'
+    + ` ИМЕЮЩИЕ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) >= ${MIN_RECIPIENTS}`
+    + ' УПОРЯДОЧИТЬ ПО Получателей УБЫВ';
 }
 
-// Запрос распределения по сегментам. dtsLit — литералы 1С для дат рассылки (минимум 1),
-// dtLit_now — дата отсечения (= dts[0]), d90/d365 — границы окон.
+// Запрос сегментов: получатели всех dts → группировка по карте → классификация
+// по последней покупке (recency) и сумме за 365 дней (для VIP).
 function audienceQuery({ dtsLits, dtLitNow, d90, d365 }) {
   return 'ВЫБРАТЬ Сегмент, КОЛИЧЕСТВО(*) КАК Карт ИЗ ('
     + ' ВЫБРАТЬ'
@@ -60,67 +79,10 @@ function audienceQuery({ dtsLits, dtLitNow, d90, d365 }) {
     + ' СГРУППИРОВАТЬ ПО Сегмент';
 }
 
+const SEGMENT_KEYS = { 'VIP': 'VIP', 'активный': 'active', 'спящий': 'sleeping', 'холодный': 'cold' };
 function emptyDist() { return { VIP: 0, active: 0, sleeping: 0, cold: 0, total: 0 }; }
 
-function dtsLitsForFirstDate(firstDate) {
-  // sms-attribution схлопывает повторные отправки в одну кампанию, но в нашем
-  // API мы не получаем оригинальный массив дат. Используем приближение: запрос
-  // покрывает ВСЕ отправки этого дня (хх:мм заменяем на 00:00..23:59) — для
-  // сегментации хватает по дню.
-  const p = parseDateRu(firstDate);
-  if (!p) return null;
-  // одна дата на весь день: SMSСообщение.Дата хранится с временем, поэтому фильтр
-  // нужен по диапазону. Меняем подход — в запросе используем ДАТЫ ОТПРАВКИ ИЗ КАМПАНИИ.
-  // Но у нас их нет. Делаем фильтр иначе.
-  return p;
-}
-
-// Альтернативный запрос — по диапазону дат (если у нас только день первой отправки).
-function audienceQueryByDayRange({ dayStart, dayEnd, dtLitNow, d90, d365, textNorm }) {
-  return 'ВЫБРАТЬ Сегмент, КОЛИЧЕСТВО(*) КАК Карт ИЗ ('
-    + ' ВЫБРАТЬ'
-    + ' П.Получатель КАК К,'
-    + ' ВЫБОР'
-    + ` КОГДА МАКСИМУМ(Чек.Дата) ЕСТЬ NULL ТОГДА "холодный"`
-    + ` КОГДА МАКСИМУМ(Чек.Дата) >= ${d90} И СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) >= ${VIP_REVENUE_THRESHOLD} ТОГДА "VIP"`
-    + ` КОГДА МАКСИМУМ(Чек.Дата) >= ${d90} ТОГДА "активный"`
-    + ` КОГДА МАКСИМУМ(Чек.Дата) >= ${d365} ТОГДА "спящий"`
-    + ` ИНАЧЕ "холодный"`
-    + ' КОНЕЦ КАК Сегмент'
-    + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
-    + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ЧекККМ КАК Чек'
-    + ' ПО Чек.ДисконтнаяКарта = П.Получатель'
-    + ` И Чек.Дата >= ${d365} И Чек.Дата < ${dtLitNow} И Чек.Проведен`
-    + ` ГДЕ П.Ссылка.Дата >= ${dayStart} И П.Ссылка.Дата <= ${dayEnd}`
-    + (textNorm ? ` И ВЫРАЗИТЬ(П.Ссылка.ТекстПисьма КАК СТРОКА(300)) = "${textNorm.replace(/"/g, '""').slice(0, 300)}"` : '')
-    + ' СГРУППИРОВАТЬ ПО П.Получатель'
-    + ') КАК Т'
-    + ' СГРУППИРОВАТЬ ПО Сегмент';
-}
-
-const SEGMENT_KEYS = { 'VIP': 'VIP', 'активный': 'active', 'спящий': 'sleeping', 'холодный': 'cold' };
-
-async function audienceForCampaign(c) {
-  const first = parseDateRu(c.firstDate);
-  if (!first) return emptyDist();
-  const dtNow = dtLit({ ...first, hh: 0, mm: 0, ss: 0 });
-  const d90 = dayLit(plusDays(first, -90));
-  const d365 = dayLit(plusDays(first, -365));
-  const dayStart = dayLit(first);
-  const dayEnd = dtLit({ ...first, hh: 23, mm: 59, ss: 59 });
-  const q = audienceQueryByDayRange({ dayStart, dayEnd, dtLitNow: dtNow, d90, d365, textNorm: c.text });
-  const res = await upp.callQuery(q, { timeoutMs: 60000 });
-  const dist = emptyDist();
-  for (const row of (res?.rows || [])) {
-    const k = SEGMENT_KEYS[row.Сегмент] || 'cold';
-    const n = upp.parseRu(row.Карт) || 0;
-    dist[k] += n;
-    dist.total += n;
-  }
-  return dist;
-}
-
-// Ограниченная параллель: чтобы 1С не перегружать.
+// Ограниченная параллель — чтобы 1С не перегружать (на одну кампанию ~3-5с).
 async function pMapLimit(items, limit, fn) {
   const ret = new Array(items.length);
   let i = 0;
@@ -136,18 +98,43 @@ async function pMapLimit(items, limit, fn) {
 }
 
 async function compute(period) {
-  const sa = await smsAttribution.getSmsAttribution(period);
-  const camps = (sa && sa.campaigns) || [];
-  if (!camps.length) return { period, campaigns: [], refreshedAt: new Date().toISOString() };
-  const dists = await pMapLimit(camps, 3, async (c) => audienceForCampaign(c));
-  const out = camps.map((c, i) => ({
-    firstDate: c.firstDate,
-    text: c.text,
-    type: c.type,
-    recipients: c.recipients,
-    audience: dists[i] && !dists[i].error ? dists[i] : null,
-    audienceError: dists[i]?.error || null
-  }));
+  const list = await upp.callQuery(campaignListQuery(period));
+  if (!list || !list.rows) return { period, campaigns: [], error: 'нет ответа 1С', refreshedAt: new Date().toISOString() };
+
+  // Дедуп ровно как в sms-attribution: только маркетинговые темы + normText.
+  const byText = new Map();
+  for (const r of list.rows) {
+    if (!MARKETING_RE.test(r.Тема || '')) continue;
+    const dt = parseDt(r.Дата); if (!dt) continue;
+    const key = normText(r.Текст) || ('doc-' + r.Дата);
+    if (!byText.has(key)) byText.set(key, { text: (r.Текст || '').trim(), theme: r.Тема, dts: [] });
+    byText.get(key).dts.push(dt);
+  }
+  const groups = Array.from(byText.values()).slice(0, MAX_CAMPAIGNS);
+
+  const out = await pMapLimit(groups, 3, async (g) => {
+    g.dts.sort((a, b) => Date.UTC(a.y, a.m - 1, a.d, a.hh, a.mm, a.ss) - Date.UTC(b.y, b.m - 1, b.d, b.hh, b.mm, b.ss));
+    const first = g.dts[0];
+    const firstDate = `${pad(first.d)}.${pad(first.m)}.${first.y}`;
+    const dtLitNow = dayLit(first); // отсечка — начало дня первой отправки
+    const d90 = dayLit(plusDays(first, -90));
+    const d365 = dayLit(plusDays(first, -365));
+    try {
+      const res = await upp.callQuery(audienceQuery({
+        dtsLits: g.dts.map(dtLit), dtLitNow, d90, d365
+      }), { timeoutMs: 60000 });
+      const dist = emptyDist();
+      for (const row of (res?.rows || [])) {
+        const k = SEGMENT_KEYS[row.Сегмент] || 'cold';
+        const n = upp.parseRu(row.Карт) || 0;
+        dist[k] += n; dist.total += n;
+      }
+      return { firstDate, text: g.text, sendsCount: g.dts.length, audience: dist, audienceError: null };
+    } catch (e) {
+      return { firstDate, text: g.text, sendsCount: g.dts.length, audience: null, audienceError: e.message };
+    }
+  });
+
   return {
     period,
     campaigns: out,
