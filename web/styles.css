@@ -128,7 +128,10 @@ body {
   text-rendering: optimizeLegibility;
   min-height: 100vh;
   position: relative;
-  overflow-x: hidden;
+  /* clip (а не hidden): режет горизонтальный выезд, но НЕ делает body scroll-контейнером,
+     поэтому position:sticky сайдбара работает относительно вьюпорта. hidden коерсил
+     overflow-y→auto и ломал липкость. */
+  overflow-x: clip;
 }
 
 /* Ambient background orbs (full-viewport fixed) */
@@ -185,12 +188,15 @@ table, .kpi-value, .spot-value, .num, td, th, input, .pct-val, .rec-kpi-val,
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* sticky — сайдбар следует за прокруткой и всегда на виду.
+     (position:sticky сам создаёт containing block для ::before, отдельный relative не нужен
+     и РАНЬШЕ перетирал sticky → сайдбар уезжал вместе со страницей.) */
   position: sticky;
   top: 14px;
+  align-self: start;
   height: calc(100vh - 28px);
   overflow-y: auto;
   box-shadow: var(--glow-card);
-  position: relative;
 }
 
 .sidebar::before {
