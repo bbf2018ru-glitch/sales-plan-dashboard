@@ -860,7 +860,24 @@ const server = http.createServer(async (req, res) => {
           date = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
         }
         const yoy = parsedUrl.searchParams.get('yoy') === '1';
-        sendJson(res, 200, await productionPlan.getPlan(date, { yoy }));
+        const fParam = parsedUrl.searchParams.get('f'); // f=0 выкл, f=1 вкл, иначе авто
+        const opts = { yoy };
+        if (fParam === '0') opts.includeTodayOutput = false;
+        else if (fParam === '1') opts.includeTodayOutput = true;
+        sendJson(res, 200, await productionPlan.getPlan(date, opts));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // Сходимость робота с фактическим заданием Маши (АРМ) — метрика доверия.
+    if (pathname === '/api/production/convergence' && req.method === 'GET') {
+      try {
+        let date = parsedUrl.searchParams.get('date');
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          const t = new Date(Date.now() - 86400000); // вчера (по умолч. — последний прошедший день)
+          date = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+        }
+        sendJson(res, 200, await productionPlan.getConvergence(date));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

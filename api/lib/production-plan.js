@@ -68,6 +68,29 @@ async function qSite(day) {
   return (await upp.callQuery(q, { timeoutMs: 60000 })).rows || [];
 }
 
+// Машино задание выпуска (S = ПланВыпускНаЗавтра) из АРМ Планирование производства за день.
+// Документ дробится по цехам на несколько шапок → суммируем по продукции. Это «эталон»
+// для метрики сходимости и источник F (план выпуска на сегодня, ещё не в остатке).
+async function qArmTask(dayObj) {
+  const q = 'ВЫБРАТЬ П.Продукция.Код КАК Код, П.Продукция.Наименование КАК Имя,'
+    + ' СУММА(П.ПланВыпускНаЗавтра) КАК S, СУММА(П.ПланируемыйВыпускСегодня) КАК F'
+    + ' ИЗ Документ.ф_АРМПланированиеПроизводства КАК А'
+    + ' ВНУТРЕННЕЕ СОЕДИНЕНИЕ Документ.ф_АРМПланированиеПроизводства.Планирование КАК П ПО П.Ссылка = А.Ссылка'
+    + ` ГДЕ А.ДатаНачала >= ${dtLit(dayObj)} И А.ДатаНачала < ${dtLit(addDays(dayObj, 1))} И А.Проведен`
+    + ' СГРУППИРОВАТЬ ПО П.Продукция.Код, П.Продукция.Наименование';
+  return (await upp.callQuery(q, { timeoutMs: 90000 })).rows || [];
+}
+
+// Фактически выпущено за день (КоличествоФакт из плана-факта выпуска). Регистратор —
+// «Отчёт производства за смену». Нужно для F: сколько из сегодняшнего задания УЖЕ сделано.
+async function qProducedFact(dayObj) {
+  const q = 'ВЫБРАТЬ Р.Продукция.Код КАК Код, СУММА(Р.КоличествоФакт) КАК Факт'
+    + ' ИЗ РегистрНакопления.ф_ПланФактВыпуска КАК Р'
+    + ` ГДЕ Р.Период >= ${dtLit(dayObj)} И Р.Период < ${dtLit(addDays(dayObj, 1))}`
+    + ' СГРУППИРОВАТЬ ПО Р.Продукция.Код ИМЕЮЩИЕ СУММА(Р.КоличествоФакт) <> 0';
+  return (await upp.callQuery(q, { timeoutMs: 90000 })).rows || [];
+}
+
 // среднее отгрузки по коду на даты `days` (массив {y,m,d})
 function weekdayAvg(shipMap, days) {
   const out = {};
@@ -95,13 +118,26 @@ async function pressForDate(target) {
   return { M: weekdayAvg(shipMap, mDays), O: weekdayAvg(shipMap, oDays), names, shipRows: rows.length };
 }
 
+// сегодня (UTC) как {y,m,d}
+function todayObj() { const n = new Date(); return { y: n.getUTCFullYear(), m: n.getUTCMonth() + 1, d: n.getUTCDate() }; }
+function ymdNum(o) { return o.y * 10000 + o.m * 100 + o.d; }
+
 async function compute(dateStr, opts) {
   const yoy = !!(opts && opts.yoy);
   const target = parseYMD(dateStr);
   const next = addDays(target, 1);
+  const today = todayObj();
+  // F (утренний выпуск): когда планируем БУДУЩИЙ день, сегодняшний выпуск ещё не оприходован
+  // в текущем остатке, но к началу target-дня он поступит. Добавляем «сегодня запланировано
+  // минус уже выпущено». По умолчанию включено для будущих дат; отключается ?f=0.
+  const wantF = (opts && opts.includeTodayOutput != null)
+    ? !!opts.includeTodayOutput
+    : ymdNum(target) > ymdNum(today);
 
-  const [stockRows, press, siteL, siteP] = await Promise.all([
-    qStock(), pressForDate(target), qSite(target), qSite(next)
+  const [stockRows, press, siteL, siteP, armToday, factToday] = await Promise.all([
+    qStock(), pressForDate(target), qSite(target), qSite(next),
+    wantF ? qArmTask(today).catch(() => []) : Promise.resolve([]),
+    wantF ? qProducedFact(today).catch(() => []) : Promise.resolve([]),
   ]);
 
   // остаток по коду
@@ -112,6 +148,18 @@ async function compute(dateStr, opts) {
     if (WH_GP.includes(w)) E[code] = (E[code] || 0) + q;
     else if (w === WH_ZAP) G[code] = (G[code] || 0) + q;
     else if (w === WH_KONT) H[code] = (H[code] || 0) + q;
+  }
+
+  // F: остаток сегодняшнего невыпущенного задания = max(0, S_сегодня − Факт_сегодня)
+  const F = {}; let fTotal = 0, fSkus = 0;
+  if (wantF) {
+    const armMap = {}, factMap = {};
+    for (const r of armToday) { armMap[cc(r.Код)] = upp.parseRu(r.S); names[cc(r.Код)] = names[cc(r.Код)] || r.Имя; }
+    for (const r of factToday) factMap[cc(r.Код)] = upp.parseRu(r.Факт);
+    for (const code of Object.keys(armMap)) {
+      const rem = Math.round((armMap[code] - (factMap[code] || 0)) * 10) / 10;
+      if (rem > 0) { F[code] = rem; fTotal += rem; fSkus++; E[code] = (E[code] || 0) + rem; }
+    }
   }
   Object.assign(names, press.names);
   const L = {}, P = {};
@@ -148,6 +196,7 @@ async function compute(dateStr, opts) {
     if (e === 0 && g === 0 && h === 0 && m === 0 && o === 0 && l === 0 && p === 0) continue;
     const lym = yoy ? (lyM[code] || 0) : null;
     const it = { code, name: nm, gp: e, zap: g, kont: h, ship: m, shipNext: o, siteL: l, siteP: p,
+      fToday: r1(F[code] || 0),
       lyShip: lym, deltaPct: (yoy && lym) ? r1((m - lym) / lym * 100) : null, bom: false };
     recompute(it);
     items.push(it);
@@ -199,19 +248,77 @@ async function compute(dateStr, opts) {
   const todayN = now.getUTCFullYear() * 10000 + (now.getUTCMonth() + 1) * 100 + now.getUTCDate();
   const targetN = target.y * 10000 + target.m * 100 + target.d;
   if (targetN < todayN) warnings.push('Дата в прошлом: остаток показан ТЕКУЩИЙ (из 1С сейчас), а не на выбранную дату — цифры остатка будут отличаться от того дня.');
+  if (wantF) {
+    if (fSkus > 0) warnings.push(`К остатку добавлен план выпуска на сегодня (${Math.round(fTotal)} шт по ${fSkus} поз.) — он ещё НЕ оприходован, но поступит к началу ${dayKey(target)}. Это оценка по заданию Маши за сегодня минус уже выпущено.`);
+    else warnings.push('Сегодняшний план выпуска (F) не найден в АРМ или уже полностью выпущен — остаток показан как есть.');
+  }
 
   return {
     date: dateStr, weekday: weekdayRu(target), nextWeekday: weekdayRu(next),
     yoy, ceh, warnings,
-    totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits), skippedNonPlan },
-    note: 'Онлайн-расчёт из 1С. Остаток — текущий; «Отгрузка завтра/послезавтра» — ПРОГНОЗ (среднее отгрузки А00000130→магазины по дню недели за 3 нед). Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы/Выходные не учтены (ручные у Маши).',
+    includeTodayOutput: wantF,
+    totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits), skippedNonPlan, fToday: Math.round(fTotal), fSkus },
+    note: 'Онлайн-расчёт из 1С. Остаток — текущий' + (wantF ? ' + сегодняшний невыпущенный план (F)' : '') + '; «Отгрузка завтра/послезавтра» — ПРОГНОЗ (среднее отгрузки А00000130→магазины по дню недели за 3 нед; выходные учтены автоматически — производство идёт ежедневно). Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы — ручные у Маши, не учтены.',
     refreshedAt: new Date().toISOString()
   };
 }
 
-function getPlan(dateStr, opts) {
-  const key = 'plan:' + dateStr + (opts && opts.yoy ? ':yoy' : '');
-  return cache.wrap(key, () => compute(dateStr, opts));
+// СХОДИМОСТЬ: робот vs факт Маши. Сравниваем механическое задание робота для даты D
+// с её S (ПланВыпускНаЗавтра) из АРМ за тот же производственный день. Робот обычно ≤ S
+// (Маша округляет вверх до партии + ручные довозы) — это норма, метрика показывает её честно.
+async function computeConvergence(dateStr) {
+  const target = parseYMD(dateStr);
+  const [plan, armRows] = await Promise.all([
+    getPlan(dateStr, { includeTodayOutput: false }), // сравниваем чистый механический спрос
+    qArmTask(target),
+  ]);
+  const arm = {}, armNames = {};
+  for (const r of armRows) { const c = cc(r.Код); arm[c] = upp.parseRu(r.S); armNames[c] = r.Имя; }
+  const robot = {};
+  for (const ce of plan.ceh) for (const it of ce.items) robot[it.code] = it.task;
+
+  const codes = new Set([...Object.keys(arm).filter(c => arm[c] > 0), ...Object.keys(robot).filter(c => robot[c] > 0)]);
+  let exact = 0, within10 = 0, within25 = 0, robotOnly = 0, mariaOnly = 0, both = 0;
+  let sumRobot = 0, sumMaria = 0;
+  const rows = [];
+  for (const code of codes) {
+    const rb = robot[code] || 0, mr = arm[code] || 0;
+    sumRobot += rb; sumMaria += mr;
+    if (rb > 0 && mr > 0) {
+      both++;
+      const d = Math.abs(rb - mr), rel = d / mr;
+      if (d === 0) exact++;
+      if (rel <= 0.10) within10++;
+      if (rel <= 0.25) within25++;
+    } else if (rb > 0) robotOnly++;
+    else mariaOnly++;
+    rows.push({ code, name: armNames[code] || (plan.ceh.flatMap(c => c.items).find(i => i.code === code) || {}).name || code, robot: rb, maria: mr, diff: Math.round((rb - mr) * 10) / 10 });
+  }
+  rows.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  const denom = both || 1;
+  return {
+    date: dateStr, weekday: weekdayRu(target),
+    armFound: armRows.length > 0,
+    summary: {
+      codes: codes.size, both, exact, within10, within25, robotOnly, mariaOnly,
+      exactPct: Math.round(exact / denom * 100), within10Pct: Math.round(within10 / denom * 100), within25Pct: Math.round(within25 / denom * 100),
+      sumRobot: Math.round(sumRobot), sumMaria: Math.round(sumMaria),
+    },
+    topDiffs: rows.slice(0, 25),
+    note: armRows.length === 0
+      ? 'За эту дату нет проведённого АРМ Планирования производства — сравнить не с чем (выбери прошедший рабочий день).'
+      : 'Сравнение механического задания робота (без ручных правок) с фактическим заданием Маши (S из АРМ). Робот обычно ≤ Маши: она округляет вверх до партии и добавляет довозы. «Только робот» — робот видит дефицит, а Маша не планировала (возможно, покрыла иначе); «только Маша» — она запланировала то, чего робот не насчитал.',
+    refreshedAt: new Date().toISOString(),
+  };
 }
 
-module.exports = { getPlan };
+function getPlan(dateStr, opts) {
+  const fKey = (opts && opts.includeTodayOutput != null) ? (opts.includeTodayOutput ? ':f1' : ':f0') : '';
+  const key = 'plan:' + dateStr + (opts && opts.yoy ? ':yoy' : '') + fKey;
+  return cache.wrap(key, () => compute(dateStr, opts));
+}
+function getConvergence(dateStr) {
+  return cache.wrap('conv:' + dateStr, () => computeConvergence(dateStr));
+}
+
+module.exports = { getPlan, getConvergence };
