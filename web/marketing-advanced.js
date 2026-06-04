@@ -459,9 +459,9 @@
         loadAll();
       }
     }
-    // Кнопка маркетинг-таба называется «CRM · ассортимент» (data-tab="marketing").
-    // Подписываемся по data-tab, а не по тексту, чтобы рефакторинг текста кнопки не сломал хук.
-    document.querySelectorAll('[data-tab="marketing"]').forEach(btn => {
+    // Главная нав-кнопка маркетинг-таба — .nav-btn с data-page="marketing".
+    // (раньше слушали по тексту «маркетинг» — работает, но ломается при ребрендинге).
+    document.querySelectorAll('.nav-btn[data-page="marketing"]').forEach(btn => {
       btn.addEventListener('click', () => setTimeout(onTabSwitch, 200));
     });
     // Если страница загружена и маркетинг уже активен — грузим сразу
