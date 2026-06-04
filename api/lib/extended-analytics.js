@@ -18,6 +18,7 @@ const {
   rangeMonths,
   callRegister,
   callDocument,
+  callQuery,
   makeCache,
   nowYM
 } = require('./upp-client');
@@ -292,133 +293,117 @@ async function warmPromoCodesMonthly(period) {
   return { ok, fail, total: months.length };
 }
 
-// «Торт месяца» — автоопределение по всплеску продаж конкретного торта в каждом месяце
-// vs его средняя по ПОЛНЫМ месяцам. Использует кэш marketing-channels (aggSales).
-// Возвращает [{ ym, productCode, name, revenue, qty, ratio, categoryRevenue, sharePct }, ...]
+// «Торт месяца» — НАСТОЯЩАЯ акция Марии: на один торт встаёт скидка на весь месяц
+// (механика подтверждена 04.06.2026 по РегистрНакопления.ПредоставленныеСкидки:
+// топ-торт по сумме скидок доминирует с отрывом ×5+ и стоит 25-31 день — май
+// «Банан-солёная карамель» 414к скидок/31д, дек-2025 «Красный бархат» 3.2М/25д,
+// который автодетект по выручке вообще не видел).
 //
-// Фиксы 04.06.2026 («считался неправильно»):
-// 1. Мусорные SKU исключены: безымянный «ТОРТ» (генерик-позиция) и «на заказ».
-// 2. Месяцы с неполными данными 1С (выручка тортов < 30% медианы) помечаются
-//    incomplete — раньше уверенно показывали случайный торт на огрызке данных.
-// 3. Текущий месяц: выручка в пересчёте на полный месяц (по темпу) + флаг partialMonth —
-//    раньше 4 дня июня сравнивались с полными месяцами (ratio 0.55 = бессмыслица).
-// 4. Средняя торта — только по полным месяцам; новинки без ≥2 полных месяцев истории
-//    не участвуют (раньше avg включал сам месяц всплеска и размывал ratio).
+// Источник торта = скидки 1С (а не всплеск выручки); продажи (выручка/шт) — факт
+// из aggSales. Запрос скидок за прошлый месяц неизменен → дисковый кэш надолго.
+const cakeDiscCache = makeCache(24 * 60 * 60 * 1000, 'cake-discounts');
+const CAKE_SLICE_RE = /кусоч/i; // «… КУСОЧЕК» — тот же торт, не отдельный кандидат
+
+// Топ тортов по сумме скидок за месяц: [{ name, discount, days }]
+async function monthCakeDiscounts(ym) {
+  const r = await cakeDiscCache.wrap('cd:' + ym, async () => {
+    const [y, m] = ym.split('-').map(Number);
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    const q = 'ВЫБРАТЬ ПЕРВЫЕ 8 П.Номенклатура КАК Т, СУММА(П.СуммаСкидки) КАК С,'
+      + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ НАЧАЛОПЕРИОДА(П.Период,ДЕНЬ)) КАК Д'
+      + ' ИЗ РегистрНакопления.ПредоставленныеСкидки КАК П'
+      + ` ГДЕ П.Период >= ДАТАВРЕМЯ(${y},${m},1) И П.Период < ДАТАВРЕМЯ(${ny},${nm},1)`
+      + ' И П.Номенклатура.Наименование ПОДОБНО "Торт%"'
+      + ' СГРУППИРОВАТЬ ПО П.Номенклатура УПОРЯДОЧИТЬ ПО С УБЫВ';
+    const res = await callQuery(q, { timeoutMs: 90000 });
+    const rows = (res?.rows || []).map(r2 => ({
+      name: String(r2['Т'] || '').trim(),
+      discount: parseRu(r2['С']),
+      days: parseRu(r2['Д'])
+    }));
+    return { rows };
+  });
+  return (r && r.rows) || [];
+}
+
+function normName(s) { return String(s || '').toLowerCase().replace(/[^a-zа-яё0-9]+/g, ''); }
+
 async function buildCakeOfMonthSeries(period) {
   // Ленивый require — circular dependency safety
   const mc = require('./marketing-channels')._internal;
   const months = mc.monthsExtendedSeries(period);
   const pmap = await mc.getProductMap(period); // productCode → { name, group }
 
-  // Собираем productCode → revenue по месяцам. Только товары из «тортовой» группы.
   const TORT_RE = /торт/i;
-  const JUNK_RE = /^торты?\.?$/i;    // безымянная генерик-позиция «ТОРТ»
-  const CUSTOM_RE = /на заказ/i;     // заказные — не розничный флагман
-  const productMonthly = new Map(); // code → { name, byMonth: { ym → {revenue, qty} } }
-  const monthData = [];             // [{ ym, ready, categoryRevenue }]
-  for (const ym of months) {
-    const cached = mc.monthCache.getCached('agg:' + ym);
-    if (!cached) {
-      monthData.push({ ym, ready: false });
-      if (!mc.monthCache.isPending('agg:' + ym)) {
-        mc.aggSales(ym).then(() => console.log(`[cake-of-month] warm agg ${ym}`)).catch(() => {});
-      }
-      continue;
-    }
-    let catRev = 0;
-    for (const [code, v] of cached.products) {
-      const meta = pmap[code];
-      if (!meta) continue;
-      // «Торт» определяем по группе товара или по имени
-      const isTort = TORT_RE.test(meta.group || '') || TORT_RE.test(meta.name || '');
-      if (!isTort) continue;
-      const nm = String(meta.name || '').trim();
-      if (JUNK_RE.test(nm) || CUSTOM_RE.test(nm)) continue;
-      catRev += v.sum || 0;
-      if (!productMonthly.has(code)) productMonthly.set(code, { code, name: meta.name, byMonth: {} });
-      productMonthly.get(code).byMonth[ym] = { revenue: v.sum || 0, qty: v.qty || 0 };
-    }
-    monthData.push({ ym, ready: true, categoryRevenue: Math.round(catRev) });
-  }
-
-  // Текущий календарный месяц — данные неполные по определению.
   const now = new Date();
   const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const daysInCur = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const daysElapsed = Math.max(1, now.getDate() - 1); // вчера = последний полный день
-  const curScale = daysInCur / daysElapsed;
 
-  // Неполные месяцы данных 1С: выручка тортов сильно ниже медианы остальных.
-  const fullRevs = monthData
-    .filter(m => m.ready && m.ym !== curYM)
-    .map(m => m.categoryRevenue)
-    .sort((a, b) => a - b);
-  const medianRev = fullRevs.length ? fullRevs[Math.floor(fullRevs.length / 2)] : 0;
-  for (const md of monthData) {
-    if (md.ready && md.ym !== curYM && medianRev && md.categoryRevenue < medianRev * 0.3) md.incomplete = true;
-  }
-  const fullYms = new Set(monthData.filter(m => m.ready && !m.incomplete && m.ym !== curYM).map(m => m.ym));
+  const series = [];
+  for (const ym of months) {
+    const isCur = ym === curYM;
+    // 1) ТОРТ МЕСЯЦА = топ по сумме скидок 1С за месяц (целый торт, не КУСОЧЕК).
+    let rows;
+    try {
+      rows = await monthCakeDiscounts(ym);
+    } catch (e) {
+      series.push({ ym, name: null, error: 'скидки 1С: ' + String(e.message || e).slice(0, 80) });
+      continue;
+    }
+    const cand = rows.find(r => !CAKE_SLICE_RE.test(r.name)) || null;
+    // Акция должна СТОЯТЬ месяц: ≥15 дней (текущий месяц — почти все прошедшие дни).
+    const minDays = isCur ? Math.max(1, Math.min(3, now.getDate() - 1)) : 15;
+    const minDisc = isCur ? 5000 : 50000;
+    if (!cand || cand.days < minDays || cand.discount < minDisc) {
+      series.push({ ym, name: null, noFlagman: true });
+      continue;
+    }
+    // КУСОЧЕК-вариант той же позиции — добавляем его скидку к акции.
+    const baseNorm = normName(cand.name);
+    let discountSum = cand.discount;
+    for (const r of rows) {
+      if (r === cand || !CAKE_SLICE_RE.test(r.name)) continue;
+      if (normName(r.name.replace(/кусоч\w*/gi, '')) === baseNorm) discountSum += r.discount;
+    }
 
-  // Средняя выручка торта — ТОЛЬКО по полным месяцам. Минимум 2 месяца истории.
-  const productAvg = new Map();
-  for (const [code, p] of productMonthly) {
-    const vals = Object.entries(p.byMonth).filter(([ym]) => fullYms.has(ym)).map(([, v]) => v.revenue || 0);
-    if (vals.length < 2) continue;
-    productAvg.set(code, vals.reduce((a, b) => a + b, 0) / vals.length);
-  }
+    // 2) Факт продаж торта (целый + кусочек) из aggSales — если месяц прогрет.
+    const cached = mc.monthCache.getCached('agg:' + ym);
+    let revenue = null, qty = null, sharePct = null;
+    if (cached) {
+      let catRev = 0, rev = 0, q = 0;
+      for (const [code, v] of cached.products) {
+        const meta = pmap[code];
+        if (!meta) continue;
+        const nm = String(meta.name || '');
+        if (!TORT_RE.test(nm) && !TORT_RE.test(meta.group || '')) continue;
+        catRev += v.sum || 0;
+        if (normName(nm.replace(/кусоч\w*/gi, '')) === baseNorm) { rev += v.sum || 0; q += v.qty || 0; }
+      }
+      revenue = Math.round(rev);
+      qty = Math.round(q);
+      sharePct = catRev ? Math.round((rev / catRev) * 1000) / 10 : null;
+    } else if (!mc.monthCache.isPending('agg:' + ym)) {
+      mc.aggSales(ym).then(() => console.log(`[cake-of-month] warm agg ${ym}`)).catch(() => {});
+    }
 
-  // Для каждого месяца: торт с наибольшим ratio = revenue[ym] / avg по полным месяцам.
-  // Порог: revenue >= 50 000 ₽ (для текущего месяца — пропорционально прошедшим дням).
-  const series = monthData.map(md => {
-    if (!md.ready) return { ym: md.ym, _pending: true };
-    if (md.incomplete) {
-      return { ym: md.ym, productCode: null, name: null, incomplete: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
-    }
-    const isCur = md.ym === curYM;
-    // Порог НЕ масштабируем по темпу: в начале месяца одиночная продажа дорогого
-    // торта (5 100 ₽ × 1 шт) пролезала во флагманы с ratio ×6. Требуем фактические
-    // ≥50к и ≥30 шт — настоящий флагман набирает это за 1-2 дня.
-    let best = null;
-    for (const [code, p] of productMonthly) {
-      const m = p.byMonth[md.ym];
-      if (!m || m.revenue < 50000 || (m.qty || 0) < 30) continue;
-      const avg = productAvg.get(code);
-      if (!avg) continue; // новинка без истории — ratio не посчитать честно
-      const ratio = (isCur ? m.revenue * curScale : m.revenue) / avg;
-      if (!best || ratio > best.ratio) best = { code, name: p.name, revenue: Math.round(m.revenue), qty: Math.round(m.qty), ratio: Math.round(ratio * 100) / 100 };
-    }
-    if (!best) {
-      return isCur
-        ? { ym: md.ym, productCode: null, name: null, tooEarly: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue }
-        : { ym: md.ym, productCode: null, name: 'нет данных', revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
-    }
-    const sharePct = md.categoryRevenue ? Math.round((best.revenue / md.categoryRevenue) * 1000) / 10 : null;
-    // Слабый лидер ≠ флагман: без всплеска (×<2) и с мизерной долей в тортах —
-    // в месяце просто не было «торта месяца» (напр. апрель = куличи, декабрь = НГ-ассортимент).
-    if (best.ratio < 2 && (sharePct == null || sharePct < 5)) {
-      return { ym: md.ym, productCode: null, name: null, noFlagman: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
-    }
-    return {
-      ym: md.ym,
-      productCode: best.code,
-      name: best.name,
-      revenue: best.revenue,
-      qty: best.qty,
-      ratio: best.ratio,
+    series.push({
+      ym,
+      name: cand.name,
+      discount: Math.round(discountSum),
+      discountDays: cand.days,
+      revenue, qty, sharePct,
       partialMonth: isCur || undefined,
-      categoryRevenue: md.categoryRevenue,
-      sharePct
-    };
-  });
+      salesPending: cached ? undefined : true
+    });
+  }
 
-  const pendingCount = series.filter(s => s._pending).length;
+  const salesPendingCount = series.filter(s => s.salesPending).length;
   return {
     period,
-    method: 'auto: max(revenue/avg по полным месяцам) среди тортов с выручкой ≥50к; генерик «ТОРТ» и «на заказ» исключены; текущий месяц — по темпу',
+    method: 'торт месяца = торт с месячной скидкой в 1С (РегистрНакопления.ПредоставленныеСкидки, топ по сумме скидок, акция ≥15 дней); продажи — факт из чеков',
     range: { from: months[0], to: months[months.length - 1] },
     series,
-    seriesPending: pendingCount,
-    productsConsidered: productMonthly.size
+    seriesPending: salesPendingCount,
+    productsConsidered: series.filter(s => s.name).length
   };
 }
 
