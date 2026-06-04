@@ -4892,6 +4892,45 @@ function renderFunnel(d){
 // Без аргументов — плейсхолдер (вызывается из mktInit до загрузки). Только реальные данные.
 // Для незавершённого (текущего) месяца абсолютный YoY по выручке/чекам недостоверен —
 // показываем лишь относительные сигналы (доли: средний чек, карта) + пометку.
+// ── Аудитории для рассылок: живые сегменты из 1С + тексты + CSV ──────────────
+// Не зависит от выбранного периода — грузится один раз при входе на вкладку.
+function loadCampaignAudiences(){
+  var el=document.getElementById('mktAudiences'); if(!el) return;
+  fetchJson('/api/marketing/campaign-audiences').then(function(d){ renderCampaignAudiences(d); })
+    .catch(function(e){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Сегменты недоступны: '+escapeHtml(e.message)+'</div>'; });
+}
+function renderCampaignAudiences(d){
+  var el=document.getElementById('mktAudiences'); if(!el||!d||!d.segments) return;
+  var segs=d.segments.slice().sort(function(a,b){ return (a.priority||9)-(b.priority||9); });
+  var totalSms=0, totalCost=0;
+  segs.forEach(function(s){ totalSms+=s.size||0; totalCost+=s.smsCostRub||0; });
+  var html='<div class="aud-summary">Всего в сегментах: <b>'+fmtNum(totalSms)+'</b> получателей · отправка всех волн ≈ <b>'+fmtNum(totalCost)+' ₽</b> ('+d.smsPrice+' ₽/SMS) · окно оттока: '+escapeHtml((d.windows&&d.windows.churn)||'')+(d.fromCache?' · из кэша':'')+'</div>';
+  html+='<div class="aud-grid">';
+  segs.forEach(function(s,i){
+    var metr=[];
+    if(s.bonusSum) metr.push('бонусов на сегменте: <b>'+fmtNum(s.bonusSum)+' ₽</b>');
+    if(s.withBonus) metr.push('с бонусами ≥50: <b>'+fmtNum(s.withBonus)+'</b>');
+    if(s.avgSpent) metr.push('ср. покупки: <b>'+fmtNum(s.avgSpent)+' ₽</b>');
+    html+='<div class="aud-card">'
+      +'<div class="aud-head"><span class="aud-prio">'+(i+1)+'</span><span class="aud-title">'+escapeHtml(s.title)+'</span><span class="aud-size">'+fmtNum(s.size)+' чел.</span></div>'
+      +'<div class="aud-desc">'+escapeHtml(s.desc||'')+'</div>'
+      +(metr.length?'<div class="aud-metr">'+metr.join(' · ')+'</div>':'')
+      +'<div class="aud-text" title="Рекомендованный текст, '+s.textLen+' зн. = 1 SMS-сегмент. {Имя}/{N} подставляются в CSV автоматически."><code>'+escapeHtml(s.text)+'</code>'
+      +'<button class="aud-copy" data-text="'+escapeHtml(s.text)+'">копировать</button></div>'
+      +(s.needsApproval?'<div class="aud-warn">⚠ '+escapeHtml(s.needsApproval)+'</div>':'')
+      +'<div class="aud-foot"><span class="aud-cost">~'+fmtNum(s.smsCostRub)+' ₽</span>'
+      +'<a class="aud-btn" href="'+escapeHtml(s.csvUrl)+'" download>⬇ CSV для рассыльщика</a></div>'
+      +'</div>';
+  });
+  html+='</div>';
+  html+='<div class="aud-note">'+escapeHtml(d.note||'')+' Порядок: сверху вниз по приоритету; после каждой волны — замер в блоке «SMS-атрибуция» ниже (окно 14 дней). Перед повторной выгрузкой сегмент пересчитается сам — вернувшиеся выпадут из списков.</div>';
+  el.innerHTML=html;
+  el.querySelectorAll('.aud-copy').forEach(function(b){
+    b.addEventListener('click', function(){
+      navigator.clipboard.writeText(b.dataset.text).then(function(){ b.textContent='скопировано'; setTimeout(function(){ b.textContent='копировать'; },1500); });
+    });
+  });
+}
 function renderAlerts(d, period){
   var el=document.getElementById('mktAlerts'); if(!el) return;
   if(!d){ el.innerHTML='<div class="mkt-yoy-load">Загрузка сигналов…</div>'; return; }
@@ -5079,6 +5118,7 @@ function mktInit(){
     mktRenderProducts();
     renderPrices();
     renderAlerts();
+    loadCampaignAudiences();
     renderFunnel();
     renderDemand();
     renderAI();

@@ -996,6 +996,34 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Аудитории для рассылок: живые сегменты из 1С + тексты + CSV ──
+    // Сводка (счётчики) открыта как channels; CSV с телефонами/ФИО — ТОЛЬКО админ (персданные).
+    if (pathname === '/api/marketing/campaign-audiences' && req.method === 'GET') {
+      try {
+        const campaignAudiences = require('./lib/campaign-audiences');
+        const force = parsedUrl.searchParams.get('force') === '1';
+        sendJson(res, 200, await campaignAudiences.getAudiences({ force }));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+    if (pathname === '/api/marketing/campaign-audience.csv' && req.method === 'GET') {
+      const user = await resolveUser(req);
+      if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
+      try {
+        const campaignAudiences = require('./lib/campaign-audiences');
+        const key = String(parsedUrl.searchParams.get('key') || '');
+        const { filename, csv } = await campaignAudiences.getAudienceCsv(key);
+        const buf = Buffer.from(csv, 'utf8');
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="audience-${key}.csv"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          'Content-Length': buf.length,
+        });
+        res.end(buf);
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Маркетинговая аналитика — pack 1 (zombie/cannibalization/rfm/holiday-yoy) ──
     // По решению пользователя 03.06.2026 — открыты без admin-guard (как channels):
     // данные агрегатные, без персоналки. RFM показывает количества сегментов,

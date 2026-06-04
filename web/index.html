@@ -16,7 +16,7 @@
     <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-cyrillic.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-latin.woff2" crossorigin />
     <link rel="stylesheet" href="/fonts.css?v=1" />
-    <link rel="stylesheet" href="/styles.css?v=67" />
+    <link rel="stylesheet" href="/styles.css?v=68" />
   </head>
   <body>
 
@@ -1317,6 +1317,12 @@
             <div id="mktBloggersHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </section>
 
+          <section class="section" id="mkt-s-audiences" data-mgroup="channels">
+            <div class="section-label">Кому отправить рассылку — сегменты из 1С <span class="mkt-scope dyn" title="Живые сегменты: согласие на рассылку + телефон, бонусы из регистра Бонусы.Остатки. Кэш 6 часов.">live · сейчас</span></div>
+            <div class="section-hint">Готовые аудитории с рекомендованным текстом (≤70 знаков = 1 SMS-сегмент) и ценой отправки. CSV содержит телефоны и колонку SMS с подставленными бонусами/именем — грузится в рассыльщик 1С как есть. Сегменты с пометкой «оффер» требуют утверждения акции до отправки. Скачивание CSV — только под админом (персональные данные).</div>
+            <div id="mktAudiences"><div class="mkt-yoy-load">Считаю сегменты из 1С…</div></div>
+          </section>
+
           <section class="section" id="mkt-s-sms" data-mgroup="channels">
             <div class="section-label">SMS-рассылки — атрибуция к покупкам <span class="mkt-scope dyn" title="Живой JOIN получателей рассылки с чеками по карте лояльности за выбранный месяц (1С /query)">live · за месяц</span></div>
             <div class="section-hint">Связываем получателей SMS с покупками <b>по карте лояльности</b>: получатель купил по той же карте в окне «месяц рассылки + 14 дней». Источник — 1С (Документ.SMSСообщение ⋈ ЧекККМ). Атрибутируются только рассылки с картой; рассылки по телефону без карты — нет.</div>
@@ -1551,7 +1557,7 @@
       </form>
     </div>
 
-    <script src="/app.js?v=105"></script>
+    <script src="/app.js?v=106"></script>
     <script src="/marketing-advanced.js?v=16"></script>
   </body>
 </html>
