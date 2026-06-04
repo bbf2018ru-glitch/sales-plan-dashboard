@@ -327,9 +327,8 @@ async function compute(period) {
   // 1С отдаёт один месяц за ~100с. Поэтому 17 точек тянуть синхронно нельзя — TTFB упадёт в 502.
   // Вместо этого собираем серию из того что лежит в кэше СЕЙЧАС, а недостающие месяцы пинаем
   // в фон без await (aggSales кэширован per-month с дедупом одновременных запросов).
-  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards, promoUse] = await Promise.all([
-    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period),
-    promoUsage().catch(e => ({ error: e.message, byPromo: [] })),
+  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards] = await Promise.all([
+    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
   ]);
   const curSeries = [];
   for (const ym of curMonths) {
@@ -407,7 +406,6 @@ async function compute(period) {
       isNew: sweetPrev.cards === 0 && sweetPrev.points === 0
     },
     promos,
-    promoUsage: promoUse,
     loyaltyCards,
     topProducts,
     categories,
@@ -466,9 +464,14 @@ async function getChannels(period) {
   // cache.wrap — async, возвращает Promise. Без await Object.assign({}, Promise, ...)
   // отдавал бы {external:...} (у Promise нет own enumerable свойств), что и ломало
   // весь маркетинг-таб (revenue/cheques/cardPct/monthlySeries отсутствовали).
-  const r = await cache.wrap('ch:' + p, () => compute(p));
+  // promoUsage — мимо channels-кэша (у него собственный 6ч кэш + лёгкие запросы),
+  // иначе свежезадеплоенный код ждал бы истечения старого снапшота.
+  const [r, promoUse] = await Promise.all([
+    cache.wrap('ch:' + p, () => compute(p)),
+    promoUsage().catch(e => ({ error: e.message, byPromo: [] })),
+  ]);
   // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
-  return Object.assign({}, r, { external: externalBlock() });
+  return Object.assign({}, r, { external: externalBlock(), promoUsage: promoUse });
 }
 
 // Фоновый прогрев кэша (вызывается из server.js по интервалу).
