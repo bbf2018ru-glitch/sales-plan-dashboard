@@ -5502,24 +5502,27 @@ function mktLoadYoY(){
         if(hint) hint.textContent='Загрузка скидок из 1С…';
         return;
       }
-      el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт месяца (акция)</th><th class="num">Скидок выдано ₽</th><th class="num">Дней акции</th><th class="num">Выручка ₽</th><th class="num">Штук</th><th class="num">Доля в тортах</th></tr></thead><tbody>'+
+      el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт месяца (акция)</th><th class="num">Скидка</th><th class="num">Скидок выдано ₽</th><th class="num">Дней акции</th><th class="num">Выручка ₽</th><th class="num">Штук</th><th class="num">Доля в тортах</th></tr></thead><tbody>'+
         ready.slice().reverse().map(function(s){
           var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
           if(s.error){
-            return '<tr><td>'+lbl+'</td><td colspan="6" style="color:var(--muted);font-size:11px">⚠ '+s.error+'</td></tr>';
+            return '<tr><td>'+lbl+'</td><td colspan="7" style="color:var(--muted);font-size:11px">⚠ '+s.error+'</td></tr>';
           }
           if(s.noFlagman){
-            return '<tr><td>'+lbl+'</td><td colspan="6" style="color:var(--muted);font-size:11px">— месячной скидки на торт не было</td></tr>';
+            return '<tr><td>'+lbl+'</td><td colspan="7" style="color:var(--muted);font-size:11px">— месячной скидки на торт не было</td></tr>';
           }
           var nm='<b>'+s.name+'</b>'+(s.partialMonth?' <span style="color:var(--muted);font-size:10px">(месяц идёт)</span>':'');
+          var pctCell = s.discountPct!=null
+            ? '<td class="num" style="color:#e0466a;font-weight:600" title="Эффективная скидка: скидки ÷ полная цена (скидки + выручка). Номинал акции обычно круглый: ~'+Math.round(s.discountPct/5)*5+'%">−'+mNum1(s.discountPct)+' %</td>'
+            : '<td class="num" style="color:var(--muted)">—</td>';
           var sales = s.salesPending
             ? '<td colspan="3" style="color:var(--muted);font-size:11px;text-align:center">продажи прогреваются…</td>'
             : '<td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(s.qty)+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td>';
-          return '<tr><td>'+lbl+'</td><td>'+nm+'</td><td class="num">'+mNum(s.discount)+'</td><td class="num">'+mNum(s.discountDays)+'</td>'+sales+'</tr>';
+          return '<tr><td>'+lbl+'</td><td>'+nm+'</td>'+pctCell+'<td class="num">'+mNum(s.discount)+'</td><td class="num">'+mNum(s.discountDays)+'</td>'+sales+'</tr>';
         }).join('')+'</tbody></table>';
       if(hint){
         var pending=cm.seriesPending||0;
-        hint.innerHTML='<b>Торт месяца — реальная акция</b>: на один торт в 1С встаёт скидка на весь месяц. Торт определяется по скидкам (РегистрНакопления.ПредоставленныеСкидки: топ по сумме, акция ≥15 дней; целый торт + кусочек). «Скидок выдано» — сколько ₽ скидки реально ушло покупателям; «Выручка/Штук» — продажи этого торта за месяц.'+(pending?' · продажи '+pending+' мес. ещё прогреваются из 1С':'');
+        hint.innerHTML='<b>Торт месяца — реальная акция</b>: на один торт в 1С встаёт скидка на весь месяц. Торт определяется по скидкам (РегистрНакопления.ПредоставленныеСкидки: топ по сумме, акция ≥15 дней; целый торт + кусочек). <b>Скидка</b> — эффективный % (скидки ÷ полная цена; номинал акции — ближайший круглый). «Скидок выдано» — сколько ₽ скидки ушло покупателям; «Выручка/Штук» — продажи этого торта за месяц.'+(pending?' · продажи '+pending+' мес. ещё прогреваются из 1С':'');
       }
     }).catch(function(){});
 

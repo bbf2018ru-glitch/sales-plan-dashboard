@@ -389,11 +389,18 @@ async function buildCakeOfMonthSeries(period) {
       mc.aggSales(ym).then(() => console.log(`[cake-of-month] warm agg ${ym}`)).catch(() => {});
     }
 
+    // Эффективный % скидки: скидки / полная цена (выручка уже СО скидкой).
+    // Проверено: дек-2025 даёт 52.7% (в чеках реально стояло 50%), май-2026 ~22% (≈20%).
+    const discountPct = (revenue != null && revenue + discountSum > 0)
+      ? Math.round((discountSum / (revenue + discountSum)) * 1000) / 10
+      : null;
+
     series.push({
       ym,
       name: cand.name,
       discount: Math.round(discountSum),
       discountDays: cand.days,
+      discountPct,
       revenue, qty, sharePct,
       partialMonth: isCur || undefined,
       salesPending: cached ? undefined : true
