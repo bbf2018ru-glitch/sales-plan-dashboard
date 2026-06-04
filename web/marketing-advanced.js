@@ -458,7 +458,9 @@
   // app.js renderPaidCosts() показывает SMS одной строкой ("X уник. получателей").
   // Чтобы не трогать app.js (правит параллельная сессия) — после рендера ищем строку
   // SMS в #mktPaidLive и вставляем под неё раскрывающийся блок с текстом каждой
-  // рассылки + распределением получателей по RFM-сегментам.
+  // рассылки + критерием отбора из 1С.
+  // (Сегменты VIP/акт/спящ/хол и ответственный убраны по просьбе Маши 04.06.2026 —
+  // sms-audience всё ещё дёргаем: из него берётся критерий.)
   // Используем MutationObserver: app.js может перерендерить таблицу несколько раз
   // (live-обновления, переключение периода) — каждый раз перевставляем нашу строку.
   let paidSmsState = { html: null, lastPeriod: null };
@@ -470,53 +472,34 @@
     try { aud = await fetchJson('/api/marketing/sms-audience?period=' + period); } catch (_) { aud = null; }
     const camps = (sa && sa.campaigns) || [];
     if (!camps.length) return null;
-    const audMap = new Map();
     const critMap = new Map();
     for (const a of (aud?.campaigns || [])) {
       const k = a.firstDate + '|' + (a.text || '').slice(0, 50);
-      audMap.set(k, a.audience);
-      critMap.set(k, { criterion: a.criterion, responsible: a.responsible });
+      critMap.set(k, a.criterion);
     }
     const typeLabel = { 'A': 'продукт+срок', 'A*': 'всё+срок', 'B': 'ссылка', 'C': 'оценка' };
-    const audCell = (a) => {
-      if (!a || !a.total) return '<span style="color:var(--muted,#64748b)">—</span>';
-      const parts = [];
-      if (a.VIP) parts.push(`<span style="color:#a855f7" title="≤90д + ≥10к₽ за 365д">🏆 ${a.VIP} VIP</span>`);
-      if (a.active) parts.push(`<span style="color:#22c55e" title="покупка ≤90 дней">🟢 ${a.active} акт.</span>`);
-      if (a.sleeping) parts.push(`<span style="color:#f59e0b" title="покупка 90–365 дней назад">🟡 ${a.sleeping} спящ.</span>`);
-      if (a.cold) parts.push(`<span style="color:#94a3b8" title=">365д или не было покупок">⚪ ${a.cold} хол.</span>`);
-      return parts.join(' · ');
-    };
-    const critCell = (c) => {
-      if (!c || !c.criterion) return '';
-      const who = c.responsible ? ` <span style="color:#94a3b8">· ${esc(c.responsible)}</span>` : '';
-      return `<div style="margin-top:4px;font-size:10px;color:#0369a1" title="Критерий отбора из карточки SMS в 1С (СодержаниеТемыSMS)">🎯 <b>Критерий:</b> ${esc(c.criterion)}${who}</div>`;
+    const critCell = (criterion) => {
+      if (!criterion) return '';
+      return `<div style="margin-top:4px;font-size:10px;color:#0369a1" title="Критерий отбора из карточки SMS в 1С (СодержаниеТемыSMS)">🎯 <b>Критерий:</b> ${esc(criterion)}</div>`;
     };
     const rowsHtml = camps.map(c => {
       const k = c.firstDate + '|' + (c.text || '').slice(0, 50);
-      const a = audMap.get(k);
-      const cr = critMap.get(k);
       return `<tr>
         <td style="white-space:nowrap;color:var(--muted,#64748b);vertical-align:top">${esc(c.firstDate || '')}</td>
         <td style="text-align:right;vertical-align:top">${(c.recipients || 0).toLocaleString('ru-RU')}</td>
         <td style="vertical-align:top"><span style="font-size:10px;color:var(--muted,#64748b)">${esc(typeLabel[c.type] || c.type || '')}</span></td>
         <td style="font-size:11px;vertical-align:top">
           <div>${esc(c.text || '')}</div>
-          ${critCell(cr)}
-          <div style="margin-top:4px;font-size:10px">${audCell(a)}</div>
+          ${critCell(critMap.get(k))}
         </td>
       </tr>`;
     }).join('');
-    const audNote = aud
-      ? `<div style="font-size:10px;color:var(--muted,#64748b);margin-top:6px">Сегменты считаем на момент даты рассылки. VIP = покупка ≤90д + ≥10к₽ за 365д. Активный = покупка ≤90д. Спящий = 90–365д. Холодный = &gt;365д или без покупок (включая новых).</div>`
-      : `<div style="font-size:10px;color:var(--amber,#f59e0b);margin-top:6px">Аудитория ещё не подсчитана (запрос идёт в фоне, обнови через 30 сек).</div>`;
     const inner = `<details style="padding:8px 12px">
       <summary style="cursor:pointer;font-size:12px;color:#555">📝 Содержание рассылок за месяц (${camps.length})</summary>
       <div style="margin-top:8px;overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">
-        <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст / Аудитория</th></tr></thead>
+        <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table></div>
-      ${audNote}
     </details>`;
     paidSmsState = { html: inner, lastPeriod: period };
     return inner;
@@ -563,21 +546,12 @@
     }
   }
 
-  // ─── SMS-атрибуция → колонка «Аудитория» ───────────────────────────────────
+  // ─── SMS-атрибуция → критерий отбора ────────────────────────────────────────
   // app.js рисует таблицу #mktSmsAttr (Рассылка/Оффер/Получ./Купили/.../Затраты).
-  // Дополняем: в КАЖДУЮ строку под текст добавляем распределение по сегментам.
-  // Данные берём из тех же sms-audience и мапим по «DD.MM.YYYY + первые 50 символов текста».
+  // Дополняем: в КАЖДУЮ строку под текст добавляем критерий отбора из 1С.
+  // Данные из sms-audience, мапим по «DD.MM.YYYY + первые 50 символов текста».
+  // (Сегменты VIP/акт/спящ/хол и ответственный убраны по просьбе Маши 04.06.2026.)
   let smsAttrState = { audMap: null, lastPeriod: null };
-
-  function audCellHtml(a) {
-    if (!a || !a.total) return '<span style="color:var(--muted)">аудитория ещё считается…</span>';
-    const parts = [];
-    if (a.VIP) parts.push(`<span style="color:#a855f7" title="≤90д + ≥10к₽ за 365д">🏆 ${a.VIP} VIP</span>`);
-    if (a.active) parts.push(`<span style="color:#22c55e" title="покупка ≤90 дней">🟢 ${a.active} акт.</span>`);
-    if (a.sleeping) parts.push(`<span style="color:#f59e0b" title="покупка 90–365 дней назад">🟡 ${a.sleeping} спящ.</span>`);
-    if (a.cold) parts.push(`<span style="color:#94a3b8" title=">365д или не было покупок">⚪ ${a.cold} хол.</span>`);
-    return parts.join(' · ');
-  }
 
   async function fetchSmsAudMap(period) {
     if (smsAttrState.lastPeriod === period && smsAttrState.audMap) return smsAttrState.audMap;
@@ -586,7 +560,7 @@
     const map = new Map();
     for (const a of (aud?.campaigns || [])) {
       const key = a.firstDate + '|' + (a.text || '').slice(0, 50);
-      map.set(key, { audience: a.audience, criterion: a.criterion, responsible: a.responsible });
+      map.set(key, { criterion: a.criterion });
     }
     smsAttrState = { audMap: map, lastPeriod: period };
     return map;
@@ -617,17 +591,10 @@
         cr.className = 'sms-aud-line sms-crit-line';
         cr.style.cssText = 'font-size:10px;margin-top:4px;color:#0369a1';
         cr.setAttribute('title', 'Критерий отбора из 1С (СодержаниеТемыSMS)');
-        const who = entry.responsible ? ` · <span style="color:#94a3b8">${entry.responsible.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</span>` : '';
-        cr.innerHTML = `🎯 <b>Критерий:</b> ${entry.criterion.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}${who}`;
+        cr.innerHTML = `🎯 <b>Критерий:</b> ${entry.criterion.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}`;
         firstCell.appendChild(cr);
+        injected++;
       }
-      // Распределение по сегментам
-      const line = document.createElement('div');
-      line.className = 'sms-aud-line';
-      line.style.cssText = 'font-size:10px;margin-top:4px';
-      line.innerHTML = audCellHtml(entry.audience);
-      firstCell.appendChild(line);
-      injected++;
     });
     return injected > 0;
   }
