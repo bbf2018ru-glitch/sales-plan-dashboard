@@ -11,7 +11,7 @@ const upp = require('./upp-client');
 const smsAttribution = require('./sms-attribution');
 
 const EXT_DIR = process.env.MARKETING_DATA_DIR || '/opt/marketing-data';
-const cache = upp.makeCache(6 * 60 * 60 * 1000);
+const cache = upp.makeCache(6 * 60 * 60 * 1000, 'paid-costs');
 
 function readExt(file) {
   try { return JSON.parse(fs.readFileSync(EXT_DIR + '/' + file, 'utf8')); } catch (_) { return null; }

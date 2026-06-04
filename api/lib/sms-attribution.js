@@ -19,7 +19,7 @@
 
 const fs = require('fs');
 const upp = require('./upp-client');
-const cache = upp.makeCache(6 * 60 * 60 * 1000);
+const cache = upp.makeCache(6 * 60 * 60 * 1000, 'sms-attribution');
 const EXT_DIR = process.env.MARKETING_DATA_DIR || '/opt/marketing-data';
 function readExt(file) { try { return JSON.parse(fs.readFileSync(EXT_DIR + '/' + file, 'utf8')); } catch (_) { return null; } }
 // Переходы по ссылкам (Тип B) считает серверный скрейпер scrape-metrika-entry.js:

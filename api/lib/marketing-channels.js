@@ -13,8 +13,9 @@ function readExternal(file) {
   catch (_) { return null; }
 }
 
-const cache = makeCache(6 * 60 * 60 * 1000);     // 6 часов — основной расчёт
-const mapCache = makeCache(24 * 60 * 60 * 1000); // 24 часа — карты товаров/точек
+const cache = makeCache(6 * 60 * 60 * 1000, 'mkt-channels');     // 6 часов — основной расчёт (персистентно: HTTP-ответ JSON-safe)
+const mapCache = makeCache(24 * 60 * 60 * 1000, 'mkt-maps'); // 24 часа — карты товаров/точек (плоские объекты)
+// monthCache НЕ персистим: агрегаты содержат Map (byStore/products) — JSON-roundtrip превратит в {} и сломает .get()
 const monthCache = makeCache(24 * 60 * 60 * 1000); // 24 часа — агрегаты per-month (прошлые месяцы не меняются)
 
 // Карта точек: storeCode -> name (по /stores-detail), кэш 24ч.

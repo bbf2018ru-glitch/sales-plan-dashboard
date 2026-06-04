@@ -8,7 +8,11 @@
 
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const { fetchUppPackage } = require('./upp-pull');
+
+const CACHE_DIR = path.join(__dirname, '..', '..', 'data', 'cache');
 
 function base() {
   return (process.env.UPP_PULL_URL || '').replace(/\/pull(\?.*)?$/, '');
@@ -152,9 +156,40 @@ function callQuery(queryText, { timeoutMs = 100000 } = {}) {
 }
 
 // ─── Простой in-memory cache с TTL ──────────────────────────────────────
-function makeCache(ttlMs = 5 * 60 * 1000) {
+// С опциональным name — персистентность в data/cache/<name>.json: кэш переживает
+// рестарты Node (каждый деплой!), иначе тяжёлые расчёты (SMS-атрибуция ~90с на
+// холодную) заново считаются после каждого push. Сохранение — дебаунс 3с,
+// загрузка — один раз при создании, просроченные записи отбрасываются.
+function makeCache(ttlMs = 5 * 60 * 1000, name = null) {
   const m = new Map();
   const pending = new Map();
+  const file = name ? path.join(CACHE_DIR, name.replace(/[^a-z0-9_-]/gi, '_') + '.json') : null;
+
+  if (file) {
+    try {
+      const obj = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const now = Date.now();
+      for (const [k, v] of Object.entries(obj)) {
+        if (v && typeof v.at === 'number' && now - v.at < ttlMs) m.set(k, v);
+      }
+    } catch (_) { /* нет файла / битый JSON — стартуем пустыми */ }
+  }
+
+  let saveTimer = null;
+  function scheduleSave() {
+    if (!file || saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      try {
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+        const tmp = file + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries(m)));
+        fs.renameSync(tmp, file); // атомарно — деплой-рестарт не оставит полузаписанный файл
+      } catch (_) { /* диск переполнен/нет прав — кэш остаётся in-memory */ }
+    }, 3000);
+    if (saveTimer.unref) saveTimer.unref();
+  }
+
   return {
     async wrap(key, fn) {
       const c = m.get(key);
@@ -164,7 +199,7 @@ function makeCache(ttlMs = 5 * 60 * 1000) {
       const promise = (async () => {
         try {
           const data = await fn();
-          if (data && !data.error) m.set(key, { data, at: Date.now() });
+          if (data && !data.error) { m.set(key, { data, at: Date.now() }); scheduleSave(); }
           return data;
         } finally { pending.delete(key); }
       })();
@@ -178,7 +213,10 @@ function makeCache(ttlMs = 5 * 60 * 1000) {
       return c && Date.now() - c.at < ttlMs ? c.data : null;
     },
     isPending(key) { return pending.has(key); },
-    clear() { m.clear(); }
+    clear() {
+      m.clear();
+      if (file) { try { fs.unlinkSync(file); } catch (_) {} }
+    }
   };
 }
 

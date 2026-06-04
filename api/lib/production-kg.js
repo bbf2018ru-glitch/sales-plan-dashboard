@@ -5,7 +5,7 @@
 // Позиции без веса (ВесКг=0/null) в кг дают 0 — считаем отдельно как «без веса».
 
 const upp = require('./upp-client');
-const cache = upp.makeCache(6 * 60 * 60 * 1000);
+const cache = upp.makeCache(6 * 60 * 60 * 1000, 'production-kg');
 
 function bounds(period) {
   const [y, m] = period.split('-').map(Number);

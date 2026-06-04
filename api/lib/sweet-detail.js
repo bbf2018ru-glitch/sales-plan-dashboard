@@ -3,7 +3,7 @@
 // и сумму покупок участников за весь период действия программы.
 const { callQuery, parseRu, nowYM, makeCache } = require('./upp-client');
 
-const cache = makeCache(6 * 60 * 60 * 1000); // 6 часов
+const cache = makeCache(6 * 60 * 60 * 1000, 'sweet-detail'); // 6 часов
 
 function ymBounds(period) {
   const [y, m] = period.split('-').map(Number);

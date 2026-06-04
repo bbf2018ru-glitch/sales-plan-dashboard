@@ -17,7 +17,7 @@
 // параллельная сессия).
 
 const upp = require('./upp-client');
-const cache = upp.makeCache(6 * 60 * 60 * 1000);
+const cache = upp.makeCache(6 * 60 * 60 * 1000, 'sms-audience');
 
 const VIP_REVENUE_THRESHOLD = 10000;
 const MIN_RECIPIENTS = 100;
