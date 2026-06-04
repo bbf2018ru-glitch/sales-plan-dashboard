@@ -863,9 +863,13 @@ const server = http.createServer(async (req, res) => {
         }
         const plan = await productionPlan.getPlan(date, { yoy: false });
         const buf = productionXlsx.buildXlsx(plan);
+        // Дружелюбное русское имя файла «План выпуска ДД.ММ.ГГГГ.xlsx» (RFC5987 для кириллицы),
+        // + ASCII-фолбэк для старых клиентов.
+        const [yy, mm, dd] = date.split('-');
+        const ruName = `План выпуска ${dd}.${mm}.${yy}.xlsx`;
         res.writeHead(200, {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="plan-${date}.xlsx"`,
+          'Content-Disposition': `attachment; filename="plan-${date}.xlsx"; filename*=UTF-8''${encodeURIComponent(ruName)}`,
           'Content-Length': buf.length
         });
         res.end(buf);
