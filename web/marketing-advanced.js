@@ -68,17 +68,19 @@
         ordered.map(s => {
           const m = meta[s.segment] || { emoji: '🟦', color: '#94a3b8', desc: '' };
           const share = (s.count || 0) / total;
+          const monetary = Number(s.monetary) || 0;
+          const avg = Number(s.avgMonetary) || 0;
           return `<div style="padding:14px;border:1px solid var(--line,#e2e8f0);border-radius:10px;background:var(--paper,#fff);border-top:3px solid ${m.color}">
             <div style="font-size:24px">${m.emoji}</div>
             <div style="font-weight:600;color:${m.color}">${esc(s.segment)}</div>
-            <div style="font-size:28px;font-weight:700;margin:4px 0">${(s.count || 0).toLocaleString('ru-RU')}</div>
+            <div style="font-size:28px;font-weight:700;margin:4px 0" title="точно ${(s.count || 0).toLocaleString('ru-RU')} клиентов">${(s.count || 0).toLocaleString('ru-RU')}</div>
             <div style="font-size:12px;color:var(--muted,#64748b)">${fmtPct(share)} клиентов</div>
             <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">${esc(m.desc)}</div>
-            <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">Чек: ${fmtMoney(s.avgMonetary || 0)} ₽ · Выручка ${fmtMoney(s.monetary || 0)} ₽</div>
+            <div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px" title="точные цифры: средний чек ${Math.round(avg).toLocaleString('ru-RU')} ₽ · общая выручка ${Math.round(monetary).toLocaleString('ru-RU')} ₽">Чек: ${fmtMoney(avg)} ₽ · Выручка ${fmtMoney(monetary)} ₽</div>
           </div>`;
         }).join('') +
         '</div>' +
-        `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Всего клиентов: ${total.toLocaleString('ru-RU')} · Период: ${from} … ${to} (6 мес)</div>` +
+        `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Всего клиентов: ${total.toLocaleString('ru-RU')} · Период: ${from} … ${to} (6 мес). Наведи на цифру — точное значение в подсказке.</div>` +
         (data.topVIP && data.topVIP.length ? renderTopVip(data.topVIP) : '');
     } catch (e) {
       el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить RFM: ${esc(e.message)}</div>`;
@@ -86,18 +88,22 @@
   }
 
   function renderTopVip(list) {
-    const rows = list.slice(0, 10).map((v, i) => `<tr>
-      <td>${i + 1}</td>
-      <td>${esc(v.name || '')}</td>
-      <td style="text-align:right">${fmtMoney(v.monetary || 0)} ₽</td>
-      <td style="text-align:right">${(v.frequency || 0).toLocaleString('ru-RU')}</td>
-    </tr>`).join('');
+    const rows = list.slice(0, 10).map((v, i) => {
+      const m = Number(v.monetary) || 0;
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${esc(v.name || '')}</td>
+        <td style="text-align:right" title="${m.toLocaleString('ru-RU')} ₽">${fmtMoney(m)} ₽</td>
+        <td style="text-align:right">${(v.frequency || 0).toLocaleString('ru-RU')}</td>
+      </tr>`;
+    }).join('');
     return `<div style="margin-top:14px">
       <div style="font-weight:600;font-size:13px;margin-bottom:6px">Топ-10 VIP клиентов</div>
       <div class="table-wrap"><table style="width:100%;font-size:13px">
-        <thead><tr><th>#</th><th>Клиент</th><th style="text-align:right">Выручка</th><th style="text-align:right">Покупок</th></tr></thead>
+        <thead><tr><th>#</th><th>Клиент</th><th style="text-align:right">Выручка</th><th style="text-align:right" title="Число чеков, не уникальных покупок">Чеков</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
+      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:6px">Наведите на сумму — точная цифра в всплывающей подсказке. «Чеков» — число транзакций по карте за период.</div>
     </div>`;
   }
 
@@ -119,16 +125,28 @@
       const offsets = Array.from({ length: maxOffset }, (_, i) => i + 1);
       const head = '<tr><th>Месяц регистрации</th><th style="text-align:right">Новых карт</th>' +
         offsets.map(o => `<th style="text-align:center">+${o} мес</th>`).join('') + '</tr>';
+      // Помечаем текущий месяц (последняя когорта) как «неполный» — у него нет
+      // ещё ни одного «+1 мес» наблюдения, и пустые ячейки могут читаться как 0%.
+      const currentMonth = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      })();
       const rows = cohorts.map(c => {
+        const firstMonth = c.firstMonth || c.month || '';
+        const isCurrent = firstMonth === currentMonth;
         const byOffset = new Map((c.retention || []).map(r => [r.offset, r]));
         const tds = offsets.map(o => {
           const r = byOffset.get(o);
-          if (!r || r.pct == null) return '<td style="color:var(--muted,#64748b);text-align:center">—</td>';
+          if (!r || r.pct == null) {
+            // Если когорта = текущий месяц, ячейка «+1 мес» ещё не имеет смысла.
+            return `<td style="color:var(--muted,#64748b);text-align:center" title="${isCurrent ? 'месяц ещё не закончился' : 'данных нет'}">${isCurrent ? '<span style="font-size:10px;opacity:.6">ожидается</span>' : '—'}</td>`;
+          }
           const ratio = Math.max(0, Math.min(1, r.pct / 100));
           const bg = `hsl(${Math.round(120 * ratio)}deg 60% ${88 - ratio * 28}%)`;
           return `<td style="background:${bg};text-align:center;font-weight:600" title="${r.count?.toLocaleString('ru-RU') ?? 0} карт">${r.pct.toFixed(1)}%</td>`;
         }).join('');
-        return `<tr><td>${esc(c.firstMonth || c.month || '')}</td><td style="text-align:right">${(c.total || c.size || 0).toLocaleString('ru-RU')}</td>${tds}</tr>`;
+        const label = firstMonth + (isCurrent ? ' <span style="font-size:10px;color:var(--amber,#f59e0b)">(не завершён)</span>' : '');
+        return `<tr><td>${label}</td><td style="text-align:right">${(c.total || c.size || 0).toLocaleString('ru-RU')}</td>${tds}</tr>`;
       }).join('');
       el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
     } catch (e) {
@@ -213,9 +231,9 @@
           const totalFact = stores.reduce((s, x) => s + (Number(x.fact) || 0), 0);
           return `<div style="padding:12px;border:1px solid var(--line,#e2e8f0);border-radius:10px;border-left:4px solid ${color}">
             <div style="font-weight:600;margin-bottom:6px">${esc(cl.name || `Кластер ${i + 1}`)}</div>
-            <div style="font-size:11px;color:var(--muted,#64748b);margin-bottom:8px">${cl.count ?? stores.length} точек · ${fmtMoney(totalFact)} ₽ суммарно</div>
+            <div style="font-size:11px;color:var(--muted,#64748b);margin-bottom:8px" title="точно ${Math.round(totalFact).toLocaleString('ru-RU')} ₽">${cl.count ?? stores.length} точек · ${fmtMoney(totalFact)} ₽ суммарно</div>
             <div style="font-size:12px;color:var(--muted,#64748b)">Сред. чек: ${fmtMoney(avg.avgCheck || 0)} ₽</div>
-            ${avg.marginPct != null ? `<div style="font-size:12px;color:var(--muted,#64748b)">Маржа: ${avg.marginPct.toFixed(1)}%</div>` : ''}
+            ${avg.marginPct != null ? `<div style="font-size:12px;color:var(--muted,#64748b)">Маржа: ${avg.marginPct > 0.5 ? avg.marginPct.toFixed(1) + '%' : '<span title="1С не передала cost для этих точек">н/д</span>'}</div>` : ''}
             ${avg.pctCompletion != null ? `<div style="font-size:12px;color:var(--muted,#64748b)">Выполн. плана: ${avg.pctCompletion.toFixed(1)}%</div>` : ''}
             <div style="font-size:11px;margin-top:6px;color:var(--muted,#64748b)">${stores.slice(0, 5).map(s => esc(s.storeName || s.name || '')).join(', ')}${stores.length > 5 ? '…' : ''}</div>
           </div>`;
@@ -272,38 +290,54 @@
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Архив пока пуст. Первый снимок появится завтра после cron 7:00.</div>';
         return;
       }
-      // Сгруппировать по точке: { address: [{date, rating}] }
-      const byAddr = new Map();
+      // Группируем по ID точки (а не по адресу): у master-карточек 2ГИС address=null,
+      // но рейтинг есть — мы их теряли. Теперь показываем всех с rating != null.
+      const byId = new Map();
       for (const e of entries) {
         for (const b of (e.branches || [])) {
-          if (!b.address || b.rating == null) continue;
-          if (!byAddr.has(b.address)) byAddr.set(b.address, []);
-          byAddr.get(b.address).push({ date: e.date, rating: b.rating });
+          if (b.rating == null) continue;
+          const key = b.id;
+          if (!byId.has(key)) byId.set(key, { id: b.id, address: b.address, history: [] });
+          const rec = byId.get(key);
+          if (!rec.address && b.address) rec.address = b.address; // подхватим, если в другой день распарсилось
+          rec.history.push({ date: e.date, rating: b.rating, ratingCount: b.ratingCount });
         }
       }
-      if (!byAddr.size) {
-        el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">В архиве пока только снимки без распарсенных адресов.</div>';
+      if (!byId.size) {
+        el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Точек с рейтингом ещё нет в архиве.</div>';
         return;
       }
-      // Таблица с последним рейтингом + стрелочкой если есть ≥2 точки в архиве.
-      const rows = [...byAddr.entries()].map(([addr, arr]) => {
-        arr.sort((a, b) => a.date.localeCompare(b.date));
-        const last = arr[arr.length - 1].rating;
-        const first = arr[0].rating;
-        const delta = arr.length > 1 ? last - first : null;
-        const trend = delta == null ? '' : (delta > 0.05 ? `<span style="color:var(--green,#22c55e)">↑ +${delta.toFixed(2)}</span>` : delta < -0.05 ? `<span style="color:var(--red,#ef4444)">↓ ${delta.toFixed(2)}</span>` : '<span style="color:var(--muted,#64748b)">→</span>');
+      // Таблица: рейтинг + delta vs первый снимок.
+      const rows = [...byId.values()].sort((a, b) => {
+        const lastA = a.history[a.history.length - 1].rating;
+        const lastB = b.history[b.history.length - 1].rating;
+        return lastB - lastA;
+      }).map(rec => {
+        rec.history.sort((a, b) => a.date.localeCompare(b.date));
+        const last = rec.history[rec.history.length - 1].rating;
+        const lastCount = rec.history[rec.history.length - 1].ratingCount;
+        const first = rec.history[0].rating;
+        const delta = rec.history.length > 1 ? last - first : null;
+        const trend = delta == null ? '' :
+          delta > 0.05 ? `<span style="color:var(--green,#22c55e)">↑ +${delta.toFixed(2)}</span>` :
+          delta < -0.05 ? `<span style="color:var(--red,#ef4444)">↓ ${delta.toFixed(2)}</span>` :
+          '<span style="color:var(--muted,#64748b)">→</span>';
+        const addrCell = rec.address
+          ? esc(rec.address)
+          : `<span style="color:var(--muted,#64748b)">(без адреса) <code style="font-size:11px">${esc(rec.id)}</code></span>`;
         return `<tr>
-          <td>${esc(addr)}</td>
+          <td>${addrCell}</td>
           <td style="text-align:right;font-weight:600">${last.toFixed(2)}</td>
-          <td style="text-align:right">${arr.length}</td>
+          <td style="text-align:right;color:var(--muted,#64748b)">${lastCount != null ? lastCount.toLocaleString('ru-RU') : '—'}</td>
+          <td style="text-align:right">${rec.history.length}</td>
           <td>${trend}</td>
         </tr>`;
       }).join('');
       el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px">
-        <thead><tr><th>Адрес</th><th>Текущий</th><th>Снимков</th><th>Тренд</th></tr></thead>
+        <thead><tr><th>Адрес / ID</th><th style="text-align:right">Рейтинг</th><th style="text-align:right">Оценок</th><th style="text-align:right">Снимков</th><th>Тренд</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
-      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:8px">Снимков в архиве: ${entries.length} (за ${entries[0].date} … ${entries[entries.length - 1].date})</div>`;
+      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:8px">Точек с рейтингом: ${byId.size} · Снимков в архиве: ${entries.length} (за ${entries[0].date} … ${entries[entries.length - 1].date})</div>`;
     } catch (e) {
       el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }

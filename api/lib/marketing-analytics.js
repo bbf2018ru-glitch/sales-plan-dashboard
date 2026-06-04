@@ -407,16 +407,24 @@ function buildStoreClusters(db, period) {
 
   // Сортируем кластеры по avgPct убыванию и присваиваем уникальные имена
   raw.sort((a, b) => b.avgPct - a.avgPct);
-  const labels = ['Лидеры', 'Средние верх', 'Средние низ', 'Отстающие'];
+  const baseLabels = ['Лидеры', 'Средние верх', 'Средние низ', 'Отстающие'];
   const tones = ['good', 'neutral', 'neutral', 'bad'];
   // Если кластеров меньше 4 — урезаем
-  while (labels.length > raw.length) { labels.pop(); tones.pop(); }
+  const labels = baseLabels.slice(0, raw.length);
+  while (tones.length > raw.length) tones.pop();
   // Если у двух кластеров близкий avgPct (разница <3 п.п.), но разный чек —
-  // помечаем по чеку, чтобы не было одинаковых имён
+  // помечаем по чеку, чтобы не было одинаковых имён.
+  // FIX 2026-06-04: брать ВСЕГДА базовое имя (baseLabels[i-1]), а не labels[i-1] —
+  // иначе при 3+ близких кластерах суффикс «(высокий чек)» накладывался итеративно
+  // и получались имена вроде «Лидеры (низкий чек) (высокий чек)».
   for (let i = 1; i < raw.length; i++) {
     if (Math.abs(raw[i].avgPct - raw[i - 1].avgPct) < 3) {
-      labels[i] = raw[i].avgCheck > raw[i - 1].avgCheck ? `${labels[i - 1]} (высокий чек)` : `${labels[i - 1]} (низкий чек)`;
-      if (!labels[i - 1].includes('чек')) labels[i - 1] += raw[i - 1].avgCheck > raw[i].avgCheck ? ' (высокий чек)' : ' (низкий чек)';
+      const base = baseLabels[i - 1];
+      const checkSuffix = (a, b) => a > b ? ' (высокий чек)' : ' (низкий чек)';
+      labels[i] = base + checkSuffix(raw[i].avgCheck, raw[i - 1].avgCheck);
+      if (!labels[i - 1].includes('чек')) {
+        labels[i - 1] = base + checkSuffix(raw[i - 1].avgCheck, raw[i].avgCheck);
+      }
     }
   }
 
