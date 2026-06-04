@@ -5496,7 +5496,7 @@ function mktLoadYoY(){
       var el=document.getElementById('mktCake'); var hint=document.getElementById('mktCakeHint');
       if(!el) return;
       var MM3=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-      var ready=cm.series.filter(function(s){return !s._pending && s.productCode;});
+      var ready=cm.series.filter(function(s){return !s._pending && (s.productCode || s.incomplete);});
       if(!ready.length){
         el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Данные тортов прогреваются вместе с основной серией 1С. Обнови страницу через 10–30 мин.</div>';
         if(hint) hint.textContent='Прогрев из 1С (фоновый ~30 мин)';
@@ -5505,12 +5505,17 @@ function mktLoadYoY(){
       el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт-флагман</th><th class="num">Выручка ₽</th><th class="num">Штук</th><th class="num">Доля в тортах</th><th class="num">×ср.</th></tr></thead><tbody>'+
         ready.slice().reverse().map(function(s){
           var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
+          if(s.incomplete){
+            return '<tr><td>'+lbl+'</td><td colspan="5" style="color:var(--muted);font-size:11px">⚠ неполные данные 1С за месяц — флагман не определить</td></tr>';
+          }
           var rc=s.ratio>=2?'color:#10a05a':(s.ratio>=1.3?'color:#b8860b':'');
-          return '<tr><td>'+lbl+'</td><td><b>'+s.name+'</b></td><td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(s.qty)+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td><td class="num" style="'+rc+'">×'+(s.ratio!=null?mNum1(s.ratio):'?')+'</td></tr>';
+          var nm='<b>'+s.name+'</b>'+(s.partialMonth?' <span style="color:var(--muted);font-size:10px">(месяц идёт — лидер по темпу)</span>':'');
+          var rt=(s.ratio!=null?(s.partialMonth?'≈':'')+'×'+mNum1(s.ratio):'—');
+          return '<tr><td>'+lbl+'</td><td>'+nm+'</td><td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(s.qty)+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td><td class="num" style="'+rc+'">'+rt+'</td></tr>';
         }).join('')+'</tbody></table>';
       if(hint){
         var pending=cm.seriesPending||0;
-        hint.innerHTML='Метод: '+cm.method+'. Рассмотрено '+cm.productsConsidered+' тортов. Колонка <b>×ср.</b> — во сколько раз выручка торта в этом месяце превысила свою среднюю за 17 мес (зелёное ≥2× — явный «эффект акции», жёлтое ≥1,3× — заметный, без цвета — спорный).'+(pending?' · '+pending+' мес. ещё прогреваются':'');
+        hint.innerHTML='Метод: '+cm.method+'. Рассмотрено '+cm.productsConsidered+' тортов. Колонка <b>×ср.</b> — во сколько раз выручка торта в месяце превысила его среднюю по полным месяцам (зелёное ≥2× — явный «эффект акции», жёлтое ≥1,3× — заметный). Текущий месяц — оценка в пересчёте на полный (по темпу прошедших дней).'+(pending?' · '+pending+' мес. ещё прогреваются':'');
       }
     }).catch(function(){});
 

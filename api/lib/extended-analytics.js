@@ -293,8 +293,17 @@ async function warmPromoCodesMonthly(period) {
 }
 
 // «Торт месяца» — автоопределение по всплеску продаж конкретного торта в каждом месяце
-// vs его средняя за все 17 месяцев. Использует кэш marketing-channels (aggSales).
+// vs его средняя по ПОЛНЫМ месяцам. Использует кэш marketing-channels (aggSales).
 // Возвращает [{ ym, productCode, name, revenue, qty, ratio, categoryRevenue, sharePct }, ...]
+//
+// Фиксы 04.06.2026 («считался неправильно»):
+// 1. Мусорные SKU исключены: безымянный «ТОРТ» (генерик-позиция) и «на заказ».
+// 2. Месяцы с неполными данными 1С (выручка тортов < 30% медианы) помечаются
+//    incomplete — раньше уверенно показывали случайный торт на огрызке данных.
+// 3. Текущий месяц: выручка в пересчёте на полный месяц (по темпу) + флаг partialMonth —
+//    раньше 4 дня июня сравнивались с полными месяцами (ratio 0.55 = бессмыслица).
+// 4. Средняя торта — только по полным месяцам; новинки без ≥2 полных месяцев истории
+//    не участвуют (раньше avg включал сам месяц всплеска и размывал ratio).
 async function buildCakeOfMonthSeries(period) {
   // Ленивый require — circular dependency safety
   const mc = require('./marketing-channels')._internal;
@@ -303,6 +312,8 @@ async function buildCakeOfMonthSeries(period) {
 
   // Собираем productCode → revenue по месяцам. Только товары из «тортовой» группы.
   const TORT_RE = /торт/i;
+  const JUNK_RE = /^торты?\.?$/i;    // безымянная генерик-позиция «ТОРТ»
+  const CUSTOM_RE = /на заказ/i;     // заказные — не розничный флагман
   const productMonthly = new Map(); // code → { name, byMonth: { ym → {revenue, qty} } }
   const monthData = [];             // [{ ym, ready, categoryRevenue }]
   for (const ym of months) {
@@ -321,6 +332,8 @@ async function buildCakeOfMonthSeries(period) {
       // «Торт» определяем по группе товара или по имени
       const isTort = TORT_RE.test(meta.group || '') || TORT_RE.test(meta.name || '');
       if (!isTort) continue;
+      const nm = String(meta.name || '').trim();
+      if (JUNK_RE.test(nm) || CUSTOM_RE.test(nm)) continue;
       catRev += v.sum || 0;
       if (!productMonthly.has(code)) productMonthly.set(code, { code, name: meta.name, byMonth: {} });
       productMonthly.get(code).byMonth[ym] = { revenue: v.sum || 0, qty: v.qty || 0 };
@@ -328,24 +341,48 @@ async function buildCakeOfMonthSeries(period) {
     monthData.push({ ym, ready: true, categoryRevenue: Math.round(catRev) });
   }
 
-  // Для каждого товара: avg выручка по доступным месяцам.
+  // Текущий календарный месяц — данные неполные по определению.
+  const now = new Date();
+  const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const daysInCur = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysElapsed = Math.max(1, now.getDate() - 1); // вчера = последний полный день
+  const curScale = daysInCur / daysElapsed;
+
+  // Неполные месяцы данных 1С: выручка тортов сильно ниже медианы остальных.
+  const fullRevs = monthData
+    .filter(m => m.ready && m.ym !== curYM)
+    .map(m => m.categoryRevenue)
+    .sort((a, b) => a - b);
+  const medianRev = fullRevs.length ? fullRevs[Math.floor(fullRevs.length / 2)] : 0;
+  for (const md of monthData) {
+    if (md.ready && md.ym !== curYM && medianRev && md.categoryRevenue < medianRev * 0.3) md.incomplete = true;
+  }
+  const fullYms = new Set(monthData.filter(m => m.ready && !m.incomplete && m.ym !== curYM).map(m => m.ym));
+
+  // Средняя выручка торта — ТОЛЬКО по полным месяцам. Минимум 2 месяца истории.
   const productAvg = new Map();
   for (const [code, p] of productMonthly) {
-    const vals = Object.values(p.byMonth).map(v => v.revenue || 0);
-    if (!vals.length) continue;
+    const vals = Object.entries(p.byMonth).filter(([ym]) => fullYms.has(ym)).map(([, v]) => v.revenue || 0);
+    if (vals.length < 2) continue;
     productAvg.set(code, vals.reduce((a, b) => a + b, 0) / vals.length);
   }
 
-  // Для каждого месяца: ищем торт с наибольшим ratio = revenue[ym] / avgOverall.
-  // Минимальный порог: revenue в этом месяце >= 50 000 ₽ (отсечь редко продаваемые товары).
+  // Для каждого месяца: торт с наибольшим ratio = revenue[ym] / avg по полным месяцам.
+  // Порог: revenue >= 50 000 ₽ (для текущего месяца — пропорционально прошедшим дням).
   const series = monthData.map(md => {
     if (!md.ready) return { ym: md.ym, _pending: true };
+    if (md.incomplete) {
+      return { ym: md.ym, productCode: null, name: null, incomplete: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
+    }
+    const isCur = md.ym === curYM;
+    const minRev = isCur ? 50000 / curScale : 50000;
     let best = null;
     for (const [code, p] of productMonthly) {
       const m = p.byMonth[md.ym];
-      if (!m || m.revenue < 50000) continue;
-      const avg = productAvg.get(code) || 1;
-      const ratio = m.revenue / avg;
+      if (!m || m.revenue < minRev) continue;
+      const avg = productAvg.get(code);
+      if (!avg) continue; // новинка без истории — ratio не посчитать честно
+      const ratio = (isCur ? m.revenue * curScale : m.revenue) / avg;
       if (!best || ratio > best.ratio) best = { code, name: p.name, revenue: Math.round(m.revenue), qty: Math.round(m.qty), ratio: Math.round(ratio * 100) / 100 };
     }
     if (!best) return { ym: md.ym, productCode: null, name: 'нет данных', revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
@@ -356,6 +393,7 @@ async function buildCakeOfMonthSeries(period) {
       revenue: best.revenue,
       qty: best.qty,
       ratio: best.ratio,
+      partialMonth: isCur || undefined,
       categoryRevenue: md.categoryRevenue,
       sharePct: md.categoryRevenue ? Math.round((best.revenue / md.categoryRevenue) * 1000) / 10 : null
     };
@@ -364,7 +402,7 @@ async function buildCakeOfMonthSeries(period) {
   const pendingCount = series.filter(s => s._pending).length;
   return {
     period,
-    method: 'auto: max(revenue/avg) среди тортов с месячной выручкой ≥50к',
+    method: 'auto: max(revenue/avg по полным месяцам) среди тортов с выручкой ≥50к; генерик «ТОРТ» и «на заказ» исключены; текущий месяц — по темпу',
     range: { from: months[0], to: months[months.length - 1] },
     series,
     seriesPending: pendingCount,
