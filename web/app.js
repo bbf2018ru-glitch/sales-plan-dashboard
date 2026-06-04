@@ -4482,6 +4482,26 @@ function renderDirectMonthly(d){
     '</tbody></table></div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:6px">Источник — отчёт «Перформанс-кампании» в кабинете Директа, помесячно. Конверсии — цели Я.Метрики в кабинете. Обновлено: '+st+(dh.sessionExpired?' · ⚠️ сессия протухла':'')+'.</div>';
 }
+// 2ГИС «Присутствие в выдаче» помесячно — live из кабинета (scrape-2gis-monthly.js).
+function renderGisMonthly(d){
+  var el=document.getElementById('mktGis'); if(!el) return;
+  var gh=d&&d.external&&d.external.gisHistory;
+  var ms=(gh&&gh.series||[]).filter(function(m){return m && m.impressions;});
+  if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история 2ГИС собирается скрейпером кабинета.</div>'; return; }
+  var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  var imp=0;
+  var rows=ms.map(function(m){ imp+=m.impressions||0;
+    var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
+    var posR=(m.positionMin&&m.positionMax)?(m.positionMin+'–'+m.positionMax):'—';
+    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.days||'—')+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+posR+'</td></tr>';
+  }).reverse().join('');
+  var st=gh.scrapedAt?new Date(gh.scrapedAt).toLocaleString('ru-RU'):'—';
+  el.innerHTML='<div class="mkt-chart-t">2ГИС — присутствие в выдаче помесячно <span class="mkt-scope dyn">live · кабинет</span></div>'+
+    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Показы в выдаче</th><th class="num">Дней</th><th class="num">Позиция ср.</th><th class="num">Позиция мин–макс</th></tr></thead><tbody>'+rows+
+    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(imp)+'</td><td colspan="3"></td></tr>'+
+    '</tbody></table></div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Раздел «Присутствие в выдаче» кабинета 2ГИС (показы карточки в поиске + средняя позиция по категории). Помесячная история ведётся с момента подключения модуля. Обновлено: '+st+'.</div>';
+}
 // Платные каналы — затраты и отдача (бюджет маркетинга) из /api/marketing/paid-costs.
 function renderPaidCosts(pc){
   var el=document.getElementById('mktPaidLive'); if(!el) return;
@@ -4945,6 +4965,8 @@ function mktLoadYoY(){
     try { renderSalesMonthly(d); } catch(_){}
     // Я.Директ помесячно — live из кабинета (заменили статику).
     try { renderDirectMonthly(d); } catch(_){}
+    // 2ГИС присутствие в выдаче помесячно — live из кабинета (заменили статику).
+    try { renderGisMonthly(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){

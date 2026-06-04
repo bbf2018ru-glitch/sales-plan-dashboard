@@ -333,6 +333,7 @@ async function compute(period) {
     categories,
     external: {
       gis: readExternal('2gis.json'),
+      gisHistory: readExternal('2gis-history.json'),
       direct: readExternal('direct.json'),
       directHistory: readExternal('direct-history.json'),
       metrika: readExternal('metrika.json'),
