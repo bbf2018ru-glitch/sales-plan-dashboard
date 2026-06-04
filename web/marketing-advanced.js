@@ -454,6 +454,58 @@
     }
   }
 
+  // ─── Платные каналы → SMS: тексты рассылок ─────────────────────────────────
+  // app.js renderPaidCosts() показывает SMS одной строкой ("X уник. получателей").
+  // Чтобы не трогать app.js (правит параллельная сессия) — после рендера ищем строку
+  // SMS в #mktPaidLive и вставляем под неё раскрывающийся блок с текстом каждой
+  // рассылки за месяц. Источник — тот же /api/marketing/sms-attribution.
+  async function enrichPaidSms() {
+    const container = document.getElementById('mktPaidLive');
+    if (!container) return;
+    // ждём пока app.js дорендерит таблицу (paid-costs тянется отдельно, может ~3-5с)
+    const smsRow = await new Promise(resolve => {
+      const deadline = Date.now() + 30000;
+      const tick = () => {
+        const tbody = container.querySelector('table tbody');
+        if (tbody) {
+          const row = Array.from(tbody.querySelectorAll('tr')).find(r => /SMS-рассылки/i.test(r.textContent || ''));
+          if (row) return resolve(row);
+        }
+        if (Date.now() > deadline) return resolve(null);
+        setTimeout(tick, 400);
+      };
+      tick();
+    });
+    if (!smsRow) return;
+    // не дублируем, если уже вставили
+    if (smsRow.nextElementSibling?.classList.contains('sms-texts-row')) return;
+    const period = currentPeriod();
+    let sa;
+    try { sa = await fetchJson('/api/marketing/sms-attribution?period=' + period); } catch (_) { return; }
+    const camps = (sa && sa.campaigns) || [];
+    if (!camps.length) return;
+    const colCount = smsRow.children.length || 5;
+    const typeLabel = { 'A': 'продукт+срок', 'A*': 'всё+срок', 'B': 'ссылка', 'C': 'оценка' };
+    const rowsHtml = camps.map(c => `<tr>
+      <td style="white-space:nowrap;color:var(--muted,#64748b)">${esc(c.firstDate || '')}</td>
+      <td style="text-align:right">${(c.recipients || 0).toLocaleString('ru-RU')}</td>
+      <td><span style="font-size:10px;color:var(--muted,#64748b)">${esc(typeLabel[c.type] || c.type || '')}</span></td>
+      <td style="font-size:11px">${esc(c.text || '')}</td>
+    </tr>`).join('');
+    const insertRow = document.createElement('tr');
+    insertRow.className = 'sms-texts-row';
+    insertRow.innerHTML = `<td colspan="${colCount}" style="padding:0;background:#fafafa">
+      <details style="padding:8px 12px">
+        <summary style="cursor:pointer;font-size:12px;color:#555">📝 Содержание рассылок за месяц (${camps.length})</summary>
+        <div style="margin-top:8px;overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">
+          <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table></div>
+      </details>
+    </td>`;
+    smsRow.parentNode.insertBefore(insertRow, smsRow.nextSibling);
+  }
+
   // ─── Запуск ─────────────────────────────────────────────────────────────────
   // Триггеримся когда пользователь открывает соответствующую секцию маркетинг-таба.
   // Дешевле, чем грузить всё сразу: каждый блок прячется CSS-классом hidden до клика.
@@ -466,6 +518,7 @@
     loadHoliday();
     loadGisHistory();
     loadSeoExtra();
+    enrichPaidSms();
   }
 
   function tryHook() {
