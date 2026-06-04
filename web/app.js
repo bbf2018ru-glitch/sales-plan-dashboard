@@ -4421,13 +4421,16 @@ function mBars(elId, labels, values, color, unit){
   var bars=labels.map(function(lb,i){ var bh=values[i]/max*ih, x=padL+step*i+(step-bw)/2, y=padT+ih-bh; return '<g><rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(bh,0).toFixed(1)+'" rx="3" fill="'+color+'" opacity="0.85"><title>'+lb+': '+mNum(values[i])+(unit||'')+'</title></rect><text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
   el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px">'+grid+bars+'</svg>';
 }
-function mGroup(elId, labels, a, b, ca, cb){
+function mGroup(elId, labels, a, b, ca, cb, unit, nameA, nameB){
   var el=document.getElementById(elId); if(!el) return;
-  // Расширяем viewBox при ≥13 точек, чтобы 17 баров не слипались (mкритично для расширенной 17-мес серии)
+  // unit/nameA/nameB — для тултипов. Раньше тут были захардкожены «SMS: X ₽» /
+  // «Контекст: X ₽» (наследие первого графика затрат) — и «Карта лояльности, %»
+  // при наведении показывала проценты как рубли SMS.
+  unit=unit||''; nameA=nameA||'факт'; nameB=nameB||'год назад';
   var w=Math.max(720, labels.length*60),h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
   var max=Math.max.apply(null, a.concat(b).concat([1])), step=iw/labels.length, bw=step*0.30;
   var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.08"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
-  var bars=labels.map(function(lb,i){ var x0=padL+step*i+(step-bw*2-4)/2, ha=a[i]/max*ih, hb=b[i]/max*ih; return '<g><rect x="'+x0.toFixed(1)+'" y="'+(padT+ih-ha).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(ha,0).toFixed(1)+'" rx="2" fill="'+ca+'" opacity="0.85"><title>'+lb+' SMS: '+mNum(a[i])+' ₽</title></rect><rect x="'+(x0+bw+4).toFixed(1)+'" y="'+(padT+ih-hb).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(hb,0).toFixed(1)+'" rx="2" fill="'+cb+'" opacity="0.85"><title>'+lb+' Контекст: '+mNum(b[i])+' ₽</title></rect><text x="'+(x0+bw+2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
+  var bars=labels.map(function(lb,i){ var x0=padL+step*i+(step-bw*2-4)/2, ha=a[i]/max*ih, hb=b[i]/max*ih; return '<g><rect x="'+x0.toFixed(1)+'" y="'+(padT+ih-ha).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(ha,0).toFixed(1)+'" rx="2" fill="'+ca+'" opacity="0.85"><title>'+lb+' '+nameA+': '+mNum(a[i])+unit+'</title></rect><rect x="'+(x0+bw+4).toFixed(1)+'" y="'+(padT+ih-hb).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(hb,0).toFixed(1)+'" rx="2" fill="'+cb+'" opacity="0.85"><title>'+lb+' '+nameB+': '+mNum(b[i])+unit+'</title></rect><text x="'+(x0+bw+2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
   el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px">'+grid+bars+'</svg>';
 }
 function mktRender(){
@@ -5299,10 +5302,10 @@ function mktLoadYoY(){
       setT('mktChartCardT','Карта лояльности, %', cCardW, pCardW, true);
       var leg=document.getElementById('mktChartRevLeg');
       if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>факт месяца</span><span class="mkt-lg"><i style="background:#b8860b"></i>год назад (YoY)</span>'; }
-      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m.revenue;}), 'var(--accent)', '#b8860b');
-      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m.cheques;}), 'var(--accent)', '#b8860b');
-      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b');
-      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b');
+      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m.revenue;}), 'var(--accent)', '#b8860b', ' ₽');
+      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m.cheques;}), 'var(--accent)', '#b8860b', ' шт');
+      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b', ' ₽');
+      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b', ' %');
     }
     // Партнёры (Bitrix iblock 88) — список с UTM-метками
     if (d.external && d.external.partners) {
