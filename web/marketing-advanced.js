@@ -459,8 +459,10 @@
         loadAll();
       }
     }
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      if (/маркетинг/i.test(btn.textContent || '')) btn.addEventListener('click', () => setTimeout(onTabSwitch, 200));
+    // Кнопка маркетинг-таба называется «CRM · ассортимент» (data-tab="marketing").
+    // Подписываемся по data-tab, а не по тексту, чтобы рефакторинг текста кнопки не сломал хук.
+    document.querySelectorAll('[data-tab="marketing"]').forEach(btn => {
+      btn.addEventListener('click', () => setTimeout(onTabSwitch, 200));
     });
     // Если страница загружена и маркетинг уже активен — грузим сразу
     onTabSwitch();
