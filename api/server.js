@@ -19,6 +19,7 @@ const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
 const smsAttribution = require('./lib/sms-attribution');
 const productionKg = require('./lib/production-kg');
+const productionPlan = require('./lib/production-plan');
 const paidCosts = require('./lib/paid-costs');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
@@ -821,6 +822,21 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await productionKg.getProductionKg(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // План выпуска кондитерки — живой расчёт из 1С (остаток+пресс-сетка+сайт → N/R).
+    // ?date=YYYY-MM-DD (по умолч. завтра), ?yoy=1 — сравнение с прошлым годом.
+    if (pathname === '/api/production/plan' && req.method === 'GET') {
+      try {
+        let date = parsedUrl.searchParams.get('date');
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          const t = new Date(Date.now() + 86400000); // завтра
+          date = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+        }
+        const yoy = parsedUrl.searchParams.get('yoy') === '1';
+        sendJson(res, 200, await productionPlan.getPlan(date, { yoy }));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
