@@ -371,6 +371,7 @@ function externalBlock() {
     directHistory: readExternal('direct-history.json'),
     metrika: readExternal('metrika.json'),
     metrikaHistory: readExternal('metrika-history.json'),
+    smsClicks: readExternal('sms-clicks.json'),
     seo: readExternal('seo.json'),
     prices: readExternal('prices.json'),
     social: readExternal('social.json'),

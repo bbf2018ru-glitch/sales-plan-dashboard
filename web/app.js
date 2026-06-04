@@ -4772,19 +4772,45 @@ function renderPrices(){
     PRICES.map(function(r){ return '<tr><td>'+r[0]+'</td><td class="mkt-priceus">'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[5]+'</td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по ценам:</b> «Мария» — в середине. Бенто от 690 ₽ — самый дешёвый старт на рынке (трафик-драйвер). Целые торты дороже эконом-сетей (Стефания от 525 ₽/кг, ЯХОНТ от 640 ₽/шт), но дешевле премиума (Этика от 2090 ₽/кг, Cake Home до 2990 ₽/кг). Кофе-меню — единственное публичное на рынке.</div>';
 }
-// FUNNEL: hardcoded заменён на live из external.metrika. Старые цифры (249к/16к/5к/414) были выдуманы — реальный счётчик 43949414 даёт ~2k/мес визитов, см. live-блок.
-var FUNNEL = null;
-function renderFunnel(){
+// Воронка: классическая визит→корзина→оплата невозможна (нет ecommerce-целей в Метрике).
+// Строим РЕАЛЬНУЮ mini-воронку «путь к регистрации в лояльности» из живых источников:
+// визиты сайта (Метрика) → переходы на страницу регистрации /for_clients/ (Метрика) →
+// новые карты «Сладкого чека» (1С). Охваты/периоды у шагов разные — помечаем явно,
+// конверсию считаем ТОЛЬКО там, где охват совпадает (визит→страница, оба из Метрики).
+function renderFunnel(d){
   var el=document.getElementById('mktFunnel'); if(!el) return;
-  if(!FUNNEL){
-    el.innerHTML='<div class="section-hint">Воронка сайта пока не рендерится — старые цифры (249к визитов, 16к корзина, 5к заказы, 414 оплат) были выдуманы. Реальный счётчик Метрики 43949414 даёт ~2 тыс визитов/мес (см. live-блок ниже). После настройки целей в Метрике (Ecommerce: add_to_cart / purchase) воронку соберём из realtime API.</div>';
+  var met=d&&d.external&&d.external.metrika;
+  var sc=d&&d.external&&d.external.smsClicks;
+  var sweet=d&&d.sweet&&d.sweet.cur;
+  var visits=met&&met.totalVisits;
+  // переходы на /for_clients/ (страница регистрации Сладкого чека)
+  var fcVisits=null, fcUsers=null;
+  if(sc&&sc.codeToUrl){
+    Object.keys(sc.codeToUrl).forEach(function(code){
+      if(/\/for_clients\//.test(sc.codeToUrl[code])){
+        fcVisits=(fcVisits||0)+((sc.byCodeVisits&&sc.byCodeVisits[code])||0);
+        fcUsers=(fcUsers||0)+((sc.byCode&&sc.byCode[code])||0);
+      }
+    });
+  }
+  var regs=sweet&&sweet.cards;
+  if(!visits && fcVisits==null && regs==null){
+    el.innerHTML='<div class="section-hint">Классическая воронка визит→корзина→оплата требует ecommerce-целей в Метрике (их в счётчике 43949414 нет). Ниже — реальная mini-воронка лояльности из Метрики+1С, как только подгрузятся источники.</div>';
     return;
   }
-  var max=FUNNEL[0][1];
-  el.innerHTML='<div class="mkt-funnel">'+FUNNEL.map(function(s,i){
-    var w=Math.max(s[1]/max*100,8), conv=i?(s[1]/FUNNEL[i-1][1]*100):100;
-    return '<div class="mkt-fstep"><div class="mkt-fbar" style="width:'+w.toFixed(1)+'%"><span>'+s[0]+'</span><b>'+mNum(s[1])+'</b></div><div class="mkt-fconv">'+(i?'→ '+conv.toFixed(1).replace('.',',')+' % от пред.':'')+'</div></div>';
-  }).join('')+'</div>';
+  var metP=(met&&met.period&&met.period.label)||'период Метрики';
+  var scP=(sc&&sc.period)||'период';
+  var steps=[];
+  if(visits) steps.push({l:'Визиты сайта', n:visits, src:'Метрика · '+metP+' · все источники'});
+  if(fcVisits!=null) steps.push({l:'Переходы на страницу регистрации /for_clients/', n:fcVisits, src:'Метрика · '+scP+' · в осн. из SMS-рассылки', conv:visits?fcVisits/visits*100:null});
+  if(regs!=null) steps.push({l:'Новые карты «Сладкого чека»', n:regs, src:'1С · '+((d&&d.monthName)||'месяц')+' · все источники'});
+  var max=steps.length?Math.max.apply(null,steps.map(function(s){return s.n;})):1;
+  el.innerHTML='<div class="mkt-funnel">'+steps.map(function(s){
+    var w=Math.max(s.n/max*100,10);
+    return '<div class="mkt-fstep"><div class="mkt-fbar" style="width:'+w.toFixed(1)+'%"><span>'+s.l+'</span><b>'+mNum(s.n)+'</b></div>'+
+      '<div class="mkt-fconv" style="font-size:10px">'+(s.conv!=null?'→ '+mNum1(s.conv)+' % от визитов · ':'')+s.src+'</div></div>';
+  }).join('')+'</div>'+
+  '<div class="mkt-comp-ins" style="margin-top:10px;font-size:11px"><b>Это не классическая воронка покупок</b> (для неё нужны ecommerce-цели в Метрике — корзина/оплата, сейчас не настроены). Здесь — реальные числа из Метрики и 1С по пути к регистрации в лояльности. Шаги имеют <b>разные охваты и периоды</b> (визиты — все источники за 28 дн; переходы на /for_clients/ измеряются в основном по SMS-ссылке; новые карты — из 1С за выбранный месяц), поэтому сквозную конверсию между ними считать некорректно.</div>';
 }
 // Алерты живые: считаются из данных /api/marketing/channels за ВЫБРАННЫЙ период (d).
 // Без аргументов — плейсхолдер (вызывается из mktInit до загрузки). Только реальные данные.
@@ -4982,6 +5008,8 @@ function mktLoadYoY(){
     try { renderGisMonthly(d); } catch(_){}
     // Спрос (поисковые запросы 2ГИС) — live из секции demand (заменили снимок апреля).
     try { renderDemand(d); } catch(_){}
+    // Воронка лояльности — реальная mini-воронка из Метрики+1С (заменили выдуманную).
+    try { renderFunnel(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){
