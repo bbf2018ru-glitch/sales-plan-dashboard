@@ -4983,6 +4983,34 @@ function renderDemand(d){
     rows.map(function(r){ var w=Math.max(r[1]/max*100,2); return '<tr><td>'+r[0]+'</td><td class="num">'+mNum1(r[1])+' %</td><td style="width:40%"><div class="mkt-dbar" style="width:'+w.toFixed(0)+'%"></div></td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод:</b> ~'+mNum1(brand)+' % запросов брендовые («мария» + варианты) — высокая узнаваемость. Родовой спрос (торты, кондитерские, кофейни, кофе, завтрак) — точки роста через SEO и карточку; заметная доля «кофе/кофейни/завтрак» подтверждает кафе-нишу.</div>';
 }
+// «Сладкий чек» — детализация из 1С (/api/marketing/sweet-detail): всего участников,
+// пришло за месяц, текущие задания, покупки участников за период действия.
+var _MM_SWEET=['','января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+function smMonth(ym){ if(!ym) return ''; var p=ym.split('-'); return _MM_SWEET[Number(p[1])]+' '+p[0]; }
+function renderSweetDetail(sd){
+  var el=document.getElementById('mktSweetLive'); if(!el) return;
+  if(!sd || sd.available===false){ return; } // оставляем быстрый рендер из d.sweet, если детализация недоступна
+  var tasks=(sd.tasks||[]).slice();
+  var totalEv=tasks.reduce(function(s,t){return s+t.events;},0)||1;
+  var pur=sd.purchases||{};
+  var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
+  el.innerHTML='<div class="mkt-chart-t">«Сладкий чек» — live из 1С (РегистрНакопления.СладкийЧек)</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin:2px 0 8px">Геймификация: баллы за задания по картам лояльности. Программа действует с '+smMonth(sd.programStartMonth)+'.</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:8px 0">'+
+      kpi('<b>'+mNum(sd.totalParticipants||0)+'</b>','Всего участников')+
+      kpi('+'+mNum(sd.newThisMonth||0),'Пришло за '+(sd.monthName||smMonth(sd.period)))+
+      kpi(mNum(sd.monthCards||0),'Карт в заданиях (мес)')+
+      kpi(mNum(sd.monthEvents||0),'Выполнений (мес)')+
+      kpi(mNum(sd.monthPoints||0),'Баллов (мес)')+
+    '</div>'+
+    '<div class="mkt-comp-ins" style="margin:8px 0;background:#eafaf0;border:1px solid #b6e3c8;color:#0a6b3a;padding:8px 10px;border-radius:6px">'+
+      '<b>Участники купили продукции на '+mNum(pur.net||0)+' ₽</b> за период действия (с '+smMonth(pur.since)+'): '+mNum(pur.cheques||0)+' чеков, '+mNum(pur.cards||0)+' карт'+
+      (pur.returns?' · возвраты −'+mNum(pur.returns)+' ₽':'')+'.</div>'+
+    '<div class="mkt-chart-t" style="margin-top:10px">Текущие задания за '+(sd.monthName||smMonth(sd.period))+'</div>'+
+    (tasks.length?'<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Задание</th><th class="num">Выполнений</th><th class="num">Карт</th><th class="num">Баллов</th><th class="num">Доля</th></tr></thead><tbody>'+
+      tasks.map(function(t){ var pct=t.events/totalEv*100; return '<tr><td>'+t.name+'</td><td class="num">'+mNum(t.events)+'</td><td class="num">'+mNum(t.cards)+'</td><td class="num">'+mNum(t.points)+'</td><td class="num">'+mNum1(pct)+' %</td></tr>'; }).join('')+
+      '</tbody></table></div>':'<div style="font-size:12px;color:var(--muted)">Заданий в этом месяце не было.</div>');
+}
 var _mktInited=false;
 // Последние live-данные для CSV-экспорта (channels / sms-attribution / paid-costs).
 var _mktLive=null, _mktSms=null, _mktPaid=null;
@@ -5080,6 +5108,8 @@ function mktLoadYoY(){
       fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ _mktSms=sa; renderSmsAttribution(sa); })
         .catch(function(e){ smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>'; });
     }
+    // «Сладкий чек» — детализация (участники/пришло/задания/покупки) из 1С, отдельный эндпоинт (~5с).
+    fetchJson('/api/marketing/sweet-detail?period='+period).then(function(sd){ try{ renderSweetDetail(sd); }catch(_){} }).catch(function(){});
     // Выпуск продукции в кг — отдельный эндпоинт (1С /query).
     var prodKgEl=document.getElementById('mktProdKgKpi');
     if(prodKgEl){

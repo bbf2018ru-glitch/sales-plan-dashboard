@@ -19,6 +19,7 @@ const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
 const smsAttribution = require('./lib/sms-attribution');
 const productionKg = require('./lib/production-kg');
+const sweetDetail = require('./lib/sweet-detail');
 const productionPlan = require('./lib/production-plan');
 const productionXlsx = require('./lib/production-xlsx');
 const paidCosts = require('./lib/paid-costs');
@@ -823,6 +824,16 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await productionKg.getProductionKg(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    if (pathname === '/api/marketing/sweet-detail' && req.method === 'GET') {
+      // Открыт как весь маркетинг-таб. Детализация «Сладкого чека» из 1С: всего участников,
+      // пришло за месяц, текущие задания, покупки участников за период действия.
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await sweetDetail.getSweetDetail(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
