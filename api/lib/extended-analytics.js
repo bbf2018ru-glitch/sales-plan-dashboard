@@ -375,17 +375,29 @@ async function buildCakeOfMonthSeries(period) {
       return { ym: md.ym, productCode: null, name: null, incomplete: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
     }
     const isCur = md.ym === curYM;
-    const minRev = isCur ? 50000 / curScale : 50000;
+    // Порог НЕ масштабируем по темпу: в начале месяца одиночная продажа дорогого
+    // торта (5 100 ₽ × 1 шт) пролезала во флагманы с ratio ×6. Требуем фактические
+    // ≥50к и ≥30 шт — настоящий флагман набирает это за 1-2 дня.
     let best = null;
     for (const [code, p] of productMonthly) {
       const m = p.byMonth[md.ym];
-      if (!m || m.revenue < minRev) continue;
+      if (!m || m.revenue < 50000 || (m.qty || 0) < 30) continue;
       const avg = productAvg.get(code);
       if (!avg) continue; // новинка без истории — ratio не посчитать честно
       const ratio = (isCur ? m.revenue * curScale : m.revenue) / avg;
       if (!best || ratio > best.ratio) best = { code, name: p.name, revenue: Math.round(m.revenue), qty: Math.round(m.qty), ratio: Math.round(ratio * 100) / 100 };
     }
-    if (!best) return { ym: md.ym, productCode: null, name: 'нет данных', revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
+    if (!best) {
+      return isCur
+        ? { ym: md.ym, productCode: null, name: null, tooEarly: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue }
+        : { ym: md.ym, productCode: null, name: 'нет данных', revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
+    }
+    const sharePct = md.categoryRevenue ? Math.round((best.revenue / md.categoryRevenue) * 1000) / 10 : null;
+    // Слабый лидер ≠ флагман: без всплеска (×<2) и с мизерной долей в тортах —
+    // в месяце просто не было «торта месяца» (напр. апрель = куличи, декабрь = НГ-ассортимент).
+    if (best.ratio < 2 && (sharePct == null || sharePct < 5)) {
+      return { ym: md.ym, productCode: null, name: null, noFlagman: true, revenue: 0, qty: 0, ratio: null, categoryRevenue: md.categoryRevenue };
+    }
     return {
       ym: md.ym,
       productCode: best.code,
@@ -395,7 +407,7 @@ async function buildCakeOfMonthSeries(period) {
       ratio: best.ratio,
       partialMonth: isCur || undefined,
       categoryRevenue: md.categoryRevenue,
-      sharePct: md.categoryRevenue ? Math.round((best.revenue / md.categoryRevenue) * 1000) / 10 : null
+      sharePct
     };
   });
 

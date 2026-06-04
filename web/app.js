@@ -5496,7 +5496,7 @@ function mktLoadYoY(){
       var el=document.getElementById('mktCake'); var hint=document.getElementById('mktCakeHint');
       if(!el) return;
       var MM3=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-      var ready=cm.series.filter(function(s){return !s._pending && (s.productCode || s.incomplete);});
+      var ready=cm.series.filter(function(s){return !s._pending && (s.productCode || s.incomplete || s.noFlagman || s.tooEarly);});
       if(!ready.length){
         el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Данные тортов прогреваются вместе с основной серией 1С. Обнови страницу через 10–30 мин.</div>';
         if(hint) hint.textContent='Прогрев из 1С (фоновый ~30 мин)';
@@ -5507,6 +5507,12 @@ function mktLoadYoY(){
           var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
           if(s.incomplete){
             return '<tr><td>'+lbl+'</td><td colspan="5" style="color:var(--muted);font-size:11px">⚠ неполные данные 1С за месяц — флагман не определить</td></tr>';
+          }
+          if(s.noFlagman){
+            return '<tr><td>'+lbl+'</td><td colspan="5" style="color:var(--muted);font-size:11px">— без явного флагмана (ни один торт не дал всплеска ×2 или доли ≥5%)</td></tr>';
+          }
+          if(s.tooEarly){
+            return '<tr><td>'+lbl+'</td><td colspan="5" style="color:var(--muted);font-size:11px">месяц только начался — флагман ещё не набрал порог (≥50 тыс ₽, ≥30 шт)</td></tr>';
           }
           var rc=s.ratio>=2?'color:#10a05a':(s.ratio>=1.3?'color:#b8860b':'');
           var nm='<b>'+s.name+'</b>'+(s.partialMonth?' <span style="color:var(--muted);font-size:10px">(месяц идёт — лидер по темпу)</span>':'');
