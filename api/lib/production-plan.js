@@ -17,6 +17,13 @@ const WH_GP = ['А00000011', 'А00000033'];
 const WH_ZAP = 'А00000046';
 const WH_KONT = 'А00000155';
 const SRC_PRESS = 'А00000130';
+// Центральные склады-источники для режима demand=central: ГП + промежуточный + пф + цеха
+// производства (БЕЗ кухонь точек «(Кухня)» и без сырья). Спрос = их отгрузка В розничные
+// точки. Шире, чем только А00000130 (хаб): ловит десерты/пирожные, идущие напрямую из цехов.
+const CENTRAL_SRC = ['А00000011', 'А00000130', 'А00000033', 'А00000046',
+  'А00000024', 'А00000023', 'А00000140', 'А00000069', 'А00000057', 'А00000030',
+  'А00000019', 'А00000026', 'А00000027', 'А00000028', 'А00000082', 'А00000067',
+  'А00000139', 'А00000083'];
 
 let CEH = { order: [], map: {} };
 try { CEH = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'prod-ceh-map.json'), 'utf8')); }
@@ -52,11 +59,35 @@ async function qStock() {
   if (rows.length === 0) throw new Error('1С вернула пустой остаток (0 строк) — данные недоступны; план не строится (защита от выдуманных данных)');
   return rows;
 }
-async function qShipDaily(from, to) {
+// Розничные точки = склады с продажами (ЧекККМ) за окно. Кэш 24ч — список почти статичен.
+const ptCache = upp.makeCache(24 * 60 * 60 * 1000);
+async function retailPoints(refDay) {
+  const from = addDays(refDay, -30);
+  return ptCache.wrap('pts:' + dayKey(from), async () => {
+    const q = 'ВЫБРАТЬ РАЗЛИЧНЫЕ Ч.Склад.Код КАК Код ИЗ Документ.ЧекККМ КАК Ч'
+      + ` ГДЕ Ч.Дата >= ${dtLit(from)} И Ч.Проведен И Ч.Склад.Код <> "${SRC_PRESS}"`;
+    const rows = (await upp.callQuery(q, { timeoutMs: 60000 })).rows || [];
+    return { codes: rows.map(r => cc(r.Код)).filter(Boolean) };
+  });
+}
+
+// mode 'hub' (по умолч.): отгрузка ИЗ А00000130 — узкий хаб.
+// mode 'central': отгрузка из всех ЦЕНТРАЛЬНЫХ складов В розничные точки — ловит десерты/
+// пирожные, минующие хаб. Исключает кухни точек (их нет в CENTRAL_SRC) и точка→точка
+// (источник обязан быть центральным).
+async function qShipDaily(from, to, mode, pointCodes) {
+  let srcFilter;
+  if (mode === 'central') {
+    const central = CENTRAL_SRC.map(c => `"${c}"`).join(',');
+    const pts = (pointCodes || []).map(c => `"${c}"`).join(',');
+    srcFilter = `Т.Ссылка.СкладОтправитель.Код В (${central})`
+      + (pts ? ` И Т.Ссылка.СкладПолучатель.Код В (${pts})` : '');
+  } else {
+    srcFilter = `Т.Ссылка.СкладОтправитель.Код = "${SRC_PRESS}"`;
+  }
   const q = 'ВЫБРАТЬ НАЧАЛОПЕРИОДА(Т.Ссылка.Дата,ДЕНЬ) КАК День, Т.Номенклатура.Код КАК Код, Т.Номенклатура.Наименование КАК Имя,'
     + ' СУММА(Т.Количество) КАК Кол ИЗ Документ.ПеремещениеТоваров.Товары КАК Т'
-    + ` ГДЕ Т.Ссылка.Дата >= ${dtLit(from)} И Т.Ссылка.Дата < ${dtLit(to)} И Т.Ссылка.Проведен`
-    + ` И Т.Ссылка.СкладОтправитель.Код = "${SRC_PRESS}"`
+    + ` ГДЕ Т.Ссылка.Дата >= ${dtLit(from)} И Т.Ссылка.Дата < ${dtLit(to)} И Т.Ссылка.Проведен И ${srcFilter}`
     + ' СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Т.Ссылка.Дата,ДЕНЬ), Т.Номенклатура.Код, Т.Номенклатура.Наименование';
   return (await upp.callQuery(q, { timeoutMs: 90000 })).rows || [];
 }
@@ -102,9 +133,10 @@ function weekdayAvg(shipMap, days) {
 }
 
 // собрать пресс-сетку (M на день target, O на target+1) из подённой отгрузки за 3 нед назад
-async function pressForDate(target) {
+async function pressForDate(target, mode) {
   const from = addDays(target, -22), to = addDays(target, 1);
-  const rows = await qShipDaily(from, to);
+  const pts = mode === 'central' ? (await retailPoints(target).catch(() => ({ codes: [] }))).codes : null;
+  const rows = await qShipDaily(from, to, mode, pts);
   const shipMap = {}; const names = {};
   for (const r of rows) {
     const code = cc(r.Код), day = cc(r.День).slice(0, 10);
@@ -124,6 +156,7 @@ function ymdNum(o) { return o.y * 10000 + o.m * 100 + o.d; }
 
 async function compute(dateStr, opts) {
   const yoy = !!(opts && opts.yoy);
+  const demand = (opts && opts.demand === 'hub') ? 'hub' : 'central'; // central — новый дефолт
   const target = parseYMD(dateStr);
   const next = addDays(target, 1);
   const today = todayObj();
@@ -135,7 +168,7 @@ async function compute(dateStr, opts) {
     : ymdNum(target) > ymdNum(today);
 
   const [stockRows, press, siteL, siteP, armToday, factToday] = await Promise.all([
-    qStock(), pressForDate(target), qSite(target), qSite(next),
+    qStock(), pressForDate(target, demand), qSite(target), qSite(next),
     wantF ? qArmTask(today).catch(() => []) : Promise.resolve([]),
     wantF ? qProducedFact(today).catch(() => []) : Promise.resolve([]),
   ]);
@@ -169,7 +202,7 @@ async function compute(dateStr, opts) {
   // YoY: отгрузка на ту же дату год назад
   let lyM = {};
   if (yoy) {
-    try { lyM = (await pressForDate({ y: target.y - 1, m: target.m, d: target.d })).M; }
+    try { lyM = (await pressForDate({ y: target.y - 1, m: target.m, d: target.d }, demand)).M; }
     catch (e) { console.log('[production-plan] yoy fail:', e.message); }
   }
 
@@ -210,10 +243,10 @@ async function compute(dateStr, opts) {
       let changed = false;
       for (const pfNorm of Object.keys(BOM)) {
         const it = byNorm[pfNorm]; if (!it) continue;
-        let demand = 0;
-        for (const par of BOM[pfNorm].parents) { const pit = byNorm[par]; if (pit) demand += pit.task; }
+        let pfDemand = 0;
+        for (const par of BOM[pfNorm].parents) { const pit = byNorm[par]; if (pit) pfDemand += pit.task; }
         it.bom = true;
-        if (it.ship !== demand) { it.ship = demand; recompute(it); changed = true; }
+        if (it.ship !== pfDemand) { it.ship = pfDemand; recompute(it); changed = true; }
       }
       if (!changed) break;
     }
@@ -253,12 +286,15 @@ async function compute(dateStr, opts) {
     else warnings.push('Сегодняшний план выпуска (F) не найден в АРМ или уже полностью выпущен — остаток показан как есть.');
   }
 
+  const demandNote = demand === 'central'
+    ? 'среднее отгрузки из ЦЕНТРАЛЬНЫХ складов (ГП+цеха+промежуточный) в розничные точки по дню недели за 3 нед — ловит десерты/пирожные, минующие хаб А00000130'
+    : 'среднее отгрузки А00000130→магазины по дню недели за 3 нед (узкий хаб)';
   return {
     date: dateStr, weekday: weekdayRu(target), nextWeekday: weekdayRu(next),
-    yoy, ceh, warnings,
+    yoy, ceh, warnings, demand,
     includeTodayOutput: wantF,
     totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits), skippedNonPlan, fToday: Math.round(fTotal), fSkus },
-    note: 'Онлайн-расчёт из 1С. Остаток — текущий' + (wantF ? ' + сегодняшний невыпущенный план (F)' : '') + '; «Отгрузка завтра/послезавтра» — ПРОГНОЗ (среднее отгрузки А00000130→магазины по дню недели за 3 нед; выходные учтены автоматически — производство идёт ежедневно). Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы — ручные у Маши, не учтены.',
+    note: 'Онлайн-расчёт из 1С. Остаток — текущий' + (wantF ? ' + сегодняшний невыпущенный план (F)' : '') + '; «Отгрузка завтра/послезавтра» — ПРОГНОЗ (' + demandNote + '; выходные учтены автоматически — производство ежедневное). Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы — ручные у Маши, не учтены.',
     refreshedAt: new Date().toISOString()
   };
 }
@@ -282,10 +318,10 @@ async function lastFullArmDate() {
 // СХОДИМОСТЬ: робот vs факт Маши. Сравниваем механическое задание робота для даты D
 // с её S (ПланВыпускНаЗавтра) из АРМ за тот же производственный день. Робот обычно ≤ S
 // (Маша округляет вверх до партии + ручные довозы) — это норма, метрика показывает её честно.
-async function computeConvergence(dateStr) {
+async function computeConvergence(dateStr, demand) {
   const target = parseYMD(dateStr);
   const [plan, armRows] = await Promise.all([
-    getPlan(dateStr, { includeTodayOutput: false }), // сравниваем чистый механический спрос
+    getPlan(dateStr, { includeTodayOutput: false, demand }), // чистый механический спрос
     qArmTask(target),
   ]);
   const arm = {}, armNames = {};
@@ -333,7 +369,7 @@ async function computeConvergence(dateStr) {
   })).sort((a, b) => b.sumMaria - a.sumMaria);
   const denom = both || 1;
   return {
-    date: dateStr, weekday: weekdayRu(target),
+    date: dateStr, weekday: weekdayRu(target), demand: plan.demand,
     armFound: armRows.length > 0,
     summary: {
       codes: codes.size, both, exact, within10, within25, robotOnly, mariaOnly,
@@ -352,11 +388,13 @@ async function computeConvergence(dateStr) {
 
 function getPlan(dateStr, opts) {
   const fKey = (opts && opts.includeTodayOutput != null) ? (opts.includeTodayOutput ? ':f1' : ':f0') : '';
-  const key = 'plan:' + dateStr + (opts && opts.yoy ? ':yoy' : '') + fKey;
+  const dKey = (opts && opts.demand === 'hub') ? ':hub' : ''; // central — дефолт, без суффикса
+  const key = 'plan:' + dateStr + (opts && opts.yoy ? ':yoy' : '') + fKey + dKey;
   return cache.wrap(key, () => compute(dateStr, opts));
 }
-function getConvergence(dateStr) {
-  return cache.wrap('conv:' + dateStr, () => computeConvergence(dateStr));
+function getConvergence(dateStr, demand) {
+  const dKey = demand === 'hub' ? ':hub' : '';
+  return cache.wrap('conv:' + dateStr + dKey, () => computeConvergence(dateStr, demand));
 }
 
 module.exports = { getPlan, getConvergence, lastFullArmDate };
