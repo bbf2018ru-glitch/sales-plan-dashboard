@@ -454,42 +454,24 @@
     }
   }
 
-  // ─── Платные каналы → SMS: тексты рассылок ─────────────────────────────────
+  // ─── Платные каналы → SMS: тексты рассылок + аудитория ────────────────────
   // app.js renderPaidCosts() показывает SMS одной строкой ("X уник. получателей").
   // Чтобы не трогать app.js (правит параллельная сессия) — после рендера ищем строку
   // SMS в #mktPaidLive и вставляем под неё раскрывающийся блок с текстом каждой
-  // рассылки за месяц. Источник — тот же /api/marketing/sms-attribution.
-  async function enrichPaidSms() {
-    const container = document.getElementById('mktPaidLive');
-    if (!container) return;
-    // ждём пока app.js дорендерит таблицу (paid-costs тянется отдельно, может ~3-5с)
-    const smsRow = await new Promise(resolve => {
-      const deadline = Date.now() + 30000;
-      const tick = () => {
-        const tbody = container.querySelector('table tbody');
-        if (tbody) {
-          const row = Array.from(tbody.querySelectorAll('tr')).find(r => /SMS-рассылки/i.test(r.textContent || ''));
-          if (row) return resolve(row);
-        }
-        if (Date.now() > deadline) return resolve(null);
-        setTimeout(tick, 400);
-      };
-      tick();
-    });
-    if (!smsRow) return;
-    // не дублируем, если уже вставили
-    if (smsRow.nextElementSibling?.classList.contains('sms-texts-row')) return;
-    const period = currentPeriod();
-    // sms-attribution: тексты + получатели; sms-audience: распределение по RFM-сегментам
-    // на момент даты рассылки. Тянем параллельно, аудиторию мапим по firstDate.
+  // рассылки + распределением получателей по RFM-сегментам.
+  // Используем MutationObserver: app.js может перерендерить таблицу несколько раз
+  // (live-обновления, переключение периода) — каждый раз перевставляем нашу строку.
+  let paidSmsState = { html: null, lastPeriod: null };
+
+  async function fetchPaidSmsData(period) {
+    if (paidSmsState.lastPeriod === period && paidSmsState.html) return paidSmsState.html;
     let sa, aud;
-    try { sa = await fetchJson('/api/marketing/sms-attribution?period=' + period); } catch (_) { return; }
+    try { sa = await fetchJson('/api/marketing/sms-attribution?period=' + period); } catch (_) { return null; }
     try { aud = await fetchJson('/api/marketing/sms-audience?period=' + period); } catch (_) { aud = null; }
     const camps = (sa && sa.campaigns) || [];
-    if (!camps.length) return;
+    if (!camps.length) return null;
     const audMap = new Map();
     for (const a of (aud?.campaigns || [])) audMap.set(a.firstDate + '|' + (a.text || '').slice(0, 50), a.audience);
-    const colCount = smsRow.children.length || 5;
     const typeLabel = { 'A': 'продукт+срок', 'A*': 'всё+срок', 'B': 'ссылка', 'C': 'оценка' };
     const audCell = (a) => {
       if (!a || !a.total) return '<span style="color:var(--muted,#64748b)">—</span>';
@@ -514,20 +496,51 @@
     }).join('');
     const audNote = aud
       ? `<div style="font-size:10px;color:var(--muted,#64748b);margin-top:6px">Сегменты считаем на момент даты рассылки. VIP = покупка ≤90д + ≥10к₽ за 365д. Активный = покупка ≤90д. Спящий = 90–365д. Холодный = &gt;365д или без покупок (включая новых).</div>`
-      : `<div style="font-size:10px;color:var(--amber,#f59e0b);margin-top:6px">Аудитория ещё не подсчитана (запрос идёт в фоне ~30 сек, обнови страницу).</div>`;
+      : `<div style="font-size:10px;color:var(--amber,#f59e0b);margin-top:6px">Аудитория ещё не подсчитана (запрос идёт в фоне, обнови через 30 сек).</div>`;
+    const inner = `<details style="padding:8px 12px">
+      <summary style="cursor:pointer;font-size:12px;color:#555">📝 Содержание рассылок за месяц (${camps.length})</summary>
+      <div style="margin-top:8px;overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст / Аудитория</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>
+      ${audNote}
+    </details>`;
+    paidSmsState = { html: inner, lastPeriod: period };
+    return inner;
+  }
+
+  function insertSmsRowIfNeeded(container, innerHtml) {
+    const tbody = container.querySelector('table tbody');
+    if (!tbody) return false;
+    const smsRow = Array.from(tbody.querySelectorAll('tr')).find(r => /SMS-рассылки/i.test(r.textContent || ''));
+    if (!smsRow) return false;
+    if (smsRow.nextElementSibling?.classList.contains('sms-texts-row')) return true; // уже вставлена
+    const colCount = smsRow.children.length || 5;
     const insertRow = document.createElement('tr');
     insertRow.className = 'sms-texts-row';
-    insertRow.innerHTML = `<td colspan="${colCount}" style="padding:0;background:#fafafa">
-      <details style="padding:8px 12px">
-        <summary style="cursor:pointer;font-size:12px;color:#555">📝 Содержание рассылок за месяц (${camps.length})</summary>
-        <div style="margin-top:8px;overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">
-          <thead><tr style="border-bottom:1px solid #e2e8f0"><th style="text-align:left;padding:4px">Дата</th><th style="text-align:right;padding:4px">Получ.</th><th style="text-align:left;padding:4px">Тип</th><th style="text-align:left;padding:4px">Текст / Аудитория</th></tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table></div>
-        ${audNote}
-      </details>
-    </td>`;
+    insertRow.innerHTML = `<td colspan="${colCount}" style="padding:0;background:#fafafa">${innerHtml}</td>`;
     smsRow.parentNode.insertBefore(insertRow, smsRow.nextSibling);
+    return true;
+  }
+
+  async function enrichPaidSms() {
+    const container = document.getElementById('mktPaidLive');
+    if (!container) return;
+    const period = currentPeriod();
+    const inner = await fetchPaidSmsData(period);
+    if (!inner) return;
+    // Сразу попробовать вставить (если данные paid-costs уже отрендерены).
+    insertSmsRowIfNeeded(container, inner);
+    // И повесить наблюдателя — app.js может перерисовать таблицу несколько раз
+    // (live-обновления, рестарт паданий paid-costs). Каждый перерендер съедает
+    // нашу строку — observer её ставит обратно.
+    if (!container.__smsObserverArmed) {
+      const obs = new MutationObserver(() => {
+        if (paidSmsState.html) insertSmsRowIfNeeded(container, paidSmsState.html);
+      });
+      obs.observe(container, { childList: true, subtree: true });
+      container.__smsObserverArmed = true;
+    }
   }
 
   // ─── Запуск ─────────────────────────────────────────────────────────────────
