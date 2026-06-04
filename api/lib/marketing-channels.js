@@ -380,9 +380,12 @@ function externalBlock() {
   };
 }
 
-function getChannels(period) {
+async function getChannels(period) {
   const p = period || nowYM();
-  const r = cache.wrap('ch:' + p, () => compute(p));
+  // cache.wrap — async, возвращает Promise. Без await Object.assign({}, Promise, ...)
+  // отдавал бы {external:...} (у Promise нет own enumerable свойств), что и ломало
+  // весь маркетинг-таб (revenue/cheques/cardPct/monthlySeries отсутствовали).
+  const r = await cache.wrap('ch:' + p, () => compute(p));
   // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
   return Object.assign({}, r, { external: externalBlock() });
 }
