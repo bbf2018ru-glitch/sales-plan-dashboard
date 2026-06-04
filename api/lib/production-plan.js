@@ -277,24 +277,44 @@ async function computeConvergence(dateStr) {
   const robot = {};
   for (const ce of plan.ceh) for (const it of ce.items) robot[it.code] = it.task;
 
+  // имя→цех из карты цехов (для разбивки доверия по цехам)
+  const robotName = {};
+  for (const ce of plan.ceh) for (const it of ce.items) robotName[it.code] = it.name;
+  function cehOf(code) {
+    const nm = robotName[code] || armNames[code] || '';
+    const info = CEH.map[norm(nm)];
+    return (info && info.ceh) || 'Прочее';
+  }
+
   const codes = new Set([...Object.keys(arm).filter(c => arm[c] > 0), ...Object.keys(robot).filter(c => robot[c] > 0)]);
   let exact = 0, within10 = 0, within25 = 0, robotOnly = 0, mariaOnly = 0, both = 0;
   let sumRobot = 0, sumMaria = 0;
   const rows = [];
+  const byCeh = {}; // цех → {both, within25, sumRobot, sumMaria, robotOnly, mariaOnly}
   for (const code of codes) {
     const rb = robot[code] || 0, mr = arm[code] || 0;
     sumRobot += rb; sumMaria += mr;
+    const ceh = cehOf(code);
+    const cb = byCeh[ceh] || (byCeh[ceh] = { ceh, both: 0, within25: 0, sumRobot: 0, sumMaria: 0, robotOnly: 0, mariaOnly: 0 });
+    cb.sumRobot += rb; cb.sumMaria += mr;
     if (rb > 0 && mr > 0) {
-      both++;
+      both++; cb.both++;
       const d = Math.abs(rb - mr), rel = d / mr;
       if (d === 0) exact++;
       if (rel <= 0.10) within10++;
-      if (rel <= 0.25) within25++;
-    } else if (rb > 0) robotOnly++;
-    else mariaOnly++;
-    rows.push({ code, name: armNames[code] || (plan.ceh.flatMap(c => c.items).find(i => i.code === code) || {}).name || code, robot: rb, maria: mr, diff: Math.round((rb - mr) * 10) / 10 });
+      if (rel <= 0.25) { within25++; cb.within25++; }
+    } else if (rb > 0) { robotOnly++; cb.robotOnly++; }
+    else { mariaOnly++; cb.mariaOnly++; }
+    rows.push({ code, name: armNames[code] || robotName[code] || code, ceh, robot: rb, maria: mr, diff: Math.round((rb - mr) * 10) / 10 });
   }
   rows.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  // разбивка по цехам: % покрытия суммы (robot/maria) + within25 от пересечения
+  const cehStats = Object.values(byCeh).map(c => ({
+    ceh: c.ceh, both: c.both, robotOnly: c.robotOnly, mariaOnly: c.mariaOnly,
+    sumRobot: Math.round(c.sumRobot), sumMaria: Math.round(c.sumMaria),
+    coverPct: c.sumMaria > 0 ? Math.round(c.sumRobot / c.sumMaria * 100) : (c.sumRobot > 0 ? null : 100),
+    within25Pct: c.both > 0 ? Math.round(c.within25 / c.both * 100) : null,
+  })).sort((a, b) => b.sumMaria - a.sumMaria);
   const denom = both || 1;
   return {
     date: dateStr, weekday: weekdayRu(target),
@@ -303,7 +323,9 @@ async function computeConvergence(dateStr) {
       codes: codes.size, both, exact, within10, within25, robotOnly, mariaOnly,
       exactPct: Math.round(exact / denom * 100), within10Pct: Math.round(within10 / denom * 100), within25Pct: Math.round(within25 / denom * 100),
       sumRobot: Math.round(sumRobot), sumMaria: Math.round(sumMaria),
+      coverPct: sumMaria > 0 ? Math.round(sumRobot / sumMaria * 100) : null,
     },
+    byCeh: cehStats,
     topDiffs: rows.slice(0, 25),
     note: armRows.length === 0
       ? 'За эту дату нет проведённого АРМ Планирования производства — сравнить не с чем (выбери прошедший рабочий день).'

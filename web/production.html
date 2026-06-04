@@ -39,6 +39,15 @@
     border-radius:9px;padding:8px 12px;margin:6px 0;font-size:12.5px;line-height:1.45}
   .fc{font-size:9px;color:var(--warn);font-weight:600;letter-spacing:.3px}
   .note{color:var(--muted);font-size:11px;margin-top:10px;line-height:1.5}
+  .convbox{border:1px solid var(--line,#2a2f3a);border-radius:10px;padding:12px 14px;margin:10px 0;background:rgba(120,160,255,.05)}
+  .convhead{font-weight:600;font-size:14px;margin-bottom:8px}
+  .convhead button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px}
+  .convkpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .convsub{font-size:12px;color:var(--muted);margin:12px 0 4px}
+  .convtbl{width:100%;border-collapse:collapse;font-size:12px}
+  .convtbl th{text-align:left;color:var(--muted);font-weight:500;padding:3px 8px;border-bottom:1px solid var(--line,#2a2f3a)}
+  .convtbl td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.12)}
+  .pos{color:#4caf50}.neg{color:#e5736b}
 </style>
 </head>
 <body>
@@ -51,6 +60,7 @@
     <div class="ctrl">
       <input type="date" id="date" />
       <button id="yoyBtn">📊 Прошлый год</button>
+      <button id="convBtn" title="Сравнить план робота с фактическим заданием Маши за прошлый день">🎯 Сходимость с Машей</button>
       <button id="xlsxBtn" title="Скачать xlsx и переслать Маше">⬇ Файл для Маши</button>
       <button id="refresh">⟳ Обновить</button>
       <span class="auto" id="auto"></span>
@@ -58,6 +68,7 @@
   </header>
   <div class="kpis" id="kpis"></div>
   <div id="warn"></div>
+  <div id="conv"></div>
   <div id="err"></div>
   <div id="tbl"></div>
   <div class="note" id="note"></div>
@@ -87,7 +98,8 @@ function render(d){
     ? warns.map(function(w){return '<div class="warnbox">⚠️ '+w+'</div>';}).join('') : '';
   document.getElementById('kpis').innerHTML=
     kpi(t.skus,'позиций')+kpi(t.deficitCount,'в дефиците',(t.deficitCount?'neg':''))+
-    kpi(n1(t.taskUnits),'к выпуску, шт','task');
+    kpi(n1(t.taskUnits),'к выпуску, шт','task')+
+    (t.fSkus?kpi('+'+n1(t.fToday),'сегодня в работе (F)','fc'):'');
   var yoyTh = YOY? '<th class="yoycol">Год назад</th><th class="yoycol">Δ спрос</th>':'';
   var h='<div style="max-height:72vh;overflow:auto"><table><thead><tr>'+
     '<th>Наименование</th><th>ГП</th><th>Запас</th><th>Конт.</th><th>Сайт↓</th>'+
@@ -113,12 +125,58 @@ function render(d){
   document.getElementById('note').textContent=d.note||'';
 }
 function kpi(v,l,cls){ return '<div class="kpi"><div class="v '+(cls||'')+'">'+(v==null?'—':v)+'</div><div class="l">'+l+'</div></div>'; }
+// ── Сходимость робота с фактом Маши (метрика доверия) ──
+function yesterdayISO(){ var t=new Date(Date.now()-86400000); return t.toISOString().slice(0,10); }
+function loadConv(){
+  var el=document.getElementById('conv');
+  var date=document.getElementById('date').value||tomorrowISO();
+  // по умолчанию сверяем вчерашний день (там уже есть факт Маши); если выбран прошлый — его
+  var cd = date < tomorrowISO() ? date : yesterdayISO();
+  el.innerHTML='<div class="warnbox">🎯 Считаю сходимость за '+cd+' (робот vs задание Маши)…</div>';
+  fetch('/api/production/convergence?date='+cd).then(function(r){return r.json();}).then(renderConv).catch(function(e){
+    el.innerHTML='<div class="warnbox">Сходимость недоступна: '+e.message+'</div>';
+  });
+}
+function pct(v){ return v==null?'—':v+'%'; }
+function renderConv(d){
+  var el=document.getElementById('conv');
+  if(d.error){ el.innerHTML='<div class="warnbox">Ошибка: '+d.error+'</div>'; return; }
+  if(!d.armFound){ el.innerHTML='<div class="warnbox">🎯 За '+d.date+' нет проведённого АРМ Планирования — не с чем сравнивать. Выбери прошедший рабочий день.</div>'; return; }
+  var s=d.summary;
+  var cover = s.coverPct;
+  var head='<div class="convbox"><div class="convhead">🎯 Сходимость робота с заданием Маши · '+d.date+' ('+d.weekday+')'+
+    ' <button id="convClose" style="float:right">✕</button></div>'+
+    '<div class="convkpis">'+
+    kpi(pct(cover),'покрытие плана (робот/Маша по шт)',(cover>=80?'task':(cover>=50?'':'neg')))+
+    kpi(n1(s.sumRobot)+' / '+n1(s.sumMaria),'шт: робот / Маша')+
+    kpi(pct(s.within25Pct),'совпало ±25% (из пересечения)')+
+    kpi(s.both,'оба плана >0',(''))+
+    '</div>';
+  // разбивка по цехам — где роботу можно доверять, где нет
+  var rows=(d.byCeh||[]).map(function(c){
+    var cl = c.coverPct==null?'':(c.coverPct>=80?'pos':(c.coverPct>=50?'':'neg'));
+    return '<tr><td>'+c.ceh+'</td><td class="'+cl+'">'+pct(c.coverPct)+'</td>'+
+      '<td>'+n1(c.sumRobot)+'</td><td>'+n1(c.sumMaria)+'</td>'+
+      '<td>'+pct(c.within25Pct)+'</td><td class="mut">'+c.robotOnly+' / '+c.mariaOnly+'</td></tr>';
+  }).join('');
+  head+='<table class="convtbl"><thead><tr><th>Цех</th><th>покрытие</th><th>робот шт</th><th>Маша шт</th><th>±25%</th><th class="mut">только роб/Маша</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  // топ-расхождения
+  var diffs=(d.topDiffs||[]).slice(0,12).map(function(r){
+    return '<tr><td>'+r.name+'</td><td class="mut">'+(r.ceh||'')+'</td><td>'+n1(r.robot)+'</td><td>'+n1(r.maria)+'</td><td class="'+(r.diff<0?'neg':'pos')+'">'+(r.diff>0?'+':'')+n1(r.diff)+'</td></tr>';
+  }).join('');
+  head+='<div class="convsub">Топ расхождений (робот − Маша):</div>'+
+    '<table class="convtbl"><thead><tr><th>Продукт</th><th class="mut">цех</th><th>робот</th><th>Маша</th><th>Δ</th></tr></thead><tbody>'+diffs+'</tbody></table>';
+  head+='<div class="note">'+(d.note||'')+'</div></div>';
+  el.innerHTML=head;
+  document.getElementById('convClose').onclick=function(){ el.innerHTML=''; };
+}
 function td(v,cls){ return '<td class="'+(cls||'')+'">'+(v?n1(v):'<span class="mut">·</span>')+'</td>'; }
 document.getElementById('date').value=tomorrowISO();
 document.getElementById('refresh').onclick=fetchPlan;
 document.getElementById('xlsxBtn').onclick=function(){ var date=document.getElementById('date').value||tomorrowISO(); window.location='/api/production/plan.xlsx?date='+date; };
 document.getElementById('date').onchange=fetchPlan;
 document.getElementById('yoyBtn').onclick=function(){ YOY=!YOY; this.classList.toggle('on',YOY); fetchPlan(); };
+document.getElementById('convBtn').onclick=loadConv;
 // автообновление каждые 5 минут (real-time)
 function setAuto(){ if(AUTO)clearInterval(AUTO); AUTO=setInterval(fetchPlan,300000); document.getElementById('auto').textContent='⟳ авто 5 мин'; }
 setAuto(); fetchPlan();
