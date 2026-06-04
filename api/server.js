@@ -127,6 +127,18 @@ function warmNewCustomers() {
 setTimeout(warmNewCustomers, 90000);
 setInterval(warmNewCustomers, 24 * 60 * 60 * 1000);
 
+// SMS-атрибуция/аудитория текущего месяца — холодный расчёт ~90с (десятки запросов
+// к 1С по кампаниям). Кэш дисковый (переживает рестарты), но TTL 6ч: греем сами,
+// чтобы пользователь никогда не ждал. getSmsMonthly попутно греет прошлые месяцы в фоне.
+function warmSms() {
+  const sms = require('./lib/sms-attribution');
+  const aud = require('./lib/sms-audience');
+  Promise.allSettled([sms.getSmsAttribution(), sms.getSmsMonthly(), aud.getSmsAudience()])
+    .then(rs => console.log('[sms] warm', rs.map(r => r.status).join(','), new Date().toISOString()));
+}
+setTimeout(warmSms, 45000);
+setInterval(warmSms, 6 * 60 * 60 * 1000);
+
 // UDS-промокоды помесячно — 17 запросов callDocument('ЧекККМ').
 function warmPromoCodes() {
   warmPromoCodesMonthly()
