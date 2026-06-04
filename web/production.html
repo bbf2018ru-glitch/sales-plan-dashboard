@@ -48,6 +48,7 @@
     <div class="ctrl">
       <input type="date" id="date" />
       <button id="yoyBtn">📊 Прошлый год</button>
+      <button id="xlsxBtn">⬇ Скачать xlsx</button>
       <button id="refresh">⟳ Обновить</button>
       <span class="auto" id="auto"></span>
     </div>
@@ -105,6 +106,7 @@ function kpi(v,l,cls){ return '<div class="kpi"><div class="v '+(cls||'')+'">'+(
 function td(v,cls){ return '<td class="'+(cls||'')+'">'+(v?n1(v):'<span class="mut">·</span>')+'</td>'; }
 document.getElementById('date').value=tomorrowISO();
 document.getElementById('refresh').onclick=fetchPlan;
+document.getElementById('xlsxBtn').onclick=function(){ var date=document.getElementById('date').value||tomorrowISO(); window.location='/api/production/plan.xlsx?date='+date; };
 document.getElementById('date').onchange=fetchPlan;
 document.getElementById('yoyBtn').onclick=function(){ YOY=!YOY; this.classList.toggle('on',YOY); fetchPlan(); };
 // автообновление каждые 5 минут (real-time)
