@@ -130,10 +130,10 @@ function yesterdayISO(){ var t=new Date(Date.now()-86400000); return t.toISOStri
 function loadConv(){
   var el=document.getElementById('conv');
   var date=document.getElementById('date').value||tomorrowISO();
-  // по умолчанию сверяем вчерашний день (там уже есть факт Маши); если выбран прошлый — его
-  var cd = date < tomorrowISO() ? date : yesterdayISO();
-  el.innerHTML='<div class="warnbox">🎯 Считаю сходимость за '+cd+' (робот vs задание Маши)…</div>';
-  fetch('/api/production/convergence?date='+cd).then(function(r){return r.json();}).then(renderConv).catch(function(e){
+  // если выбран прошедший день — сверяем его; иначе пусть бэкенд возьмёт последний ПОЛНЫЙ день АРМ
+  var cd = date < tomorrowISO() ? date : '';
+  el.innerHTML='<div class="warnbox">🎯 Считаю сходимость (робот vs задание Маши)…</div>';
+  fetch('/api/production/convergence'+(cd?'?date='+cd:'')).then(function(r){return r.json();}).then(renderConv).catch(function(e){
     el.innerHTML='<div class="warnbox">Сходимость недоступна: '+e.message+'</div>';
   });
 }

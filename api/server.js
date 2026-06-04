@@ -874,8 +874,12 @@ const server = http.createServer(async (req, res) => {
       try {
         let date = parsedUrl.searchParams.get('date');
         if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          const t = new Date(Date.now() - 86400000); // вчера (по умолч. — последний прошедший день)
-          date = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+          // по умолчанию — последний день с ПОЛНЫМ АРМ (иначе частичный док даёт ложные %)
+          date = await productionPlan.lastFullArmDate().catch(() => null);
+          if (!date) {
+            const t = new Date(Date.now() - 86400000);
+            date = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+          }
         }
         sendJson(res, 200, await productionPlan.getConvergence(date));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
