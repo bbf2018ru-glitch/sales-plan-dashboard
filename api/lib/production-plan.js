@@ -129,10 +129,15 @@ async function compute(dateStr, opts) {
     it.R = r1(it.N - it.shipNext - it.siteP);
     it.task = it.R < 0 ? Math.ceil(-it.R) : 0;
   }
-  // плоский список позиций
+  // плоский список позиций — ТОЛЬКО SKU из планового списка Маши (карта цехов).
+  // Иначе в план лезут упаковка/этикетки/брак/компоненты из 1С (отриц. остаток, M=0)
+  // → ложные огромные «задания». Маша планирует строго свой список (266 SKU).
+  const hasMap = CEH.map && Object.keys(CEH.map).length > 0;
   const items = [];
+  let skippedNonPlan = 0;
   for (const code of codes) {
     const nm = names[code] || code;
+    if (hasMap && !CEH.map[norm(nm)]) { skippedNonPlan++; continue; } // не из списка выпуска — пропуск
     const e = r1(E[code] || 0), g = r1(G[code] || 0), h = r1(H[code] || 0);
     const m = press.M[code] || 0, o = press.O[code] || 0, l = L[code] || 0, p = P[code] || 0;
     if (e === 0 && g === 0 && h === 0 && m === 0 && o === 0 && l === 0 && p === 0) continue;
@@ -185,7 +190,7 @@ async function compute(dateStr, opts) {
   return {
     date: dateStr, weekday: weekdayRu(target), nextWeekday: weekdayRu(next),
     yoy, ceh,
-    totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits) },
+    totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits), skippedNonPlan },
     note: 'Онлайн-расчёт из 1С. Остаток — текущий; M/O — среднее отгрузки А00000130→магазины по дню недели за 3 нед. Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы/Выходные не учтены (ручные у Маши).',
     refreshedAt: new Date().toISOString()
   };
