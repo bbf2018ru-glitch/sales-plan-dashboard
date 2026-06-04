@@ -4606,39 +4606,73 @@ function renderProductionKg(pk){
 }
 function mktCsvN(n, dec){ return dec ? (Math.round(n*100)/100).toFixed(2).replace('.',',') : String(Math.round(n)); }
 function mktExport(){
-  var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
-  if(!fromEl||!toEl) return;
-  var a=+fromEl.value,b=+toEl.value,lo=Math.min(a,b),hi=Math.max(a,b),idx=[];
-  for(var i=lo;i<=hi;i++) idx.push(i);
-  function sum(arr){ return idx.reduce(function(s,i){return s+arr[i];},0); }
-  var L=[], push=function(arr){ L.push(arr.map(function(v){return String(v).replace(/;/g,',');}).join(';')); }, nm=function(i){return MKT.months[i].replace('*','');};
-  push(['Маркетинг «Мария» — '+nm(lo)+'–'+nm(hi)+' 2026']); L.push('');
-  push(['Показатель','Значение']);
-  push(['Выручка, руб', mktCsvN(sum(MKT.revenue))]);
-  push(['Платный маркетинг (SMS+контекст), руб', mktCsvN(sum(MKT.smsCost)+sum(MKT.ctxCost))]);
-  push(['SMS отправлено', mktCsvN(sum(MKT.smsSent))]);
-  push(['Покупок с рекламы', mktCsvN(sum(MKT.ctxPurch))]); L.push('');
-  push(['SMS-рассылки']); push(['Месяц','Рассылок','Отправлено','Стоимость руб','Цена SMS руб']);
-  idx.forEach(function(i){ push([nm(i), MKT.smsCnt[i], MKT.smsSent[i], MKT.smsCost[i], mktCsvN(MKT.smsCost[i]/MKT.smsSent[i],1)]); });
-  push(['Итого', sum(MKT.smsCnt), sum(MKT.smsSent), sum(MKT.smsCost), mktCsvN(sum(MKT.smsCost)/sum(MKT.smsSent),1)]); L.push('');
-  push(['Контекст (Яндекс.Директ)']); push(['Месяц','Расход руб','Клики','Покупок','CPA руб']);
-  idx.forEach(function(i){ push([nm(i), MKT.ctxCost[i], MKT.ctxClicks[i], MKT.ctxPurch[i], MKT.ctxPurch[i]?mktCsvN(MKT.ctxCost[i]/MKT.ctxPurch[i]):'']); });
-  var pur=sum(MKT.ctxPurch); push(['Итого', sum(MKT.ctxCost), sum(MKT.ctxClicks), pur, pur?mktCsvN(sum(MKT.ctxCost)/pur):'']); L.push('');
-  push(['2ГИС']); push(['Месяц','Переходов на карточку','Действий']);
-  idx.forEach(function(i){ push([nm(i), MKT.gis[i], MKT.gisAct[i]]); });
-  push(['Итого', sum(MKT.gis), sum(MKT.gisAct)]); L.push('');
-  push(['Сладкий чек']); push(['Месяц','Выполнений','Активных карт','Баллов']);
-  idx.forEach(function(i){ push([nm(i), MKT.sweet[i], MKT.sweetCards[i], MKT.sweetPts[i]]); });
-  push(['Итого', sum(MKT.sweet), '', sum(MKT.sweetPts)]); L.push('');
-  push(['Продажи и лояльность']); push(['Месяц','Выручка руб','Чеков','Ср.чек руб','Карта лоял. %','Бонусами руб']);
-  idx.forEach(function(i){ push([nm(i), MKT.revenue[i], MKT.cheques[i], mktCsvN(MKT.revenue[i]/MKT.cheques[i]), mktCsvN(MKT.cardPct[i],1), MKT.bonus[i]]); });
-  var chq=sum(MKT.cheques), rev=sum(MKT.revenue); push(['Итого', rev, chq, mktCsvN(rev/chq), '', sum(MKT.bonus)]); L.push('');
-  // SEO/источники: hardcoded ранее (173k SEO, 248k всего) выдуман — реальная Метрика даёт другие цифры,
-  // см. блок «Источники трафика сайта» на вкладке. В CSV эту секцию пока не включаем.
+  // Экспорт ТОЛЬКО из live-данных (захардкоженный MKT.* убран — он давал выдуманные/
+  // устаревшие SMS/контекст/2ГИС). Источники: monthlySeries (1С), directHistory (кабинет
+  // Директа), gisHistory (кабинет 2ГИС), sms-attribution, paid-costs, gisDemand.
+  var d=_mktLive;
+  if(!d){ alert('Данные ещё загружаются — открой вкладку Маркетинг и подожди пару секунд.'); return; }
+  var MM=['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  var ymLbl=function(ym){ var p=String(ym).split('-'); return MM[Number(p[1])]+' '+p[0]; };
+  var L=[], push=function(arr){ L.push(arr.map(function(v){return String(v==null?'':v).replace(/;/g,',');}).join(';')); };
+  push(['Маркетинг «Мария» — live-выгрузка ('+new Date().toLocaleDateString('ru-RU')+')']);
+  push(['Все цифры из источников: 1С, кабинеты Я.Директа и 2ГИС, Метрика. Без оценок.']); L.push('');
+
+  // Платные каналы / бюджет (paid-costs за выбранный месяц)
+  if(_mktPaid && _mktPaid.channels){
+    push(['Платные каналы (за месяц), руб']); push(['Канал','Затраты/мес руб','Что даёт']);
+    _mktPaid.channels.forEach(function(c){ push([c.name, mktCsvN(c.cost), (c.live?'':'(фикс) ')+(c.result||'').replace(/<[^>]+>/g,'')]); });
+    push(['Итого/мес', mktCsvN(_mktPaid.totalMonthly), '']); L.push('');
+  }
+
+  // Продажи и лояльность помесячно (1С)
+  var ms=(d.monthlySeries&&d.monthlySeries.cur||[]).filter(function(m){return !m._pending && m.revenue;});
+  if(ms.length){ push(['Продажи и лояльность помесячно (1С)']); push(['Месяц','Выручка руб','Чеков','Ср.чек руб','Карта лоял. %','Бонусами руб']);
+    var rv=0,cq=0,bn=0; ms.forEach(function(m){ rv+=m.revenue||0;cq+=m.cheques||0;bn+=m.bonus||0;
+      push([ymLbl(m.ym), mktCsvN(m.revenue), m.cheques, mktCsvN(m.avgCheck||(m.cheques?m.revenue/m.cheques:0)), mktCsvN(m.cardPct||0,1), mktCsvN(m.bonus||0)]); });
+    push(['Итого', mktCsvN(rv), cq, mktCsvN(cq?rv/cq:0), '', mktCsvN(bn)]); L.push('');
+  }
+
+  // Я.Директ помесячно (кабинет)
+  var dh=(d.external&&d.external.directHistory&&d.external.directHistory.months||[]).filter(function(m){return m.spend;});
+  if(dh.length){ push(['Я.Директ помесячно (кабинет porg-mcw4s7ni)']); push(['Месяц','Расход руб','Показы','Клики','CTR %','Конверсии','CR %','CPC руб','CPA руб']);
+    dh.forEach(function(m){ push([ymLbl(m.ym), mktCsvN(m.spend), m.impressions, m.clicks, mktCsvN(m.ctrPct||0,1), m.conversions, mktCsvN(m.crPct||0,1), mktCsvN(m.cpc||0,1), m.cpa==null?'':mktCsvN(m.cpa)]); });
+    L.push('');
+  }
+
+  // 2ГИС присутствие в выдаче помесячно (кабинет)
+  var gh=(d.external&&d.external.gisHistory&&d.external.gisHistory.series||[]).filter(function(m){return m.impressions;});
+  if(gh.length){ push(['2ГИС — присутствие в выдаче помесячно (кабинет)']); push(['Месяц','Показы в выдаче','Дней','Позиция ср.','Позиция мин','Позиция макс']);
+    gh.forEach(function(m){ push([ymLbl(m.ym), m.impressions, m.days||'', m.positionAvg==null?'':mktCsvN(m.positionAvg,1), m.positionMin||'', m.positionMax||'']); });
+    L.push('');
+  }
+
+  // SMS-атрибуция (чистые данные)
+  if(_mktSms && _mktSms.totals){ var t=_mktSms.totals;
+    push(['SMS-рассылки — атрибуция (за месяц, чистые данные)']); push(['Показатель','Значение']);
+    push(['Получателей (уник. карт)', mktCsvN(t.recipients||0)]);
+    push(['Затраты руб (получатели × '+(_mktSms.price||8.5)+')', mktCsvN(t.cost||0)]);
+    push(['Купивших/перешедших', mktCsvN(t.buyers||0)]);
+    push(['Выручка атрибут. руб', mktCsvN(t.revenue||0)]);
+    if(t.sweetReg!=null) push(['Регистраций в «Сладком чеке»', mktCsvN(t.sweetReg)]);
+    L.push('');
+  }
+
+  // Сладкий чек — текущий месяц (1С)
+  if(d.sweet && d.sweet.cur){ var sc=d.sweet.cur;
+    push(['«Сладкий чек» — '+(d.monthName||'месяц')+' (1С)']); push(['Показатель','Значение']);
+    push(['Активных карт', mktCsvN(sc.cards||0)]); push(['Выполнений заданий', mktCsvN(sc.events||0)]); push(['Баллов начислено', mktCsvN(sc.points||0)]); L.push('');
+  }
+
+  // Поисковые запросы 2ГИС (Спрос)
+  var gd=d.external&&d.external.gisDemand;
+  if(gd && gd.queries && gd.queries.length){ push(['Поисковые запросы 2ГИС'+(gd.period?' ('+gd.period+')':'')]); push(['Запрос','Доля %']);
+    gd.queries.forEach(function(q){ push([q.q, mktCsvN(q.pct,1)]); }); L.push('');
+  }
+
   var csv='﻿'+L.join('\n');
   var el=document.createElement('a');
   el.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  el.download='maria-marketing-2026-m'+(lo+1)+'-m'+(hi+1)+'.csv';
+  el.download='maria-marketing-live-'+(new Date().toISOString().slice(0,10))+'.csv';
   el.click();
 }
 var COMPETITORS = [
@@ -4950,6 +4984,8 @@ function renderDemand(d){
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод:</b> ~'+mNum1(brand)+' % запросов брендовые («мария» + варианты) — высокая узнаваемость. Родовой спрос (торты, кондитерские, кофейни, кофе, завтрак) — точки роста через SEO и карточку; заметная доля «кофе/кофейни/завтрак» подтверждает кафе-нишу.</div>';
 }
 var _mktInited=false;
+// Последние live-данные для CSV-экспорта (channels / sms-attribution / paid-costs).
+var _mktLive=null, _mktSms=null, _mktPaid=null;
 function mktInit(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
   if(!fromEl||!toEl) return;
@@ -5017,6 +5053,7 @@ function mktLoadYoY(){
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
     // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
     try { renderAlerts(d, period); } catch(_){}
+    _mktLive=d; // для CSV-экспорта (live)
     // Продажи и лояльность помесячно — live (заменили статику янв–май).
     try { renderSalesMonthly(d); } catch(_){}
     // Я.Директ помесячно — live из кабинета (заменили статику).
@@ -5033,14 +5070,14 @@ function mktLoadYoY(){
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){
       paidEl.innerHTML='<div class="mkt-yoy-load">Считаю бюджет платных каналов…</div>';
-      fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ renderPaidCosts(pc); })
+      fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ _mktPaid=pc; renderPaidCosts(pc); })
         .catch(function(e){ paidEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Бюджет недоступен: '+e.message+'</div>'; });
     }
     // SMS-атрибуция за выбранный месяц — отдельный (тяжёлый ~9с, кэш 6ч) эндпоинт.
     var smsAttrEl=document.getElementById('mktSmsAttr');
     if(smsAttrEl){
       smsAttrEl.innerHTML='<div class="mkt-yoy-load">Считаю атрибуцию рассылок из 1С (~10 сек)…</div>';
-      fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ renderSmsAttribution(sa); })
+      fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ _mktSms=sa; renderSmsAttribution(sa); })
         .catch(function(e){ smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>'; });
     }
     // Выпуск продукции в кг — отдельный эндпоинт (1С /query).
