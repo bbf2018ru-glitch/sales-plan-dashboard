@@ -343,6 +343,98 @@
     }
   }
 
+  // ─── SEO: расширенная аналитика поверх mktSeo ───────────────────────────────
+  async function loadSeoExtra() {
+    const el = document.getElementById('mktSeoExtra');
+    if (!el) return;
+    el.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Загрузка…</div>';
+    try {
+      const data = await fetchJson('/api/marketing/seo-history');
+      const entries = data.entries || [];
+      if (!entries.length) {
+        el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Архив SEO пока пуст. Появится после первого ежедневного снимка (cron 7:00).</div>';
+        return;
+      }
+      const latest = entries[entries.length - 1];
+      const sum = latest.summary || {};
+
+      // Сравнение 5 брендов
+      const brands = [
+        { key: 'maria',    name: 'Мария',     color: '#22c55e' },
+        { key: 'stefania', name: 'Стефания',  color: '#3b82f6' },
+        { key: 'cakehome', name: 'Cake Home', color: '#a855f7' },
+        { key: 'etika',    name: 'Этика',     color: '#f59e0b' },
+        { key: 'yahont',   name: 'Яхонт',     color: '#ef4444' },
+      ];
+      const brandCards = brands.map(b => {
+        const v = sum[b.key];
+        if (!v || typeof v !== 'object') return '';
+        return `<div style="padding:12px;border:1px solid var(--line,#e2e8f0);border-radius:10px;border-top:3px solid ${b.color}">
+          <div style="font-weight:600;color:${b.color}">${esc(b.name)}</div>
+          <div style="font-size:24px;font-weight:700;margin:4px 0">${v.top10 || 0} <span style="font-size:12px;color:var(--muted,#64748b);font-weight:400">в топ-10</span></div>
+          <div style="font-size:12px;color:var(--muted,#64748b)">Топ-3: ${v.top3 || 0}</div>
+          <div style="font-size:12px;color:var(--muted,#64748b)">Найден в выдаче: ${v.found || 0} запросов</div>
+          <div style="font-size:12px;color:var(--muted,#64748b)">Сред. позиция: ${v.avg != null ? v.avg.toFixed(1) : '—'}</div>
+        </div>`;
+      }).join('');
+
+      // По категориям
+      const catLabels = {
+        main: 'Основные',
+        'cake-type': 'Виды тортов',
+        occasion: 'Случаи (свадебный/детский)',
+        dessert: 'Десерты',
+        coffee: 'Кофе и кафе',
+        geo: 'По районам',
+        brand: 'Брендовые',
+        other: 'Прочее',
+      };
+      const catRows = (latest.byCategory || []).sort((a, b) => (a.avgRankMaria ?? 99) - (b.avgRankMaria ?? 99)).map(c => `<tr>
+        <td>${esc(catLabels[c.cat] || c.cat)}</td>
+        <td style="text-align:right">${c.total}</td>
+        <td style="text-align:right">${c.mariaInTop10}</td>
+        <td style="text-align:right">${c.avgRankMaria != null ? c.avgRankMaria.toFixed(1) : '—'}</td>
+        <td style="text-align:right;color:${c.captcha ? 'var(--amber,#f59e0b)' : 'var(--muted,#64748b)'}">${c.captcha || 0}</td>
+      </tr>`).join('');
+
+      // Тренд средней позиции Маши по снимкам
+      const trendRows = entries.map(e => {
+        const m = e.summary?.maria;
+        return { date: e.date, avg: m?.avg ?? null, top10: m?.top10 ?? null, captcha: e.captchaCount ?? null };
+      });
+      const validTrend = trendRows.filter(t => t.avg != null);
+      let trendBlock = '';
+      if (validTrend.length >= 2) {
+        const first = validTrend[0].avg;
+        const last = validTrend[validTrend.length - 1].avg;
+        const delta = last - first;
+        const trendColor = delta < -0.2 ? 'var(--green,#22c55e)' : delta > 0.2 ? 'var(--red,#ef4444)' : 'var(--muted,#64748b)';
+        const arrow = delta < -0.2 ? '↑ позиции выросли' : delta > 0.2 ? '↓ позиции упали' : '→ без изменений';
+        trendBlock = `<div style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper,#fff)">
+          <div style="font-weight:600;font-size:13px;margin-bottom:8px">Динамика средней позиции «Мария»</div>
+          <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+            <div style="font-size:24px;font-weight:700;color:${trendColor}">${last.toFixed(1)} <span style="font-size:13px;font-weight:400;color:${trendColor}">${arrow} (${delta > 0 ? '+' : ''}${delta.toFixed(1)})</span></div>
+            <div style="font-size:11px;color:var(--muted,#64748b)">было ${first.toFixed(1)} (${validTrend[0].date}) → стало ${last.toFixed(1)} (${validTrend[validTrend.length - 1].date})</div>
+          </div>
+        </div>`;
+      } else {
+        trendBlock = `<div style="margin-top:14px;padding:10px;border:1px dashed var(--line);border-radius:10px;color:var(--muted,#64748b);font-size:12px">Тренд появится после второго еженедельного снимка. Сейчас в архиве: ${entries.length}.</div>`;
+      }
+
+      el.innerHTML =
+        `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">${brandCards}</div>` +
+        `<div style="font-weight:600;font-size:13px;margin-bottom:6px">Позиции Марии по группам запросов</div>` +
+        `<div class="table-wrap"><table style="width:100%;font-size:13px">
+          <thead><tr><th>Группа</th><th style="text-align:right">Запросов</th><th style="text-align:right">В топ-10</th><th style="text-align:right">Сред. позиция</th><th style="text-align:right" title="Сколько запросов в группе вернули капчу">⚠ Капча</th></tr></thead>
+          <tbody>${catRows || '<tr><td colspan="5" style="color:var(--muted,#64748b);padding:8px">Нет данных по категориям — последний скрейп ещё на старой версии (15 запросов). Перезапустится в понедельник по cron.</td></tr>'}</tbody>
+        </table></div>` +
+        trendBlock +
+        `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Источник: Яндекс SERP, регион Иркутск (lr=63), скрейп еженедельно (пн 4:00). Капчи неизбежны при текущей анти-бот защите Яндекса. <code>scrape-seo.js</code> на VDS.</div>`;
+    } catch (e) {
+      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить SEO: ${esc(e.message)}</div>`;
+    }
+  }
+
   // ─── Запуск ─────────────────────────────────────────────────────────────────
   // Триггеримся когда пользователь открывает соответствующую секцию маркетинг-таба.
   // Дешевле, чем грузить всё сразу: каждый блок прячется CSS-классом hidden до клика.
@@ -354,6 +446,7 @@
     loadClusters();
     loadHoliday();
     loadGisHistory();
+    loadSeoExtra();
   }
 
   function tryHook() {

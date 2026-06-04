@@ -1029,6 +1029,56 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
+    // ── SEO история — архив снимков seo.json (тренд позиций Маши vs конкуренты) ──
+    if (pathname === '/api/marketing/seo-history' && req.method === 'GET') {
+      try {
+        const fs = require('node:fs');
+        const path = require('node:path');
+        const archiveDir = '/opt/marketing-data/archive';
+        const dates = fs.existsSync(archiveDir)
+          ? fs.readdirSync(archiveDir).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
+          : [];
+        const entries = [];
+        const seen = new Set();
+        for (const date of dates) {
+          const file = path.join(archiveDir, date, 'seo.json');
+          if (!fs.existsSync(file)) continue;
+          try {
+            const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+            // дедуп — если файл не менялся между днями (один и тот же scrapedAt), берём один раз
+            const sig = j?.scrapedAt || date;
+            if (seen.has(sig)) continue;
+            seen.add(sig);
+            entries.push({
+              date,
+              scrapedAt: j?.scrapedAt || null,
+              summary: j?.summary || null,
+              byCategory: j?.byCategory || null,
+              captchaCount: j?.summary?.captchaCount ?? null,
+            });
+          } catch (_) { /* skip битый */ }
+        }
+        // + сегодняшний live snapshot (если был обновлён сегодня после архива)
+        try {
+          const today = '/opt/marketing-data/seo.json';
+          if (fs.existsSync(today)) {
+            const j = JSON.parse(fs.readFileSync(today, 'utf8'));
+            const sig = j?.scrapedAt || '';
+            if (!seen.has(sig)) {
+              entries.push({
+                date: new Date().toISOString().slice(0, 10),
+                scrapedAt: j?.scrapedAt || null,
+                summary: j?.summary || null,
+                byCategory: j?.byCategory || null,
+                captchaCount: j?.summary?.captchaCount ?? null,
+              });
+            }
+          }
+        } catch (_) {}
+        sendJson(res, 200, { entries, count: entries.length });
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
     // Pending-эндпоинты (отдают { available: false, pending: true, reason })
     if (pathname === '/api/marketing/birthdays' && req.method === 'GET') {
       const user = await resolveUser(req);
