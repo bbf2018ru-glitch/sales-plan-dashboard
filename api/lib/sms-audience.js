@@ -43,17 +43,27 @@ function monthBounds(period) {
 }
 function normText(t) { return String(t || '').toLowerCase().replace(/[^a-zа-я0-9]+/gi, ' ').trim(); }
 
-// Запрос списка отправок месяца — те же поля что в sms-attribution.
+// Запрос списка отправок месяца. Кроме базовых полей вытаскиваем «критерий отбора»
+// (Документ.SMSСообщение.СодержаниеТемыSMS — менеджер пишет туда вручную перед
+// рассылкой, напр. «клиенты, кто покупал блюда вчера Ржанова/Ядринцева 01.06.-03.06.»)
+// и ответственного (кто отправил).
 function campaignListQuery(period) {
   const b = monthBounds(period);
   return 'ВЫБРАТЬ П.Ссылка.Дата КАК Дата, П.Ссылка.Тема КАК Тема,'
     + ' МАКСИМУМ(ВЫРАЗИТЬ(П.Ссылка.ТекстПисьма КАК СТРОКА(300))) КАК Текст,'
+    + ' МАКСИМУМ(ВЫРАЗИТЬ(П.Ссылка.СодержаниеТемыSMS КАК СТРОКА(500))) КАК Критерий,'
+    + ' МАКСИМУМ(ВЫРАЗИТЬ(П.Ссылка.Ответственный.Наименование КАК СТРОКА(80))) КАК Ответственный,'
     + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) КАК Получателей'
     + ' ИЗ Документ.SMSСообщение.Получатели КАК П'
     + ` ГДЕ П.Ссылка.Дата >= ДАТАВРЕМЯ(${b.y},${b.m},1) И П.Ссылка.Дата < ДАТАВРЕМЯ(${b.ny},${b.nm},1)`
     + ' СГРУППИРОВАТЬ ПО П.Ссылка, П.Ссылка.Дата, П.Ссылка.Тема'
     + ` ИМЕЮЩИЕ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Получатель) >= ${MIN_RECIPIENTS}`
     + ' УПОРЯДОЧИТЬ ПО Получателей УБЫВ';
+}
+
+// Нормализуем «текст-разделитель» 1С: спецсимвол ¶ в реальных строках = перевод строки.
+function cleanCriterion(s) {
+  return String(s || '').replace(/¶+/g, ' · ').replace(/[\r\n]+/g, ' · ').replace(/\s+/g, ' ').trim();
 }
 
 // Запрос сегментов: получатели всех dts → группировка по карте → классификация
@@ -102,13 +112,17 @@ async function compute(period) {
   if (!list || !list.rows) return { period, campaigns: [], error: 'нет ответа 1С', refreshedAt: new Date().toISOString() };
 
   // Дедуп ровно как в sms-attribution: только маркетинговые темы + normText.
+  // Критерий/ответственный схлопываем по первой непустой отправке группы.
   const byText = new Map();
   for (const r of list.rows) {
     if (!MARKETING_RE.test(r.Тема || '')) continue;
     const dt = parseDt(r.Дата); if (!dt) continue;
     const key = normText(r.Текст) || ('doc-' + r.Дата);
-    if (!byText.has(key)) byText.set(key, { text: (r.Текст || '').trim(), theme: r.Тема, dts: [] });
-    byText.get(key).dts.push(dt);
+    if (!byText.has(key)) byText.set(key, { text: (r.Текст || '').trim(), theme: r.Тема, dts: [], criterion: '', responsible: '' });
+    const g = byText.get(key);
+    g.dts.push(dt);
+    if (!g.criterion && r.Критерий) g.criterion = cleanCriterion(r.Критерий);
+    if (!g.responsible && r.Ответственный) g.responsible = String(r.Ответственный).trim();
   }
   const groups = Array.from(byText.values()).slice(0, MAX_CAMPAIGNS);
 
@@ -129,9 +143,9 @@ async function compute(period) {
         const n = upp.parseRu(row.Карт) || 0;
         dist[k] += n; dist.total += n;
       }
-      return { firstDate, text: g.text, sendsCount: g.dts.length, audience: dist, audienceError: null };
+      return { firstDate, text: g.text, sendsCount: g.dts.length, criterion: g.criterion || null, responsible: g.responsible || null, audience: dist, audienceError: null };
     } catch (e) {
-      return { firstDate, text: g.text, sendsCount: g.dts.length, audience: null, audienceError: e.message };
+      return { firstDate, text: g.text, sendsCount: g.dts.length, criterion: g.criterion || null, responsible: g.responsible || null, audience: null, audienceError: e.message };
     }
   });
 

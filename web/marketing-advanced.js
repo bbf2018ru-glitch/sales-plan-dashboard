@@ -471,7 +471,12 @@
     const camps = (sa && sa.campaigns) || [];
     if (!camps.length) return null;
     const audMap = new Map();
-    for (const a of (aud?.campaigns || [])) audMap.set(a.firstDate + '|' + (a.text || '').slice(0, 50), a.audience);
+    const critMap = new Map();
+    for (const a of (aud?.campaigns || [])) {
+      const k = a.firstDate + '|' + (a.text || '').slice(0, 50);
+      audMap.set(k, a.audience);
+      critMap.set(k, { criterion: a.criterion, responsible: a.responsible });
+    }
     const typeLabel = { 'A': 'продукт+срок', 'A*': 'всё+срок', 'B': 'ссылка', 'C': 'оценка' };
     const audCell = (a) => {
       if (!a || !a.total) return '<span style="color:var(--muted,#64748b)">—</span>';
@@ -482,14 +487,22 @@
       if (a.cold) parts.push(`<span style="color:#94a3b8" title=">365д или не было покупок">⚪ ${a.cold} хол.</span>`);
       return parts.join(' · ');
     };
+    const critCell = (c) => {
+      if (!c || !c.criterion) return '';
+      const who = c.responsible ? ` <span style="color:#94a3b8">· ${esc(c.responsible)}</span>` : '';
+      return `<div style="margin-top:4px;font-size:10px;color:#0369a1" title="Критерий отбора из карточки SMS в 1С (СодержаниеТемыSMS)">🎯 <b>Критерий:</b> ${esc(c.criterion)}${who}</div>`;
+    };
     const rowsHtml = camps.map(c => {
-      const a = audMap.get(c.firstDate + '|' + (c.text || '').slice(0, 50));
+      const k = c.firstDate + '|' + (c.text || '').slice(0, 50);
+      const a = audMap.get(k);
+      const cr = critMap.get(k);
       return `<tr>
         <td style="white-space:nowrap;color:var(--muted,#64748b);vertical-align:top">${esc(c.firstDate || '')}</td>
         <td style="text-align:right;vertical-align:top">${(c.recipients || 0).toLocaleString('ru-RU')}</td>
         <td style="vertical-align:top"><span style="font-size:10px;color:var(--muted,#64748b)">${esc(typeLabel[c.type] || c.type || '')}</span></td>
         <td style="font-size:11px;vertical-align:top">
           <div>${esc(c.text || '')}</div>
+          ${critCell(cr)}
           <div style="margin-top:4px;font-size:10px">${audCell(a)}</div>
         </td>
       </tr>`;
@@ -572,7 +585,8 @@
     try { aud = await fetchJson('/api/marketing/sms-audience?period=' + period); } catch (_) { return null; }
     const map = new Map();
     for (const a of (aud?.campaigns || [])) {
-      map.set(a.firstDate + '|' + (a.text || '').slice(0, 50), a.audience);
+      const key = a.firstDate + '|' + (a.text || '').slice(0, 50);
+      map.set(key, { audience: a.audience, criterion: a.criterion, responsible: a.responsible });
     }
     smsAttrState = { audMap: map, lastPeriod: period };
     return map;
@@ -596,11 +610,22 @@
       const textRaw = (textDiv.textContent || '').trim();
       if (!dateMatch || !textRaw) return;
       const key = dateMatch[0] + '|' + textRaw.slice(0, 50);
-      const a = audMap.get(key);
+      const entry = audMap.get(key) || {};
+      // Критерий отбора из 1С (СодержаниеТемыSMS)
+      if (entry.criterion) {
+        const cr = document.createElement('div');
+        cr.className = 'sms-aud-line sms-crit-line';
+        cr.style.cssText = 'font-size:10px;margin-top:4px;color:#0369a1';
+        cr.setAttribute('title', 'Критерий отбора из 1С (СодержаниеТемыSMS)');
+        const who = entry.responsible ? ` · <span style="color:#94a3b8">${entry.responsible.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</span>` : '';
+        cr.innerHTML = `🎯 <b>Критерий:</b> ${entry.criterion.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}${who}`;
+        firstCell.appendChild(cr);
+      }
+      // Распределение по сегментам
       const line = document.createElement('div');
       line.className = 'sms-aud-line';
       line.style.cssText = 'font-size:10px;margin-top:4px';
-      line.innerHTML = audCellHtml(a);
+      line.innerHTML = audCellHtml(entry.audience);
       firstCell.appendChild(line);
       injected++;
     });
