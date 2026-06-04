@@ -272,8 +272,11 @@ async function getAudienceCsv(key) {
       const nm = cleanName(r['Имя']);
       let text = nm ? renderText(T.tpl, { name: nm }) : T.fallback;
       if (segs(text) > 1) text = T.fallback;
-      return baseCols(r).concat([day ? `${pad(day)}.${pad(mon)}` : '', day ? ruDate(send < now ? now : send) : 'вручную (нет дня ДР)', Math.round(parseRu(r['Бонусы']) || 0), text, segs(text)]);
-    }).sort((a, b) => String(a[6]).localeCompare(String(b[6])));
+      const sendD = send < now ? now : send;
+      const row = baseCols(r).concat([day ? `${pad(day)}.${pad(mon)}` : '', day ? ruDate(sendD) : 'вручную (нет дня ДР)', Math.round(parseRu(r['Бонусы']) || 0), text, segs(text)]);
+      row._k = day ? sendD.getTime() : 9e15; // сортировка по реальной дате отправки, «вручную» — в конец
+      return row;
+    }).sort((a, b) => a._k - b._k);
     return { filename: 'ДР-30-дней.csv', csv: toCsv(BASE_HEAD.concat(['ДР', 'ДатаОтправки', 'БонусовНаКарте', 'SMS', 'СегментовSMS']), out) };
   }
 
