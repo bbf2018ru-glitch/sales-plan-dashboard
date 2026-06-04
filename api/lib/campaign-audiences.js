@@ -196,11 +196,9 @@ async function buildAudiences() {
 }
 
 async function getAudiences({ force = false } = {}) {
-  const key = 'audiences';
-  if (!force) { const hit = cache.get(key); if (hit) return { ...hit, fromCache: true }; }
-  const data = await buildAudiences();
-  cache.set(key, data);
-  return data;
+  // makeCache: единственный метод wrap(key, fn) — кэш+дедуп; force обходит через прямой вызов
+  if (force) return buildAudiences();
+  return cache.wrap('audiences', buildAudiences);
 }
 
 // ── CSV-выгрузка сегмента ────────────────────────────────────────────────────
