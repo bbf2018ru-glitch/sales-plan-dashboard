@@ -156,7 +156,11 @@ function ymdNum(o) { return o.y * 10000 + o.m * 100 + o.d; }
 
 async function compute(dateStr, opts) {
   const yoy = !!(opts && opts.yoy);
-  const demand = (opts && opts.demand === 'hub') ? 'hub' : 'central'; // central — новый дефолт
+  // demand: 'hub' (дефолт) — отгрузка из хаба А00000130, дневной такт ≈ дневное производство,
+  // хорошо калибрует товары, идущие через хаб (торты). 'central' — отгрузка из ВСЕХ
+  // центральных складов в точки: ловит десерты/пирожные мимо хаба, НО переоценивает (точки
+  // затариваются волнами на неск. дней) → только диагностика, не для планирования.
+  const demand = (opts && opts.demand === 'central') ? 'central' : 'hub';
   const target = parseYMD(dateStr);
   const next = addDays(target, 1);
   const today = todayObj();
@@ -388,12 +392,12 @@ async function computeConvergence(dateStr, demand) {
 
 function getPlan(dateStr, opts) {
   const fKey = (opts && opts.includeTodayOutput != null) ? (opts.includeTodayOutput ? ':f1' : ':f0') : '';
-  const dKey = (opts && opts.demand === 'hub') ? ':hub' : ''; // central — дефолт, без суффикса
+  const dKey = (opts && opts.demand === 'central') ? ':central' : ''; // hub — дефолт
   const key = 'plan:' + dateStr + (opts && opts.yoy ? ':yoy' : '') + fKey + dKey;
   return cache.wrap(key, () => compute(dateStr, opts));
 }
 function getConvergence(dateStr, demand) {
-  const dKey = demand === 'hub' ? ':hub' : '';
+  const dKey = demand === 'central' ? ':central' : '';
   return cache.wrap('conv:' + dateStr + dKey, () => computeConvergence(dateStr, demand));
 }
 

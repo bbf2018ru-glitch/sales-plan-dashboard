@@ -864,7 +864,7 @@ const server = http.createServer(async (req, res) => {
         const opts = { yoy };
         if (fParam === '0') opts.includeTodayOutput = false;
         else if (fParam === '1') opts.includeTodayOutput = true;
-        if (parsedUrl.searchParams.get('demand') === 'hub') opts.demand = 'hub';
+        if (parsedUrl.searchParams.get('demand') === 'central') opts.demand = 'central';
         sendJson(res, 200, await productionPlan.getPlan(date, opts));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
@@ -882,7 +882,7 @@ const server = http.createServer(async (req, res) => {
             date = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
           }
         }
-        const demand = parsedUrl.searchParams.get('demand') === 'hub' ? 'hub' : 'central';
+        const demand = parsedUrl.searchParams.get('demand') === 'central' ? 'central' : 'hub';
         sendJson(res, 200, await productionPlan.getConvergence(date, demand));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
