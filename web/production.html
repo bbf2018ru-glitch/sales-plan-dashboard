@@ -88,8 +88,11 @@ function render(d){
     h+='<tr class="ceh"><td colspan="'+cols+'">▓ '+c.name+'  ·  к выпуску '+n1(c.task)+' шт ('+c.deficit+' поз.)</td></tr>';
     c.items.forEach(function(it){
       var yoy = YOY? '<td class="yoycol">'+(it.lyShip!=null?n1(it.lyShip):'—')+'</td><td class="yoycol '+(it.deltaPct>0?'pos':(it.deltaPct<0?'neg':''))+'">'+(it.deltaPct!=null?(it.deltaPct>0?'+':'')+it.deltaPct+'%':'—')+'</td>':'';
+      var shipCell = it.bom
+        ? '<td title="разузловка: спрос из заданий родителей" style="color:#c39bff">🧩 '+(it.ship?n1(it.ship):'<span class="mut">·</span>')+'</td>'
+        : td(it.ship);
       h+='<tr class="'+(it.task>0?'def':'')+'"><td>'+it.name+'</td>'+
-        td(it.gp)+td(it.zap)+td(it.kont)+td(it.siteL,'mut')+td(it.ship)+td(it.shipNext)+td(it.siteP,'mut')+
+        td(it.gp)+td(it.zap)+td(it.kont)+td(it.siteL,'mut')+shipCell+td(it.shipNext)+td(it.siteP,'mut')+
         td(it.N)+'<td class="'+(it.R<0?'neg':'')+'">'+n1(it.R)+'</td>'+
         '<td class="task">'+(it.task>0?n1(it.task):'')+'</td>'+yoy+'</tr>';
     });

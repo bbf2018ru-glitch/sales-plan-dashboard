@@ -22,6 +22,12 @@ let CEH = { order: [], map: {} };
 try { CEH = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'prod-ceh-map.json'), 'utf8')); }
 catch (e) { console.log('[production-plan] нет prod-ceh-map.json:', e.message); }
 
+// Разузловка п/ф: { норм.имя п/ф → { name, parents:[норм.имя родителя…] } }.
+// Спрос на п/ф = сумма заданий родительских продуктов (1:1, как в файле Маши: M13=S34).
+let BOM = {};
+try { BOM = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 'prod-bom-map.json'), 'utf8')); }
+catch (e) { console.log('[production-plan] нет prod-bom-map.json:', e.message); }
+
 function norm(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim(); }
 function cc(s) { return String(s == null ? '' : s).trim(); }
 // дата → {y,m,d}; сдвиг на дни
@@ -117,25 +123,49 @@ async function compute(dateStr, opts) {
   // все коды, по которым есть хоть что-то
   const codes = new Set([...Object.keys(E), ...Object.keys(G), ...Object.keys(H), ...Object.keys(press.M), ...Object.keys(L), ...Object.keys(P)]);
   const cehBuckets = {};
-  let deficitCount = 0, taskUnits = 0;
+  const r1 = (x) => Math.round(x * 10) / 10;
+  function recompute(it) {
+    it.N = r1(it.gp + it.kont + it.zap - it.siteL - it.ship);
+    it.R = r1(it.N - it.shipNext - it.siteP);
+    it.task = it.R < 0 ? Math.ceil(-it.R) : 0;
+  }
+  // плоский список позиций
+  const items = [];
   for (const code of codes) {
     const nm = names[code] || code;
-    const e = Math.round((E[code] || 0) * 10) / 10, g = Math.round((G[code] || 0) * 10) / 10, h = Math.round((H[code] || 0) * 10) / 10;
+    const e = r1(E[code] || 0), g = r1(G[code] || 0), h = r1(H[code] || 0);
     const m = press.M[code] || 0, o = press.O[code] || 0, l = L[code] || 0, p = P[code] || 0;
-    const N = e + h + g - l - m;
-    const R = N - o - p;
-    const task = R < 0 ? Math.ceil(-R) : 0;
     if (e === 0 && g === 0 && h === 0 && m === 0 && o === 0 && l === 0 && p === 0) continue;
-    if (task > 0) { deficitCount++; taskUnits += task; }
-    const cehInfo = CEH.map[norm(nm)];
-    const ceh = (cehInfo && cehInfo.ceh) || 'Прочее';
     const lym = yoy ? (lyM[code] || 0) : null;
-    const deltaPct = (yoy && lym) ? Math.round((m - lym) / lym * 1000) / 10 : null;
-    (cehBuckets[ceh] = cehBuckets[ceh] || []).push({
-      code, name: nm, gp: e, zap: g, kont: h, ship: m, shipNext: o, siteL: l, siteP: p,
-      N: Math.round(N * 10) / 10, R: Math.round(R * 10) / 10, task,
-      lyShip: lym, deltaPct
-    });
+    const it = { code, name: nm, gp: e, zap: g, kont: h, ship: m, shipNext: o, siteL: l, siteP: p,
+      lyShip: lym, deltaPct: (yoy && lym) ? r1((m - lym) / lym * 100) : null, bom: false };
+    recompute(it);
+    items.push(it);
+  }
+  // РАЗУЗЛОВКА п/ф: спрос (ship) = сумма заданий родителей. Итеративно — для цепочек
+  // (п/ф зависит от задания другого п/ф). До 6 проходов до стабилизации.
+  const byNorm = {};
+  for (const it of items) byNorm[norm(it.name)] = it;
+  if (BOM && Object.keys(BOM).length) {
+    for (let pass = 0; pass < 6; pass++) {
+      let changed = false;
+      for (const pfNorm of Object.keys(BOM)) {
+        const it = byNorm[pfNorm]; if (!it) continue;
+        let demand = 0;
+        for (const par of BOM[pfNorm].parents) { const pit = byNorm[par]; if (pit) demand += pit.task; }
+        it.bom = true;
+        if (it.ship !== demand) { it.ship = demand; recompute(it); changed = true; }
+      }
+      if (!changed) break;
+    }
+  }
+  // тоталы + группировка по цеху
+  let deficitCount = 0, taskUnits = 0;
+  for (const it of items) if (it.task > 0) { deficitCount++; taskUnits += it.task; }
+  for (const it of items) {
+    const cehInfo = CEH.map[norm(it.name)];
+    const ceh = (cehInfo && cehInfo.ceh) || 'Прочее';
+    (cehBuckets[ceh] = cehBuckets[ceh] || []).push(it);
   }
   const order = CEH.order && CEH.order.length ? CEH.order : Object.keys(cehBuckets);
   const ceh = [];
@@ -156,7 +186,7 @@ async function compute(dateStr, opts) {
     date: dateStr, weekday: weekdayRu(target), nextWeekday: weekdayRu(next),
     yoy, ceh,
     totals: { skus: [].concat(...ceh.map(c => c.items)).length, deficitCount, taskUnits: Math.round(taskUnits) },
-    note: 'Онлайн-расчёт из 1С. Остаток — текущий; M/O — среднее отгрузки А00000130→магазины по дню недели за 3 нед; Вычерки/Довозы/Выходные не учтены (ручные у Маши).',
+    note: 'Онлайн-расчёт из 1С. Остаток — текущий; M/O — среднее отгрузки А00000130→магазины по дню недели за 3 нед. Для п/ф (🧩) «Отгрузка» = разузловка: сумма заданий родительских продуктов. Вычерки/Довозы/Выходные не учтены (ручные у Маши).',
     refreshedAt: new Date().toISOString()
   };
 }
