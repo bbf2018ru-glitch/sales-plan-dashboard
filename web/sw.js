@@ -4,7 +4,7 @@
 // НЕ кэшируем: /api/*, SSE (/api/events), HTML с динамическим контентом.
 // При network failure для shell — отдаём из кэша (offline-режим).
 
-const CACHE_NAME = 'maria-dashboard-v44';
+const CACHE_NAME = 'maria-dashboard-v45';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

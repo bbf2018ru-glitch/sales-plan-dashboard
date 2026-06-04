@@ -4983,6 +4983,30 @@ function renderDemand(d){
     rows.map(function(r){ var w=Math.max(r[1]/max*100,2); return '<tr><td>'+r[0]+'</td><td class="num">'+mNum1(r[1])+' %</td><td style="width:40%"><div class="mkt-dbar" style="width:'+w.toFixed(0)+'%"></div></td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод:</b> ~'+mNum1(brand)+' % запросов брендовые («мария» + варианты) — высокая узнаваемость. Родовой спрос (торты, кондитерские, кофейни, кофе, завтрак) — точки роста через SEO и карточку; заметная доля «кофе/кофейни/завтрак» подтверждает кафе-нишу.</div>';
 }
+// «Прочие каналы» — действующие акции (d.promos) + база карт лояльности (d.loyaltyCards),
+// всё live из 1С. Метрик Я.Карт/онлайн-сайта/звонков в 1С нет — честно не показываем.
+function renderOtherChannels(d){
+  var el=document.getElementById('mktOther'); if(!el) return;
+  var promos=(d&&d.promos)||[];
+  var lc=(d&&d.loyaltyCards)||{};
+  var fd=function(s){ if(!s) return '—'; var p=String(s).split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):s; };
+  var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
+  var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">'+
+    kpi('<b>'+(lc.total!=null?mNum(lc.total):'н/д')+'</b>','Карт лояльности в базе')+
+    kpi(lc.newThisMonth!=null?('+'+mNum(lc.newThisMonth)):'н/д','Новых карт за месяц')+
+    kpi(mNum(promos.length),'Действующих акций')+
+    '</div>';
+  if(promos.length){
+    html+='<div class="mkt-chart-t">Действующие промокоды и акции (1С, справочник «Акции»)</div>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Начало</th><th class="num">Окончание</th></tr></thead><tbody>'+
+      promos.map(function(p){ return '<tr><td>'+p.name+'</td><td class="num">'+fd(p.start)+'</td><td class="num">'+fd(p.end)+'</td></tr>'; }).join('')+
+      '</tbody></table></div>';
+  } else {
+    html+='<div style="font-size:12px;color:var(--muted)">Действующих акций в справочнике «Акции» на сегодня нет.</div>';
+  }
+  html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">Не хранится в 1С (поэтому не показываем): визиты/звонки/маршруты Яндекс.Карт, онлайн-заказы сайта, клики по телефону, переходы к партнёрам — нужны кабинет Я.Бизнес и цели в Метрике.</div>';
+  el.innerHTML=html;
+}
 // «Сладкий чек» — детализация из 1С (/api/marketing/sweet-detail): всего участников,
 // пришло за месяц, текущие задания, покупки участников за период действия.
 var _MM_SWEET=['','января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -5094,6 +5118,8 @@ function mktLoadYoY(){
     try { renderFunnel(d); } catch(_){}
     // Конкуренты — оверлей live-рейтингов 2ГИС (кабинет «Сравнение») на ресёрч-снимок.
     try { renderCompetitors(d); } catch(_){}
+    // Прочие каналы — действующие акции + база лояльности, live из 1С.
+    try { renderOtherChannels(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
     var paidEl=document.getElementById('mktPaidLive');
     if(paidEl){

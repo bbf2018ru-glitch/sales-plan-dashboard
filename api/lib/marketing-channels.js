@@ -204,6 +204,20 @@ async function aggSweet(period) {
   } catch (e) { return { cards: 0, points: 0, events: 0, tasks: {}, error: e.message }; }
 }
 
+// Карты лояльности (Справочник.ИнформационныеКарты): всего в базе + зарегистрировано
+// за выбранный месяц (по ДатаКарты). Реальные регистрации в программе лояльности.
+async function aggLoyaltyCards(period) {
+  const [y, m] = period.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  try {
+    const rt = await callQuery('ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Всего ИЗ Справочник.ИнформационныеКарты КАК К ГДЕ НЕ К.ПометкаУдаления И НЕ К.ЭтоГруппа', { timeoutMs: 60000 });
+    const total = parseRu(((rt.rows || [])[0] || {})['Всего']) || 0;
+    const rn = await callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Новых ИЗ Справочник.ИнформационныеКарты КАК К ГДЕ К.ДатаКарты >= ДАТАВРЕМЯ(${y},${m},1) И К.ДатаКарты < ДАТАВРЕМЯ(${ny},${nm},1) И НЕ К.ПометкаУдаления И НЕ К.ЭтоГруппа`, { timeoutMs: 60000 });
+    const newThisMonth = parseRu(((rn.rows || [])[0] || {})['Новых']) || 0;
+    return { total, newThisMonth };
+  } catch (e) { return { total: null, newThisMonth: null, error: e.message }; }
+}
+
 // Действующие промокоды (справочник Акции, фильтр по датам)
 async function activePromos(asOf) {
   try {
@@ -250,8 +264,8 @@ async function compute(period) {
   // 1С отдаёт один месяц за ~100с. Поэтому 17 точек тянуть синхронно нельзя — TTFB упадёт в 502.
   // Вместо этого собираем серию из того что лежит в кэше СЕЙЧАС, а недостающие месяцы пинаем
   // в фон без await (aggSales кэширован per-month с дедупом одновременных запросов).
-  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap] = await Promise.all([
-    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap()
+  const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards] = await Promise.all([
+    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
   ]);
   const curSeries = [];
   for (const ym of curMonths) {
@@ -329,6 +343,7 @@ async function compute(period) {
       isNew: sweetPrev.cards === 0 && sweetPrev.points === 0
     },
     promos,
+    loyaltyCards,
     topProducts,
     categories,
     external: externalBlock(),
