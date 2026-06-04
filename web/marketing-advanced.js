@@ -358,7 +358,11 @@
       const latest = entries[entries.length - 1];
       const sum = latest.summary || {};
 
-      // Сравнение 5 брендов
+      // Сравнение 5 брендов. Поддерживаем оба формата:
+      //   новый: summary[brand] = {top10, top3, found, avg}
+      //   старый (до 04.06.2026): summary.{maria,stefania}Top10 / avgRank{Maria,Stefania}
+      // Старый формат содержит данные только по maria и stefania → остальные карточки не показываем,
+      // чтобы не врать нулями.
       const brands = [
         { key: 'maria',    name: 'Мария',     color: '#22c55e' },
         { key: 'stefania', name: 'Стефания',  color: '#3b82f6' },
@@ -366,15 +370,28 @@
         { key: 'etika',    name: 'Этика',     color: '#f59e0b' },
         { key: 'yahont',   name: 'Яхонт',     color: '#ef4444' },
       ];
+      function brandStats(brandKey) {
+        const v = sum[brandKey];
+        if (v && typeof v === 'object') return v; // новый формат
+        if (brandKey === 'maria' && sum.mariaTop10 != null) {
+          return { top10: sum.mariaTop10, avg: sum.avgRankMaria ?? null, top3: null, found: null, _legacy: true };
+        }
+        if (brandKey === 'stefania' && sum.stefaniaTop10 != null) {
+          return { top10: sum.stefaniaTop10, avg: sum.avgRankStefania ?? null, top3: null, found: null, _legacy: true };
+        }
+        return null;
+      }
       const brandCards = brands.map(b => {
-        const v = sum[b.key];
-        if (!v || typeof v !== 'object') return '';
+        const v = brandStats(b.key);
+        if (!v) return '';
+        const fmtNum = n => n == null ? '—' : n;
         return `<div style="padding:12px;border:1px solid var(--line,#e2e8f0);border-radius:10px;border-top:3px solid ${b.color}">
           <div style="font-weight:600;color:${b.color}">${esc(b.name)}</div>
-          <div style="font-size:24px;font-weight:700;margin:4px 0">${v.top10 || 0} <span style="font-size:12px;color:var(--muted,#64748b);font-weight:400">в топ-10</span></div>
-          <div style="font-size:12px;color:var(--muted,#64748b)">Топ-3: ${v.top3 || 0}</div>
-          <div style="font-size:12px;color:var(--muted,#64748b)">Найден в выдаче: ${v.found || 0} запросов</div>
+          <div style="font-size:24px;font-weight:700;margin:4px 0">${v.top10 ?? 0} <span style="font-size:12px;color:var(--muted,#64748b);font-weight:400">в топ-10</span></div>
+          <div style="font-size:12px;color:var(--muted,#64748b)">Топ-3: ${fmtNum(v.top3)}</div>
+          <div style="font-size:12px;color:var(--muted,#64748b)">Найден в выдаче: ${fmtNum(v.found)} запросов</div>
           <div style="font-size:12px;color:var(--muted,#64748b)">Сред. позиция: ${v.avg != null ? v.avg.toFixed(1) : '—'}</div>
+          ${v._legacy ? '<div style="font-size:10px;color:var(--amber,#f59e0b);margin-top:4px" title="Старый формат скрейпа без top-3 и количества найденных">формат до 04.06</div>' : ''}
         </div>`;
       }).join('');
 
@@ -397,10 +414,12 @@
         <td style="text-align:right;color:${c.captcha ? 'var(--amber,#f59e0b)' : 'var(--muted,#64748b)'}">${c.captcha || 0}</td>
       </tr>`).join('');
 
-      // Тренд средней позиции Маши по снимкам
+      // Тренд средней позиции Маши по снимкам — поддерживаем оба формата summary.
       const trendRows = entries.map(e => {
-        const m = e.summary?.maria;
-        return { date: e.date, avg: m?.avg ?? null, top10: m?.top10 ?? null, captcha: e.captchaCount ?? null };
+        const s = e.summary || {};
+        const avg = s.maria?.avg ?? s.avgRankMaria ?? null;
+        const top10 = s.maria?.top10 ?? s.mariaTop10 ?? null;
+        return { date: e.date, avg, top10, captcha: e.captchaCount ?? null };
       });
       const validTrend = trendRows.filter(t => t.avg != null);
       let trendBlock = '';
