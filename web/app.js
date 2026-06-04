@@ -2300,6 +2300,10 @@ async function loadMetadata() {
   $('periodSelect').innerHTML = meta.periods.map(p => `<option value="${p}">${p}</option>`).join('');
   state.period = meta.periods[0] || '';
   $('periodSelect').value = state.period;
+  // Гонка: если маркетинг-таб успел загрузиться ДО metadata (с фоллбэк-периодом),
+  // а реальный период оказался другим — перезагружаем блоки маркетинга.
+  if (state.period && typeof _mktLoadedPeriod !== 'undefined' && _mktLoadedPeriod && _mktLoadedPeriod !== state.period
+      && typeof mktLoadYoY === 'function') mktLoadYoY();
 
   const tgStatus = $('telegramStatus');
   if (tgStatus && meta.hasTelegram) {
@@ -5057,6 +5061,8 @@ function renderSweetDetail(sd){
       '</tbody></table></div>':'<div style="font-size:12px;color:var(--muted)">Заданий в этом месяце не было.</div>');
 }
 var _mktInited=false;
+// Какой период реально загружен в маркетинг-блоки (для ресинка после metadata).
+var _mktLoadedPeriod=null;
 // Последние live-данные для CSV-экспорта (channels / sms-attribution / paid-costs).
 var _mktLive=null, _mktSms=null, _mktPaid=null;
 function mktInit(){
@@ -5089,7 +5095,11 @@ function mktInit(){
 // Период берём ГЛОБАЛЬНЫЙ — селектор «ПЕРИОД» слева в сайдбаре (state.period),
 // тот же, что рулит Дашбордом и Аналитикой. Свой диапазон-селектор маркетинга убран.
 function mktSelectedPeriod(){
-  return state.period || ('2026-' + String(MKT.months.length).padStart(2,'0'));
+  // Фоллбэк — ТЕКУЩИЙ календарный месяц, не хардкод MKT.months (давал вечный
+  // 2026-05 при гонке «маркетинг-таб открыт раньше, чем пришла metadata»).
+  if(state.period) return state.period;
+  var now=new Date();
+  return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
 }
 function mktDeltaBadge(v, unit){
   if(v===null||v===undefined) return '<span class="mkt-yoy-d mkt-yoy-na">нет базы</span>';
@@ -5106,6 +5116,7 @@ function mktYoYCard(label, curStr, prevStr, delta, unit){
 function mktLoadYoY(){
   var el=document.getElementById('mktYoY'); if(!el) return;
   var period=mktSelectedPeriod();
+  _mktLoadedPeriod=period;
   var echo=document.getElementById('mktPeriodEcho'); if(echo) echo.textContent=period;
   el.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
   fetchJson('/api/marketing/channels?period='+period).then(function(d){

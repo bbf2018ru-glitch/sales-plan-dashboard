@@ -26,6 +26,11 @@
   function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
   function currentPeriod() {
+    // ЕДИНЫЙ источник периода со страницей: state.period из app.js (глобальный
+    // селектор слева). Иначе наши вставки (критерии под рассылками) могли брать
+    // другой месяц, чем таблицы app.js → ключи «дата+текст» не совпадали и
+    // строки молча не вставлялись. URL/календарь — только фоллбэк.
+    try { if (typeof state !== 'undefined' && state.period) return state.period; } catch (_) {}
     const params = new URLSearchParams(location.search);
     return params.get('period') || (() => {
       const now = new Date();
