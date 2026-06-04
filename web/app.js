@@ -2768,6 +2768,7 @@ function initPageNav() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const page = btn.dataset.page;
+      if (!page) return; // ссылки-пункты (напр. «Производство» → /production.html) — штатная навигация
       switchPage(page);
       if (page === 'analytics' && !analyticsState.data) {
         await loadAnalytics();
