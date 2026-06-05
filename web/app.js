@@ -5072,15 +5072,16 @@ function renderOtherChannels(d){
     kpi(mNum(promos.length),'Действующих акций')+
     '</div>';
   var usageCells=function(u){
-    if(!u||(!u.cheques&&!u.cardsTotal)) return '<td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">—</td>';
-    return '<td class="num">'+mNum(u.cardsTotal||0)+'</td><td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+mNum(u.buyers||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td>';
+    if(!u||(!u.cheques&&!u.orders&&!u.cardsTotal)) return '<td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">—</td>';
+    return '<td class="num">'+mNum(u.cardsTotal||0)+'</td><td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+mNum(u.orders||0)+'</td><td class="num">'+mNum(u.buyers||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td>';
   };
+  var usageHead='<th class="num" title="Виртуальных карт создано по акции (за всё время)">Карт</th><th class="num" title="Чеков ККМ по картам/ссылкам акции за последние 3 месяца">Чеков</th><th class="num" title="Заказов покупателя с этим промокодом за 3 мес (телефон/сайт/доставка)">Заказов</th><th class="num" title="Уникальных карт-покупателей за 3 мес">Покупателей</th><th class="num" title="Выручка чеков и заказов акции за 3 мес">Выручка</th>';
   if(promos.length){
     html+='<div class="mkt-chart-t">Действующие промокоды и акции (1С) — с использованием за 3 мес</div>'+
-      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Начало</th><th class="num">Окончание</th><th class="num" title="Виртуальных карт создано по акции (за всё время)">Карт</th><th class="num" title="Чеков по картам/ссылкам акции за последние 3 месяца">Чеков</th><th class="num" title="Уникальных карт-покупателей за 3 мес">Покупателей</th><th class="num" title="Выручка этих чеков за 3 мес">Выручка</th></tr></thead><tbody>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Начало</th><th class="num">Окончание</th>'+usageHead+'</tr></thead><tbody>'+
       promos.map(function(p){ return '<tr><td>'+p.name+'</td><td class="num">'+fd(p.start)+'</td><td class="num">'+fd(p.end)+'</td>'+usageCells(byName[p.name])+'</tr>'; }).join('')+
       '</tbody></table></div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:4px">0 = по акции не создано ни одной виртуальной карты и нет чеков — на кассе её ещё не применяли. Механика применения в 1С: акция → виртуальная карта → чек.</div>';
+      '<div style="font-size:11px;color:var(--muted);margin-top:4px">Промокоды применяются двумя путями: <b>«Чеков»</b> — на кассе (акция → виртуальная карта → чек ККМ), <b>«Заказов»</b> — в заказах покупателя (телефон/сайт/доставка, реквизит «Акция» заказа). 0/0 = акцию ещё не применяли нигде.</div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Действующих акций в справочнике «Акции» на сегодня нет.</div>';
   }
@@ -5088,13 +5089,13 @@ function renderOtherChannels(d){
   // показывает, какие механики реально работают на кассе)
   var activeNames={};
   promos.forEach(function(p){ activeNames[p.name]=1; });
-  var others=usage.filter(function(u){ return !activeNames[u.name] && u.cheques>0; }).slice(0,12);
+  var others=usage.filter(function(u){ return !activeNames[u.name] && (u.cheques>0 || u.orders>0); }).slice(0,12);
   if(others.length){
     html+='<div class="mkt-chart-t" style="margin-top:12px">Какими акциями реально пользуются'+(pu.sinceDate?' (с '+fd(pu.sinceDate)+')':'')+'</div>'+
-      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Карт всего</th><th class="num">Чеков</th><th class="num">Покупателей</th><th class="num">Выручка</th></tr></thead><tbody>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th>'+usageHead+'</tr></thead><tbody>'+
       others.map(function(u){ return '<tr><td>'+u.name+'</td>'+usageCells(u)+'</tr>'; }).join('')+
       '</tbody></table></div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:4px">«РЕГИСТРАЦИЯ …» — выдача виртуальных карт при регистрации на точке. Выручка = сумма чеков, где применялась карта акции.</div>';
+      '<div style="font-size:11px;color:var(--muted);margin-top:4px">«РЕГИСТРАЦИЯ …» — выдача виртуальных карт при регистрации на точке. Выручка = сумма чеков и заказов, где применялась акция.</div>';
   }
   html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">Не хранится в 1С (поэтому не показываем): визиты/звонки/маршруты Яндекс.Карт, онлайн-заказы сайта, клики по телефону, переходы к партнёрам — нужны кабинет Я.Бизнес и цели в Метрике.</div>';
   el.innerHTML=html;

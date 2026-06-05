@@ -255,13 +255,13 @@ async function activePromos(asOf) {
 // объёму, а по числу запросов к 1С.
 const promoUsageCache = makeCache(6 * 60 * 60 * 1000, 'promo-usage');
 async function promoUsage() {
-  return promoUsageCache.wrap('all', async () => {
+  return promoUsageCache.wrap('all-v2', async () => { // v2: + заказы покупателя (ключ сменён для инвалидации дискового кэша)
     const since = new Date(Date.now() - 92 * 24 * 3600 * 1000);
     const DT = `ДАТАВРЕМЯ(${since.getFullYear()},${since.getMonth() + 1},${since.getDate()})`;
     const P = `Ч.Проведен И Ч.Дата >= ${DT}`;
-    const usage = new Map(); // name → {cheques, buyers, revenue, coffee, cardsTotal}
+    const usage = new Map(); // name → {cheques, orders, buyers, revenue, coffee, cardsTotal}
     const get = (name) => {
-      if (!usage.has(name)) usage.set(name, { cheques: 0, buyers: 0, revenue: 0, coffee: 0, cardsTotal: 0 });
+      if (!usage.has(name)) usage.set(name, { cheques: 0, orders: 0, buyers: 0, revenue: 0, coffee: 0, cardsTotal: 0 });
       return usage.get(name);
     };
     // 1) Чеки по виртуальным картам акций — основной канал применения
@@ -294,6 +294,17 @@ async function promoUsage() {
       u.coffee += parseRu(r['Кофе']) || 0;
       u.revenue += parseRu(r['Выручка']) || 0;
     }
+    // 3б) ЗАКАЗЫ ПОКУПАТЕЛЯ с промокодом — промокоды заказов (телефон/сайт/доставка:
+    // ЗВОНОК/ЛЕТО/СУШИ/ОЗЕРО...) живут ЗДЕСЬ, а не в чеках ККМ. Без этого запроса
+    // блок показывал по ним честные-но-неверные нули (найдено Машей 05.06.2026).
+    const orders = await callQuery(
+      `ВЫБРАТЬ З.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Заказов, СУММА(З.СуммаДокумента) КАК Выручка ИЗ Документ.ЗаказПокупателя КАК З ГДЕ З.Проведен И З.Дата >= ${DT} И З.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО З.Акция.Наименование`,
+      { timeoutMs: 120000 });
+    for (const r of orders.rows || []) {
+      const u = get(String(r['Акция'] || '').trim());
+      u.orders += parseRu(r['Заказов']) || 0;
+      u.revenue += parseRu(r['Выручка']) || 0;
+    }
     // 4) Сколько карт создано по каждой акции (вся база — охват акции)
     const cards = await callQuery(
       `ВЫБРАТЬ К.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Карт ИЗ Справочник.ИнформационныеКарты КАК К ГДЕ НЕ К.ПометкаУдаления И НЕ К.ЭтоГруппа И К.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО К.Акция.Наименование`,
@@ -304,7 +315,7 @@ async function promoUsage() {
     return {
       sinceDate: since.toISOString().slice(0, 10),
       byPromo: [...usage.entries()].map(([name, u]) => ({ name, ...u, revenue: Math.round(u.revenue) }))
-        .sort((a, b) => b.cheques - a.cheques),
+        .sort((a, b) => (b.cheques + b.orders) - (a.cheques + a.orders)),
     };
   });
 }
