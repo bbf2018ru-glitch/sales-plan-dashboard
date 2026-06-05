@@ -5368,7 +5368,7 @@ function mktLoadYoY(){
         var trackNote = clicksUpd
           ? '<div style="margin-top:10px;font-size:12px;background:#eafaf0;padding:8px 10px;border-radius:6px;border:1px solid #b6e6c9;color:#0a6b3a">✓ <b>Трекинг переходов включён.</b> Цель <code>partner_click</code> в Метрике + JS на сайте; клики копятся и матчатся к партнёру по домену ссылки. Сейчас: <b>'+mNum(totalClicks)+'</b> переходов у <b>'+withClicks+'</b> партнёров за '+(pj.metrikaClicksPeriod||'последние 30 дней')+'. Обновляется ежедневно (скрейп Метрики). Данные '+clicksUpd+'.</div>'
           : '<div style="margin-top:10px;font-size:12px;color:var(--muted)">Переходы появятся после ближайшего скрейпа Метрики.</div>';
-        pHint.innerHTML = 'Всего <b>'+pj.total+'</b> партнёров · активных <b>'+active+'</b>. Источник: Bitrix CMS iblock 88. Обновлено: '+(pj.scrapedAt?new Date(pj.scrapedAt).toLocaleString('ru-RU'):'?')+'.' + trackNote;
+        pHint.innerHTML = 'Всего <b>'+pj.total+'</b> партнёров · активных <b>'+active+'</b>. Источник: Bitrix CMS iblock 88 (список от '+(pj.scrapedAt?new Date(pj.scrapedAt).toLocaleDateString('ru-RU'):'?')+')'+(pj.metrikaClicksUpdatedAt?' · переходы из Метрики обновлены '+new Date(pj.metrikaClicksUpdatedAt).toLocaleString('ru-RU')+(pj.metrikaClicksPeriod?' (окно: '+pj.metrikaClicksPeriod+')':''):'')+'.' + trackNote;
       }
     }
 
