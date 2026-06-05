@@ -36,6 +36,20 @@ try { BOM = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'data', 
 catch (e) { console.log('[production-plan] нет prod-bom-map.json:', e.message); }
 
 function norm(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim(); }
+
+// Партионные / мимо-хаба цеха — робот (дневная модель, читает хаб А00000130) для них
+// НЕнадёжен: десерты/пирожные производятся партиями и идут в точки мимо хаба (hub-покрытие
+// 0-44%); Торты 1/5 тоже частично мимо хаба (hub занижает); заказные торты не прогнозируются.
+// Надёжные (без бейджа): Торты 2/3, фарши, слойка — дневной такт через хаб ≈ производство.
+// Обновлено по разбору сходимости 2026-06-04 (см. memo проекта). Корректировать здесь.
+const APPROX_CEH = new Set(['пирожные', 'пирожные 2', 'прочее', 'торты 1', 'торты 5', 'п\\ф', 'торты вафельные']);
+function isApproxCeh(name) {
+  const n = norm(name);
+  if (APPROX_CEH.has(n)) return true;
+  // заказные торты: «ТОРТЫ <слово>...» (буква после «торты », в отличие от «торты 1/2/3/5»)
+  if (/^торты /.test(n) && !/^торты \d/.test(n)) return true;
+  return false;
+}
 function cc(s) { return String(s == null ? '' : s).trim(); }
 // дата → {y,m,d}; сдвиг на дни
 function parseYMD(s) { const [y, m, d] = s.split('-').map(Number); return { y, m, d }; }
@@ -265,17 +279,21 @@ async function compute(dateStr, opts) {
   }
   const order = CEH.order && CEH.order.length ? CEH.order : Object.keys(cehBuckets);
   const ceh = [];
+  const mkCeh = (name, items) => ({
+    name, items, task: items.reduce((s, x) => s + x.task, 0),
+    deficit: items.filter(x => x.task > 0).length, approx: isApproxCeh(name),
+  });
   for (const name of order) {
     const items = cehBuckets[name];
     if (!items || !items.length) continue;
     items.sort((a, b) => b.task - a.task || (b.ship - a.ship));
-    ceh.push({ name, items, task: items.reduce((s, x) => s + x.task, 0), deficit: items.filter(x => x.task > 0).length });
+    ceh.push(mkCeh(name, items));
   }
   // прочие цеха, которых нет в order
   for (const name of Object.keys(cehBuckets)) {
     if (order.includes(name)) continue;
     const items = cehBuckets[name]; items.sort((a, b) => b.task - a.task);
-    ceh.push({ name, items, task: items.reduce((s, x) => s + x.task, 0), deficit: items.filter(x => x.task > 0).length });
+    ceh.push(mkCeh(name, items));
   }
 
   // Предупреждения о неполноте/контексте данных — чтобы НЕ принять прогноз/неполноту за факт.

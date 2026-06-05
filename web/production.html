@@ -48,6 +48,8 @@
   .convtbl th{text-align:left;color:var(--muted);font-weight:500;padding:3px 8px;border-bottom:1px solid var(--line,#2a2f3a)}
   .convtbl td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.12)}
   .pos{color:#4caf50}.neg{color:#e5736b}
+  .approx{display:inline-block;font-size:10px;font-weight:600;color:#b8860b;background:rgba(184,134,11,.13);border:1px solid rgba(184,134,11,.4);border-radius:8px;padding:1px 7px;margin-left:8px;letter-spacing:.2px;vertical-align:middle}
+  tr.ceh-approx td{background:rgba(184,134,11,.05)}
 </style>
 </head>
 <body>
@@ -108,7 +110,8 @@ function render(d){
     '<th>Остаток-<br>прогноз</th><th>ИТОГО</th><th>ЗАДАНИЕ</th>'+yoyTh+'</tr></thead><tbody>';
   (d.ceh||[]).forEach(function(c){
     var cols = YOY?13:11;
-    h+='<tr class="ceh"><td colspan="'+cols+'">▓ '+c.name+'  ·  к выпуску '+n1(c.task)+' шт ('+c.deficit+' поз.)</td></tr>';
+    var approxBadge = c.approx ? ' <span class="approx" title="Партионное/мимо-хаба производство: робот видит спрос неполно (десерты/пирожные пекут партиями и везут в точки мимо хаба; заказные торты не прогнозируются). Цифры — ориентир, доверяйте опыту.">≈ прогноз приблизителен</span>' : '';
+    h+='<tr class="ceh'+(c.approx?' ceh-approx':'')+'"><td colspan="'+cols+'">▓ '+c.name+'  ·  к выпуску '+n1(c.task)+' шт ('+c.deficit+' поз.)'+approxBadge+'</td></tr>';
     c.items.forEach(function(it){
       var yoy = YOY? '<td class="yoycol">'+(it.lyShip!=null?n1(it.lyShip):'—')+'</td><td class="yoycol '+(it.deltaPct>0?'pos':(it.deltaPct<0?'neg':''))+'">'+(it.deltaPct!=null?(it.deltaPct>0?'+':'')+it.deltaPct+'%':'—')+'</td>':'';
       var shipCell = it.bom
@@ -121,6 +124,8 @@ function render(d){
     });
   });
   h+='</tbody></table></div>';
+  var approxN=(d.ceh||[]).filter(function(c){return c.approx;}).length;
+  if(approxN) h+='<div class="note"><span class="approx">≈ прогноз приблизителен</span> — цеха партионного/мимо-хаба производства (десерты, пирожные, Торты 1/5, п/ф, заказные). Робот видит их спрос неполно: эти позиции пекут партиями раз в несколько дней и часть везут в точки мимо склада-хаба. Задание по ним — ориентир, итог за вами. Надёжно (дневной такт через хаб): Торты 2/3, фарши, слойка.</div>';
   document.getElementById('tbl').innerHTML=h;
   document.getElementById('note').textContent=d.note||'';
 }
