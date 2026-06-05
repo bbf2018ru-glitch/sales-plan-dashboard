@@ -139,6 +139,9 @@
       const rows = cohorts.map(c => {
         const firstMonth = c.firstMonth || c.month || '';
         const isCurrent = firstMonth === currentMonth;
+        if (c._pending) {
+          return `<tr><td>${firstMonth}</td><td colspan="${offsets.length + 1}" style="color:var(--muted,#64748b);font-size:11px">прогревается из 1С…</td></tr>`;
+        }
         const byOffset = new Map((c.retention || []).map(r => [r.offset, r]));
         const tds = offsets.map(o => {
           const r = byOffset.get(o);
@@ -153,7 +156,9 @@
         const label = firstMonth + (isCurrent ? ' <span style="font-size:10px;color:var(--amber,#f59e0b)">(не завершён)</span>' : '');
         return `<tr><td>${label}</td><td style="text-align:right">${(c.total || c.size || 0).toLocaleString('ru-RU')}</td>${tds}</tr>`;
       }).join('');
-      el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
+      const note = (data.pendingNote ? `<div style="font-size:11px;color:var(--amber,#f59e0b);margin-top:6px">⚠ ${esc(data.pendingNote)}</div>` : '') +
+        `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">«Новых карт» = карты, не покупавшие ни разу за предыдущие 12 месяцев — та же методика, что у графика «Новые карты лояльности» (цифры совпадают).</div>`;
+      el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px"><thead>${head}</thead><tbody>${rows}</tbody></table></div>` + note;
     } catch (e) {
       el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить когорты: ${esc(e.message)}</div>`;
     }
