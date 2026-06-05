@@ -15,7 +15,12 @@ const cache = upp.makeCache(10 * 60 * 1000); // 10 минут
 
 const WH_GP = ['А00000011', 'А00000033'];
 const WH_ZAP = 'А00000046';
-const WH_KONT = 'А00000155';
+// H «Контейнер» = остатки НА ПРОИЗВОДСТВЕ (в цехах), а НЕ склад А00000155 (тот пустой/мёртвый).
+// Цеха = склады группы «Цеха Производства» (Родитель.Код = А00000032): Торты 1-5, Пирожные 1/2/3,
+// Слоечный, Бисквиты, Выпечка, Заказной, Фарши, Кремы, Украшения, п/фабрикатчики и т.д.
+// Тянем список динамически (если Маша добавит цех — подхватится). Продукт в цеху уже сделан →
+// доступен → уменьшает потребность. Двойного счёта с ГП нет (разные склады).
+const CEH_GROUP = 'А00000032';
 const SRC_PRESS = 'А00000130';
 // Центральные склады-источники для режима demand=central: ГП + промежуточный + пф + цеха
 // производства (БЕЗ кухонь точек «(Кухня)» и без сырья). Спрос = их отгрузка В розничные
@@ -59,8 +64,18 @@ function dayKey(o) { return `${String(o.d).padStart(2, '0')}.${String(o.m).padSt
 function weekdayRu(o) { const w = new Date(Date.UTC(o.y, o.m - 1, o.d)).getUTCDay(); return ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][w]; }
 
 // --- запросы в 1С ---
+// Коды складов-цехов производства (группа CEH_GROUP), кэш 24ч — список почти статичен.
+const cehCache = upp.makeCache(24 * 60 * 60 * 1000);
+async function prodCehCodes() {
+  return cehCache.wrap('cehcodes', async () => {
+    const q = `ВЫБРАТЬ С.Код КАК Код ИЗ Справочник.Склады КАК С ГДЕ С.Родитель.Код = "${CEH_GROUP}" И НЕ С.ЭтоГруппа`;
+    const rows = (await upp.callQuery(q, { timeoutMs: 60000 })).rows || [];
+    return { codes: rows.map(r => cc(r.Код)).filter(Boolean) };
+  });
+}
 async function qStock() {
-  const wh = WH_GP.concat([WH_ZAP, WH_KONT]).map(c => `"${c}"`).join(',');
+  const kont = (await prodCehCodes()).codes;
+  const wh = WH_GP.concat([WH_ZAP], kont).map(c => `"${c}"`).join(',');
   const q = 'ВЫБРАТЬ Ост.Склад.Код КАК Склад, Ост.Номенклатура.Код КАК Код, Ост.Номенклатура.Наименование КАК Имя,'
     + ' СУММА(Ост.КоличествоОстаток) КАК Кол'
     + ` ИЗ РегистрНакопления.ТоварыНаСкладах.Остатки(, Склад.Код В (${wh})) КАК Ост`
@@ -185,20 +200,22 @@ async function compute(dateStr, opts) {
     ? !!opts.includeTodayOutput
     : ymdNum(target) > ymdNum(today);
 
-  const [stockRows, press, siteL, siteP, armToday, factToday] = await Promise.all([
+  const [stockRows, press, siteL, siteP, armToday, factToday, kontCodes] = await Promise.all([
     qStock(), pressForDate(target, demand), qSite(target), qSite(next),
     wantF ? qArmTask(today).catch(() => []) : Promise.resolve([]),
     wantF ? qProducedFact(today).catch(() => []) : Promise.resolve([]),
+    prodCehCodes().then(x => x.codes).catch(() => []),
   ]);
 
-  // остаток по коду
+  // остаток по коду. H (Контейнер) = остатки на производстве (склады-цеха).
+  const kontSet = new Set(kontCodes);
   const E = {}, G = {}, H = {}, names = {};
   for (const r of stockRows) {
     const code = cc(r.Код), w = cc(r.Склад), q = upp.parseRu(r.Кол);
     names[code] = r.Имя;
     if (WH_GP.includes(w)) E[code] = (E[code] || 0) + q;
     else if (w === WH_ZAP) G[code] = (G[code] || 0) + q;
-    else if (w === WH_KONT) H[code] = (H[code] || 0) + q;
+    else if (kontSet.has(w)) H[code] = (H[code] || 0) + q;
   }
 
   // F: остаток сегодняшнего невыпущенного задания = max(0, S_сегодня − Факт_сегодня)
