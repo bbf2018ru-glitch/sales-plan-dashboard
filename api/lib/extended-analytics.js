@@ -715,64 +715,67 @@ async function buildPromoByAction(fromYM, toYM) {
   };
 }
 
+// UDS-промокоды за ОДИН месяц — прямой агрегат в 1С (callQuery), без лимита 5000.
+// Раньше шло через callDocument('ЧекККМ', ..., 5000): брало первые 5000 чеков месяца
+// (~12% при 40к/мес, только первые дни) → за май видели 571 код вместо 1363, выручку
+// 321к вместо 742к. Теперь СГРУППИРОВАТЬ в 1С — полные данные + бонусы списано.
 async function buildUdsPromoCodes(fromYM, toYM) {
-  const months = rangeMonths(fromYM, toYM);
-  const allCodes = []; // {code, date, doc, sum, store}
-  let totalChecks = 0;
-  let truncatedMonths = 0;
+  // toYM = выбранный месяц (фронт привязан к периоду слева). fromYM игнорируем —
+  // считаем РОВНО за выбранный месяц (весь маркетинг «за период слева»).
+  const ym = toYM || fromYM || nowYM();
+  const [y, m] = ym.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  const range = `Ч.Проведен И Ч.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Ч.Дата < ДАТАВРЕМЯ(${ny},${nm},1)`;
 
-  for (const ym of months) {
-    const d = await callDocument('ЧекККМ', ym, ym, 5000);
-    const rows = d.rows || [];
-    totalChecks += rows.length;
-    if (rows.length >= 5000) truncatedMonths += 1;
-    for (const r of rows) {
-      const code = (r['uds_КодСкидки'] || '').trim();
-      if (!code) continue;
-      const sum = parseRu(r['СуммаДокумента']);
-      allCodes.push({
-        code,
-        date: r['Дата'] || '',
-        docNumber: r['Номер'] || '',
-        store: (r['Склад'] || r['КассаККМ'] || '').toString(),
-        sum: Number(sum.toFixed(2))
-      });
-    }
-  }
+  // 1) Все проведённые чеки месяца (для доли) + итоги по чекам с промокодом
+  const [totalRes, promoRes, topRes, recentRes] = await Promise.all([
+    callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Всего ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range}`, { timeoutMs: 120000 }),
+    callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.uds_КодСкидки) КАК Кодов, КОЛИЧЕСТВО(*) КАК Применений,`
+      + ` СУММА(ЕСТЬNULL(Ч.СуммаДокумента,0)) КАК Выручка, СУММА(ЕСТЬNULL(Ч.СуммаОплатыБонусами,0)) КАК Бонусы`
+      + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> ""`, { timeoutMs: 120000 }),
+    callQuery(`ВЫБРАТЬ ПЕРВЫЕ 50 Ч.uds_КодСкидки КАК Код, КОЛИЧЕСТВО(*) КАК Применений,`
+      + ` СУММА(ЕСТЬNULL(Ч.СуммаДокумента,0)) КАК Выручка, СУММА(ЕСТЬNULL(Ч.СуммаОплатыБонусами,0)) КАК Бонусы,`
+      + ` КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.Склад.Код) КАК Точек, МИНИМУМ(Ч.Дата) КАК Первый`
+      + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> ""`
+      + ` СГРУППИРОВАТЬ ПО Ч.uds_КодСкидки УПОРЯДОЧИТЬ ПО Выручка УБЫВ`, { timeoutMs: 120000 }),
+    callQuery(`ВЫБРАТЬ ПЕРВЫЕ 100 Ч.Дата КАК Дата, Ч.uds_КодСкидки КАК Код, Ч.Номер КАК Номер,`
+      + ` Ч.Склад.Наименование КАК Точка, ЕСТЬNULL(Ч.СуммаДокумента,0) КАК Сумма`
+      + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> "" УПОРЯДОЧИТЬ ПО Ч.Дата УБЫВ`, { timeoutMs: 120000 })
+  ]);
 
-  // Группируем по коду — обычно UDS-коды одноразовые, но всё равно агрегируем
-  const byCode = new Map();
-  for (const c of allCodes) {
-    if (!byCode.has(c.code)) byCode.set(c.code, { code: c.code, uses: 0, totalSum: 0, firstDate: c.date, stores: new Set() });
-    const e = byCode.get(c.code);
-    e.uses += 1;
-    e.totalSum += c.sum;
-    if (c.store) e.stores.add(c.store);
-  }
+  const totalChecks = parseRu((totalRes.rows || [])[0]?.['Всего']) || 0;
+  const pr = (promoRes.rows || [])[0] || {};
+  const uniqueCodes = parseRu(pr['Кодов']) || 0;
+  const checksWithPromocode = parseRu(pr['Применений']) || 0;
+  const bonusUsed = Math.round(parseRu(pr['Бонусы']) || 0);
+  const revenue = Math.round(parseRu(pr['Выручка']) || 0);
 
   return {
-    period: { from: fromYM, to: toYM },
+    period: { from: ym, to: ym },
+    periodYM: ym,
     totalChecksScanned: totalChecks,
-    checksWithPromocode: allCodes.length,
-    promocodeRate: totalChecks ? Number(((allCodes.length / totalChecks) * 100).toFixed(2)) : 0,
-    uniqueCodes: byCode.size,
-    truncatedMonths,
-    truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 чеков — данные неполные. После обновления BSL лимит поднимется.`
-      : null,
-    topCodes: Array.from(byCode.values())
-      .sort((a, b) => b.totalSum - a.totalSum || b.uses - a.uses)
-      .slice(0, 50)
-      .map(e => ({
-        code: e.code,
-        uses: e.uses,
-        totalSum: Number(e.totalSum.toFixed(2)),
-        stores: e.stores.size,
-        firstDate: e.firstDate
-      })),
-    recentApplications: allCodes
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-      .slice(0, 100)
+    checksWithPromocode,
+    promocodeRate: totalChecks ? Number(((checksWithPromocode / totalChecks) * 100).toFixed(2)) : 0,
+    uniqueCodes,
+    revenue,
+    bonusUsed,
+    drr: revenue ? Number(((bonusUsed / revenue) * 100).toFixed(1)) : 0,
+    truncatedNote: null,
+    topCodes: (topRes.rows || []).map(r => ({
+      code: (r['Код'] || '').trim(),
+      uses: parseRu(r['Применений']) || 0,
+      totalSum: Math.round(parseRu(r['Выручка']) || 0),
+      bonusUsed: Math.round(parseRu(r['Бонусы']) || 0),
+      stores: parseRu(r['Точек']) || 0,
+      firstDate: r['Первый'] || ''
+    })),
+    recentApplications: (recentRes.rows || []).map(r => ({
+      date: r['Дата'] || '',
+      code: (r['Код'] || '').trim(),
+      docNumber: r['Номер'] || '',
+      store: (r['Точка'] || '').toString(),
+      sum: Math.round(parseRu(r['Сумма']) || 0)
+    }))
   };
 }
 
@@ -883,13 +886,13 @@ async function getProductionKg(opts = {}) {
   });
 }
 
+const udsCache = makeCache(6 * 60 * 60 * 1000, 'uds-promo');
 async function getUdsPromoCodes(opts = {}) {
   if (!BASE()) return { available: false, note: 'UPP_PULL_URL не настроен' };
-  const fromYM = opts.from || nowYM();
-  const toYM = opts.to || fromYM;
-  return cached(`uds:${fromYM}:${toYM}`, async () => {
+  const ym = opts.to || opts.from || nowYM(); // считаем за выбранный месяц
+  return udsCache.wrap(`uds:${ym}`, async () => {
     try {
-      return { available: true, ...(await buildUdsPromoCodes(fromYM, toYM)) };
+      return { available: true, ...(await buildUdsPromoCodes(ym, ym)) };
     } catch (e) {
       return { available: false, error: e.message };
     }

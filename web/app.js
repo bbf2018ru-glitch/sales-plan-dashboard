@@ -5465,9 +5465,7 @@ function mktLoadYoY(){
       }
     }
     // Последние UDS-применения (recentApplications с датой/чеком/суммой) — отдельный fetch
-    var ymP = (period||'').split('-'); var nowY = +ymP[0], nowM = +ymP[1];
-    var fromYM = (nowY-1)+'-'+String(nowM).padStart(2,'0');
-    fetchJson('/api/analytics/uds-promocodes?from='+fromYM+'&to='+period).then(function(uds){
+    fetchJson('/api/analytics/uds-promocodes?to='+period).then(function(uds){
       if(!uds || !uds.recentApplications) return;
       var el=document.getElementById('mktPromoFresh');
       if(!el) return;
@@ -5484,7 +5482,7 @@ function mktLoadYoY(){
         (uds.recentApplications||[]).slice(0,40).map(function(r){
           return '<tr><td style="font-size:11px">'+(r.date||'')+'</td><td><b>'+r.code+'</b></td><td style="font-size:11px;color:var(--muted)">'+(r.docNumber||'—')+'</td><td class="num">'+mNum(r.sum)+'</td><td style="font-size:11px;color:var(--muted)">'+((r.store||'—')+'').slice(0,30)+'</td></tr>';
         }).join('')+'</tbody></table></div>'+
-        '<div style="font-size:11px;color:var(--muted);margin-top:6px">Период '+fromYM+' → '+period+'.'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px">За '+(uds.periodYM||period)+' · выручка чеков с промокодом '+mNum(uds.revenue||0)+' ₽ · бонусов списано '+mNum(uds.bonusUsed||0)+' ₽ (ДРР '+mNum1(uds.drr||0)+' %).'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
     }).catch(function(){});
 
     // Промокоды UDS — помесячная матрица.
