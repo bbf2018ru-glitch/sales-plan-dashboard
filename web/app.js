@@ -5738,9 +5738,9 @@ function mktLoadYoY(){
     if (d.external && d.external.prices && d.external.prices.competitors) {
       var prTbl = document.querySelector('#mktPrices table');
       if (prTbl) {
-        var fmtPrice = function(s){ if(!s) return null; return s.min===s.max ? (s.min+' ₽') : (s.min+'–'+s.max+' ₽'); };
+        var fmtPrice = function(s){ if(!s) return null; var u=s.unit?(' ₽/'+s.unit):' ₽'; return s.min===s.max ? (s.min+u) : (s.min+'–'+s.max+u); };
         // Мапим заголовок строки → ключ категории в JSON
-        var rowCatMap = { 'Торт на заказ':'tort_zakaz', 'Бенто-торт':'bento', 'Кусочек / пирожное':['kusochki','pirozhnoe','desserts'], 'Макаронс, ₽/шт':'macarons' };
+        var rowCatMap = { 'Торт на заказ':'tort_zakaz', 'Просто торты (готовые, в наличии)*':'tort_gotovyj', 'Бенто-торт':'bento', 'Кусочек / пирожное':['kusochki','pirozhnoe','desserts'], 'Макаронс, ₽/шт':'macarons' };
         // Колонки конкурентов: Мария(1) Стефания(2) Этика(3) Cake Home(4) ЯХОНТ(5)
         var compColMap = { 'stefania':2, 'etika':3, 'cakehome':4 };
         var trs = prTbl.querySelectorAll('tbody tr');
