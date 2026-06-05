@@ -4501,20 +4501,20 @@ function renderGisMonthly(d){
   var ms=(gh&&gh.series||[]).filter(function(m){return m && m.impressions;});
   if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история 2ГИС собирается скрейпером кабинета.</div>'; return; }
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var imp=0;
+  var imp=0,pv=0,sc=0,rt=0,cl=0;
   var selYM=mktSelectedPeriod();
   var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
-  var rows=ms.map(function(m){ imp+=m.impressions||0;
-    var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
-    var posR=(m.positionMin&&m.positionMax)?(m.positionMin+'–'+m.positionMax):'—';
-    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.days||'—')+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+posR+'</td></tr>';
+  var nv=function(v){ return v==null?'—':mNum(v); };
+  var rows=ms.map(function(m){ imp+=m.impressions||0; pv+=m.pageVisits||0; sc+=m.siteClicks||0; rt+=m.routes||0; cl+=m.calls||0;
+    var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.partial?' <span style="font-size:10px;color:var(--muted)">(идёт)</span>':'');
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+nv(m.pageVisits)+'</td><td class="num">'+nv(m.siteClicks)+'</td><td class="num">'+nv(m.routes)+'</td><td class="num">'+nv(m.calls)+'</td></tr>';
   }).reverse().join('');
   var st=gh.scrapedAt?new Date(gh.scrapedAt).toLocaleString('ru-RU'):'—';
-  el.innerHTML='<div class="mkt-chart-t">2ГИС — присутствие в выдаче помесячно <span class="mkt-scope dyn">live · кабинет</span></div>'+
-    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Показы в выдаче</th><th class="num">Дней</th><th class="num">Позиция ср.</th><th class="num">Позиция мин–макс</th></tr></thead><tbody>'+rows+
-    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(imp)+'</td><td colspan="3"></td></tr>'+
+  el.innerHTML='<div class="mkt-chart-t">2ГИС помесячно — показы, позиция, переходы <span class="mkt-scope dyn">live · кабинет · 13 мес</span></div>'+
+    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num" title="Показы карточки в поиске 2ГИС за календарный месяц">Показы</th><th class="num" title="Средняя позиция в выдаче за месяц">Позиция ср.</th><th class="num" title="Переходы на страницу компании в 2ГИС">Переходы на стр.</th><th class="num" title="Клики «перейти на сайт» с карточки">На сайт</th><th class="num" title="Построения маршрута до точки — намерение прийти">Маршруты</th><th class="num" title="Звонки и просмотры телефона">Звонки</th></tr></thead><tbody>'+rows+
+    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(imp)+'</td><td class="num"></td><td class="num">'+mNum(pv)+'</td><td class="num">'+mNum(sc)+'</td><td class="num">'+mNum(rt)+'</td><td class="num">'+mNum(cl)+'</td></tr>'+
     '</tbody></table></div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Раздел «Присутствие в выдаче» кабинета 2ГИС (показы карточки в поиске + средняя позиция по категории). Помесячная история ведётся с момента подключения модуля. Обновлено: '+st+'.</div>';
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Календарные месяцы из кабинета 2ГИС («Присутствие в выдаче» + «Страница компании», пресет «Год», обновляется ежедневно). <b>Продаж 2ГИС не передаёт</b> (это справочник, не касса) — ближайшие к продаже сигналы: «Маршруты» (намерение прийти) и «На сайт». Обновлено: '+st+'.</div>';
 }
 // Платные каналы — затраты и отдача (бюджет маркетинга) из /api/marketing/paid-costs.
 function renderPaidCosts(pc){
@@ -5645,7 +5645,7 @@ function mktLoadYoY(){
         var rubsTable='';
         if(g.appearanceByRubric && g.appearanceByRubric.length){
           rubsTable='<div class="mkt-chart-t" style="margin-top:14px">Позиция и показы по каждой нашей рубрике в 2ГИС</div>'+
-            '<div class="table-wrap"><table><thead><tr><th>Рубрика</th><th class="num">Показы/мес</th><th class="num">Позиция (ср.)</th><th class="num">Диапазон</th></tr></thead><tbody>'+
+            '<div class="table-wrap"><table><thead><tr><th>Рубрика</th><th class="num" title="Скользящее окно 2ГИС — последние ~30 дней, не календарный месяц">Показы (30 дн)</th><th class="num">Позиция (ср.)</th><th class="num">Диапазон</th></tr></thead><tbody>'+
             g.appearanceByRubric.map(function(b){
               if(b.error) return '<tr><td>'+b.rubric+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">— '+b.error+'</td></tr>';
               var posColor=b.positionAvg<=5?'color:#10a05a':(b.positionAvg<=15?'':(b.positionAvg<=50?'color:#b8860b':'color:#e0466a'));
@@ -5654,7 +5654,7 @@ function mktLoadYoY(){
         }
         gl.innerHTML='<div class="mkt-chart-t">Присутствие в выдаче 2ГИС <span class="mkt-scope dyn">live</span></div>'+
           '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
-          (a.impressions?'<li><b>Показы в поиске (все рубрики):</b> '+mNum(a.impressions)+'/мес (за '+a.days+' дн), средняя позиция '+(a.positionAvg||'?')+' ('+(a.positionMin||'?')+'–'+(a.positionMax||'?')+').</li>':'')+
+          (a.impressions?'<li><b>Показы в поиске (все рубрики):</b> '+mNum(a.impressions)+' за последние '+a.days+' дн (скользящее окно 2ГИС, не календарный месяц — календарные в таблице выше), средняя позиция '+(a.positionAvg||'?')+' ('+(a.positionMin||'?')+'–'+(a.positionMax||'?')+').</li>':'')+
           (acts?'<li><b>Действия на карточке:</b> '+acts+'.</li>':'')+
           (qs?'<li><b>Топ-запросы:</b> '+qs+'.</li>':'')+
           '</ul>'+rubsTable+
