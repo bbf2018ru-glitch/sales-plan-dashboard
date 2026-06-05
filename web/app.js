@@ -4501,17 +4501,17 @@ function renderGisMonthly(d){
   var ms=(gh&&gh.series||[]).filter(function(m){return m && m.impressions;});
   if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история 2ГИС собирается скрейпером кабинета.</div>'; return; }
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var imp=0,pv=0,sc=0,rt=0,cl=0;
+  var imp=0,pv=0,sc=0,rt=0,cl=0,so=0,me=0,pr=0;
   var selYM=mktSelectedPeriod();
   var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
   var nv=function(v){ return v==null?'—':mNum(v); };
-  var rows=ms.map(function(m){ imp+=m.impressions||0; pv+=m.pageVisits||0; sc+=m.siteClicks||0; rt+=m.routes||0; cl+=m.calls||0;
+  var rows=ms.map(function(m){ imp+=m.impressions||0; pv+=m.pageVisits||0; sc+=m.siteClicks||0; rt+=m.routes||0; cl+=m.calls||0; so+=m.socialClicks||0; me+=m.messengerClicks||0; pr+=m.priceViews||0;
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.partial?' <span style="font-size:10px;color:var(--muted)">(идёт)</span>':'');
-    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+nv(m.pageVisits)+'</td><td class="num">'+nv(m.siteClicks)+'</td><td class="num">'+nv(m.routes)+'</td><td class="num">'+nv(m.calls)+'</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+nv(m.pageVisits)+'</td><td class="num">'+nv(m.siteClicks)+'</td><td class="num">'+nv(m.routes)+'</td><td class="num">'+nv(m.calls)+'</td><td class="num">'+nv(m.socialClicks)+'</td><td class="num">'+nv(m.messengerClicks)+'</td><td class="num">'+nv(m.priceViews)+'</td></tr>';
   }).reverse().join('');
   var st=gh.scrapedAt?new Date(gh.scrapedAt).toLocaleString('ru-RU'):'—';
   el.innerHTML='<div class="mkt-chart-t">2ГИС помесячно — показы, позиция, переходы <span class="mkt-scope dyn">live · кабинет · 13 мес</span></div>'+
-    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num" title="Показы карточки в поиске 2ГИС за календарный месяц">Показы</th><th class="num" title="Средняя позиция в выдаче за месяц">Позиция ср.</th><th class="num" title="Переходы на страницу компании в 2ГИС">Переходы на стр.</th><th class="num" title="Клики «перейти на сайт» с карточки">На сайт</th><th class="num" title="Построения маршрута до точки — намерение прийти">Маршруты</th><th class="num" title="Звонки и просмотры телефона">Звонки</th></tr></thead><tbody>'+rows+
+    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num" title="Показы карточки в поиске 2ГИС за календарный месяц">Показы</th><th class="num" title="Средняя позиция в выдаче за месяц">Позиция ср.</th><th class="num" title="Переходы на страницу компании в 2ГИС">Переходы на стр.</th><th class="num" title="Клики «перейти на сайт» с карточки">На сайт</th><th class="num" title="Построения маршрута до точки — намерение прийти">Маршруты</th><th class="num" title="Звонки и просмотры телефона">Звонки</th><th class="num" title="Клики по ссылкам соцсетей на карточке">Соцсети</th><th class="num" title="Клики по ссылкам мессенджеров">Мессендж.</th><th class="num" title="Просмотры блока цен на карточке">Цены</th></tr></thead><tbody>'+rows+
     '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(imp)+'</td><td class="num"></td><td class="num">'+mNum(pv)+'</td><td class="num">'+mNum(sc)+'</td><td class="num">'+mNum(rt)+'</td><td class="num">'+mNum(cl)+'</td></tr>'+
     '</tbody></table></div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:6px">Календарные месяцы из кабинета 2ГИС («Присутствие в выдаче» + «Страница компании», пресет «Год», обновляется ежедневно). <b>Продаж 2ГИС не передаёт</b> (это справочник, не касса) — ближайшие к продаже сигналы: «Маршруты» (намерение прийти) и «На сайт». Обновлено: '+st+'.</div>';
