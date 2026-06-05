@@ -4517,10 +4517,13 @@ function renderPaidCosts(pc){
   var ch=pc.channels||[];
   var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
   var share=function(c){ return pc.totalMonthly?Math.round(c/pc.totalMonthly*100):0; };
+  // Самый дорогой канал — считаем, а не хардкодим: «контекст» был зашит, хотя
+  // реально крупнейший — SMS (тот же класс косяка, что тултип «SMS: X ₽» в mGroup).
+  var topCh=ch.slice().sort(function(a,b){ return (b.cost||0)-(a.cost||0); })[0]||{};
   var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px">'+
     kpi('<b>'+mNum(pc.totalMonthly)+' ₽</b>','Платный маркетинг / мес (итого)')+
     kpi(mNum(ch.length),'Каналов')+
-    kpi(mNum((ch.find(function(x){return x.key==='context';})||{}).cost||0)+' ₽','Самый дорогой: контекст')+
+    kpi(mNum(topCh.cost||0)+' ₽','Самый дорогой: '+(topCh.name||'—'))+
     '</div>'+
     '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Канал</th><th class="num">Затраты/мес ₽</th><th class="num">Доля</th><th>Что даёт</th><th>Стоимость результата</th></tr></thead><tbody>'+
     ch.map(function(c){
