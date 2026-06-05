@@ -5097,6 +5097,17 @@ function renderOtherChannels(d){
       '</tbody></table></div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:4px">«РЕГИСТРАЦИЯ …» — выдача виртуальных карт при регистрации на точке. Выручка = сумма чеков и заказов, где применялась акция.</div>';
   }
+  // Виды дисконтных карт — отдельная механика лояльности (скидка по виду карты, без акции).
+  var kinds=pu.byCardKind||[];
+  if(kinds.length){
+    html+='<div class="mkt-chart-t" style="margin-top:12px">Виды дисконтных карт — применение'+(pu.sinceDate?' (с '+fd(pu.sinceDate)+')':'')+'</div>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Вид карты</th><th class="num" title="Карт этого вида в базе (за всё время)">Карт в базе</th><th class="num" title="Уникальных карт, по которым были чеки за 3 мес">Покупали</th><th class="num" title="Чеков по картам этого вида за 3 мес">Чеков</th><th class="num" title="Выручка этих чеков">Выручка</th><th class="num" title="Скидок выдано по условию «По виду дисконтных карт» за 3 мес">Скидок выдано</th></tr></thead><tbody>'+
+      kinds.map(function(u){
+        return '<tr><td>'+u.kind+'</td><td class="num">'+mNum(u.cardsTotal||0)+'</td><td class="num">'+mNum(u.cardsActive||0)+'</td><td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td><td class="num">'+(u.discount?mNum(u.discount)+' ₽':'—')+'</td></tr>';
+      }).join('')+
+      '</tbody></table></div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:4px">Это механика «скидка по виду карты», БЕЗ акции — поэтому, например, акция «Промокод ОФИС» выше пуста, а реальная офисная программа живёт здесь (вид «Офис»). У «Карты Любимого покупателя» скидки идут по другим условиям (порог суммы, ДР) — в колонке только скидки именно «по виду карты».</div>';
+  }
   html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">Не хранится в 1С (поэтому не показываем): визиты/звонки/маршруты Яндекс.Карт, онлайн-заказы сайта, клики по телефону, переходы к партнёрам — нужны кабинет Я.Бизнес и цели в Метрике.</div>';
   el.innerHTML=html;
 }

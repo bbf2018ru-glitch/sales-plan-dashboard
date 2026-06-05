@@ -255,7 +255,7 @@ async function activePromos(asOf) {
 // объёму, а по числу запросов к 1С.
 const promoUsageCache = makeCache(6 * 60 * 60 * 1000, 'promo-usage');
 async function promoUsage() {
-  return promoUsageCache.wrap('all-v2', async () => { // v2: + заказы покупателя (ключ сменён для инвалидации дискового кэша)
+  return promoUsageCache.wrap('all-v3', async () => { // v3: + byCardKind (виды дисконтных карт); ключ меняется для инвалидации дискового кэша
     const since = new Date(Date.now() - 92 * 24 * 3600 * 1000);
     const DT = `ДАТАВРЕМЯ(${since.getFullYear()},${since.getMonth() + 1},${since.getDate()})`;
     const P = `Ч.Проведен И Ч.Дата >= ${DT}`;
@@ -312,10 +312,49 @@ async function promoUsage() {
     for (const r of cards.rows || []) {
       get(String(r['Акция'] || '').trim()).cardsTotal = parseRu(r['Карт']) || 0;
     }
+    // 6) ВИДЫ ДИСКОНТНЫХ КАРТ — отдельная механика лояльности (Офис/Студенческая/
+    // Премиум/Донора...): скидка по виду карты, БЕЗ акции. «Промокод ОФИС» в акциях
+    // пуст, а реальная офисная механика — 477 активных карт вида «Офис» (05.06.2026).
+    const kinds = new Map(); // вид → {cardsTotal, cardsActive, cheques, revenue, discount}
+    const getKind = (k) => {
+      if (!kinds.has(k)) kinds.set(k, { cardsTotal: 0, cardsActive: 0, cheques: 0, revenue: 0, discount: 0 });
+      return kinds.get(k);
+    };
+    const kindBase = await callQuery(
+      'ВЫБРАТЬ К.ВидДисконтнойКарты КАК Вид, КОЛИЧЕСТВО(*) КАК Карт ИЗ Справочник.ИнформационныеКарты КАК К ГДЕ НЕ К.ПометкаУдаления И НЕ К.ЭтоГруппа СГРУППИРОВАТЬ ПО К.ВидДисконтнойКарты',
+      { timeoutMs: 120000 });
+    for (const r of kindBase.rows || []) {
+      const k = String(r['Вид'] || '').trim();
+      if (k) getKind(k).cardsTotal = parseRu(r['Карт']) || 0;
+    }
+    const kindCheques = await callQuery(
+      `ВЫБРАТЬ Ч.ДисконтнаяКарта.ВидДисконтнойКарты КАК Вид, КОЛИЧЕСТВО(*) КАК Чеков, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.ДисконтнаяКарта) КАК Карт, СУММА(Ч.СуммаДокумента) КАК Выручка ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${P} СГРУППИРОВАТЬ ПО Ч.ДисконтнаяКарта.ВидДисконтнойКарты`,
+      { timeoutMs: 180000 });
+    for (const r of kindCheques.rows || []) {
+      const k = String(r['Вид'] || '').trim();
+      if (!k) continue; // чеки без карты
+      const u = getKind(k);
+      u.cheques = parseRu(r['Чеков']) || 0;
+      u.cardsActive = parseRu(r['Карт']) || 0;
+      u.revenue = Math.round(parseRu(r['Выручка']) || 0);
+    }
+    // Скидки по виду: ЗначениеУсловияСкидки в ПредоставленныеСкидки = вид ДК
+    // (для условия «По виду дисконтных карт»). Матчим по имени вида в JS.
+    const kindDisc = await callQuery(
+      `ВЫБРАТЬ П.ЗначениеУсловияСкидки КАК Вид, СУММА(П.СуммаСкидки) КАК С ИЗ РегистрНакопления.ПредоставленныеСкидки КАК П ГДЕ П.Период >= ${DT} СГРУППИРОВАТЬ ПО П.ЗначениеУсловияСкидки`,
+      { timeoutMs: 120000 });
+    for (const r of kindDisc.rows || []) {
+      const k = String(r['Вид'] || '').trim();
+      if (k && kinds.has(k)) kinds.get(k).discount = Math.round(parseRu(r['С']) || 0);
+    }
+
     return {
       sinceDate: since.toISOString().slice(0, 10),
       byPromo: [...usage.entries()].map(([name, u]) => ({ name, ...u, revenue: Math.round(u.revenue) }))
         .sort((a, b) => (b.cheques + b.orders) - (a.cheques + a.orders)),
+      byCardKind: [...kinds.entries()].map(([kind, u]) => ({ kind, ...u }))
+        .filter(u => u.cardsTotal || u.cheques)
+        .sort((a, b) => b.cheques - a.cheques),
     };
   });
 }
