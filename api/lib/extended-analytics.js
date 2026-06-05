@@ -120,6 +120,18 @@ async function getMonthCards(ym) {
   });
 }
 
+// Синхронный доступ к картам месяца из кэша (+фоновый прогрев при промахе).
+// Используется когортами в marketing-analytics — чтобы «новые карты» считались
+// ОДНОЙ методикой с графиком «Новые карты лояльности» (baseline 12 мес).
+function peekMonthCards(ym) {
+  const c = monthCardsCache.getCached('cards:' + ym);
+  if (c) return c;
+  if (!monthCardsCache.isPending('cards:' + ym)) {
+    getMonthCards(ym).then(() => console.log(`[month-cards] warm ${ym}`)).catch(() => {});
+  }
+  return null;
+}
+
 // Помесячно: новые карты в каждом месяце с янв пред.года по выбранный включительно.
 // «Новая» = карта появилась впервые ИМЕННО в этом месяце (нет в предыдущих 12 мес и нет
 // в более ранних месяцах того же ряда).
@@ -911,6 +923,7 @@ async function getTopCustomersByRevenue(opts = {}) {
 module.exports = {
   getCustomersRetention,
   getNewCustomersMonthly,
+  peekMonthCards,
   warmNewCustomersMonthly,
   getPromoCodesMonthly,
   warmPromoCodesMonthly,

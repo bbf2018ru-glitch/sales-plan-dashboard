@@ -455,61 +455,79 @@ function buildStoreClusters(db, period) {
 }
 
 // ─── 6) Cohort retention ────────────────────────────────────────────────────
-// Когорта = клиенты которые впервые активировали карту в месяце N. Смотрим
-// какой % из них активен в N+1, N+2, ... мес. Используем РегистрНакопления.Бонусы
-// (как customers-retention, но split по first-month).
+// Когорта = карты, впервые активные в месяце N. Смотрим какой % активен в N+1...
+//
+// ПЕРЕПИСАНО 05.06.2026 («данные завышены», Маша права — было ×2-4):
+// 1. Left-censoring: «новой» считалась карта, впервые встреченная в окне 6 мес —
+//    давний клиент, молчавший полгода, попадал в «новые». Теперь baseline 12 мес
+//    ДО окна отсекает давних — ровно та же методика, что у графика «Новые карты
+//    лояльности» (buildNewCustomersMonthly), цифры обоих блоков совпадают.
+// 2. Карты месяца берём из общего кэша peekMonthCards (extended-analytics),
+//    а не отдельным запросом с limit 5000 — без дублей и расхождений.
+// Non-blocking: непрогретые месяцы помечаются _pending (кэш греет warmNewCustomers).
 async function buildCohortRetention(monthsBack = 6) {
+  const ext = require('./extended-analytics');
   // Берём N последних завершённых месяцев + текущий
   const today = nowYM();
   let from = today;
   for (let i = 0; i < monthsBack; i++) from = prevMonth(from);
   const months = rangeMonths(from, today);
 
-  // 1. Собираем card -> { firstMonth, activeMonths: Set }
-  const cards = new Map();
-  for (const ym of months) {
-    try {
-      const data = await callRegister('Бонусы', ym, ym, 5000);
-      for (const r of data.rows || []) {
-        const card = (r['БонуснаяКарта'] || '').trim();
-        if (!card) continue;
-        if (!cards.has(card)) cards.set(card, { card, firstMonth: ym, activeMonths: new Set() });
-        const c = cards.get(card);
-        c.activeMonths.add(ym);
-        if (ym < c.firstMonth) c.firstMonth = ym;
-      }
-    } catch { /* skip month if 1C 5xx */ }
+  // baseline: 12 мес до окна — карты, которые уже встречались (НЕ новые)
+  const baselineMonths = [];
+  let bm = months[0];
+  for (let i = 0; i < 12; i++) { bm = prevMonth(bm); baselineMonths.unshift(bm); }
+  const baseline = new Set();
+  let baselinePending = 0;
+  for (const ym of baselineMonths) {
+    const c = ext.peekMonthCards(ym);
+    if (!c) { baselinePending++; continue; }
+    for (const card of c.cards || []) baseline.add(card);
   }
 
-  // 2. Группируем по firstMonth → строим retention curve
-  const cohorts = new Map();
-  for (const c of cards.values()) {
-    if (!cohorts.has(c.firstMonth)) cohorts.set(c.firstMonth, { firstMonth: c.firstMonth, total: 0, retained: new Map() });
-    const k = cohorts.get(c.firstMonth);
-    k.total += 1;
-    // По месяцам после first
-    const firstIdx = months.indexOf(c.firstMonth);
-    if (firstIdx < 0) continue;
-    for (let i = 0; i < months.length - firstIdx; i++) {
-      const ym = months[firstIdx + i];
-      if (c.activeMonths.has(ym)) {
-        k.retained.set(i, (k.retained.get(i) || 0) + 1);
-      }
-    }
+  // Карты каждого месяца окна
+  const monthSets = new Map();
+  for (const ym of months) {
+    const c = ext.peekMonthCards(ym);
+    monthSets.set(ym, c ? new Set(c.cards || []) : null);
   }
+
+  // Когорты: новые = не было ни в baseline, ни в предыдущих месяцах окна
+  const seen = new Set(baseline);
+  const cohorts = new Map();
+  for (let i = 0; i < months.length; i++) {
+    const ym = months[i];
+    const set = monthSets.get(ym);
+    if (!set) { cohorts.set(ym, { firstMonth: ym, total: null, _pending: true, retained: new Map() }); continue; }
+    const fresh = [];
+    for (const card of set) { if (!seen.has(card)) { fresh.push(card); seen.add(card); } }
+    const retained = new Map();
+    for (let o = 0; i + o < months.length; o++) {
+      const s2 = monthSets.get(months[i + o]);
+      if (!s2) continue; // месяц не прогрет — точку пропускаем (фронт покажет пусто)
+      retained.set(o, o === 0 ? fresh.length : fresh.reduce((n, card) => n + (s2.has(card) ? 1 : 0), 0));
+    }
+    cohorts.set(ym, { firstMonth: ym, total: fresh.length, retained });
+  }
+  const pendingNote = baselinePending
+    ? `baseline прогревается (${baselinePending} из 12 мес) — «новых» может быть чуть больше до полного прогрева`
+    : null;
 
   return {
     monthsBack,
     months,
+    method: 'когорта месяца N = карты, не встречавшиеся в предыдущие 12 мес (единая методика с графиком «Новые карты лояльности»)',
+    pendingNote,
     cohorts: Array.from(cohorts.values())
       .map(k => ({
         firstMonth: k.firstMonth,
         total: k.total,
+        _pending: k._pending || undefined,
         retention: Array.from(k.retained.entries())
           .map(([offset, count]) => ({
             offset,
             count,
-            pct: Number(((count / k.total) * 100).toFixed(1))
+            pct: k.total ? Number(((count / k.total) * 100).toFixed(1)) : 0
           }))
           .sort((a, b) => a.offset - b.offset)
       }))
