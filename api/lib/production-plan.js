@@ -103,11 +103,20 @@ async function retailPoints(refDay) {
   });
 }
 
-// mode 'hub' (по умолч.): отгрузка ИЗ А00000130 — узкий хаб.
-// mode 'central': отгрузка из всех ЦЕНТРАЛЬНЫХ складов В розничные точки — ловит десерты/
-// пирожные, минующие хаб. Исключает кухни точек (их нет в CENTRAL_SRC) и точка→точка
-// (источник обязан быть центральным).
+// Магазинная пресс-сетка (M/O) — подённая отгрузка в магазины за окно. Источник:
+//   mode 'register' (ПО УМОЛЧАНИЮ): РегистрНакопления.ф_ЗаказыДляПрессСетки, Рейс «Наши
+//     торговые точки» по Периоду=ДатаОтгрузки — ТОТ ЖЕ источник, что Отчёт.ф_ПрессСетка/лист
+//     «Завтра стс» Маши. Сверка с листом 93%/92% (лучше хаба). Это авторитетный источник.
+//   mode 'hub' (fallback): отгрузка ИЗ А00000130 (реверс-инжиниринг, ~90%).
+//   mode 'central' (диагностика): отгрузка из всех центральных складов в точки (переоценивает).
 async function qShipDaily(from, to, mode, pointCodes) {
+  if (mode === 'register') {
+    const q = 'ВЫБРАТЬ НАЧАЛОПЕРИОДА(Р.Период,ДЕНЬ) КАК День, Р.Номенклатура.Код КАК Код, Р.Номенклатура.Наименование КАК Имя,'
+      + ' СУММА(Р.Количество) КАК Кол ИЗ РегистрНакопления.ф_ЗаказыДляПрессСетки КАК Р'
+      + ` ГДЕ Р.Период >= ${dtLit(from)} И Р.Период < ${dtLit(to)} И Р.Рейс.Наименование = "Наши торговые точки"`
+      + ' СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Р.Период,ДЕНЬ), Р.Номенклатура.Код, Р.Номенклатура.Наименование';
+    return (await upp.callQuery(q, { timeoutMs: 90000 })).rows || [];
+  }
   let srcFilter;
   if (mode === 'central') {
     const central = CENTRAL_SRC.map(c => `"${c}"`).join(',');
@@ -175,7 +184,7 @@ function weekdayAvg(shipMap, days) {
 async function pressForDate(target, mode) {
   const from = addDays(target, -22), to = addDays(target, 1);
   const pts = mode === 'central' ? (await retailPoints(target).catch(() => ({ codes: [] }))).codes : null;
-  const rows = await qShipDaily(from, to, mode, pts);
+  const rows = await qShipDaily(from, to, mode, pts); // mode: register(деф)/hub/central
   const shipMap = {}; const names = {};
   for (const r of rows) {
     const code = cc(r.Код), day = cc(r.День).slice(0, 10);
@@ -195,11 +204,12 @@ function ymdNum(o) { return o.y * 10000 + o.m * 100 + o.d; }
 
 async function compute(dateStr, opts) {
   const yoy = !!(opts && opts.yoy);
-  // demand: 'hub' (дефолт) — отгрузка из хаба А00000130, дневной такт ≈ дневное производство,
-  // хорошо калибрует товары, идущие через хаб (торты). 'central' — отгрузка из ВСЕХ
-  // центральных складов в точки: ловит десерты/пирожные мимо хаба, НО переоценивает (точки
-  // затариваются волнами на неск. дней) → только диагностика, не для планирования.
-  const demand = (opts && opts.demand === 'central') ? 'central' : 'hub';
+  // demand-источник магазинной пресс-сетки (M/O):
+  //  'register' (ДЕФОЛТ) — РегистрНакопления.ф_ЗаказыДляПрессСетки Рейс «Наши торговые точки»
+  //     = тот же источник, что Отчёт.ф_ПрессСетка/лист Маши «Завтра стс» (сверка 93%/92%).
+  //  'hub' — реверс через отгрузку А00000130 (~90%, fallback).
+  //  'central' — все центральные склады в точки (переоценивает, только диагностика).
+  const demand = (opts && (opts.demand === 'central' || opts.demand === 'hub')) ? opts.demand : 'register';
   const target = parseYMD(dateStr);
   const next = addDays(target, 1);
   const today = todayObj();
@@ -339,7 +349,9 @@ async function compute(dateStr, opts) {
 
   const demandNote = demand === 'central'
     ? 'среднее отгрузки из ЦЕНТРАЛЬНЫХ складов (ГП+цеха+промежуточный) в розничные точки по дню недели за 3 нед — ловит десерты/пирожные, минующие хаб А00000130'
-    : 'среднее отгрузки А00000130→магазины по дню недели за 3 нед (узкий хаб)';
+    : demand === 'hub'
+      ? 'среднее отгрузки А00000130→магазины по дню недели за 3 нед (реверс-хаб)'
+      : 'среднее по дню недели за 3 нед из пресс-сетки 1С (РегистрНакопления.ф_ЗаказыДляПрессСетки, Рейс «Наши торговые точки») — тот же источник, что лист «Завтра стс» Маши';
   return {
     date: dateStr, weekday: weekdayRu(target), nextWeekday: weekdayRu(next),
     yoy, ceh, warnings, demand,
@@ -439,12 +451,12 @@ async function computeConvergence(dateStr, demand) {
 
 function getPlan(dateStr, opts) {
   const fKey = (opts && opts.includeTodayOutput != null) ? (opts.includeTodayOutput ? ':f1' : ':f0') : '';
-  const dKey = (opts && opts.demand === 'central') ? ':central' : ''; // hub — дефолт
+  const dm = opts && opts.demand; const dKey = (dm === 'central' || dm === 'hub') ? ':' + dm : ''; // register — дефолт
   const key = 'plan:' + dateStr + (opts && opts.yoy ? ':yoy' : '') + fKey + dKey;
   return cache.wrap(key, () => compute(dateStr, opts));
 }
 function getConvergence(dateStr, demand) {
-  const dKey = demand === 'central' ? ':central' : '';
+  const dKey = (demand === 'central' || demand === 'hub') ? ':' + demand : '';
   return cache.wrap('conv:' + dateStr + dKey, () => computeConvergence(dateStr, demand));
 }
 
