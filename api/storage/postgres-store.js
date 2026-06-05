@@ -53,6 +53,25 @@ class PostgresStore {
       console.error('[pg pool] idle client error:', err && err.message ? err.message : err);
     });
 
+    // Отдельный мини-пул для ingest: insert сырого payload тяжёлого месяца
+    // (raw_upp_payloads, мегабайты JSON: март-2026 = 42.5к чеков) не влезает в
+    // 90с-потолок основного пула → «Query read timeout» и месяц не грузится.
+    // Основной пул не трогаем — 90с остаётся анти-зависанием для фронта.
+    this.ingestPool = new Pool({
+      connectionString: this.connectionString,
+      ssl: needsSSL ? { rejectUnauthorized: false } : false,
+      max: 2,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
+      connectionTimeoutMillis: 20000,
+      idleTimeoutMillis: 30000,
+      query_timeout: 600000,
+      statement_timeout: 600000
+    });
+    this.ingestPool.on('error', (err) => {
+      console.error('[pg ingest pool] idle client error:', err && err.message ? err.message : err);
+    });
+
     // Ретрай на ТРАНЗИЕНТНЫЕ connection-сбои: протухшее/оборванное соединение к
     // удалённой БД даёт ошибку на ПЕРВОМ запросе. Повторяем 1 раз и ТОЛЬКО для
     // SELECT — чтобы исключить любой риск двойной записи (INSERT/UPDATE/DELETE).
@@ -452,7 +471,8 @@ class PostgresStore {
     await this.init();
     const normalized = normalizeUppPayload(payload);
     validateNormalizedUppPayload(normalized);
-    const client = await this.pool.connect();
+    // ingest-пул: длинный таймаут под мегабайтные raw-payload тяжёлых месяцев
+    const client = await (this.ingestPool || this.pool).connect();
 
     try {
       await client.query('begin');
