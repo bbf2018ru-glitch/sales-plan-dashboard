@@ -4458,9 +4458,11 @@ function renderSalesMonthly(d){
   if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Данные 1С прогреваются…</div>'; return; }
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var rev=0,chq=0,bon=0,cardW=0;
+  var selYM=mktSelectedPeriod();
+  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
   var rows=ms.map(function(m){ rev+=m.revenue||0; chq+=m.cheques||0; bon+=m.bonus||0; cardW+=(m.cardPct||0)*(m.cheques||0);
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
-    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.revenue)+'</td><td class="num">'+mNum(m.cheques)+'</td><td class="num">'+mNum(m.avgCheck||(m.cheques?m.revenue/m.cheques:0))+'</td><td class="num">'+mNum1(m.cardPct||0)+' %</td><td class="num">'+mNum(m.bonus||0)+'</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.revenue)+'</td><td class="num">'+mNum(m.cheques)+'</td><td class="num">'+mNum(m.avgCheck||(m.cheques?m.revenue/m.cheques:0))+'</td><td class="num">'+mNum1(m.cardPct||0)+' %</td><td class="num">'+mNum(m.bonus||0)+'</td></tr>';
   }).reverse().join('');
   el.innerHTML='<table><thead><tr><th>Месяц</th><th class="num">Выручка, ₽</th><th class="num">Чеков</th><th class="num">Ср. чек, ₽</th><th class="num">Чеков с картой</th><th class="num">Бонусами, ₽</th></tr></thead><tbody>'+rows+
     '<tr class="mkt-total"><td>Итого '+ms.length+' мес</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum(chq)+'</td><td class="num">'+mNum(chq?rev/chq:0)+'</td><td class="num">'+mNum1(chq?cardW/chq:0)+' %</td><td class="num">'+mNum(bon)+'</td></tr></tbody></table>'+
@@ -4477,10 +4479,12 @@ function renderDirectMonthly(d){
   if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история Директа собирается скрейпером кабинета.</div>'; return; }
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var sp=0,im=0,cl=0,cv=0;
+  var selYM=mktSelectedPeriod();
+  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
   var rows=ms.map(function(m){ sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=m.conversions||0;
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.daysCovered&&m.daysCovered<28?' (1–'+m.daysCovered+')':'');
     var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:#10a05a':(m.cpa<=800?'color:#b8860b':'color:#e0466a'));
-    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.spend)+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+mNum(m.clicks)+'</td><td class="num">'+mNum1(m.ctrPct||0)+' %</td><td class="num">'+mNum(m.conversions)+'</td><td class="num">'+mNum1(m.crPct||0)+' %</td><td class="num">'+mNum1(m.cpc||0)+'</td><td class="num" style="'+cpaC+'">'+(m.cpa==null?'—':mNum(m.cpa))+'</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.spend)+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+mNum(m.clicks)+'</td><td class="num">'+mNum1(m.ctrPct||0)+' %</td><td class="num">'+mNum(m.conversions)+'</td><td class="num">'+mNum1(m.crPct||0)+' %</td><td class="num">'+mNum1(m.cpc||0)+'</td><td class="num" style="'+cpaC+'">'+(m.cpa==null?'—':mNum(m.cpa))+'</td></tr>';
   }).reverse().join('');
   var tcpc=cl?Math.round(sp/cl*100)/100:0, tctr=im?Math.round(cl/im*1000)/10:0, tcpa=cv?Math.round(sp/cv):0, tcr=cl?Math.round(cv/cl*1000)/10:0;
   var st=dh.scrapedAt?new Date(dh.scrapedAt).toLocaleString('ru-RU'):'—';
@@ -4498,10 +4502,12 @@ function renderGisMonthly(d){
   if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история 2ГИС собирается скрейпером кабинета.</div>'; return; }
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var imp=0;
+  var selYM=mktSelectedPeriod();
+  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
   var rows=ms.map(function(m){ imp+=m.impressions||0;
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
     var posR=(m.positionMin&&m.positionMax)?(m.positionMin+'–'+m.positionMax):'—';
-    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.days||'—')+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+posR+'</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+(m.days||'—')+'</td><td class="num">'+(m.positionAvg==null?'—':mNum1(m.positionAvg))+'</td><td class="num">'+posR+'</td></tr>';
   }).reverse().join('');
   var st=gh.scrapedAt?new Date(gh.scrapedAt).toLocaleString('ru-RU'):'—';
   el.innerHTML='<div class="mkt-chart-t">2ГИС — присутствие в выдаче помесячно <span class="mkt-scope dyn">live · кабинет</span></div>'+
@@ -4595,12 +4601,14 @@ function renderSmsMonthly(sm){
   var ready=sm.months.filter(function(m){return !m._pending;});
   if(!ready.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячные итоги SMS прогреваются из 1С (~10 сек/мес). Обнови страницу через минуту.</div>'; return; }
   var rec=0,cost=0,buy=0,rev=0;
+  var selYM=mktSelectedPeriod();
+  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
   var rows=sm.months.map(function(m){
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
     if(m._pending) return '<tr><td>'+lbl+'</td><td class="num" colspan="6" style="color:var(--muted);text-align:left">прогрев…</td></tr>';
     rec+=m.recipients||0; cost+=m.cost||0; buy+=m.buyers||0; rev+=m.revenue||0;
     var cc=m.conversionPct>=10?'#10a05a':(m.conversionPct>=3?'#b8860b':'#e0466a');
-    return '<tr><td>'+lbl+'</td><td class="num">'+mNum(m.campaigns)+'</td><td class="num">'+mNum(m.recipients)+'</td><td class="num">'+mNum(m.cost)+'</td><td class="num">'+mNum(m.buyers)+'</td><td class="num">'+(m.revenue?mNum(m.revenue):'—')+'</td><td class="num" style="color:'+cc+'">'+mNum1(m.conversionPct||0)+' %</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.campaigns)+'</td><td class="num">'+mNum(m.recipients)+'</td><td class="num">'+mNum(m.cost)+'</td><td class="num">'+mNum(m.buyers)+'</td><td class="num">'+(m.revenue?mNum(m.revenue):'—')+'</td><td class="num" style="color:'+cc+'">'+mNum1(m.conversionPct||0)+' %</td></tr>';
   }).reverse().join('');
   var tconv=rec?Math.round(buy/rec*1000)/10:0;
   el.innerHTML='<table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Рассылок</th><th class="num">Получателей</th><th class="num">Затраты ₽</th><th class="num">Купили/перешли</th><th class="num">Выручка ₽</th><th class="num">Конверсия</th></tr></thead><tbody>'+rows+
@@ -4833,9 +4841,11 @@ var PRICES = [
   // «Просто торты» = готовые целые в наличии на витрине (не заказные, не кусочки).
   // Мария — реальные цены продаж из 1С за 30 дней (05.05–04.06.2026): 46 позиций,
   // от 952 ₽, ходовые (топ-10 по штукам) 1 390–2 320 ₽, средняя 1 511 ₽.
-  // Конкуренты готовые торты онлайн НЕ публикуют (сайты только про заказные/бенто,
-  // у ЯХОНТа сайта нет) → честное «н/д». Готовые торты в наличии — формат Марии.
-  ['Просто торты (готовые, в наличии)','<span title="1С, чеки 05.05–04.06.2026: 46 позиций, от 952 ₽, средняя 1 511 ₽, ходовые 1 390–2 320 ₽">от 952 ₽/шт · ср. 1 511 ₽</span>','н/д*','н/д*','н/д*','н/д*'],
+  // Конкуренты — веб-ресёрч 05.06.2026: Стефания «Торты на каждый день» (сайт, 20+
+  // позиций), Этика «Стандартные торты» (сайт, 8 позиций 1–1,6 кг), Cake Home
+  // /catalog/cakes/ (сайт), ЯХОНТ — официальная карточка 2ГИС (21 позиция).
+  // Единицы разные (₽/кг vs ₽/шт) — в каждой ячейке, источник в title.
+  ['Просто торты (готовые, в наличии)*','<span title="1С, чеки 05.05–04.06.2026: 46 позиций, от 952 ₽, средняя 1 511 ₽, ходовые 1 390–2 320 ₽">от 952 ₽/шт · ср. 1 511 ₽</span>','<span title="stefanycake.ru «Торты на каждый день», 20+ позиций, 05.06.2026; большинство 765–1 195 ₽/кг">525–1 350 ₽/кг</span>','<span title="etikacakes.ru «Стандартные торты», 8 позиций по 1–1,6 кг, 05.06.2026 (≈1 900–2 280 ₽/кг)">2 280–3 280 ₽/шт</span>','<span title="cakehome.ru/catalog/cakes, 05.06.2026; целиком 848–4 485 ₽/шт">1 690–2 990 ₽/кг</span>','<span title="Официальная карточка 2ГИС (Обручева 14), 21 позиция, 05.06.2026; большинство 900–1 305 ₽">640–1 700 ₽/шт</span>'],
   ['Бенто-торт','от 690 ₽','1000 ₽','от 1590 ₽','350–520 ₽','от 495 ₽'],
   ['Кусочек / пирожное','88–308 ₽','89–199 ₽','210–460 ₽','н/д','н/д'],
   ['Макаронс, ₽/шт','н/д','109 ₽','135 ₽','120 ₽','131 ₽'],
@@ -5082,9 +5092,9 @@ function renderOtherChannels(d){
     if(!u||(!u.cheques&&!u.orders&&!u.cardsTotal)) return '<td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">0</td><td class="num" style="color:var(--muted)">—</td>';
     return '<td class="num">'+mNum(u.cardsTotal||0)+'</td><td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+mNum(u.orders||0)+'</td><td class="num">'+mNum(u.buyers||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td>';
   };
-  var usageHead='<th class="num" title="Виртуальных карт создано по акции (за всё время)">Карт</th><th class="num" title="Чеков ККМ по картам/ссылкам акции за последние 3 месяца">Чеков</th><th class="num" title="Заказов покупателя с этим промокодом за 3 мес (телефон/сайт/доставка)">Заказов</th><th class="num" title="Уникальных карт-покупателей за 3 мес">Покупателей</th><th class="num" title="Выручка чеков и заказов акции за 3 мес">Выручка</th>';
+  var usageHead='<th class="num" title="Виртуальных карт создано по акции (за всё время)">Карт</th><th class="num" title="Чеков ККМ по картам/ссылкам акции за выбранный месяц">Чеков</th><th class="num" title="Заказов покупателя с этим промокодом за выбранный месяц (телефон/сайт/доставка)">Заказов</th><th class="num" title="Уникальных карт-покупателей за месяц">Покупателей</th><th class="num" title="Выручка чеков и заказов акции за месяц">Выручка</th>';
   if(promos.length){
-    html+='<div class="mkt-chart-t">Действующие промокоды и акции (1С) — с использованием за 3 мес</div>'+
+    html+='<div class="mkt-chart-t">Действующие промокоды и акции (1С) — с использованием за выбранный месяц</div>'+
       '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Начало</th><th class="num">Окончание</th>'+usageHead+'</tr></thead><tbody>'+
       promos.map(function(p){ return '<tr><td>'+p.name+'</td><td class="num">'+fd(p.start)+'</td><td class="num">'+fd(p.end)+'</td>'+usageCells(byName[p.name])+'</tr>'; }).join('')+
       '</tbody></table></div>'+
@@ -5098,7 +5108,7 @@ function renderOtherChannels(d){
   promos.forEach(function(p){ activeNames[p.name]=1; });
   var others=usage.filter(function(u){ return !activeNames[u.name] && (u.cheques>0 || u.orders>0); }).slice(0,12);
   if(others.length){
-    html+='<div class="mkt-chart-t" style="margin-top:12px">Какими акциями реально пользуются'+(pu.sinceDate?' (с '+fd(pu.sinceDate)+')':'')+'</div>'+
+    html+='<div class="mkt-chart-t" style="margin-top:12px">Какими акциями реально пользуются'+(pu.period?' ('+pu.period+')':'')+'</div>'+
       '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th>'+usageHead+'</tr></thead><tbody>'+
       others.map(function(u){ return '<tr><td>'+u.name+'</td>'+usageCells(u)+'</tr>'; }).join('')+
       '</tbody></table></div>'+
@@ -5107,8 +5117,8 @@ function renderOtherChannels(d){
   // Виды дисконтных карт — отдельная механика лояльности (скидка по виду карты, без акции).
   var kinds=pu.byCardKind||[];
   if(kinds.length){
-    html+='<div class="mkt-chart-t" style="margin-top:12px">Виды дисконтных карт — применение'+(pu.sinceDate?' (с '+fd(pu.sinceDate)+')':'')+'</div>'+
-      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Вид карты</th><th class="num" title="Карт этого вида в базе (за всё время)">Карт в базе</th><th class="num" title="Уникальных карт, по которым были чеки за 3 мес">Покупали</th><th class="num" title="Чеков по картам этого вида за 3 мес">Чеков</th><th class="num" title="Выручка этих чеков">Выручка</th><th class="num" title="Скидок выдано по условию «По виду дисконтных карт» за 3 мес">Скидок выдано</th></tr></thead><tbody>'+
+    html+='<div class="mkt-chart-t" style="margin-top:12px">Виды дисконтных карт — применение'+(pu.period?' ('+pu.period+')':'')+'</div>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Вид карты</th><th class="num" title="Карт этого вида в базе (за всё время)">Карт в базе</th><th class="num" title="Уникальных карт, по которым были чеки за выбранный месяц">Покупали</th><th class="num" title="Чеков по картам этого вида за месяц">Чеков</th><th class="num" title="Выручка этих чеков">Выручка</th><th class="num" title="Скидок выдано по условию «По виду дисконтных карт» за месяц">Скидок выдано</th></tr></thead><tbody>'+
       kinds.map(function(u){
         return '<tr><td>'+u.kind+'</td><td class="num">'+mNum(u.cardsTotal||0)+'</td><td class="num">'+mNum(u.cardsActive||0)+'</td><td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td><td class="num">'+(u.discount?mNum(u.discount)+' ₽':'—')+'</td></tr>';
       }).join('')+
@@ -5527,6 +5537,8 @@ function mktLoadYoY(){
         if(hint) hint.textContent='Загрузка скидок из 1С…';
         return;
       }
+      var selYM=mktSelectedPeriod();
+      var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
       el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт месяца (акция)</th><th class="num">Скидка</th><th class="num">Скидок выдано ₽</th><th class="num">Дней акции</th><th class="num">Выручка ₽</th><th class="num">Штук</th><th class="num">Доля в тортах</th></tr></thead><tbody>'+
         ready.slice().reverse().map(function(s){
           var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
@@ -5543,7 +5555,7 @@ function mktLoadYoY(){
           var sales = s.salesPending
             ? '<td colspan="3" style="color:var(--muted);font-size:11px;text-align:center">продажи прогреваются…</td>'
             : '<td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(s.qty)+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td>';
-          return '<tr><td>'+lbl+'</td><td>'+nm+'</td>'+pctCell+'<td class="num">'+mNum(s.discount)+'</td><td class="num">'+mNum(s.discountDays)+'</td>'+sales+'</tr>';
+          return '<tr'+hlRow(s.ym)+'><td>'+lbl+'</td><td>'+nm+'</td>'+pctCell+'<td class="num">'+mNum(s.discount)+'</td><td class="num">'+mNum(s.discountDays)+'</td>'+sales+'</tr>';
         }).join('')+'</tbody></table>';
       if(hint){
         var pending=cm.seriesPending||0;

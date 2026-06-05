@@ -118,7 +118,7 @@
     if (!el) return;
     el.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Загрузка…</div>';
     try {
-      const data = await fetchJson('/api/marketing/cohort-retention?months=6');
+      const data = await fetchJson('/api/marketing/cohort-retention?months=6&period=' + currentPeriod());
       const cohorts = data.cohorts || [];
       if (!cohorts.length) {
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Нет данных для построения когорт.</div>';
@@ -655,10 +655,12 @@
   function tryHook() {
     // Активный таб «Маркетинг» — грузим один раз при первом открытии.
     let loaded = false;
+    let loadedPeriod = null;
     function onTabSwitch() {
       const mkt = document.getElementById('page-marketing');
       if (mkt && !mkt.classList.contains('hidden') && !loaded) {
         loaded = true;
+        loadedPeriod = currentPeriod();
         loadAll();
       }
     }
@@ -670,6 +672,23 @@
     // Если страница загружена и маркетинг уже активен — грузим сразу
     onTabSwitch();
     // На переключение mgroup (под-вкладки) — не грузим заново; данные уже есть.
+    // СМЕНА ПЕРИОДА слева: period-зависимые блоки (RFM/когорты/зомби/каннибализация/
+    // кластеры) перезагружаем — раньше грузились один раз и не слушали селектор.
+    const sel = document.getElementById('periodSelect');
+    if (sel) sel.addEventListener('change', () => setTimeout(() => {
+      if (!loaded) return;
+      const p = currentPeriod();
+      if (p === loadedPeriod) return;
+      loadedPeriod = p;
+      loadRfm();
+      loadCohorts();
+      loadZombie();
+      loadCanniba();
+      loadClusters();
+      // paidSms/smsAttr-вставки сами перезагрузятся через MutationObserver (период в state)
+      paidSmsState = { html: null, lastPeriod: null };
+      smsAttrState = { audMap: null, lastPeriod: null };
+    }, 100));
   }
 
   if (document.readyState === 'loading') {

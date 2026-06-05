@@ -1095,7 +1095,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/marketing/cohort-retention' && req.method === 'GET') {
       try {
         const monthsBack = Number(parsedUrl.searchParams.get('months') || 6);
-        sendJson(res, 200, await marketing.getCohortRetention(monthsBack));
+        const endPeriod = parsedUrl.searchParams.get('period') || null; // окно заканчивается выбранным месяцем
+        sendJson(res, 200, await marketing.getCohortRetention(monthsBack, endPeriod));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

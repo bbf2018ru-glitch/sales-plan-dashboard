@@ -254,11 +254,16 @@ async function activePromos(asOf) {
 // Окно: последние 92 дня (большинство акций короткие). Кэш 6ч — данные тяжёлые не по
 // объёму, а по числу запросов к 1С.
 const promoUsageCache = makeCache(6 * 60 * 60 * 1000, 'promo-usage');
-async function promoUsage() {
-  return promoUsageCache.wrap('all-v3', async () => { // v3: + byCardKind (виды дисконтных карт); ключ меняется для инвалидации дискового кэша
-    const since = new Date(Date.now() - 92 * 24 * 3600 * 1000);
-    const DT = `ДАТАВРЕМЯ(${since.getFullYear()},${since.getMonth() + 1},${since.getDate()})`;
-    const P = `Ч.Проведен И Ч.Дата >= ${DT}`;
+// Использование акций/видов карт ЗА ВЫБРАННЫЙ МЕСЯЦ (раньше фикс-окно 92 дня —
+// по просьбе Маши 05.06.2026 весь маркетинг слушает период слева). Кэш per-month.
+async function promoUsage(period) {
+  const p = period || nowYM();
+  return promoUsageCache.wrap('m4:' + p, async () => { // v4: окно = выбранный месяц
+    const [py, pm] = p.split('-').map(Number);
+    const pny = pm === 12 ? py + 1 : py, pnm = pm === 12 ? 1 : pm + 1;
+    const DT = `ДАТАВРЕМЯ(${py},${pm},1)`;
+    const DTEND = `ДАТАВРЕМЯ(${pny},${pnm},1)`;
+    const P = `Ч.Проведен И Ч.Дата >= ${DT} И Ч.Дата < ${DTEND}`;
     const usage = new Map(); // name → {cheques, orders, buyers, revenue, coffee, cardsTotal}
     const get = (name) => {
       if (!usage.has(name)) usage.set(name, { cheques: 0, orders: 0, buyers: 0, revenue: 0, coffee: 0, cardsTotal: 0 });
@@ -298,7 +303,7 @@ async function promoUsage() {
     // ЗВОНОК/ЛЕТО/СУШИ/ОЗЕРО...) живут ЗДЕСЬ, а не в чеках ККМ. Без этого запроса
     // блок показывал по ним честные-но-неверные нули (найдено Машей 05.06.2026).
     const orders = await callQuery(
-      `ВЫБРАТЬ З.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Заказов, СУММА(З.СуммаДокумента) КАК Выручка ИЗ Документ.ЗаказПокупателя КАК З ГДЕ З.Проведен И З.Дата >= ${DT} И З.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО З.Акция.Наименование`,
+      `ВЫБРАТЬ З.Акция.Наименование КАК Акция, КОЛИЧЕСТВО(*) КАК Заказов, СУММА(З.СуммаДокумента) КАК Выручка ИЗ Документ.ЗаказПокупателя КАК З ГДЕ З.Проведен И З.Дата >= ${DT} И З.Дата < ${DTEND} И З.Акция <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка) СГРУППИРОВАТЬ ПО З.Акция.Наименование`,
       { timeoutMs: 120000 });
     for (const r of orders.rows || []) {
       const u = get(String(r['Акция'] || '').trim());
@@ -341,7 +346,7 @@ async function promoUsage() {
     // Скидки по виду: ЗначениеУсловияСкидки в ПредоставленныеСкидки = вид ДК
     // (для условия «По виду дисконтных карт»). Матчим по имени вида в JS.
     const kindDisc = await callQuery(
-      `ВЫБРАТЬ П.ЗначениеУсловияСкидки КАК Вид, СУММА(П.СуммаСкидки) КАК С ИЗ РегистрНакопления.ПредоставленныеСкидки КАК П ГДЕ П.Период >= ${DT} СГРУППИРОВАТЬ ПО П.ЗначениеУсловияСкидки`,
+      `ВЫБРАТЬ П.ЗначениеУсловияСкидки КАК Вид, СУММА(П.СуммаСкидки) КАК С ИЗ РегистрНакопления.ПредоставленныеСкидки КАК П ГДЕ П.Период >= ${DT} И П.Период < ${DTEND} СГРУППИРОВАТЬ ПО П.ЗначениеУсловияСкидки`,
       { timeoutMs: 120000 });
     for (const r of kindDisc.rows || []) {
       const k = String(r['Вид'] || '').trim();
@@ -349,7 +354,7 @@ async function promoUsage() {
     }
 
     return {
-      sinceDate: since.toISOString().slice(0, 10),
+      period: p,
       byPromo: [...usage.entries()].map(([name, u]) => ({ name, ...u, revenue: Math.round(u.revenue) }))
         .sort((a, b) => (b.cheques + b.orders) - (a.cheques + a.orders)),
       byCardKind: [...kinds.entries()].map(([kind, u]) => ({ kind, ...u }))
@@ -534,7 +539,7 @@ async function getChannels(period) {
   // иначе свежезадеплоенный код ждал бы истечения старого снапшота.
   const [r, promoUse] = await Promise.all([
     cache.wrap('ch:' + p, () => compute(p)),
-    promoUsage().catch(e => ({ error: e.message, byPromo: [] })),
+    promoUsage(p).catch(e => ({ error: e.message, byPromo: [] })),
   ]);
   // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
   return Object.assign({}, r, { external: externalBlock(), promoUsage: promoUse });

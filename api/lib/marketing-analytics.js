@@ -465,10 +465,10 @@ function buildStoreClusters(db, period) {
 // 2. Карты месяца берём из общего кэша peekMonthCards (extended-analytics),
 //    а не отдельным запросом с limit 5000 — без дублей и расхождений.
 // Non-blocking: непрогретые месяцы помечаются _pending (кэш греет warmNewCustomers).
-async function buildCohortRetention(monthsBack = 6) {
+async function buildCohortRetention(monthsBack = 6, endPeriod) {
   const ext = require('./extended-analytics');
-  // Берём N последних завершённых месяцев + текущий
-  const today = nowYM();
+  // Окно заканчивается ВЫБРАННЫМ периодом (селектор слева), не «сегодня».
+  const today = endPeriod || nowYM();
   let from = today;
   for (let i = 0; i < monthsBack; i++) from = prevMonth(from);
   const months = rangeMonths(from, today);
@@ -569,8 +569,8 @@ function getHolidayYoy(db, windowDays) {
 function getStoreClusters(db, period) {
   return cache.wrap(`clusters:${period}`, async () => buildStoreClusters(db, period));
 }
-async function getCohortRetention(monthsBack) {
-  return cache.wrap(`cohorts:${monthsBack || 6}`, async () => buildCohortRetention(monthsBack || 6));
+async function getCohortRetention(monthsBack, endPeriod) {
+  return cache.wrap(`cohorts:${monthsBack || 6}:${endPeriod || 'now'}`, async () => buildCohortRetention(monthsBack || 6, endPeriod));
 }
 
 module.exports = {
