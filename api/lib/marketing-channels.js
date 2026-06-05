@@ -17,6 +17,11 @@ const cache = makeCache(6 * 60 * 60 * 1000, 'mkt-channels');     // 6 часов
 const mapCache = makeCache(24 * 60 * 60 * 1000, 'mkt-maps'); // 24 часа — карты товаров/точек (плоские объекты)
 // monthCache НЕ персистим: агрегаты содержат Map (byStore/products) — JSON-roundtrip превратит в {} и сломает .get()
 const monthCache = makeCache(24 * 60 * 60 * 1000); // 24 часа — агрегаты per-month (прошлые месяцы не меняются)
+// А вот headline-выжимку (только скаляры: revenue/cheques/avgCheck/cardPct/bonus) — персистим.
+// Иначе каждый деплой (рестарт Node) обнулял серию «Динамика по месяцам», и она заново
+// грелась ~2,5 ч с дырками «прогревается». Закрытые месяцы не меняются — TTL 7 дней,
+// текущий месяц серия берёт из живого monthCache (он всегда свежее после aggSales(period)).
+const headlineCache = makeCache(7 * 24 * 60 * 60 * 1000, 'mkt-headline');
 
 // Карта точек: storeCode -> name (по /stores-detail), кэш 24ч.
 async function getStoreMap() {
@@ -68,7 +73,11 @@ function deltaPct(cur, prev) {
 // Кэшированная обёртка над агрегатами per-month (24ч). Прошлые месяцы не меняются;
 // текущий месяц обновится не дольше чем через сутки.
 async function aggSales(period) {
-  return monthCache.wrap('agg:' + period, () => _aggSalesUncached(period));
+  const agg = await monthCache.wrap('agg:' + period, () => _aggSalesUncached(period));
+  // Персистентная headline-копия (скаляры) для серии «Динамика по месяцам» — переживает
+  // рестарты Node. Для текущего месяца серия всё равно берёт свежий monthCache.
+  headlineCache.wrap('hl:' + period, async () => headline(period, agg)).catch(() => {});
+  return agg;
 }
 
 // Нетто-выручка = Σ ЧекККМ.СуммаДокумента (продажа) − Σ СуммаДокумента (возврат), по Склад.Код.
@@ -335,13 +344,20 @@ async function compute(period) {
     const cached = monthCache.getCached('agg:' + ym);
     if (cached) {
       curSeries.push(headline(ym, cached));
-    } else {
-      // плейсхолдер; фронт нарисует пробел/«н/д» в этой точке, при следующем обновлении она появится
-      curSeries.push({ ym, revenue: null, cheques: null, avgCheck: null, cardPct: null, bonus: null, _pending: true });
-      if (!monthCache.isPending('agg:' + ym)) {
-        // пинаем фоновый прогрев — не ждём; в логах увидим «warm agg:ym» через ~100с
-        aggSales(ym).then(() => console.log(`[marketing-channels] warm ${ym}`)).catch(e => console.log(`[marketing-channels] warm ${ym} fail: ${e.message}`));
-      }
+      continue;
+    }
+    // После рестарта monthCache пуст — берём персистентную headline-копию,
+    // чтобы серия не зияла «прогревается» 2,5 часа после каждого деплоя.
+    const hl = headlineCache.getCached('hl:' + ym);
+    if (hl) {
+      curSeries.push({ ym, revenue: hl.revenue, cheques: hl.cheques, avgCheck: hl.avgCheck, cardPct: hl.cardPct, bonus: hl.bonus });
+      continue;
+    }
+    // плейсхолдер; фронт нарисует пробел/«н/д» в этой точке, при следующем обновлении она появится
+    curSeries.push({ ym, revenue: null, cheques: null, avgCheck: null, cardPct: null, bonus: null, _pending: true });
+    if (!monthCache.isPending('agg:' + ym)) {
+      // пинаем фоновый прогрев — не ждём; в логах увидим «warm agg:ym» через ~100с
+      aggSales(ym).then(() => console.log(`[marketing-channels] warm ${ym}`)).catch(e => console.log(`[marketing-channels] warm ${ym} fail: ${e.message}`));
     }
   }
   // prevSeries = cur со сдвигом 12: для cur[12]..cur[N-1] это cur[0]..cur[N-13]; для остального — null.
