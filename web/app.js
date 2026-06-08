@@ -1897,8 +1897,11 @@ function urlStateApply(silent = false) {
       if (!silent) loadStoreDetails();
     }
   }
-  if (page && (page === 'dashboard' || page === 'analytics')) {
+  if (page && (page === 'dashboard' || page === 'analytics' || page === 'marketing')) {
     if (typeof switchPage === 'function') switchPage(page);
+    // При восстановлении страницы «Аналитика» из URL грузим её данные —
+    // switchPage только показывает контейнер, но не дёргает loadAnalytics.
+    if (page === 'analytics' && !analyticsState.data && typeof loadAnalytics === 'function') loadAnalytics();
   }
   if (tab && page !== 'dashboard') {
     if (typeof switchAnalyticsTab === 'function') switchAnalyticsTab(tab);
@@ -2712,13 +2715,22 @@ async function init() {
       state.selectedStoreId = '';
       $('storeDetailTitle').textContent = 'Детализация точки';
       urlStateWrite();
-      // Маркетинг по каналам слушается этого же глобального периода — обновляем
-      // сразу (независимо от loadSummary, который рисует Дашборд).
-      if (analyticsState.currentPage === 'marketing' && typeof mktLoadYoY === 'function') mktLoadYoY();
-      await loadSummary();
-      loadInsights();
       analyticsState.data = null;
-      if (analyticsState.currentPage === 'analytics') await loadAnalytics();
+      // Сначала обновляем ВИДИМУЮ страницу, чтобы реакция была мгновенной.
+      // Скрытые страницы перегружаем в фоне (без await) — иначе на «Аналитике»
+      // приходилось ждать ~20с полного ререндера скрытого Дашборда, и казалось,
+      // что аналитика не реагирует на смену месяца.
+      const page = analyticsState.currentPage;
+      if (page === 'analytics') {
+        await loadAnalytics();
+        loadSummary(); loadInsights();
+      } else if (page === 'marketing') {
+        if (typeof mktLoadYoY === 'function') mktLoadYoY();
+        loadSummary(); loadInsights();
+      } else {
+        await loadSummary();
+        loadInsights();
+      }
     });
 
     // Если в URL есть period — применить ДО первой загрузки summary
