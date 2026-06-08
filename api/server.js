@@ -863,12 +863,16 @@ const server = http.createServer(async (req, res) => {
         const gp = await grossProfit.getGrossProfitCogs(period);
         const grossProfitVal = revenue - gp.cogs;
         const marginPct = revenue > 0 ? Number((grossProfitVal / revenue * 100).toFixed(1)) : null;
+        // «Рассчитана» — только если маржа правдоподобна (50–90%). У текущего/незакрытого
+        // месяца себестоимость в УчётЗатрат ещё не посчитана → даёт мусор (маржа вне диапазона).
+        const costed = gp.cogs > 0 && marginPct != null && marginPct >= 50 && marginPct <= 90;
         sendJson(res, 200, {
           period,
           revenue: Math.round(revenue),
-          cogs: gp.cogs,
-          grossProfit: Math.round(grossProfitVal),
-          marginPct,
+          cogs: costed ? gp.cogs : null,
+          grossProfit: costed ? Math.round(grossProfitVal) : null,
+          marginPct: costed ? marginPct : null,
+          costed,
           source: gp.source,
           refreshedAt: gp.refreshedAt
         });

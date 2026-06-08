@@ -4724,6 +4724,14 @@ function renderGrossProfit(d){
   if(d && d.unavailable){ el.innerHTML='<div class="mkt-yoy-load">'+(d.reason||'1С временно недоступна')+' — попробуйте позже.</div>'; return; }
   if(!d || d.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Недоступно: '+((d&&d.error)||'ошибка')+'</div>'; return; }
   var rub=function(n){ return mNum(n)+' ₽'; };
+  // Текущий/незакрытый месяц: себестоимость в 1С ещё не рассчитана → показываем оценку.
+  if(d.costed===false){
+    var estM=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? mNum1(state.summary.totals.marginPct)+' %' : '—';
+    el.innerHTML='<div style="font-size:13px;color:var(--muted,#64748b);padding:6px;line-height:1.5">'+
+      '📅 Себестоимость за этот месяц ещё не рассчитана в 1С (производство не закрыто) — реальная валовая прибыль появится после <b>закрытия месяца</b>.<br>'+
+      'Пока — оценка по наценке: <b>'+estM+'</b> (выручка '+rub(d.revenue)+'). Открой прошлый месяц — там цифра из 1С.</div>';
+    return;
+  }
   var kpi=function(v,l,sub){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:2px">'+sub+'</div>':'')+'</div>'; };
   var est=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? state.summary.totals.marginPct : null;
   var estLine=est!=null ? 'оценка по наценке: '+mNum1(est)+' %' : '';
