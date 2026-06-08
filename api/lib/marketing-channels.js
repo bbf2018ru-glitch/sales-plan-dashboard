@@ -485,27 +485,22 @@ async function compute(period) {
   };
 }
 
-// Поисковые запросы 2ГИС («Спрос») — из секции demand в 2gis-all-sections.json
-// (скрейп scrape-mkt.js, cron daily). Строки head вида «<запрос>\t<доля>%».
+// Поисковые запросы 2ГИС («Спрос») — из 2gis.json, поле queries (scrape-mkt.js,
+// раздел «statistics/demand», cron 6:00 daily; уже формат [{q, pct}]).
+// Раньше читали 2gis-all-sections.json.demand.head — это устаревший разовый дамп
+// от 02.06 с пунктами меню кабинета (не запросы), из-за чего блок навсегда падал
+// на снимок апреля. 2gis.json обновляется ежедневно.
 function parseGisDemand() {
-  const all = readExternal('2gis-all-sections.json');
-  const head = all && all.demand && Array.isArray(all.demand.head) ? all.demand.head : null;
-  if (!head) return null;
-  const queries = [];
-  let period = null;
-  for (const line of head) {
-    const mp = /^([А-ЯЁ][а-яё]+\s+\d{4})$/.exec(String(line).trim()); // «Май 2026»
-    if (mp && !period) period = mp[1];
-    const mr = /^(\d{2}\.\d{2}\.\d{4}\s*[–-]\s*\d{2}\.\d{2}\.\d{4})$/.exec(String(line).trim());
-    if (mr) period = mr[1];
-    const m = /^(.+?)\t\s*([\d.,]+)\s*%$/.exec(String(line));
-    if (m) {
-      const pct = parseFloat(m[2].replace(',', '.'));
-      if (isFinite(pct)) queries.push({ q: m[1].trim(), pct });
-    }
-  }
-  if (!queries.length) return null;
-  return { period, queries, scrapedAt: all.scrapedAt || null };
+  const j = readExternal('2gis.json');
+  const queries = j && Array.isArray(j.queries)
+    ? j.queries.filter((x) => x && x.q && isFinite(x.pct))
+    : null;
+  if (!queries || !queries.length) return null;
+  // Явного диапазона дат у запросов в 2gis.json нет — берём окно из appearance.days
+  // (обычно 30-31 дн.), это и есть период статистики 2ГИС.
+  const days = j.appearance && j.appearance.days ? j.appearance.days : null;
+  const period = days ? `последние ${days} дн.` : null;
+  return { period, queries, scrapedAt: j.scrapedAt || null };
 }
 
 // Внешние JSON от скрейперов (2ГИС/Директ/Метрика/…) — дешёвые чтения файлов.
