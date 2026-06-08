@@ -76,8 +76,8 @@
   --muted:       #6b7080;
   --hint:        #8a8e9c;
   --line:        #e4e5ea;           /* видимая граница вместо размытой */
-  --accent:      #9a2438;           /* приглушённый бордовый (был #b5294a) */
-  --accent-soft: rgba(154,36,56,.08);
+  --accent:      #8a2a3b;           /* спокойный бордовый (calm minimal, был #9a2438) */
+  --accent-soft: rgba(138,42,59,.08);
   --good:        #16a34a;
   --good-soft:   rgba(22,163,74,.10);
   --warn:        #b45309;
@@ -2662,7 +2662,7 @@ table.num-table th {
   cursor: default;
 }
 .weekday-cell:hover { transform: translateY(-1px); }
-.weekday-cell.weekend { border-color: rgba(193, 68, 86, .25); }
+.weekday-cell.weekend { border-color: rgba(128, 120, 130, .30); }
 .weekday-cell.is-best { box-shadow: 0 0 0 2px rgba(34, 197, 94, .35); }
 .weekday-cell.is-worst { box-shadow: 0 0 0 2px rgba(239, 68, 68, .25); }
 .wc-day {

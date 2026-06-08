@@ -387,15 +387,16 @@ function renderWeekdayHeatmap(summary) {
 
   const cells = avg.map((v, i) => {
     const intensity = maxV > 0 ? v / maxV : 0; // 0..1
-    // Цвет: при 0 — почти прозрачный, при max — насыщенный accent
-    const alpha = 0.08 + intensity * 0.85;
+    // Спокойная палитра: нейтральный серо-тёплый тинт по интенсивности (тема-агностично),
+    // насыщенный цвет НЕ используем — сильный/слабый день помечены кольцом (зелёное/красное).
+    const alpha = 0.05 + intensity * 0.40;
     const isWeekend = i >= 5;
     const isBest = best && best.i === i && v > 0;
     const isWorst = worst && worst.i === i && v > 0 && ranked.length > 1;
     const cls = `weekday-cell ${isWeekend ? 'weekend' : ''} ${isBest ? 'is-best' : ''} ${isWorst ? 'is-worst' : ''}`;
     const subline = v > 0 ? `${fmtMoneyShort(v)}/день` : '—';
     const days = countsByDow[i];
-    return `<div class="${cls}" style="background: rgba(193, 68, 86, ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, медианная выручка ${formatMoney(v)} ₽">
+    return `<div class="${cls}" style="background: rgba(128, 120, 130, ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, медианная выручка ${formatMoney(v)} ₽">
       <div class="wc-day">${labels[i]}</div>
       <div class="wc-val">${subline}</div>
     </div>`;
