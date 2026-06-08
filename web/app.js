@@ -6087,20 +6087,14 @@ function initDashFx(){
     return true;
   }
   var io = hasIO ? new IntersectionObserver(function(es){ es.forEach(function(e){ if(!e.isIntersecting) return; var el=e.target; io.unobserve(el);
-    try{ var ty=el.__fxType;
-      if(ty==='chart') el.classList.add('fx-chart-in');
-      else if(ty==='num') countUp(el);
-      else { el.classList.remove('fx-pre'); el.classList.add('fx-reveal'); }
-    }catch(_){}
+    // ВАЖНО: только одноразовые анимации, БЕЗ постоянного скрытия — если IO почему-то
+    // не сработает, контент остаётся видимым (никогда не «застревает невидимым»).
+    try{ if(el.__fxType==='chart') el.classList.add('fx-chart-in'); else countUp(el); }catch(_){}
   }); }, {threshold:0.12, rootMargin:'0px 0px -4% 0px'}) : null;
-  function onScreen(el){ try{ var r=el.getBoundingClientRect(); return r.top < (window.innerHeight||9999) && r.bottom > 0; }catch(_){ return true; } }
   function watch(el, type){
     if(el.getAttribute('data-fx')!=null) return; el.setAttribute('data-fx',''); el.__fxType=type;
-    if(!io){ if(type==='num') countUp(el); return; }            // без IO — мгновенно/без эффекта
-    if(type==='num' || type==='chart'){ io.observe(el); return; }
-    // секции: pre-hide только если ВНЕ экрана (иначе мгновенная отрисовка без мигания)
-    if(onScreen(el)) return;
-    el.classList.add('fx-pre'); io.observe(el);
+    if(!io){ if(type==='num') countUp(el); return; }            // без IO — count-up сразу, графики без эффекта
+    io.observe(el);
   }
   function scan(root){
     if(!root || !root.querySelectorAll) return;
@@ -6108,7 +6102,6 @@ function initDashFx(){
     if(reduce) return;
     try{ root.querySelectorAll('.kpi-value, .mkt-v').forEach(function(el){ watch(el,'num'); }); }catch(_){}
     try{ root.querySelectorAll('svg[viewBox]').forEach(function(el){ if(isChart(el)) watch(el,'chart'); }); }catch(_){}
-    try{ root.querySelectorAll('section.section').forEach(function(el){ watch(el,'sec'); }); }catch(_){}
   }
   scan(document);
   // Блоки рендерятся асинхронно (после загрузки из 1С) — ловим вставку новых узлов.
