@@ -2622,6 +2622,7 @@ async function init() {
   initCmdK();
   initStickyMetrics();
   initChartZoom();
+  initDashFx();
   pageNavInit('dashNav','page-dashboard');
   initMobileNav();
   initDrillDown();
@@ -4717,6 +4718,23 @@ function renderSmsMonthly(sm){
     '</tbody></table>'+
     (sm.monthsPending?'<div style="font-size:11px;color:var(--muted);margin-top:4px">'+sm.monthsPending+' мес. ещё прогреваются (тяжёлый расчёт атрибуции). Обнови позже.</div>':'');
 }
+// Валовая прибыль из 1С — реальная себестоимость (материалы в производство).
+function renderGrossProfit(d){
+  var el=document.getElementById('mktGrossProfit'); if(!el) return;
+  if(d && d.unavailable){ el.innerHTML='<div class="mkt-yoy-load">'+(d.reason||'1С временно недоступна')+' — попробуйте позже.</div>'; return; }
+  if(!d || d.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Недоступно: '+((d&&d.error)||'ошибка')+'</div>'; return; }
+  var rub=function(n){ return mNum(n)+' ₽'; };
+  var kpi=function(v,l,sub){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:2px">'+sub+'</div>':'')+'</div>'; };
+  var est=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? state.summary.totals.marginPct : null;
+  var estLine=est!=null ? 'оценка по наценке: '+mNum1(est)+' %' : '';
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'+
+    kpi(rub(d.revenue),'Выручка')+
+    kpi(rub(d.cogs),'Себестоимость','материалы в произв.')+
+    kpi(rub(d.grossProfit),'Валовая прибыль')+
+    kpi((d.marginPct!=null?mNum1(d.marginPct)+' %':'—'),'Маржа',estLine)+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--muted,#64748b);margin-top:8px">Источник: '+(d.source||'1С')+'. Обновлено: '+(d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—')+'.</div>';
+}
 // Выпуск продукции в кг — KPI + график 12 мес + топ продукции.
 function renderProductionKg(pk){
   var el=document.getElementById('mktProdKgKpi'); if(!el) return;
@@ -5390,6 +5408,13 @@ function mktLoadYoY(){
       fetchJson('/api/analytics/production-kg?period='+period).then(function(pk){ renderProductionKg(pk); })
         .catch(function(e){ prodKgEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Выпуск недоступен: '+e.message+'</div>'; });
     }
+    // Валовая прибыль из 1С — реальная себестоимость (УчётЗатрат), отдельный эндпоинт (1С /query, кэш 6ч).
+    var gpEl=document.getElementById('mktGrossProfit');
+    if(gpEl){
+      gpEl.innerHTML='<div class="mkt-yoy-load">Считаю валовую прибыль из 1С…</div>';
+      fetchJson('/api/marketing/gross-profit?period='+period).then(function(gp){ try{ renderGrossProfit(gp); }catch(_){} })
+        .catch(function(e){ gpEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Недоступно: '+e.message+'</div>'; });
+    }
     var hint=document.getElementById('mktYoYHint');
     if(hint){ var t=d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—';
       hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.fromCache?' (из кэша)':'')+'.'; }
@@ -6028,3 +6053,66 @@ function initChartZoom(){
   });
 }
 
+
+// === FX: тонкие анимации интерфейса (count-up KPI, проявление графиков/секций, скелетоны). ===
+// Тренд 2026 — сдержанная, осмысленная анимация. Уважает prefers-reduced-motion.
+// Самодостаточный модуль (как зум графиков): observe + одноразовые анимации, без риска
+// «застрявшего невидимого» (pre-hide только для off-screen, IO всегда раскроет при скролле).
+function initDashFx(){
+  if(window.__dashFx) return; window.__dashFx=true;
+  var reduce=false; try{ reduce=matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+  var hasIO = ('IntersectionObserver' in window);
+  function isChart(svg){
+    if(!svg.getAttribute || !svg.getAttribute('viewBox')) return false;
+    var w=svg.getAttribute('width')||'', st=svg.getAttribute('style')||'';
+    if(w==='100%' || /width:\s*100%/.test(st)) return true;
+    try{ return svg.getBoundingClientRect().width>=220; }catch(_){ return false; }
+  }
+  // Count-up: анимируем число, в конце ВОССТАНАВЛИВАЕМ оригинальный текст (никогда не портим значение).
+  function countUp(el){
+    if(el.children.length) return;            // не трогаем элементы с вложенным HTML (<b> и т.п.)
+    var orig=el.textContent; var m=orig.match(/-?\d[\d  ]*(?:[.,]\d+)?/); if(!m) return;
+    var raw=m[0], target=parseFloat(raw.replace(/[  ]/g,'').replace(',','.')); if(!isFinite(target)||Math.abs(target)<10) return;
+    var pre=orig.slice(0,m.index), suf=orig.slice(m.index+raw.length);
+    var dm=raw.match(/[.,](\d+)$/); var dec=dm?dm[1].length:0, t0=null;
+    function fr(t){ if(t0==null)t0=t; var k=Math.min(1,(t-t0)/700), e=1-Math.pow(1-k,3);
+      el.textContent=pre+(target*e).toLocaleString('ru-RU',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf;
+      if(k<1) requestAnimationFrame(fr); else el.textContent=orig; }
+    requestAnimationFrame(fr);
+  }
+  function skeletonize(el){
+    if(!/загруз|счита|прогрев|собир|подожд|warming|loading/i.test(el.textContent||'')) return false;
+    el.classList.add('fx-skel-box');
+    el.innerHTML='<span class="fx-skel-bar" style="width:72%"></span><span class="fx-skel-bar" style="width:92%"></span><span class="fx-skel-bar" style="width:54%"></span>';
+    return true;
+  }
+  var io = hasIO ? new IntersectionObserver(function(es){ es.forEach(function(e){ if(!e.isIntersecting) return; var el=e.target; io.unobserve(el);
+    try{ var ty=el.__fxType;
+      if(ty==='chart') el.classList.add('fx-chart-in');
+      else if(ty==='num') countUp(el);
+      else { el.classList.remove('fx-pre'); el.classList.add('fx-reveal'); }
+    }catch(_){}
+  }); }, {threshold:0.12, rootMargin:'0px 0px -4% 0px'}) : null;
+  function onScreen(el){ try{ var r=el.getBoundingClientRect(); return r.top < (window.innerHeight||9999) && r.bottom > 0; }catch(_){ return true; } }
+  function watch(el, type){
+    if(el.getAttribute('data-fx')!=null) return; el.setAttribute('data-fx',''); el.__fxType=type;
+    if(!io){ if(type==='num') countUp(el); return; }            // без IO — мгновенно/без эффекта
+    if(type==='num' || type==='chart'){ io.observe(el); return; }
+    // секции: pre-hide только если ВНЕ экрана (иначе мгновенная отрисовка без мигания)
+    if(onScreen(el)) return;
+    el.classList.add('fx-pre'); io.observe(el);
+  }
+  function scan(root){
+    if(!root || !root.querySelectorAll) return;
+    try{ root.querySelectorAll('.empty-state, .mkt-yoy-load').forEach(function(el){ if(el.getAttribute('data-fx')==null && skeletonize(el)) el.setAttribute('data-fx',''); }); }catch(_){}
+    if(reduce) return;
+    try{ root.querySelectorAll('.kpi-value, .mkt-v').forEach(function(el){ watch(el,'num'); }); }catch(_){}
+    try{ root.querySelectorAll('svg[viewBox]').forEach(function(el){ if(isChart(el)) watch(el,'chart'); }); }catch(_){}
+    try{ root.querySelectorAll('section.section').forEach(function(el){ watch(el,'sec'); }); }catch(_){}
+  }
+  scan(document);
+  // Блоки рендерятся асинхронно (после загрузки из 1С) — ловим вставку новых узлов.
+  try{ new MutationObserver(function(ms){ var roots=[]; ms.forEach(function(m){ m.addedNodes && [].forEach.call(m.addedNodes,function(n){ if(n.nodeType===1) roots.push(n); }); });
+    if(roots.length){ if(window.__fxRaf) cancelAnimationFrame(window.__fxRaf); window.__fxRaf=requestAnimationFrame(function(){ roots.forEach(scan); }); }
+  }).observe(document.body,{childList:true,subtree:true}); }catch(_){}
+}

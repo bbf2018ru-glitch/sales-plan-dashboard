@@ -19,6 +19,7 @@ const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
 const smsAttribution = require('./lib/sms-attribution');
 const productionKg = require('./lib/production-kg');
+const grossProfit = require('./lib/gross-profit');
 const sweetDetail = require('./lib/sweet-detail');
 const productionPlan = require('./lib/production-plan');
 const productionXlsx = require('./lib/production-xlsx');
@@ -845,6 +846,36 @@ const server = http.createServer(async (req, res) => {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await productionKg.getProductionKg(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    if (pathname === '/api/marketing/gross-profit' && req.method === 'GET') {
+      // Реальная валовая прибыль из 1С: выручка (db.sales, как summary) − себестоимость
+      // (РегистрНакопления.УчётЗатрат «Списание партий в производство», ./lib/gross-profit).
+      // Совпадает с отчётом Маши «Валовая прибыль» (~74.6%). COGS кэшируется 6ч (тяжёлый 1С-запрос).
+      try {
+        const { db } = await getScopedDb(req);
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        const revenue = (db.sales || []).reduce((s, x) => (
+          x.period === period && x.storeId !== 'undefined' && x.productId !== 'undefined'
+            ? s + Number(x.amount || 0) : s
+        ), 0);
+        const gp = await grossProfit.getGrossProfitCogs(period);
+        const grossProfitVal = revenue - gp.cogs;
+        const marginPct = revenue > 0 ? Number((grossProfitVal / revenue * 100).toFixed(1)) : null;
+        sendJson(res, 200, {
+          period,
+          revenue: Math.round(revenue),
+          cogs: gp.cogs,
+          grossProfit: Math.round(grossProfitVal),
+          marginPct,
+          source: gp.source,
+          refreshedAt: gp.refreshedAt
+        });
+      } catch (e) {
+        if (isUpstreamDown(e)) sendJson(res, 200, { unavailable: true, reason: '1С временно недоступна' });
+        else sendJson(res, 500, { error: e.message });
+      }
       return;
     }
 
