@@ -5109,12 +5109,21 @@ function renderOtherChannels(d){
     return '<td class="num">'+mNum(u.cardsTotal||0)+'</td><td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+mNum(u.orders||0)+'</td><td class="num">'+mNum(u.buyers||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td>';
   };
   var usageHead='<th class="num" title="Виртуальных карт создано по акции (за всё время)">Карт</th><th class="num" title="Чеков ККМ по картам/ссылкам акции за выбранный месяц">Чеков</th><th class="num" title="Заказов покупателя с этим промокодом за выбранный месяц (телефон/сайт/доставка)">Заказов</th><th class="num" title="Уникальных карт-покупателей за месяц">Покупателей</th><th class="num" title="Выручка чеков и заказов акции за месяц">Выручка</th>';
+  // Для ДЕЙСТВУЮЩИХ промокодов колонка «Карт» всегда 0 (промокоды заказов карт не создают) —
+  // показываем только реальную активность за месяц, чтобы нули не путали (по просьбе Маши 08.06).
+  var actHead='<th class="num" title="Чеков ККМ, где применялась эта акция, за месяц">Чеков</th><th class="num" title="Заказов покупателя с этим промокодом за месяц (телефон/сайт/доставка)">Заказов</th><th class="num" title="Уникальных карт-покупателей за месяц">Покупателей</th><th class="num" title="Выручка чеков и заказов с этой акцией за месяц">Выручка</th>';
+  var actCells=function(u){
+    if(!u || (!u.cheques && !u.orders)) return '<td colspan="4" style="font-size:11px;color:var(--muted)">— за месяц не применялась</td>';
+    return '<td class="num">'+mNum(u.cheques||0)+'</td><td class="num">'+mNum(u.orders||0)+'</td><td class="num">'+mNum(u.buyers||0)+'</td><td class="num">'+(u.revenue?mNum(u.revenue)+' ₽':'—')+'</td>';
+  };
   if(promos.length){
-    html+='<div class="mkt-chart-t">Действующие промокоды и акции (1С) — с использованием за выбранный месяц</div>'+
-      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Начало</th><th class="num">Окончание</th>'+usageHead+'</tr></thead><tbody>'+
-      promos.map(function(p){ return '<tr><td>'+p.name+'</td><td class="num">'+fd(p.start)+'</td><td class="num">'+fd(p.end)+'</td>'+usageCells(byName[p.name])+'</tr>'; }).join('')+
+    // Активные наверх — сортируем по фактическому использованию (чеки+заказы) за месяц.
+    var promosSorted=promos.slice().sort(function(a,b){ var ua=byName[a.name]||{},ub=byName[b.name]||{}; return ((ub.cheques||0)+(ub.orders||0))-((ua.cheques||0)+(ua.orders||0)); });
+    html+='<div class="mkt-chart-t">Действующие промокоды и акции (1С) — использование за выбранный месяц</div>'+
+      '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Акция</th><th class="num">Начало</th><th class="num">Окончание</th>'+actHead+'</tr></thead><tbody>'+
+      promosSorted.map(function(p){ return '<tr><td>'+p.name+'</td><td class="num">'+fd(p.start)+'</td><td class="num">'+fd(p.end)+'</td>'+actCells(byName[p.name])+'</tr>'; }).join('')+
       '</tbody></table></div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:4px">Промокоды применяются двумя путями: <b>«Чеков»</b> — на кассе (акция → виртуальная карта → чек ККМ), <b>«Заказов»</b> — в заказах покупателя (телефон/сайт/доставка, реквизит «Акция» заказа). 0/0 = акцию ещё не применяли нигде.</div>';
+      '<div style="font-size:11px;color:var(--muted);margin-top:4px"><b>«Чеков»</b> — применений на кассе (чек ККМ), <b>«Заказов»</b> — в заказах покупателя (телефон/сайт/доставка). Эти промокоды <b>не создают карт лояльности</b> — реальная база карт и чеки по ним показаны ниже («какими акциями реально пользуются» и «виды дисконтных карт»).</div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Действующих акций в справочнике «Акции» на сегодня нет.</div>';
   }
