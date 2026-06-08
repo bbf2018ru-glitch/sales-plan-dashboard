@@ -2701,19 +2701,12 @@ async function init() {
   try {
     const meta = await loadMetadata();
     initPin(meta.pinRequired);
-    // Если в URL есть period — применить ДО первой загрузки summary
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlPeriod = urlParams.get('period');
-    if (urlPeriod && (window.__metaPeriods__ || []).includes(urlPeriod)) {
-      state.period = urlPeriod;
-      const sel = $('periodSelect'); if (sel) sel.value = urlPeriod;
-    }
-    await loadSummary();
-    // После summary применяем остальной URL-state (store/tab/page)
-    urlStateApply(false);
-    loadInsights();
-    loadMarketTrends();
-    connectEvents();
+
+    // ВАЖНО: обработчик смены месяца вешаем СРАЗУ после заполнения дропдауна
+    // (в loadMetadata), ДО тяжёлого await loadSummary(). Иначе при медленном
+    // первом рендере (несколько секунд) выбор месяца в этом окне терялся —
+    // обработчика ещё нет; дропдаун показывал новый месяц, а данные оставались
+    // на текущем, и повторный выбор того же месяца уже не давал событие change.
     $('periodSelect').addEventListener('change', async e => {
       state.period = e.target.value;
       state.selectedStoreId = '';
@@ -2727,6 +2720,20 @@ async function init() {
       analyticsState.data = null;
       if (analyticsState.currentPage === 'analytics') await loadAnalytics();
     });
+
+    // Если в URL есть period — применить ДО первой загрузки summary
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPeriod = urlParams.get('period');
+    if (urlPeriod && (window.__metaPeriods__ || []).includes(urlPeriod)) {
+      state.period = urlPeriod;
+      const sel = $('periodSelect'); if (sel) sel.value = urlPeriod;
+    }
+    await loadSummary();
+    // После summary применяем остальной URL-state (store/tab/page)
+    urlStateApply(false);
+    loadInsights();
+    loadMarketTrends();
+    connectEvents();
 
     $('trendWindowBtns')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-tw]');
