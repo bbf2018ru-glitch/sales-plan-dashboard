@@ -25,6 +25,7 @@ const productionXlsx = require('./lib/production-xlsx');
 const paidCosts = require('./lib/paid-costs');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { returnsLive } = require('./lib/returns-live');
+const { wholesaleLive } = require('./lib/wholesale-live');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
@@ -935,6 +936,15 @@ const server = http.createServer(async (req, res) => {
         const live = await returnsLive(period);
         if (live && live.totalAmount != null) out.returns = Object.assign({}, out.returns, live);
       } catch (e) { /* 1С недоступна — оставляем returns из БД */ }
+      // Не-розничные каналы (опт/сайт/агрегаторы) — живьём из 1С (Реализации), добавляем
+      // строками в «Каналы». Розничный план/факт не трогаем (у этих каналов своего плана нет).
+      try {
+        const ws = await wholesaleLive(period);
+        if (ws && ws.channels && ws.channels.length) {
+          out.byChannel = (out.byChannel || []).concat(ws.channels);
+          out.nonRetailTotal = ws.total;
+        }
+      } catch (e) { /* 1С недоступна — каналы только розничные */ }
       sendJson(res, 200, out);
       return;
     }
