@@ -422,7 +422,7 @@ function renderMarketTrends(data) {
     : null;
   if (subEl) {
     const ago = ageH === null ? '' : (ageH === 0 ? 'обновлено только что' : `обновлено ${ageH} ч назад`);
-    subEl.textContent = `тренды кондитерки и что внедрить — AI-обзор · ${ago}`;
+    subEl.textContent = `тренды кондитерки и что внедрить — AI-обзор рынка на сегодня (не зависит от выбранного месяца) · ${ago}`;
   }
   const trendBadge = (t) => {
     if (t === 'rising') return '<span class="mt-badge mt-rising">↗ растёт</span>';
@@ -1227,7 +1227,7 @@ function renderStores(summary) {
       <td class="num">
         <div class="pct-cell">
           <div class="pct-val ${tone}">${s.percent}%</div>
-          <div class="pct-track"><div class="pct-bar ${tone}" style="width:${Math.min(s.percent, 140)}%"></div></div>
+          <div class="pct-track"><div class="pct-bar" style="width:${Math.min(s.percent, 140)}%"></div></div>
         </div>
       </td>
       <td class="num col-margin ${!isNum(s.margin) ? '' : s.margin >= 0 ? 'positive' : 'negative'}">${formatMoney(s.margin)}</td>
