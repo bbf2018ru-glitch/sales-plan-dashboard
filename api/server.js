@@ -24,6 +24,7 @@ const productionPlan = require('./lib/production-plan');
 const productionXlsx = require('./lib/production-xlsx');
 const paidCosts = require('./lib/paid-costs');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
+const { returnsLive } = require('./lib/returns-live');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
@@ -926,7 +927,15 @@ const server = http.createServer(async (req, res) => {
       const period = monthKey(parsedUrl.searchParams.get('period'));
       const from = parsedUrl.searchParams.get('from');
       const to = parsedUrl.searchParams.get('to');
-      sendJson(res, 200, buildSalesAnalytics(db, period, { from, to }));
+      const out = buildSalesAnalytics(db, period, { from, to });
+      // Возвраты — живьём из 1С: БД-выгрузка кладёт лишь часть (оптовые), розничные
+      // возвраты ЧекККМ в БД не попадают (≈110к/мес недосчёт). При недоступности 1С
+      // оставляем БД-вариант (грейсфул).
+      try {
+        const live = await returnsLive(period);
+        if (live && live.totalAmount != null) out.returns = Object.assign({}, out.returns, live);
+      } catch (e) { /* 1С недоступна — оставляем returns из БД */ }
+      sendJson(res, 200, out);
       return;
     }
 
