@@ -18,7 +18,7 @@
 // Pending (нужен состав ЧекККМ.Товары):
 //   - market-basket       — что покупают вместе с тортом
 
-const { callRegister, parseRu, parseRuDate, prevMonth, rangeMonths, nowYM, makeCache } = require('./upp-client');
+const { callRegister, callQuery, parseRu, parseRuDate, prevMonth, rangeMonths, nowYM, makeCache } = require('./upp-client');
 const { getUpcomingEvents } = require('./calendar-irk');
 const { aggregateDashboard } = require('./analytics');
 
@@ -149,37 +149,54 @@ async function buildDiscountCannibalization(fromYM, toYM, opts = {}) {
 // клиента по полю ВладелецДисконтнойКарты (имя). Это работает грубо: один
 // человек с несколькими картами будет считаться несколькими, но для топ-100
 // сегмента это допустимо.
-async function buildRfmSimple(fromYM, toYM) {
-  const months = rangeMonths(fromYM, toYM);
-  const owners = new Map(); // ownerName -> { recencyYM, frequency, monetary }
-  const today = nowYM();
+// Опт/служебные виды карт — НЕ розничные VIP (по решению Маши 08.06: считаем розницу, опт исключаем).
+const RFM_WHOLESALE_KINDS = /корпоратив|офис|привилег|оптов|промоакц/i;
+// Внутренние/служебные карты сети: магазины/склад/кондитерская, служебные «ДС N»,
+// и анонимные карты без владельца (имя оканчивается на «нет»). NB: \b в JS не работает
+// с кириллицей — используем явные границы (^|\s) и (\s|$).
+const RFM_INTERNAL_CARD = /магазин|склад|кондитерск|(^|\s)(нет|дс)(\s|$)/i;
 
-  for (const ym of months) {
-    const data = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 5000);
-    const rows = data.rows || [];
-    for (const r of rows) {
-      const owner = (r['ВладелецДисконтнойКарты'] || '').trim();
-      if (!owner) continue;
-      const amount = parseRu(r['Сумма']);
-      if (!owners.has(owner)) {
-        owners.set(owner, { name: owner, recencyYM: ym, frequency: 0, monetary: 0 });
-      }
-      const o = owners.get(owner);
-      o.frequency += 1;
-      o.monetary += amount;
-      // recencyYM — самый поздний месяц активности
-      if (ym > o.recencyYM) o.recencyYM = ym;
-    }
+async function buildRfmSimple(fromYM, toYM) {
+  const today = nowYM();
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const tny = tm === 12 ? ty + 1 : ty, tnm = tm === 12 ? 1 : tm + 1;
+  const DT = `ДАТАВРЕМЯ(${fy},${fm},1)`, DTEND = `ДАТАВРЕМЯ(${tny},${tnm},1)`;
+  // Группируем по САМОЙ КАРТЕ (=клиент), а не по ВладелецДисконтнойКарты — он у розничных
+  // КЛП/ВК-карт ПУСТОЙ, из-за чего в VIP попадали только корпоративные (опт). Чеки —
+  // КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Регистратор). Берём топ-3000 карт по сумме (покрывает VIP/постоянных).
+  let data;
+  try {
+    data = await callQuery(
+      `ВЫБРАТЬ ПЕРВЫЕ 3000 ВЫРАЗИТЬ(П.ДисконтнаяКарта.Наименование КАК СТРОКА(100)) КАК Карта, ВЫРАЗИТЬ(П.ДисконтнаяКарта.ВидДисконтнойКарты.Наименование КАК СТРОКА(50)) КАК Вид, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Регистратор) КАК Чеков, СУММА(П.Сумма) КАК Сумма, МАКСИМУМ(П.Период) КАК Последняя ИЗ РегистрНакопления.ПродажиПоДисконтнымКартам КАК П ГДЕ П.Период >= ${DT} И П.Период < ${DTEND} И П.ДисконтнаяКарта <> ЗНАЧЕНИЕ(Справочник.ИнформационныеКарты.ПустаяСсылка) СГРУППИРОВАТЬ ПО ВЫРАЗИТЬ(П.ДисконтнаяКарта.Наименование КАК СТРОКА(100)), ВЫРАЗИТЬ(П.ДисконтнаяКарта.ВидДисконтнойКарты.Наименование КАК СТРОКА(50)) УПОРЯДОЧИТЬ ПО Сумма УБЫВ`,
+      { timeoutMs: 120000 });
+  } catch (e) {
+    return { period: { from: fromYM, to: toYM }, segments: [], total: 0, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
+  }
+  const ymOf = (s) => { const d = parseRuDate(s); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : fromYM; };
+  let exclWholesale = 0, exclInternal = 0;
+  const list = [];
+  for (const r of data.rows || []) {
+    const name = String(r['Карта'] || '').trim();
+    const kind = String(r['Вид'] || '').trim();
+    if (!name) continue;
+    if (RFM_WHOLESALE_KINDS.test(kind)) { exclWholesale++; continue; }   // опт/корпоратив
+    if (RFM_INTERNAL_CARD.test(name)) { exclInternal++; continue; }       // магазины/служебные
+    list.push({
+      name, kind,
+      frequency: parseRu(r['Чеков']) || 0,   // ЧЕКИ (РАЗЛИЧНЫЕ Регистратор), не строки регистра
+      monetary: parseRu(r['Сумма']) || 0,
+      recencyYM: ymOf(r['Последняя'])
+    });
   }
 
   // Сегментация: 5 ведер по каждой оси (квинтили)
-  const list = Array.from(owners.values());
   if (list.length === 0) {
     return {
       period: { from: fromYM, to: toYM },
       segments: [],
       total: 0,
-      note: 'Нет данных по дисконтным картам за период'
+      note: 'Нет розничных карт с покупками за период'
     };
   }
 
@@ -239,6 +256,9 @@ async function buildRfmSimple(fromYM, toYM) {
   return {
     period: { from: fromYM, to: toYM },
     total: list.length,
+    basis: 'по дисконтным картам (=клиентам); чеки = РАЗЛИЧНЫЕ чеки ККМ',
+    excluded: { wholesale: exclWholesale, internal: exclInternal },
+    capped: (data.rows || []).length >= 3000,
     segments: Array.from(bySegment.values())
       .map(s => ({
         ...s,
@@ -250,7 +270,7 @@ async function buildRfmSimple(fromYM, toYM) {
       .filter(o => o.segment === 'VIP')
       .sort((a, b) => b.monetary - a.monetary)
       .slice(0, 20)
-      .map(o => ({ name: o.name, monetary: Number(o.monetary.toFixed(2)), frequency: o.frequency, R: o.R, F: o.F, M: o.M })),
+      .map(o => ({ name: o.name, kind: o.kind, monetary: Number(o.monetary.toFixed(2)), frequency: o.frequency, R: o.R, F: o.F, M: o.M })),
     topSleeping: list
       .filter(o => o.segment === 'Спящие' || o.segment === 'Уходящие VIP')
       .sort((a, b) => b.monetary - a.monetary)

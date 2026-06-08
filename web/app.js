@@ -2671,7 +2671,7 @@ async function init() {
   $('mkRfmCsvVip')?.addEventListener('click', () => {
     const d = analyticsState.mkRfmData?.topVIP || [];
     if (!d.length) return alert('Нет VIP-клиентов');
-    exportCsv(d.map(x => ({ 'Имя': x.name, 'Выручка': x.monetary, 'Покупок': x.frequency, 'R': x.R, 'F': x.F, 'M': x.M })), `rfm-vip-${state.period}.csv`);
+    exportCsv(d.map(x => ({ 'Карта': x.name, 'Вид': x.kind || '', 'Выручка': x.monetary, 'Чеков': x.frequency, 'R': x.R, 'F': x.F, 'M': x.M })), `rfm-vip-${state.period}.csv`);
   });
   $('mkRfmCsvSleep')?.addEventListener('click', () => {
     const d = analyticsState.mkRfmData?.topSleeping || [];
@@ -3139,24 +3139,29 @@ async function loadMkRfm() {
         <div class="mk-seg-money">${formatMoney(s.monetary)}</div>
         <div class="mk-seg-avg">средний ${formatMoney(s.avgMonetary)}</div>
       </div>`).join('');
-    const vipRows = (data.topVIP || []).map(v => `<tr><td>${escapeHtml(v.name)}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.frequency}</td></tr>`).join('');
+    const vipRows = (data.topVIP || []).map(v => `<tr><td>${escapeHtml(v.name)}${v.kind ? `<div style="font-size:10px;color:var(--muted)">${escapeHtml(v.kind)}</div>` : ''}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.frequency}</td></tr>`).join('');
     const sleepingRows = (data.topSleeping || []).map(v => `<tr><td>${escapeHtml(v.name)}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.recencyMonths} мес.</td></tr>`).join('');
+    const exc = data.excluded || {};
+    const excNote = (exc.wholesale || exc.internal)
+      ? ` · исключены опт/корпоративные (${exc.wholesale || 0}) и служебные карты магазинов (${exc.internal || 0})`
+      : '';
     el.innerHTML = `
       <div style="padding:8px 16px;font-size:13px">
-        Всего активных клиентов за 6 мес: <b>${data.total}</b>
+        Розничных клиентов с покупками за 6 мес: <b>${data.total}</b><span class="muted" style="font-size:11px">${excNote}</span>
       </div>
       <div class="mk-segs">${segs}</div>
       <div class="mk-rfm-cols">
         <div class="mk-rfm-col">
-          <div class="mk-rfm-col-title good">👑 Топ-20 VIP <small class="muted">— предложить премиум, индивидуальный сервис</small></div>
-          ${vipRows ? `<table class="num-table"><thead><tr><th>Имя</th><th class="num">Сумма</th><th class="num">Покупок</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
+          <div class="mk-rfm-col-title good">👑 Топ-20 VIP <small class="muted">— по сумме покупок (карты лояльности, без опта); предложить премиум, индивидуальный сервис</small></div>
+          ${vipRows ? `<table class="num-table"><thead><tr><th>Карта клиента</th><th class="num">Сумма</th><th class="num" title="Уникальных чеков ККМ за 6 мес">Чеков</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
         </div>
         <div class="mk-rfm-col">
           <div class="mk-rfm-col-title bad">💤 Топ-20 спящих <small class="muted">— реактивировать SMS/push с купоном</small></div>
-          ${sleepingRows ? `<table class="num-table"><thead><tr><th>Имя</th><th class="num">Сумма</th><th class="num">Recency</th></tr></thead><tbody>${sleepingRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
+          ${sleepingRows ? `<table class="num-table"><thead><tr><th>Карта клиента</th><th class="num">Сумма</th><th class="num">Recency</th></tr></thead><tbody>${sleepingRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
         </div>
       </div>
-      <div class="mk-action-hint">💡 <b>Что делать:</b> VIP — персональные предложения и поздравления; Спящим — точечный push «вернёмся за подарком» с купоном на 1 неделю; Новых — onboarding (карта/бонусы).</div>`;
+      <div class="mk-action-hint">💡 <b>Что делать:</b> VIP — персональные предложения и поздравления; Спящим — точечный push «вернёмся за подарком» с купоном на 1 неделю; Новых — onboarding (карта/бонусы).</div>
+      <div style="font-size:11px;color:var(--muted);padding:0 16px 8px">VIP считаются по дисконтным картам (=клиентам): <b>Чеков</b> — уникальные чеки ККМ за 6 мес, <b>Сумма</b> — продажи по карте. Оптовые/корпоративные виды карт и служебные карты магазинов исключены${data.capped ? '; берётся топ-3000 карт по сумме' : ''}.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }
@@ -5562,27 +5567,29 @@ function mktLoadYoY(){
       }
       var selYM=mktSelectedPeriod();
       var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
-      el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт месяца (акция)</th><th class="num">Скидка</th><th class="num">Скидок выдано ₽</th><th class="num">Дней акции</th><th class="num">Выручка ₽</th><th class="num">Штук</th><th class="num">Доля в тортах</th></tr></thead><tbody>'+
+      el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт месяца (акция)</th><th class="num">Скидка</th><th class="num">Скидок выдано ₽</th><th class="num">Дней акции</th><th class="num">Выручка ₽</th><th class="num" title="Продано в килограммах (целый торт продаётся весовым)">Продано, кг</th><th class="num" title="≈ штук = килограммы ÷ вес одного торта (оценка)">≈ шт</th><th class="num">Доля в тортах</th></tr></thead><tbody>'+
         ready.slice().reverse().map(function(s){
           var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
           if(s.error){
-            return '<tr><td>'+lbl+'</td><td colspan="7" style="color:var(--muted);font-size:11px">⚠ '+s.error+'</td></tr>';
+            return '<tr><td>'+lbl+'</td><td colspan="8" style="color:var(--muted);font-size:11px">⚠ '+s.error+'</td></tr>';
           }
           if(s.noFlagman){
-            return '<tr><td>'+lbl+'</td><td colspan="7" style="color:var(--muted);font-size:11px">— месячной скидки на торт не было</td></tr>';
+            return '<tr><td>'+lbl+'</td><td colspan="8" style="color:var(--muted);font-size:11px">— месячной скидки на торт не было</td></tr>';
           }
           var nm='<b>'+s.name+'</b>'+(s.partialMonth?' <span style="color:var(--muted);font-size:10px">(месяц идёт)</span>':'');
           var pctCell = s.discountPct!=null
             ? '<td class="num" style="color:#e0466a;font-weight:600" title="Эффективная скидка: скидки ÷ полная цена (скидки + выручка). Номинал акции обычно круглый: ~'+Math.round(s.discountPct/5)*5+'%">−'+mNum1(s.discountPct)+' %</td>'
             : '<td class="num" style="color:var(--muted)">—</td>';
+          var kgVal = (s.kg!=null?s.kg:s.qty);
+          var unitsCell = s.units!=null ? mNum(s.units) : '<span style="color:var(--muted)">—</span>';
           var sales = s.salesPending
-            ? '<td colspan="3" style="color:var(--muted);font-size:11px;text-align:center">продажи прогреваются…</td>'
-            : '<td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(s.qty)+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td>';
+            ? '<td colspan="4" style="color:var(--muted);font-size:11px;text-align:center">продажи прогреваются…</td>'
+            : '<td class="num">'+mNum(s.revenue)+'</td><td class="num">'+mNum(kgVal)+'</td><td class="num">'+unitsCell+'</td><td class="num">'+(s.sharePct!=null?mNum1(s.sharePct)+' %':'—')+'</td>';
           return '<tr'+hlRow(s.ym)+'><td>'+lbl+'</td><td>'+nm+'</td>'+pctCell+'<td class="num">'+mNum(s.discount)+'</td><td class="num">'+mNum(s.discountDays)+'</td>'+sales+'</tr>';
         }).join('')+'</tbody></table>';
       if(hint){
         var pending=cm.seriesPending||0;
-        hint.innerHTML='<b>Торт месяца — реальная акция</b>: на один торт в 1С встаёт скидка на весь месяц. Торт определяется по скидкам (РегистрНакопления.ПредоставленныеСкидки: топ по сумме, акция ≥15 дней; целый торт + кусочек). <b>Скидка</b> — эффективный % (скидки ÷ полная цена; номинал акции — ближайший круглый). «Скидок выдано» — сколько ₽ скидки ушло покупателям; «Выручка/Штук» — продажи этого торта за месяц.'+(pending?' · продажи '+pending+' мес. ещё прогреваются из 1С':'');
+        hint.innerHTML='<b>Торт месяца — реальная акция</b>: на один торт в 1С встаёт скидка на весь месяц. Торт определяется по скидкам (РегистрНакопления.ПредоставленныеСкидки: топ по сумме, акция ≥15 дней; целый торт + кусочек). <b>Скидка</b> — эффективный % (скидки ÷ полная цена; номинал акции — ближайший круглый). «Скидок выдано» — сколько ₽ скидки ушло покупателям. <b>Продано, кг</b> — целый торт продаётся весовым, поэтому продажи в килограммах; <b>≈ шт</b> — оценка штук = кг ÷ вес одного торта (ф_ВесШтукивКг из 1С).'+(pending?' · продажи '+pending+' мес. ещё прогреваются из 1С':'');
       }
     }).catch(function(){});
 

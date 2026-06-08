@@ -421,10 +421,31 @@ async function buildCakeOfMonthSeries(period) {
     });
   }
 
+  // Торт месяца — целый ВЕСОВОЙ торт: Количество в чеках = килограммы (qty=кг).
+  // Чтобы показать и штуки, тянем вес одной штуки (ф_ВесШтукивКг) одним запросом и
+  // оцениваем штуки = кг ÷ вес. (Подтверждено пробой 08.06: «Торт …» продаётся в «кг».)
+  const cakeNames = [...new Set(series.filter(s => s.name && s.qty != null).map(s => s.name))];
+  if (cakeNames.length) {
+    try {
+      const cond = cakeNames.map(n => `Н.Наименование = "${String(n).replace(/"/g, '')}"`).join(' ИЛИ ');
+      const wd = await callQuery(`ВЫБРАТЬ ВЫРАЗИТЬ(Н.Наименование КАК СТРОКА(120)) КАК Тов, Н.ф_ВесШтукивКг КАК Вес ИЗ Справочник.Номенклатура КАК Н ГДЕ ${cond}`, { timeoutMs: 60000 });
+      const wmap = {};
+      for (const r of wd.rows || []) { const w = parseRu(r['Вес']); if (w > 0 && !wmap[String(r['Тов']).trim()]) wmap[String(r['Тов']).trim()] = w; }
+      for (const s of series) {
+        if (s.name && s.qty != null) {
+          s.kg = s.qty;                                       // qty весового торта = килограммы
+          const w = wmap[s.name];
+          s.weightKg = w || null;
+          s.units = w ? Math.round(s.qty / w) : null;         // ≈ штук (кг ÷ вес одной)
+        }
+      }
+    } catch (_) { /* вес не критичен — останется только кг */ }
+  }
+
   const salesPendingCount = series.filter(s => s.salesPending).length;
   return {
     period,
-    method: 'торт месяца = торт с месячной скидкой в 1С (РегистрНакопления.ПредоставленныеСкидки, топ по сумме скидок, акция ≥15 дней); продажи — факт из чеков',
+    method: 'торт месяца = торт с месячной скидкой в 1С (РегистрНакопления.ПредоставленныеСкидки, топ по сумме скидок, акция ≥15 дней); продажи — факт из чеков (целый торт весовой → продано в кг; штуки = кг ÷ вес одной)',
     range: { from: months[0], to: months[months.length - 1] },
     series,
     seriesPending: salesPendingCount,
