@@ -354,7 +354,21 @@
           <td>${trend}</td>
         </tr>`;
       }).join('');
-      el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px">
+      // Сводка по сети: средний рейтинг, число точек, точки ниже 4.5, лучшая/худшая.
+      const cur = [...byId.values()].map(r => ({ addr: r.address, rating: r.history[r.history.length - 1].rating, count: r.history[r.history.length - 1].ratingCount || 0 }));
+      const avg = cur.reduce((s, x) => s + x.rating, 0) / cur.length;
+      const totalRev = cur.reduce((s, x) => s + x.count, 0);
+      const low = cur.filter(x => x.rating < 4.5).length;
+      const byR = cur.slice().sort((a, b) => b.rating - a.rating);
+      const best = byR[0], worst = byR[byR.length - 1];
+      const kpiCard = (v, l, c) => `<div style="flex:1;min-width:120px;background:var(--surface-2,rgba(0,0,0,.04));border-radius:8px;padding:8px 10px"><div style="font-size:18px;font-weight:700${c ? ';color:' + c : ''}">${v}</div><div style="font-size:11px;color:var(--muted,#64748b)">${l}</div></div>`;
+      const summary = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${
+        kpiCard(avg.toFixed(2), 'Средний рейтинг сети', avg >= 4.5 ? 'var(--green,#22c55e)' : avg >= 4.2 ? 'var(--amber,#b8860b)' : 'var(--red,#ef4444)')
+        }${kpiCard(cur.length, 'Точек с рейтингом')
+        }${kpiCard(low, 'Точек ниже 4.5', low ? 'var(--amber,#b8860b)' : 'var(--green,#22c55e)')
+        }${kpiCard(totalRev.toLocaleString('ru-RU'), 'Всего оценок')}</div>
+        <div style="font-size:12px;color:var(--muted,#64748b);margin-bottom:8px">⭐ Лучшая: <b>${esc((best.addr || '').replace(', Иркутск', '') || '—')}</b> ${best.rating.toFixed(2)} · ⚠️ слабее всех: <b>${esc((worst.addr || '').replace(', Иркутск', '') || '—')}</b> ${worst.rating.toFixed(2)} — приоритет на работу с отзывами. Сравнение с конкурентами (Стефания/Этика/Cake Home/ЯХОНТ) — в разделе «Конкуренты».</div>`;
+      el.innerHTML = summary + `<div class="table-wrap"><table style="width:100%;font-size:13px">
         <thead><tr><th>Адрес / ID</th><th style="text-align:right">Рейтинг</th><th style="text-align:right">Оценок</th><th style="text-align:right">Снимков</th><th>Тренд</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>

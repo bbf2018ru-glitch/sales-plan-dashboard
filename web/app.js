@@ -4537,6 +4537,54 @@ function renderGisMonthly(d){
     '</tbody></table></div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:6px">Календарные месяцы из кабинета 2ГИС («Присутствие в выдаче» + «Страница компании», пресет «Год», обновляется ежедневно). <b>Продаж 2ГИС не передаёт</b> (это справочник, не касса) — ближайшие к продаже сигналы: «Маршруты» (намерение прийти) и «На сайт». Обновлено: '+st+'.</div>';
 }
+// 2ГИС «Воронка действий» — показы → переходы на карточку → целевые действия (сайт+маршруты+звонки)
+// за выбранный месяц (или последний завершённый). Данные: gisHistory.series.
+function renderGisFunnel(d){
+  var el=document.getElementById('mktGisFunnel'); if(!el) return;
+  var gh=d&&d.external&&d.external.gisHistory;
+  var ms=(gh&&gh.series||[]).filter(function(m){return m && m.impressions;});
+  if(!ms.length){ el.innerHTML=''; return; }
+  var MM=['','январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  var selYM=mktSelectedPeriod();
+  var m=ms.filter(function(x){return x.ym===selYM;})[0]
+      || ms.filter(function(x){return !x.partial;}).slice(-1)[0]
+      || ms[ms.length-1];
+  var imp=m.impressions||0, pv=m.pageVisits||0, site=m.siteClicks||0, rt=m.routes||0, calls=m.calls||0;
+  var target=site+rt+calls;
+  var pct=function(n,base){ return base?Math.round(n/base*1000)/10:null; };
+  var mp=m.ym.split('-'); var mlbl=MM[Number(mp[1])]+' '+mp[0];
+  var steps=[
+    {l:'Показы в поиске 2ГИС', sub:'сколько раз карточку показали', n:imp, conv:null, color:'#7c5cff'},
+    {l:'Переходы на карточку', sub:'открыли страницу компании', n:pv, conv:pct(pv,imp), color:'#5b8def'},
+    {l:'Целевые действия', sub:'на сайт + маршруты + звонки', n:target, conv:pct(target,pv||imp), color:'#10a05a'}
+  ];
+  var rows=steps.map(function(s){
+    var w=imp?Math.max(3,Math.round(s.n/imp*100)):0;
+    return '<div style="margin:6px 0">'+
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span><b>'+s.l+'</b> <span style="color:var(--muted)">— '+s.sub+'</span></span>'+
+        '<span><b>'+mNum(s.n)+'</b>'+(s.conv!=null?' <span style="color:var(--muted)">('+mNum1(s.conv)+'% от пред.)</span>':'')+'</span></div>'+
+      '<div style="background:var(--surface-2,rgba(0,0,0,.06));border-radius:6px;height:18px;overflow:hidden"><div style="width:'+w+'%;height:100%;background:'+s.color+';border-radius:6px"></div></div>'+
+    '</div>';
+  }).join('');
+  el.innerHTML='<div class="mkt-chart-t">Воронка действий 2ГИС · '+mlbl+(m.partial?' (идёт)':'')+'</div>'+rows+
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Из показов в выдаче в целевые действия (переход на сайт, построение маршрута, звонок) — '+(pct(target,imp)!=null?mNum1(pct(target,imp))+'%':'н/д')+'. Разбивка целевых: на сайт '+mNum(site)+' · маршруты '+mNum(rt)+' · звонки '+mNum(calls)+'. «Маршруты» — самый близкий к визиту сигнал.</div>';
+}
+// 2ГИС динамика по месяцам — графики показов и переходов (gisHistory.series).
+function renderGisCharts(d){
+  var el=document.getElementById('mktGisCharts'); if(!el) return;
+  var gh=d&&d.external&&d.external.gisHistory;
+  var ms=(gh&&gh.series||[]).filter(function(m){return m && m.impressions;});
+  if(ms.length<2){ el.innerHTML=''; return; }
+  var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  var labels=ms.map(function(m){var p=m.ym.split('-');return p[0].slice(2)+'-'+MM[Number(p[1])];});
+  var imp=ms.map(function(m){return m.impressions||0;});
+  var site=ms.map(function(m){return m.siteClicks||0;});
+  var rt=ms.map(function(m){return m.routes||0;});
+  el.innerHTML='<div class="mkt-chart-t">Показы в 2ГИС по месяцам</div><div id="mktGisChImp"></div>'+
+    '<div class="mkt-chart-t" style="margin-top:14px">Переходы на сайт и маршруты по месяцам</div><div id="mktGisChTr"></div>';
+  try{ mBars('mktGisChImp', labels, imp, '#7c5cff', ''); }catch(_){}
+  try{ mGroup('mktGisChTr', labels, site, rt, '#10a05a', '#5b8def', '', 'На сайт', 'Маршруты'); }catch(_){}
+}
 // Платные каналы — затраты и отдача (бюджет маркетинга) из /api/marketing/paid-costs.
 function renderPaidCosts(pc){
   var el=document.getElementById('mktPaidLive'); if(!el) return;
@@ -5271,6 +5319,9 @@ function mktLoadYoY(){
     try { renderDirectMonthly(d); } catch(_){}
     // 2ГИС присутствие в выдаче помесячно — live из кабинета (заменили статику).
     try { renderGisMonthly(d); } catch(_){}
+    // 2ГИС воронка действий + динамика-графики (показы/переходы по месяцам).
+    try { renderGisFunnel(d); } catch(_){}
+    try { renderGisCharts(d); } catch(_){}
     // Спрос (поисковые запросы 2ГИС) — live из секции demand (заменили снимок апреля).
     try { renderDemand(d); } catch(_){}
     // Воронка лояльности — реальная mini-воронка из Метрики+1С (заменили выдуманную).
