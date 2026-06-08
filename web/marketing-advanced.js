@@ -197,11 +197,14 @@
     }
   }
 
-  // ─── Каннибализация скидок ──────────────────────────────────────────────────
+  // ─── Скидки — сколько съедают (по условиям) ──────────────────────────────────
+  // ВАЖНО: бэкенд /discount-cannibalization отдаёт {totals, byCondition, byMonth,
+  // topReceivers} из РегистрНакопления.ПредоставленныеСкидки — НЕ пары товаров.
+  // Раньше фронт читал несуществующие data.pairs/items → блок всегда был пуст.
   async function loadCanniba() {
     const el = document.getElementById('mktCanniba');
     if (!el) return;
-    el.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Загрузка…</div>';
+    el.innerHTML = '<div class="muted" style="font-size:12px;padding:8px">Тяну из ПредоставленныеСкидки в 1С…</div>';
     try {
       const p = currentPeriod();
       const data = await fetchJson(`/api/marketing/discount-cannibalization?from=${p}&to=${p}`);
@@ -209,21 +212,32 @@
         el.innerHTML = `<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">${esc(data.reason || '1С временно недоступна')} — попробуйте позже.</div>`;
         return;
       }
-      const items = data.pairs || data.items || [];
-      if (!items.length) {
-        el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Явной каннибализации не выявлено за период.</div>';
+      const total = (data.totals && data.totals.totalDiscount) || 0;
+      const byCond = data.byCondition || [];
+      if (!byCond.length || total <= 0) {
+        el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Скидок за период не зафиксировано.</div>';
         return;
       }
-      const rows = items.slice(0, 20).map((p, i) => `<tr>
-        <td>${i + 1}</td>
-        <td>${esc(p.promo || p.aName)}</td>
-        <td>${esc(p.victim || p.bName)}</td>
-        <td style="text-align:right;color:var(--red,#ef4444)">${fmtPct(p.impact || p.correlation || 0)}</td>
-      </tr>`).join('');
-      el.innerHTML = `<table style="width:100%;font-size:13px">
-        <thead><tr><th>#</th><th>Акция на</th><th>«Жертва»</th><th>Импакт</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
+      const rub = n => Math.round(Number(n) || 0).toLocaleString('ru-RU') + ' ₽';
+      const maxPct = Math.max(...byCond.map(c => total > 0 ? c.amount / total * 100 : 0), 1);
+      const rows = byCond.slice(0, 20).map(c => {
+        const pct = total > 0 ? c.amount / total * 100 : 0;
+        const fill = pct / maxPct * 100;
+        return `<tr style="background:linear-gradient(to right, rgba(239,68,68,${(fill / 250).toFixed(3)}) ${fill.toFixed(1)}%, transparent ${fill.toFixed(1)}%)">
+          <td>${esc(c.condition)}</td>
+          <td style="text-align:right">${rub(c.amount)}</td>
+          <td style="text-align:right"><b>${pct.toFixed(1)} %</b></td>
+        </tr>`;
+      }).join('');
+      const recv = (data.topReceivers || []).slice(0, 5)
+        .map(r => `<span style="margin-right:14px">${esc(r.name)} — <b>${rub(r.amount)}</b></span>`).join('');
+      el.innerHTML =
+        `<div style="font-size:13px;margin-bottom:8px">Сумма скидок за период: <b>${rub(total)}</b> ` +
+        `<span class="muted" style="font-size:11px">(${data.totals.totalRows} записей, ${data.totals.months} мес.)</span>` +
+        (data.truncationWarning ? `<div style="color:#f59e0b;font-size:11px;margin-top:4px">⚠ ${esc(data.truncationWarning)}</div>` : '') +
+        `</div>` +
+        `<table style="width:100%;font-size:13px"><thead><tr><th>Условие скидки</th><th style="text-align:right">Сумма</th><th style="text-align:right">Доля</th></tr></thead><tbody>${rows}</tbody></table>` +
+        (recv ? `<div style="font-size:12px;color:var(--muted,#64748b);margin-top:8px">Топ-5 получателей: ${recv}</div>` : '');
     } catch (e) {
       el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
