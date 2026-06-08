@@ -934,7 +934,18 @@ function aggregatePeriodCore(db, period, opts = {}) {
   const lagger = [...storesList]
     .filter((s) => s.plan > 0)
     .sort((a, b) => a.percent - b.percent)[0] || null;
-  const lastSaleAt = sales.map((item) => item.soldAt).filter(Boolean).sort().at(-1) || null;
+  // ВАЖНО: числовой максимум по времени, НЕ `.sort()`. pg отдаёт sold_at как
+  // Date-объекты; `.sort()` без компаратора приводит их к Date.toString()
+  // («Wed Jun 08 2026…») и сортирует по НАЗВАНИЮ ДНЯ НЕДЕЛИ — максимум залипал
+  // на ближайшей «среде» (3 июня = Wed, последний лексикографически),
+  // создавая ложное впечатление, что данные не обновляются с 3 июня.
+  let lastSaleAt = null;
+  let lastSaleT = -Infinity;
+  for (const item of sales) {
+    if (!item.soldAt) continue;
+    const t = new Date(item.soldAt).getTime();
+    if (!Number.isNaN(t) && t > lastSaleT) { lastSaleT = t; lastSaleAt = item.soldAt; }
+  }
   // Для DoW-сезонности передаём все продажи (не только за текущий period) —
   // тогда последние 120 дней попадают в расчёт независимо от того где они
   // (текущий или прошлый месяц).
