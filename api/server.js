@@ -856,23 +856,44 @@ const server = http.createServer(async (req, res) => {
       try {
         const { db } = await getScopedDb(req);
         const period = monthKey(parsedUrl.searchParams.get('period'));
-        const revenue = (db.sales || []).reduce((s, x) => (
-          x.period === period && x.storeId !== 'undefined' && x.productId !== 'undefined'
-            ? s + Number(x.amount || 0) : s
-        ), 0);
         const gp = await grossProfit.getGrossProfitCogs(period);
-        const grossProfitVal = revenue - gp.cogs;
-        const marginPct = revenue > 0 ? Number((grossProfitVal / revenue * 100).toFixed(1)) : null;
-        // «Рассчитана» — только если маржа правдоподобна (50–90%). У текущего/незакрытого
-        // месяца себестоимость в УчётЗатрат ещё не посчитана → даёт мусор (маржа вне диапазона).
-        const costed = gp.cogs > 0 && marginPct != null && marginPct >= 50 && marginPct <= 90;
+        const cogsByMonth = gp.cogsByMonth || {};
+        // Выручка по месяцам из db.sales (как summary).
+        const revByMonth = {};
+        for (const x of db.sales || []) {
+          if (x.storeId === 'undefined' || x.productId === 'undefined') continue;
+          revByMonth[x.period] = (revByMonth[x.period] || 0) + Number(x.amount || 0);
+        }
+        // «Рассчитан» месяц — только если маржа правдоподобна (50–90%). У текущего/
+        // незакрытого месяца себестоимость в УчётЗатрат не посчитана → мусор (маржа вне).
+        const monthRow = (ym) => {
+          const revenue = Math.round(revByMonth[ym] || 0);
+          const cogs = cogsByMonth[ym];
+          if (!(revenue > 0) || !(cogs > 0)) return { ym, revenue, costed: false, marginPct: null };
+          const grossProfitVal = revenue - cogs;
+          const marginPct = Number((grossProfitVal / revenue * 100).toFixed(1));
+          const costed = marginPct >= 50 && marginPct <= 90;
+          return {
+            ym, revenue,
+            cogs: costed ? cogs : null,
+            grossProfit: costed ? Math.round(grossProfitVal) : null,
+            marginPct: costed ? marginPct : null,
+            costed
+          };
+        };
+        // Тренд: помесячно за период действия cogsByMonth, только месяцы с выручкой в БД.
+        const trend = Object.keys(cogsByMonth).sort()
+          .map(monthRow)
+          .filter((x) => x.revenue > 0);
+        const cur = monthRow(period);
         sendJson(res, 200, {
           period,
-          revenue: Math.round(revenue),
-          cogs: costed ? gp.cogs : null,
-          grossProfit: costed ? Math.round(grossProfitVal) : null,
-          marginPct: costed ? marginPct : null,
-          costed,
+          revenue: cur.revenue,
+          cogs: cur.cogs ?? null,
+          grossProfit: cur.grossProfit ?? null,
+          marginPct: cur.marginPct ?? null,
+          costed: cur.costed,
+          trend,
           source: gp.source,
           refreshedAt: gp.refreshedAt
         });

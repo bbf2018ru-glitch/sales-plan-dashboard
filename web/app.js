@@ -609,6 +609,23 @@ function animateKpiNumbers() {
   });
 }
 
+// Дописывает на карточку «Маржа» реальную маржу из 1С (за закрытый месяц).
+// Асинхронно (не блокирует summary). Эндпоинт кэширован 6ч → дёшево.
+function loadRealMarginBadge(period){
+  if(!state.realMarginCache) state.realMarginCache={};
+  var apply=function(d){
+    if(!d || !d.costed || d.marginPct==null || state.period!==period) return;
+    var sub=document.querySelector('#kpis [data-kpi-id="margin"] .kpi-sub');
+    if(sub && sub.innerHTML.indexOf('из 1С')<0){
+      sub.innerHTML += ' <span class="kpi-delta" title="Реальная маржа из 1С — себестоимость = материалы в производство (УчётЗатрат), за закрытый месяц. Совпадает с отчётом «Валовая прибыль».">· из 1С: '+mNum1(d.marginPct)+' %</span>';
+    }
+  };
+  if(state.realMarginCache[period]){ apply(state.realMarginCache[period]); return; }
+  fetchJson('/api/marketing/gross-profit?period='+period).then(function(d){
+    if(d && !d.unavailable && !d.error){ state.realMarginCache[period]=d; apply(d); }
+  }).catch(function(){});
+}
+
 function renderKpis(summary) {
   const f = summary.forecast;
   const t = summary.totals;
@@ -2477,6 +2494,7 @@ async function loadSummary() {
   renderSummaryHero(summary);
   renderStickyMetrics(summary);
   renderKpis(summary);
+  loadRealMarginBadge(state.period);
   renderForecast(summary);
   renderTrendChart(summary);
   renderWeekdayHeatmap(summary);
@@ -4720,17 +4738,27 @@ function renderSmsMonthly(sm){
     (sm.monthsPending?'<div style="font-size:11px;color:var(--muted);margin-top:4px">'+sm.monthsPending+' мес. ещё прогреваются (тяжёлый расчёт атрибуции). Обнови позже.</div>':'');
 }
 // Валовая прибыль из 1С — реальная себестоимость (материалы в производство).
+function renderGpTrend(trend){
+  var c=document.getElementById('mktGrossProfitChart'); if(!c) return;
+  var pts=(trend||[]).filter(function(x){ return x.costed && x.marginPct!=null; });
+  if(!pts.length){ c.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px">Нет закрытых месяцев с рассчитанной себестоимостью.</div>'; return; }
+  mBars('mktGrossProfitChart',
+    pts.map(function(x){ var p=x.ym.split('-'); return p[0].slice(2)+'-'+p[1]; }),
+    pts.map(function(x){ return x.marginPct; }), 'var(--accent)', ' %');
+}
 function renderGrossProfit(d){
   var el=document.getElementById('mktGrossProfit'); if(!el) return;
   if(d && d.unavailable){ el.innerHTML='<div class="mkt-yoy-load">'+(d.reason||'1С временно недоступна')+' — попробуйте позже.</div>'; return; }
   if(!d || d.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Недоступно: '+((d&&d.error)||'ошибка')+'</div>'; return; }
   var rub=function(n){ return mNum(n)+' ₽'; };
+  // Тренд маржи по месяцам (закрытые) — рисуем всегда, даже если текущий месяц не рассчитан.
+  try{ renderGpTrend(d.trend); }catch(_){}
   // Текущий/незакрытый месяц: себестоимость в 1С ещё не рассчитана → показываем оценку.
   if(d.costed===false){
     var estM=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? mNum1(state.summary.totals.marginPct)+' %' : '—';
     el.innerHTML='<div style="font-size:13px;color:var(--muted,#64748b);padding:6px;line-height:1.5">'+
       '📅 Себестоимость за этот месяц ещё не рассчитана в 1С (производство не закрыто) — реальная валовая прибыль появится после <b>закрытия месяца</b>.<br>'+
-      'Пока — оценка по наценке: <b>'+estM+'</b> (выручка '+rub(d.revenue)+'). Открой прошлый месяц — там цифра из 1С.</div>';
+      'Пока — оценка по наценке: <b>'+estM+'</b> (выручка '+rub(d.revenue)+'). Реальные цифры — по закрытым месяцам ниже и при выборе прошлого месяца.</div>';
     return;
   }
   var kpi=function(v,l,sub){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:2px">'+sub+'</div>':'')+'</div>'; };
