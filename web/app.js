@@ -2603,6 +2603,7 @@ async function init() {
   initMobileCompact();
   initCmdK();
   initStickyMetrics();
+  initChartZoom();
   pageNavInit('dashNav','page-dashboard');
   initMobileNav();
   initDrillDown();
@@ -5617,9 +5618,15 @@ function mktLoadYoY(){
         var items = rv.items || [];
         var tags = rv.tags || [];
         var gmTotal = rv.googleMapsReviews;
-        grEl.innerHTML = '<div class="mkt-chart-t">Отзывы 2ГИС <span class="mkt-scope dyn">live</span></div>' +
+        // Период отзывов: парсим даты вида «16 мая 2026» и берём диапазон.
+        var _rum={}; for(var _i=1;_i<_MM_SWEET.length;_i++) _rum[_MM_SWEET[_i]]=_i;
+        var rdate=function(s){ var m=String(s||'').match(/(\d{1,2})\s+([а-яё]+)\s+(\d{4})/i); if(!m) return null; var mo=_rum[m[2].toLowerCase()]; if(!mo) return null; return new Date(Date.UTC(+m[3],mo-1,+m[1])); };
+        var _parsed=items.map(function(r){ return {d:rdate(r.date),s:r.date}; }).filter(function(x){ return x.d; }).sort(function(a,b){ return a.d-b.d; });
+        var perLbl=_parsed.length ? (_parsed[0].s+' — '+_parsed[_parsed.length-1].s) : '';
+        grEl.innerHTML = '<div class="mkt-chart-t">Отзывы 2ГИС'+(perLbl?' · '+perLbl:'')+' <span class="mkt-scope dyn">live</span></div>' +
+          (perLbl?'<div style="font-size:11px;color:var(--muted);margin:-2px 0 6px">Период — по датам распарсенных отзывов (от старого к свежему). Это последние отзывы с карточки 2ГИС, не за выбранный слева месяц.</div>':'') +
           '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:8px 0">' +
-          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(items.length)+'</div><div class="mkt-l">Свежих отзывов</div></div>' +
+          '<div class="mkt-kpi"><div class="mkt-v">'+mNum(items.length)+'</div><div class="mkt-l" title="Сколько свежих отзывов удалось распарсить с карточки 2ГИС">Отзывов за период</div></div>' +
           (gmTotal ? '<div class="mkt-kpi"><div class="mkt-v">'+mNum(gmTotal)+'</div><div class="mkt-l">Отзывов на Google Maps</div></div>' : '<div></div>') +
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(tags.length)+'</div><div class="mkt-l">Тегов от клиентов</div></div>' +
           '</div>' +
@@ -5788,9 +5795,10 @@ function mktLoadYoY(){
         }).join('');
         var st=seo.scrapedAt?new Date(seo.scrapedAt).toLocaleString('ru-RU'):'—';
         sl.innerHTML='<div class="mkt-chart-t">Позиции в Яндексе (lr=63 Иркутск): Мария vs конкуренты <span class="mkt-scope dyn">live</span></div>'+
+          '<div style="font-size:12px;color:var(--muted);margin:4px 0 10px;line-height:1.55">Что показывает: <b>место сайта в обычной (бесплатной) выдаче Яндекса</b> по конкретному поисковому запросу — то, на какой строке Яндекс показывает сайт человеку из Иркутска (<b>lr=63</b> — код региона Иркутска). <b>1</b> = первая строка, <b>чем меньше число — тем выше</b> и тем больше переходов; «<b>—</b>» = сайта нет в топ-50. Это <b>не Я.Метрика и не реклама</b>, а живой замер поисковой выдачи (скрейп раз в неделю). Столбцы «Мария / Стефания / Cake Home» — позиция каждого по этому запросу; «Топ-1» — кто реально стоит на 1-м месте.</div>'+
           '<div style="margin:6px 0 10px;font-size:13px"><b>В топ-10:</b> Мария — <span style="color:'+(s.mariaTop10>=s.stefaniaTop10?'#10a05a':'#e0466a')+';font-weight:700">'+(s.mariaTop10||0)+'</span> запросов · Стефания — <span style="color:#b8860b;font-weight:700">'+(s.stefaniaTop10||0)+'</span> · <b>Средняя позиция</b> (по запросам где обе ранжируются): Мария '+(s.avgRankMaria||'—')+', Стефания '+(s.avgRankStefania||'—')+'.</div>'+
-          '<div class="table-wrap"><table><thead><tr><th>Запрос</th><th class="num">Мария</th><th class="num">Стефания</th><th class="num">Cake Home</th><th>Топ-1</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-          '<div style="font-size:11px;color:var(--muted);margin-top:6px">Цвет ранга: ≤3 зелёный · ≤10 янтарь · >10 красный · «—» нет в выдаче. Скрейп Яндекс-SERP по расписанию (еженедельно). Обновлено: '+st+'.</div>';
+          '<div class="table-wrap"><table><thead><tr><th title="Поисковый запрос, который человек вводит в Яндексе">Запрос</th><th class="num" title="Позиция сайта maria-irk.ru в выдаче Яндекса по этому запросу (1 = первая строка)">Мария</th><th class="num" title="Позиция сайта Стефании по этому запросу">Стефания</th><th class="num" title="Позиция сайта Cake Home по этому запросу">Cake Home</th><th title="Кто фактически занимает 1-е место выдачи по этому запросу">Топ-1</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:6px">Цвет позиции: <b style="color:#10a05a">≤3</b> топ — отлично · <b style="color:#b8860b">≤10</b> первая страница · <b style="color:#e0466a">&gt;10</b> вторая+ страница (почти не кликают) · «—» нет в топ-50. Скрейп живой выдачи Яндекса по расписанию (еженедельно). Обновлено: '+st+'.</div>';
       } else {
         sl.innerHTML='<div style="font-size:12px;color:var(--muted)">Позиции в Яндексе ещё не собраны (cron-скрейп запустится по расписанию).</div>';
       }
@@ -5863,5 +5871,46 @@ function pageNavInit(navId, pageId){
   }
   window.addEventListener('scroll', spy, {passive:true});
   spy();
+}
+
+// === Зум графиков: клик по любому SVG-графику открывает увеличенную копию в попапе. ===
+// Глобально для всех графиков проекта (делегирование на document, без правки каждого render).
+function isZoomableChart(svg){
+  if(!svg || svg.namespaceURI!=='http://www.w3.org/2000/svg') return false;
+  if(svg.closest('.chart-zoom-ov')) return false;      // уже внутри попапа
+  if(!svg.getAttribute('viewBox')) return false;        // иконки без viewBox пропускаем
+  var w=svg.getAttribute('width')||'', st=svg.getAttribute('style')||'';
+  if(w==='100%' || /width:\s*100%/.test(st)) return true;
+  try{ if(svg.getBoundingClientRect().width>=220) return true; }catch(e){}
+  return false;                                         // мелкие инлайн-иконки не зумим
+}
+function openChartZoom(svg){
+  var ov=document.createElement('div'); ov.className='chart-zoom-ov';
+  var box=document.createElement('div'); box.className='chart-zoom-box';
+  // Заголовок графика — ближайшая подпись рядом со svg.
+  var title='', t=svg.parentElement && svg.parentElement.querySelector('.mkt-chart-t,.chart-title,.section-label,h2,h3');
+  if(!t){ var sec=svg.closest('section,.card,.kpi-detail,div'); if(sec) t=sec.querySelector('.mkt-chart-t,.chart-title,.section-label,h2,h3'); }
+  if(t) title=t.textContent.trim();
+  var clone=svg.cloneNode(true);
+  clone.removeAttribute('style'); clone.setAttribute('width','100%'); clone.removeAttribute('height');
+  clone.style.width='100%'; clone.style.height='auto'; clone.style.maxHeight='82vh';
+  var bar=document.createElement('div'); bar.className='chart-zoom-bar';
+  bar.innerHTML='<span>'+(title?escapeHtml(title):'График')+'</span>';
+  var x=document.createElement('button'); x.className='chart-zoom-x'; x.setAttribute('aria-label','Закрыть'); x.textContent='✕';
+  bar.appendChild(x); box.appendChild(bar); box.appendChild(clone); ov.appendChild(box);
+  function done(){ ov.remove(); document.removeEventListener('keydown', onKey); }
+  function onKey(e){ if(e.key==='Escape') done(); }
+  ov.addEventListener('click', function(e){ if(e.target===ov) done(); });
+  x.addEventListener('click', done);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+}
+function initChartZoom(){
+  if(window.__chartZoomInit) return; window.__chartZoomInit=true;
+  document.addEventListener('click', function(e){
+    if(!e.target || !e.target.closest) return;
+    var svg=e.target.closest('svg');
+    if(svg && isZoomableChart(svg)) openChartZoom(svg);
+  });
 }
 
