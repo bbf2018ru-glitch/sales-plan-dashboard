@@ -199,6 +199,12 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || 'unknown';
 }
 
+// Транзиентная недоступность HTTP-сервиса 1С (рвёт соединение / таймаут).
+// Такие ошибки не повод отдавать 500 — фронт покажет «1С временно недоступна».
+function isUpstreamDown(e) {
+  return /ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ECONNREFUSED|socket hang up|timeout|не настроен/i.test(e?.message || '');
+}
+
 function checkPinRateLimit(ip) {
   const now = Date.now();
   const rec = pinAttempts.get(ip);
@@ -1064,18 +1070,26 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/marketing/discount-cannibalization' && req.method === 'GET') {
       try {
-        const from = parsedUrl.searchParams.get('from') || monthKey();
-        const to = parsedUrl.searchParams.get('to') || from;
+        const from = monthKey(parsedUrl.searchParams.get('from'));
+        const to = monthKey(parsedUrl.searchParams.get('to')) || from;
         sendJson(res, 200, await marketing.getDiscountCannibalization(from, to));
-      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      } catch (e) {
+        // 1С периодически рвёт соединение (ECONNRESET). Не отдаём 500 (шумит в
+        // консоли) — мягко сообщаем, что источник временно недоступен.
+        if (isUpstreamDown(e)) sendJson(res, 200, { unavailable: true, reason: '1С временно недоступна' });
+        else sendJson(res, 500, { error: e.message });
+      }
       return;
     }
     if (pathname === '/api/marketing/rfm' && req.method === 'GET') {
       try {
-        const from = parsedUrl.searchParams.get('from') || monthKey();
-        const to = parsedUrl.searchParams.get('to') || from;
+        const from = monthKey(parsedUrl.searchParams.get('from'));
+        const to = monthKey(parsedUrl.searchParams.get('to')) || from;
         sendJson(res, 200, await marketing.getRfmSimple(from, to));
-      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      } catch (e) {
+        if (isUpstreamDown(e)) sendJson(res, 200, { unavailable: true, reason: '1С временно недоступна', segments: [] });
+        else sendJson(res, 500, { error: e.message });
+      }
       return;
     }
     if (pathname === '/api/marketing/holiday-yoy' && req.method === 'GET') {

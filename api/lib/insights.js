@@ -143,14 +143,15 @@ function detectAnomalies(summary, db, period) {
     const prevFact = today.yoyTodayFact;
     const yoyDayDelta = ((curFact - prevFact) / prevFact) * 100;
     if (yoyDayDelta < -5) {
+      const est = today.yoyTodayEstimated ? '≈' : '';
       const yearLabel = today.yoyTodayYearsBack > 1
-        ? `тот же день ${today.yoyTodayYearsBack} года назад (${today.yoyTodayPeriod})`
-        : `тот же день год назад (${today.yoyTodayPeriod})`;
+        ? `темпа ${today.yoyTodayYearsBack} года назад (${today.yoyTodayPeriod})`
+        : `темпа год назад (${today.yoyTodayPeriod})`;
       findings.push({
         severity: yoyDayDelta < -15 ? 'high' : 'medium',
         kind: 'yoy-today-decline',
         headline: `За ${today.elapsedDays} дн. на ${yoyDayDelta.toFixed(1)}% ниже ${yearLabel}`,
-        detail: `На этот день прошлого года накопили: ${formatRu(prevFact)} ₽. Сейчас: ${formatRu(curFact)} ₽.`,
+        detail: `Ожидаемо к этому дню (по прошлому году): ${est}${formatRu(prevFact)} ₽. Сейчас: ${formatRu(curFact)} ₽.`,
       });
     }
   }

@@ -30,12 +30,13 @@
     // селектор слева). Иначе наши вставки (критерии под рассылками) могли брать
     // другой месяц, чем таблицы app.js → ключи «дата+текст» не совпадали и
     // строки молча не вставлялись. URL/календарь — только фоллбэк.
-    try { if (typeof state !== 'undefined' && state.period) return state.period; } catch (_) {}
+    const valid = (p) => typeof p === 'string' && /^\d{4}-\d{2}$/.test(p);
+    try { if (typeof state !== 'undefined' && valid(state.period)) return state.period; } catch (_) {}
     const params = new URLSearchParams(location.search);
-    return params.get('period') || (() => {
-      const now = new Date();
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    })();
+    const fromUrl = params.get('period');
+    if (valid(fromUrl)) return fromUrl;
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }
 
   // ─── RFM ────────────────────────────────────────────────────────────────────
@@ -53,6 +54,10 @@
         return `${sy}-${String(fm).padStart(2, '0')}`;
       })();
       const data = await fetchJson(`/api/marketing/rfm?from=${from}&to=${to}`);
+      if (data.unavailable) {
+        el.innerHTML = `<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">${esc(data.reason || '1С временно недоступна')} — попробуйте позже.</div>`;
+        return;
+      }
       const segments = data.segments || [];
       if (!segments.length) {
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Нет данных RFM за период.</div>';
@@ -200,6 +205,10 @@
     try {
       const p = currentPeriod();
       const data = await fetchJson(`/api/marketing/discount-cannibalization?from=${p}&to=${p}`);
+      if (data.unavailable) {
+        el.innerHTML = `<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">${esc(data.reason || '1С временно недоступна')} — попробуйте позже.</div>`;
+        return;
+      }
       const items = data.pairs || data.items || [];
       if (!items.length) {
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Явной каннибализации не выявлено за период.</div>';

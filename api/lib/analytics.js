@@ -505,7 +505,7 @@ function buildDailySeries(period, plans, sales) {
   });
 }
 
-function buildPeriodComparison(db, period, currentTotals) {
+function buildPeriodComparison(db, period, currentTotals, elapsedFraction = null) {
   const prevPeriod = previousPeriod(period);
   if (!prevPeriod) {
     return null;
@@ -521,28 +521,43 @@ function buildPeriodComparison(db, period, currentTotals) {
     };
   }
 
-  const factDelta = roundMetric(currentTotals.fact - previous.totals.fact);
-  const planDelta = roundMetric(currentTotals.plan - previous.totals.plan);
-  const completionDelta = roundMetric(currentTotals.completion - previous.totals.completion);
-  const quantityDelta = roundMetric(currentTotals.quantity - previous.totals.quantity);
+  // Для ТЕКУЩЕГО (неполного) месяца сравниваем не с полным прошлым месяцем, а с
+  // его долей по пройденным дням — иначе в начале месяца всегда «−75%, провал».
+  // Это ОЦЕНКА (линейная по дням), фронт помечает «(к этому дню)».
+  const proRated = elapsedFraction != null && elapsedFraction > 0 && elapsedFraction < 1;
+  const f = proRated ? elapsedFraction : 1;
+  const prevFact = previous.totals.fact * f;
+  const prevPlan = previous.totals.plan * f;
+  const prevQuantity = previous.totals.quantity * f;
+  const prevMargin = previous.totals.margin === null ? null : previous.totals.margin * f;
 
-  const haveBothMargins = currentTotals.margin !== null && previous.totals.margin !== null;
-  const marginDelta = haveBothMargins ? roundMetric(currentTotals.margin - previous.totals.margin) : null;
-  const marginDeltaPercent = haveBothMargins && previous.totals.margin > 0
-    ? percent(marginDelta / previous.totals.margin)
+  const factDelta = roundMetric(currentTotals.fact - prevFact);
+  const planDelta = roundMetric(currentTotals.plan - prevPlan);
+  const completionDelta = roundMetric(currentTotals.completion - previous.totals.completion);
+  const quantityDelta = roundMetric(currentTotals.quantity - prevQuantity);
+
+  const haveBothMargins = currentTotals.margin !== null && prevMargin !== null;
+  const marginDelta = haveBothMargins ? roundMetric(currentTotals.margin - prevMargin) : null;
+  const marginDeltaPercent = haveBothMargins && prevMargin > 0
+    ? percent(marginDelta / prevMargin)
     : null;
 
   return {
     previousPeriod: prevPeriod,
     hasData: true,
+    proRated,
+    elapsedFraction: proRated ? Number(f.toFixed(3)) : null,
     factDelta,
-    factDeltaPercent: previous.totals.fact > 0 ? percent(factDelta / previous.totals.fact) : 0,
+    factDeltaPercent: prevFact > 0 ? percent(factDelta / prevFact) : 0,
     planDelta,
     completionDelta,
     quantityDelta,
     marginDelta,
     marginDeltaPercent,
     previousTotals: previous.totals,
+    previousTotalsProRated: proRated
+      ? { fact: roundMetric(prevFact), plan: roundMetric(prevPlan), quantity: roundMetric(prevQuantity), margin: prevMargin === null ? null : roundMetric(prevMargin) }
+      : null,
     tone: factDelta >= 0 ? 'good' : 'bad'
   };
 }
@@ -692,8 +707,35 @@ function aggregatePeriodCore(db, period, opts = {}) {
   const storeMarkups = getStoreMarkups(opts.storeMarkups);
   const stores = new Map(db.stores.map((item) => [item.id, item]));
   const products = new Map(db.products.map((item) => [item.id, item]));
-  const plans = db.plans.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
-  const sales = db.sales.filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined');
+
+  // Нормализация битой кодировки store_id. В части исторических строк префикс
+  // «А»/«ЦБ» сохранён с повреждённым UTF-8 и при чтении превращается в U+FFFD
+  // («��00000134»). Такой id не матчится со справочником магазинов → продажи
+  // «осиротевают», магазин задваивается в YoY/сравнении с нулём. Складываем их
+  // обратно в канонический магазин по совпадению числового кода.
+  const storeIdByDigits = new Map();
+  for (const id of stores.keys()) {
+    if (typeof id !== 'string' || id.includes('�')) continue;
+    const d = id.replace(/\D/g, '');
+    if (d) storeIdByDigits.set(d, id);
+  }
+  const fixStoreId = (id) => {
+    if (typeof id === 'string' && id.includes('�')) {
+      const d = id.replace(/\D/g, '');
+      if (d && storeIdByDigits.has(d)) return storeIdByDigits.get(d);
+    }
+    return id;
+  };
+  const normRow = (item) => (typeof item.storeId === 'string' && item.storeId.includes('�')
+    ? { ...item, storeId: fixStoreId(item.storeId) }
+    : item);
+
+  const plans = db.plans
+    .filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined')
+    .map(normRow);
+  const sales = db.sales
+    .filter((item) => item.period === period && item.storeId !== 'undefined' && item.productId !== 'undefined')
+    .map(normRow);
 
   // Pre-pass: для каждого магазина с заданным markup считаем scale-фактор,
   // приводящий суммарный cost магазина к целевому (fact / (1 + markup/100)).
@@ -926,22 +968,6 @@ function aggregatePeriodCore(db, period, opts = {}) {
   };
 }
 
-// Накопленный факт за период до дня <=cutoffDay (включительно).
-// Используется чтобы сравнить «факт на N-й день этого месяца» с тем же N-м днём прошлого года.
-function factSumUntilDay(db, period, cutoffDay) {
-  let sum = 0;
-  for (const s of db.sales || []) {
-    if (s.period !== period) continue;
-    const at = s.soldAt || s.sold_at;
-    if (!at) continue;
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) continue;
-    if (d.getUTCDate() > cutoffDay) continue;
-    sum += Number(s.amount || 0);
-  }
-  return sum;
-}
-
 function aggregateDashboard(db, period, opts = {}) {
   const summary = aggregatePeriodCore(db, period, opts);
   const trendWindow = opts.trendWindow || 12;
@@ -962,21 +988,30 @@ function aggregateDashboard(db, period, opts = {}) {
     elapsedDaysEffective = Math.max(0, elapsedDays - 1 + hoursToday / 24);
   }
   const planToDate = (f.planPerDay || 0) * elapsedDaysEffective;
+  // YoY «к этому дню месяца». ВАЖНО: sold_at в БД = время выгрузки из 1С, а не
+  // реальная дата продажи, поэтому буквальный срез «факт до N-го дня» за прошлый
+  // год даёт случайный обрезок (вело к абсурдным +3000% в карточке «Факт»).
+  // Вместо этого берём НАДЁЖНЫЙ полный факт месяца год назад и пропорционируем
+  // его по доле пройденных дней — честная ОЦЕНКА «где мы были год назад к этому
+  // моменту месяца» (фронт помечает её как ≈).
   let yoyTodayFact = null;
   let yoyTodayPeriod = null;
   let yoyTodayYearsBack = 0;
+  let yoyTodayEstimated = false;
   if (elapsedDays > 0) {
-    // Ищем тот же день за прошлый год, потом 2/3 года назад если нет
     for (const back of [12, 24, 36]) {
       const yp = shiftPeriod(period, -back);
       if (!yp) continue;
-      const fact = factSumUntilDay(db, yp, elapsedDays);
-      // Проверяем что в этом периоде вообще есть какие-то sales (иначе пропускаем)
-      const hasAny = (db.sales || []).some(s => s.period === yp);
-      if (hasAny) {
-        yoyTodayFact = Number(fact.toFixed(2));
+      const ypFull = (db.sales || []).reduce((acc, s) => (
+        s.period === yp && s.storeId !== 'undefined' && s.productId !== 'undefined'
+          ? acc + Number(s.amount || 0) : acc
+      ), 0);
+      if (ypFull > 0) {
+        const frac = Math.min(elapsedDaysEffective / daysInPeriod(yp), 1);
+        yoyTodayFact = Number((ypFull * frac).toFixed(2));
         yoyTodayPeriod = yp;
         yoyTodayYearsBack = back / 12;
+        yoyTodayEstimated = true;
         break;
       }
     }
@@ -993,9 +1028,11 @@ function aggregateDashboard(db, period, opts = {}) {
       gapToDate: Number((planToDate - (summary.totals.fact || 0)).toFixed(2)),
       yoyTodayFact,
       yoyTodayPeriod,
-      yoyTodayYearsBack
+      yoyTodayYearsBack,
+      yoyTodayEstimated
     },
-    comparison: buildPeriodComparison(db, period, summary.totals),
+    comparison: buildPeriodComparison(db, period, summary.totals,
+      isCurrentMonth && elapsedDays > 0 ? Math.min(elapsedDaysEffective / daysInPeriod(period), 1) : null),
     yoy: buildYoYComparison(db, period, summary.totals),
     trend: buildTrend(db, period, trendWindow),
     planHealth: assessPlanHealth(db, period, summary.totals.plan)

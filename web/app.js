@@ -643,16 +643,24 @@ function renderKpis(summary) {
   const requiredSub  = planIncomplete ? 'план неполный' : `осталось ${f.remainingDays} дн.`;
   const requiredTone = planIncomplete ? 'neutral' : (f.remainingDays > 0 ? (f.paceVsPlan >= 100 ? 'good' : f.paceVsPlan >= 90 ? 'warn' : 'bad') : 'neutral');
 
-  // Сравнение vs прошлый месяц
+  // Сравнение vs прошлый месяц. Для ТЕКУЩЕГО (неполного) месяца пропорционируем
+  // прошлый месяц к доле пройденных дней — иначе в начале месяца всегда «−75%».
   const prev = summary.prevPeriod?.totals;
+  const cmpFrac = (today.isCurrentMonth && f && f.totalDays > 0 && isNum(today.elapsedDaysFractional))
+    ? Math.min(today.elapsedDaysFractional / f.totalDays, 1) : 1;
+  const cmpProRated = cmpFrac < 1;
   const vsPrev = (key) => {
     if (!prev || !isNum(prev[key]) || prev[key] === 0) return '';
+    const base = prev[key] * cmpFrac;
+    if (base === 0) return '';
     const cur = summary.totals[key] || 0;
-    const deltaPct = ((cur - prev[key]) / prev[key]) * 100;
+    const deltaPct = ((cur - base) / base) * 100;
     if (Math.abs(deltaPct) < 0.1) return '';
     const sign = deltaPct > 0 ? '↑' : '↓';
     const cls = deltaPct > 0 ? 'kpi-delta-up' : 'kpi-delta-down';
-    return ` <span class="kpi-delta ${cls}">${sign}${Math.abs(deltaPct).toFixed(0)}% vs прошл.мес</span>`;
+    const note = cmpProRated ? 'vs прошл.мес (к этому дню)' : 'vs прошл.мес';
+    const title = cmpProRated ? ` title="Оценка: прошлый месяц × доля пройденных дней (${Math.round(cmpFrac*100)}%)"` : '';
+    return ` <span class="kpi-delta ${cls}"${title}>${sign}${Math.abs(deltaPct).toFixed(0)}% ${note}</span>`;
   };
 
   // === Подпись «План на месяц»: «осталось на сегодня» (до плана-на-сегодня) ===
@@ -670,11 +678,13 @@ function renderKpis(summary) {
     const deltaPct = (delta / today.yoyTodayFact) * 100;
     const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
     const cls = delta > 0 ? 'kpi-delta-up' : delta < 0 ? 'kpi-delta-down' : '';
-    const ymd = `${elapsed}.${(today.yoyTodayPeriod || '').slice(5,7)}.${(today.yoyTodayPeriod || '').slice(0,4)}`;
-    const label = today.yoyTodayYearsBack > 1
-      ? `vs ${ymd} (${today.yoyTodayYearsBack} года назад)`
-      : `vs ${ymd}`;
-    factSub += ` · <span class="kpi-delta ${cls}">${arrow}${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(0)}% ${label}</span>`;
+    // yoyTodayFact теперь ОЦЕНКА: полный факт прошлого года, пропорционированный
+    // по доле пройденных дней (sold_at ≠ дата продажи, точный срез по дню нельзя).
+    const yr = (today.yoyTodayPeriod || '').slice(0, 4);
+    const est = today.yoyTodayEstimated ? '≈' : '';
+    const yearsTag = today.yoyTodayYearsBack > 1 ? ` (${today.yoyTodayYearsBack} года назад)` : '';
+    const label = `${est} vs ${yr} к этому дню${yearsTag}`;
+    factSub += ` · <span class="kpi-delta ${cls}" title="Оценка: полный факт ${yr} × доля пройденных дней месяца. Точный срез по дню недоступен (sold_at в БД = время выгрузки, не продажи).">${arrow}${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(0)}% ${label}</span>`;
   } else if (elapsed > 0) {
     factSub += ' · vs прошл.год: нет данных';
   }
@@ -1061,6 +1071,11 @@ function renderCmpCard(label, c, curFact) {
     </div>`;
   }
   const tone = c.factDelta >= 0 ? 'good' : 'bad';
+  // Пропорциональное сравнение неполного месяца — помечаем «(к этому дню, ≈)».
+  const proNote = c.proRated
+    ? ` <span class="muted" title="Прошлый месяц взят пропорционально пройденной доле дней (${Math.round((c.elapsedFraction || 0) * 100)}%), иначе неполный месяц всегда показывает «провал».">· к этому дню ≈</span>`
+    : '';
+  const prevBarLbl = c.proRated ? `${c.previousPeriod} ≈` : c.previousPeriod;
   // Мини-бары «сейчас vs период сравнения» по факту выручки.
   let barsHtml = '';
   if (isNum(curFact)) {
@@ -1070,11 +1085,11 @@ function renderCmpCard(label, c, curFact) {
     const wPrev = (Math.max(prevFact, 0) / mx * 100).toFixed(1);
     barsHtml = `<div class="cmp-bars">
       <div class="cmp-bar-row"><span class="cmp-bar-lbl">сейчас</span><span class="cmp-bar-track"><span class="cmp-bar-fill now" style="width:${wNow}%"></span></span><span class="cmp-bar-val">${fmtMoneyShort(curFact)}</span></div>
-      <div class="cmp-bar-row"><span class="cmp-bar-lbl">${c.previousPeriod}</span><span class="cmp-bar-track"><span class="cmp-bar-fill prev" style="width:${wPrev}%"></span></span><span class="cmp-bar-val">${fmtMoneyShort(prevFact)}</span></div>
+      <div class="cmp-bar-row"><span class="cmp-bar-lbl">${prevBarLbl}</span><span class="cmp-bar-track"><span class="cmp-bar-fill prev" style="width:${wPrev}%"></span></span><span class="cmp-bar-val">${fmtMoneyShort(prevFact)}</span></div>
     </div>`;
   }
   return `<div class="cmp-card ${tone}">
-    <div class="cmp-period">${label} (${c.previousPeriod})</div>
+    <div class="cmp-period">${label} (${c.previousPeriod})${proNote}</div>
     ${barsHtml}
     <div class="cmp-rows">
       <div class="cmp-row"><span>Факт</span><strong class="${c.factDelta >= 0 ? 'positive' : 'negative'}">${signed(c.factDelta, formatMoney)}</strong></div>
