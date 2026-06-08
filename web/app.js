@@ -5222,7 +5222,7 @@ function renderDemand(d){
   var brand=rows.reduce(function(s,r){ return s + (/мари/i.test(r[0])?r[1]:0); },0);
   var max=rows[0][1];
   var scope=isLive ? ('live · 2ГИС'+(period?' · '+period:'')) : 'снимок · апрель 2026';
-  el.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">'+scope+(isLive&&st?' · обновлено '+new Date(st).toLocaleDateString('ru-RU'):'')+'</div>'+
+  el.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">'+scope+(isLive&&st?' · обновлено '+new Date(st).toLocaleDateString('ru-RU'):'')+' · не зависит от выбранного месяца</div>'+
     '<div class="table-wrap"><table><thead><tr><th>Запрос</th><th class="num">Доля</th><th>&nbsp;</th></tr></thead><tbody>'+
     rows.map(function(r){ var w=Math.max(r[1]/max*100,2); return '<tr><td>'+r[0]+'</td><td class="num">'+mNum1(r[1])+' %</td><td style="width:40%"><div class="mkt-dbar" style="width:'+w.toFixed(0)+'%"></div></td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод:</b> ~'+mNum1(brand)+' % запросов брендовые («мария» + варианты) — высокая узнаваемость. Родовой спрос (торты, кондитерские, кофейни, кофе, завтрак) — точки роста через SEO и карточку; заметная доля «кофе/кофейни/завтрак» подтверждает кафе-нишу.</div>';
