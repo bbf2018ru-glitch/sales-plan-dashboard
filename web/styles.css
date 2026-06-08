@@ -75,7 +75,7 @@
   --ink:         #14151a;           /* почти чёрный — высокий контраст */
   --muted:       #6b7080;
   --hint:        #8a8e9c;
-  --line:        #e4e5ea;           /* видимая граница вместо размытой */
+  --line:        #ebecf0;           /* мягче граница (спокойный минимал) */
   --accent:      #8a2a3b;           /* спокойный бордовый (calm minimal, был #9a2438) */
   --accent-soft: rgba(138,42,59,.08);
   --good:        #16a34a;
@@ -700,7 +700,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   padding: 10px 22px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, var(--accent), #ff9a76);
+  background: var(--accent);
   color: #fff;
   font: inherit;
   font-size: 14px;
@@ -1208,11 +1208,15 @@ td.col-edit { text-align: center; }
   height: 100%;
   border-radius: inherit;
   position: relative;
-  box-shadow: 0 0 10px currentColor;
+  /* Спокойный минимал: нейтральный бар (только прогресс). Сигнал «лучше/хуже» —
+     в колонках Тренд/YoY, а не в окраске сырого % выполнения (он мал в начале месяца). */
+  background: var(--accent);
+  opacity: .42;
 }
-.pct-bar.good { background: linear-gradient(90deg, var(--good), #6ee7b7); color: rgba(52,211,153,.5); }
-.pct-bar.warn { background: linear-gradient(90deg, var(--warn), #fde68a); color: rgba(251,191,36,.45); }
-.pct-bar.bad  { background: linear-gradient(90deg, var(--bad), #fca5a5);  color: rgba(251,113,133,.5); }
+/* Тоновые варианты бара оставлены для возможного точечного использования (pace-based). */
+.pct-bar.good { background: linear-gradient(90deg, var(--good), #6ee7b7); opacity: 1; }
+.pct-bar.warn { background: linear-gradient(90deg, var(--warn), #fde68a); opacity: 1; }
+.pct-bar.bad  { background: linear-gradient(90deg, var(--bad), #fca5a5);  opacity: 1; }
 
 .good { color: var(--good); }
 .warn { color: var(--warn); }
