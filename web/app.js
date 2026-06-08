@@ -3664,20 +3664,33 @@ const CHANNEL_NAMES = { retail: 'Розница (ЧекККМ)', corporate: 'О�
 function renderByChannel() {
   const tbody = document.querySelector('#analyticsByChannelTbl tbody');
   if (!tbody) return;
-  const rows = analyticsState.data?.byChannel || [];
-  tbody.innerHTML = rows.map(r => `
-    <tr>
-      <td><b>${escapeHtml(CHANNEL_NAMES[r.source] || r.source)}</b></td>
-      <td class="num">${r.storesCount}</td>
-      <td class="num">${fmtNum(r.plan)}</td>
+  const d = analyticsState.data || {};
+  const rows = d.byChannel || [];
+  const retail = rows.filter(r => !r.nonRetail);
+  const nonRetail = rows.filter(r => r.nonRetail);
+  // Розничные строки — как было (с планом/маржой). Не-розничные (опт/сайт/агрегаторы)
+  // отделяем подзаголовком: у них нет плана, а «Точек» — это число документов реализации.
+  const rowHtml = (r, nr) => `
+    <tr${nr ? ' style="color:var(--muted)"' : ''}>
+      <td>${nr ? '↳ ' : '<b>'}${escapeHtml(CHANNEL_NAMES[r.source] || r.source)}${nr ? '' : '</b>'}</td>
+      <td class="num">${nr ? '<span title="Документов реализации">' + fmtNum(r.storesCount) + ' док.</span>' : r.storesCount}</td>
+      <td class="num">${nr ? '—' : fmtNum(r.plan)}</td>
       <td class="num"><b>${fmtNum(r.fact)}</b></td>
-      <td class="num">${r.completion ? r.completion.toFixed(1) + '%' : '—'}</td>
-      <td class="num">${fmtNum(r.cost)}</td>
-      <td class="num">${r.margin === null ? '—' : fmtNum(r.margin)}</td>
-      <td class="num">${fmtPct(r.marginPct)}</td>
+      <td class="num">${(!nr && r.completion) ? r.completion.toFixed(1) + '%' : '—'}</td>
+      <td class="num">${nr ? '—' : fmtNum(r.cost)}</td>
+      <td class="num">${(nr || r.margin === null) ? '—' : fmtNum(r.margin)}</td>
+      <td class="num">${nr ? '—' : fmtPct(r.marginPct)}</td>
       <td class="num">${fmtNum(r.quantity)}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  let html = retail.map(r => rowHtml(r, false)).join('');
+  if (nonRetail.length) {
+    const retailFact = retail.reduce((s, r) => s + (r.fact || 0), 0);
+    const nrFact = (d.nonRetailTotal != null) ? d.nonRetailTotal : nonRetail.reduce((s, r) => s + (r.fact || 0), 0);
+    html += `<tr><td colspan="9" style="background:var(--surface-2,rgba(0,0,0,.04));font-size:11px;color:var(--muted);padding:6px 8px">Сверх розницы — опт / сайт / агрегаторы (реализации 1С, своего плана нет)</td></tr>`;
+    html += nonRetail.map(r => rowHtml(r, true)).join('');
+    html += `<tr style="border-top:2px solid var(--line)"><td><b>Итого (розница + опт/сайт)</b></td><td></td><td></td><td class="num"><b>${fmtNum(retailFact + nrFact)}</b></td><td colspan="5"></td></tr>`;
+  }
+  tbody.innerHTML = html;
 }
 
 function renderByCategory() {
