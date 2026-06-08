@@ -4460,3 +4460,19 @@ svg[width="100%"], svg[style*="width:100%"] { cursor: zoom-in; }
 .chart-zoom-x:hover { background: var(--accent); color: #fff; }
 .chart-zoom-box svg { display: block; width: 100%; height: auto; max-height: 82vh; }
 @media (max-width: 640px) { .chart-zoom-box { padding: 0 10px 12px; } }
+
+/* === FX: тонкие анимации интерфейса (count-up, проявление, скелетоны, ховер) === */
+.card, .panel, .kpi-card, .mkt-kpi { transition: transform .18s ease, box-shadow .18s ease; }
+/* скелетон-загрузка (мерцающие плейсхолдеры вместо «Загрузка…») */
+.fx-skel-box { color: transparent !important; }
+.fx-skel-box .fx-skel-bar { display:block; height:12px; border-radius:6px; margin:9px auto; background:var(--surface-2,rgba(0,0,0,.07)); position:relative; overflow:hidden; }
+@keyframes fxShimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: no-preference){
+  .card:hover, .panel:hover, .kpi-card:hover, .mkt-kpi:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,.12); }
+  .fx-skel-box .fx-skel-bar::after { content:''; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg, transparent, rgba(255,255,255,.20), transparent); animation: fxShimmer 1.2s infinite; }
+  .fx-pre { opacity: 0; }
+  .fx-reveal { animation: fxUp .5s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes fxUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
+  .fx-chart-in { animation: fxWipe .7s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes fxWipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+}
