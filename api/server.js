@@ -27,6 +27,7 @@ const paidCosts = require('./lib/paid-costs');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { returnsLive } = require('./lib/returns-live');
 const { wholesaleLive } = require('./lib/wholesale-live');
+const { dailyLive } = require('./lib/daily-live');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
@@ -607,6 +608,13 @@ const server = http.createServer(async (req, res) => {
       const promise = (async () => {
         const db = scopeDbForUser(rawDb, user);
         const summary = aggregateDashboard(db, period, { trendWindow });
+        // Дневной ритм («ритм недели») — из 1С по РЕАЛЬНОЙ дате чека: БД пишет
+        // soldAt=время выгрузки, и пачка, выгруженная одним днём, ложно раздувает день
+        // (напр. БД 31.05=16.87М, в 1С реально 901к). Месячный итог не трогаем — только daily.
+        try {
+          const dl = await dailyLive(period);
+          if (dl && dl.daily && dl.daily.length) { summary.daily = dl.daily; summary.dailySource = dl.source; }
+        } catch (_) { /* 1С недоступна — остаётся БД-daily (soldAt) */ }
         // Сравнение с прошлым месяцем — лёгкий блок без полного аггрегата
         if (compare) {
           try {
