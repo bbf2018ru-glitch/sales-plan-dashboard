@@ -28,6 +28,7 @@ const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { returnsLive } = require('./lib/returns-live');
 const { wholesaleLive } = require('./lib/wholesale-live');
 const { dailyLive } = require('./lib/daily-live');
+const { timeLive } = require('./lib/time-live');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
@@ -1009,6 +1010,13 @@ const server = http.createServer(async (req, res) => {
           out.nonRetailTotal = ws.total;
         }
       } catch (e) { /* 1С недоступна — каналы только розничные */ }
+      // Время-разрезы (день/час/день-недели/неделя/heatmap) — live из 1С по реальной дате
+      // чека вместо soldAt-БД (та же причина, что у summary.daily: пачки сваливаются в день
+      // выгрузки). Фоллбэк на БД-разрезы при недоступности 1С.
+      try {
+        const tl = await timeLive(period);
+        if (tl) { out.daily = tl.daily; out.byHour = tl.byHour; out.byWeekday = tl.byWeekday; out.weekly = tl.weekly; out.heatmap = tl.heatmap; out.timeSource = tl.source; }
+      } catch (e) { /* 1С недоступна — остаются БД-разрезы (soldAt) */ }
       sendJson(res, 200, out);
       return;
     }
