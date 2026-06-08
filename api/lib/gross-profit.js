@@ -61,7 +61,8 @@ async function compute(period) {
 
 function getGrossProfitCogs(period) {
   const p = period || upp.nowYM();
-  return cache.wrap('gp-cogs:' + p, () => compute(p));
+  // v2 — форма результата изменилась (cogsByMonth), старые кэш-записи не годятся.
+  return cache.wrap('gpv2:' + p, () => compute(p));
 }
 
 module.exports = { getGrossProfitCogs };
