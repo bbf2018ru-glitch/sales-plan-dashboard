@@ -2623,6 +2623,7 @@ async function init() {
   initStickyMetrics();
   initChartZoom();
   initDashFx();
+  initChartCrosshair();
   pageNavInit('dashNav','page-dashboard');
   initMobileNav();
   initDrillDown();
@@ -6077,16 +6078,17 @@ function initDashFx(){
     try{ return svg.getBoundingClientRect().width>=220; }catch(_){ return false; }
   }
   // Count-up: анимируем число, в конце ВОССТАНАВЛИВАЕМ оригинальный текст (никогда не портим значение).
-  function countUp(el){
+  function countUp(el, delay){
     if(el.children.length) return;            // не трогаем элементы с вложенным HTML (<b> и т.п.)
     var orig=el.textContent; var m=orig.match(/-?\d[\d  ]*(?:[.,]\d+)?/); if(!m) return;
     var raw=m[0], target=parseFloat(raw.replace(/[  ]/g,'').replace(',','.')); if(!isFinite(target)||Math.abs(target)<10) return;
     var pre=orig.slice(0,m.index), suf=orig.slice(m.index+raw.length);
     var dm=raw.match(/[.,](\d+)$/); var dec=dm?dm[1].length:0, t0=null;
-    function fr(t){ if(t0==null)t0=t; var k=Math.min(1,(t-t0)/700), e=1-Math.pow(1-k,3);
+    // easeOutExpo — быстро стартует, мягко оседает (премиальное ощущение счётчика).
+    function fr(t){ if(t0==null)t0=t; var k=Math.min(1,(t-t0)/950), e=(k>=1)?1:1-Math.pow(2,-10*k);
       el.textContent=pre+(target*e).toLocaleString('ru-RU',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf;
       if(k<1) requestAnimationFrame(fr); else el.textContent=orig; }
-    requestAnimationFrame(fr);
+    setTimeout(function(){ requestAnimationFrame(fr); }, delay||0);
   }
   function skeletonize(el){
     if(!/загруз|счита|прогрев|собир|подожд|warming|loading/i.test(el.textContent||'')) return false;
@@ -6094,10 +6096,12 @@ function initDashFx(){
     el.innerHTML='<span class="fx-skel-bar" style="width:72%"></span><span class="fx-skel-bar" style="width:92%"></span><span class="fx-skel-bar" style="width:54%"></span>';
     return true;
   }
-  var io = hasIO ? new IntersectionObserver(function(es){ es.forEach(function(e){ if(!e.isIntersecting) return; var el=e.target; io.unobserve(el);
+  var io = hasIO ? new IntersectionObserver(function(es){ es.forEach(function(e, i){ if(!e.isIntersecting) return; var el=e.target; io.unobserve(el);
     // ВАЖНО: только одноразовые анимации, БЕЗ постоянного скрытия — если IO почему-то
     // не сработает, контент остаётся видимым (никогда не «застревает невидимым»).
-    try{ if(el.__fxType==='chart') el.classList.add('fx-chart-in'); else countUp(el); }catch(_){}
+    // Каскад (стаггер) для вошедших одной пачкой: 0,80,160…мс (до 480).
+    var delay = Math.min(i, 6) * 80;
+    try{ if(el.__fxType==='chart'){ el.style.animationDelay = delay + 'ms'; el.classList.add('fx-chart-in'); } else countUp(el, delay); }catch(_){}
   }); }, {threshold:0.12, rootMargin:'0px 0px -4% 0px'}) : null;
   function watch(el, type){
     if(el.getAttribute('data-fx')!=null) return; el.setAttribute('data-fx',''); el.__fxType=type;
@@ -6116,4 +6120,52 @@ function initDashFx(){
   try{ new MutationObserver(function(ms){ var roots=[]; ms.forEach(function(m){ m.addedNodes && [].forEach.call(m.addedNodes,function(n){ if(n.nodeType===1) roots.push(n); }); });
     if(roots.length){ if(window.__fxRaf) cancelAnimationFrame(window.__fxRaf); window.__fxRaf=requestAnimationFrame(function(){ roots.forEach(scan); }); }
   }).observe(document.body,{childList:true,subtree:true}); }catch(_){}
+}
+
+// === Кроссхейр на графиках: вертикальная линия + подсказка по наведению. ===
+// Глобально: использует встроенные <title> точек/баров (значения уже там), без правок
+// рендеров. Подсказка мгновенная (нативный <title> всплывает с задержкой — оставляем как есть).
+function initChartCrosshair(){
+  if(window.__xhair) return; window.__xhair=true;
+  document.addEventListener('mouseover', function(e){
+    var svg = e.target && e.target.closest && e.target.closest('svg');
+    if(!svg || svg.__xh || typeof isZoomableChart!=='function' || !isZoomableChart(svg)) return;
+    attach(svg);
+  });
+  function points(svg){
+    // элементы-данные = носители <title>; группируем по экранному X (бар/точка одного месяца).
+    var groups={};
+    svg.querySelectorAll('title').forEach(function(t){
+      var el=t.parentElement; if(!el) return; var tag=(el.tagName||'').toLowerCase();
+      if(tag!=='rect' && tag!=='circle' && tag!=='path' && tag!=='g') return;
+      var txt=(t.textContent||'').trim(); if(!txt) return;
+      var b; try{ b=el.getBoundingClientRect(); }catch(_){ return; } if(!b.width && !b.height) return;
+      var cx=b.left+b.width/2, key=Math.round(cx/8);
+      if(!groups[key]) groups[key]={x:cx, texts:[]};
+      if(groups[key].texts.indexOf(txt)<0) groups[key].texts.push(txt);
+    });
+    return Object.keys(groups).map(function(k){return groups[k];}).sort(function(a,b){return a.x-b.x;});
+  }
+  function attach(svg){
+    svg.__xh=true;
+    var line=null, tip=null;
+    function ensure(){
+      if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent,#7c5cff);opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
+      if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,#1c2030);color:var(--ink,#fff);border:1px solid var(--line,#333);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
+    }
+    function onMove(ev){
+      var pts=points(svg); if(!pts.length){ hide(); return; }
+      var mx=ev.clientX, best=pts[0];
+      for(var i=1;i<pts.length;i++) if(Math.abs(pts[i].x-mx)<Math.abs(best.x-mx)) best=pts[i];
+      var r=svg.getBoundingClientRect(); ensure();
+      line.style.top=r.top+'px'; line.style.height=r.height+'px'; line.style.left=best.x+'px';
+      tip.innerHTML=best.texts.map(function(s){return s.replace(/[&<>]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c];});}).join('<br>');
+      var tw=tip.offsetWidth||160;
+      tip.style.left=Math.max(6, Math.min(best.x+12, (window.innerWidth||1200)-tw-6))+'px';
+      tip.style.top=(r.top+8)+'px';
+    }
+    function hide(){ if(line){line.remove();line=null;} if(tip){tip.remove();tip=null;} }
+    svg.addEventListener('mousemove', onMove);
+    svg.addEventListener('mouseleave', hide);
+  }
 }
