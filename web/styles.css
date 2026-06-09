@@ -1452,10 +1452,10 @@ td.col-edit { text-align: center; }
 }
 
 .btn-xs-active {
-  background: linear-gradient(135deg, var(--accent), #ff9a76);
+  background: var(--accent);
   border-color: transparent;
   color: #fff !important;
-  box-shadow: 0 4px 12px -4px var(--accent);
+  box-shadow: 0 4px 12px -5px var(--accent);
 }
 
 /* ── Reports layout ───────────────────────────────────────────────── */
@@ -2981,7 +2981,7 @@ body.plan-incomplete .spark-fill {
 
 
 /* ─── Summary hero — карточка дня ─────────────────────────────────────── */
-.summary-hero { margin-bottom: 18px; }
+.summary-hero { margin-bottom: 22px; }
 .summary-hero.hidden { display: none; }
 
 .hero-card {
@@ -3351,26 +3351,30 @@ body.plan-incomplete .spark-fill {
 /* ─── Mobile compact mode — упрощённый дашборд на узких экранах ──────── */
 .mobile-toggle-bar {
   display: flex;                /* виден и на десктопе — «Краткий/Полный вид» */
-  padding: 10px 14px;
-  background: var(--bg-soft, rgba(0,0,0,.04));
+  padding: 13px 18px;           /* чуть больше воздуха (спокойный минимал) */
+  background: var(--bg-soft, rgba(0,0,0,.03));
+  border: 1px solid var(--line);
   border-radius: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   font-size: 13px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 .mobile-toggle-bar b { color: var(--ink); }
+/* Спокойная «призрак»-кнопка вместо громкой красной заливки. */
 .mobile-toggle-bar button {
-  background: rgb(193,68,86);
-  color: #fff;
-  border: none;
-  padding: 6px 14px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--line);
+  padding: 6px 16px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  transition: all .15s;
 }
+.mobile-toggle-bar button:hover { border-color: var(--accent); transform: translateY(-1px); }
 
 /* Краткий вид (на ВСЕХ ширинах, вкл. десктоп): прячем второстепенные секции
    дашборда, оставляя hero + KPI + таблицу точек. Скоуп #page-dashboard —
