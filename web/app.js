@@ -3192,7 +3192,7 @@ async function loadMkRfm() {
       <div class="mk-segs">${segs}</div>
       <div class="mk-rfm-cols">
         <div class="mk-rfm-col">
-          <div class="mk-rfm-col-title good">👑 Топ-20 VIP <small class="muted">— по сумме покупок (карты лояльности, без опта); предложить премиум, индивидуальный сервис</small></div>
+          <div class="mk-rfm-col-title good">👑 Топ-20 клиентов за месяц <small class="muted">— по выручке за выбранный месяц (карты лояльности, без опта); кому предложить премиум/сервис</small></div>
           ${vipRows ? `<table class="num-table"><thead><tr><th>Карта клиента</th><th class="num">Выручка, мес</th><th class="num" title="Чеков ККМ за выбранный месяц">Чеков</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
         </div>
         <div class="mk-rfm-col">
@@ -3201,7 +3201,7 @@ async function loadMkRfm() {
         </div>
       </div>
       <div class="mk-action-hint">💡 <b>Что делать:</b> VIP — персональные предложения и поздравления; Спящим — точечный push «вернёмся за подарком» с купоном на 1 неделю; Новых — onboarding (карта/бонусы).</div>
-      <div style="font-size:11px;color:var(--muted);padding:0 16px 8px">VIP определяются по RFM за 6 мес (по дисконтным картам=клиентам), а <b>выручка и чеки в таблице — за выбранный месяц</b> (наведи на сумму — покажет и 6-мес). Оптовые/корпоративные виды карт и служебные карты магазинов исключены${data.capped ? '; берётся топ-3000 карт по сумме' : ''}.</div>`;
+      <div style="font-size:11px;color:var(--muted);padding:0 16px 8px">Карточки-сегменты выше — RFM за 6 мес; таблица <b>«Топ клиентов» — по выручке за выбранный месяц</b> (по убыванию; наведи на сумму — покажет и 6-мес). Опт/корпоративные виды карт и служебные карты магазинов исключены${data.capped ? '; берётся топ-3000 карт' : ''}.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }

@@ -110,12 +110,12 @@
       </tr>`;
     }).join('');
     return `<div style="margin-top:14px">
-      <div style="font-weight:600;font-size:13px;margin-bottom:6px">Топ-10 VIP клиентов <span style="font-weight:400;color:var(--muted,#64748b)">— выручка за выбранный месяц</span></div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px">Топ-10 клиентов по выручке за месяц</div>
       <div class="table-wrap"><table style="width:100%;font-size:13px">
         <thead><tr><th>#</th><th>Клиент</th><th style="text-align:right">Выручка, мес</th><th style="text-align:right" title="Чеков ККМ за выбранный месяц">Чеков</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
-      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:6px">VIP определяются по RFM за 6 мес, а <b>выручка и чеки — за выбранный месяц</b> (наведи — покажет и 6-мес сумму). Если у VIP за месяц 0 — он давно не покупал.</div>
+      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:6px">Розничные клиенты, кто больше всех принёс <b>за выбранный месяц</b> (по убыванию; опт/служебные карты исключены). Наведи на сумму — покажет и выручку за 6 мес.</div>
     </div>`;
   }
 

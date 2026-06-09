@@ -269,9 +269,12 @@ async function buildRfmSimple(fromYM, toYM) {
         avgMonetary: Number((s.monetary / s.count).toFixed(2))
       }))
       .sort((a, b) => b.monetary - a.monetary),
+    // Топ клиентов ПО ВЫРУЧКЕ ЗА ВЫБРАННЫЙ МЕСЯЦ (а не по RFM-сегменту за 6 мес — это
+    // путало: показывали VIP-по-6мес, но с месячными суммами не по убыванию). Все розничные
+    // (опт/служебные уже исключены из list), кто покупал в этом месяце, по убыванию месяца.
     topVIP: list
-      .filter(o => o.segment === 'VIP')
-      .sort((a, b) => b.monetary - a.monetary)
+      .filter(o => o.monthly > 0)
+      .sort((a, b) => (b.monthly - a.monthly) || (b.monetary - a.monetary))
       .slice(0, 20)
       .map(o => ({ name: o.name, kind: o.kind, monetary: Number(o.monetary.toFixed(2)), monthly: Number(o.monthly.toFixed(2)), monthlyFreq: o.monthlyFreq, frequency: o.frequency, R: o.R, F: o.F, M: o.M })),
     topSleeping: list
