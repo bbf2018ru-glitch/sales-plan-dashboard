@@ -2695,7 +2695,7 @@ async function init() {
   $('mkRfmCsvVip')?.addEventListener('click', () => {
     const d = analyticsState.mkRfmData?.topVIP || [];
     if (!d.length) return alert('Нет VIP-клиентов');
-    exportCsv(d.map(x => ({ 'Карта': x.name, 'Вид': x.kind || '', 'Выручка': x.monetary, 'Чеков': x.frequency, 'R': x.R, 'F': x.F, 'M': x.M })), `rfm-vip-${state.period}.csv`);
+    exportCsv(d.map(x => ({ 'Карта': x.name, 'Вид': x.kind || '', 'Выручка_месяц': x.monthly || 0, 'Чеков_месяц': x.monthlyFreq || 0, 'Выручка_6мес': x.monetary, 'Чеков_6мес': x.frequency, 'R': x.R, 'F': x.F, 'M': x.M })), `rfm-vip-${state.period}.csv`);
   });
   $('mkRfmCsvSleep')?.addEventListener('click', () => {
     const d = analyticsState.mkRfmData?.topSleeping || [];
@@ -3179,7 +3179,7 @@ async function loadMkRfm() {
         <div class="mk-seg-money">${formatMoney(s.monetary)}</div>
         <div class="mk-seg-avg">средний ${formatMoney(s.avgMonetary)}</div>
       </div>`).join('');
-    const vipRows = (data.topVIP || []).map(v => `<tr><td>${escapeHtml(v.name)}${v.kind ? `<div style="font-size:10px;color:var(--muted)">${escapeHtml(v.kind)}</div>` : ''}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.frequency}</td></tr>`).join('');
+    const vipRows = (data.topVIP || []).map(v => `<tr><td>${escapeHtml(v.name)}${v.kind ? `<div style="font-size:10px;color:var(--muted)">${escapeHtml(v.kind)}</div>` : ''}</td><td class="num" title="за месяц ${formatMoney(v.monthly||0)} · за 6 мес ${formatMoney(v.monetary)}">${formatMoney(v.monthly||0)}</td><td class="num">${v.monthlyFreq||0}</td></tr>`).join('');
     const sleepingRows = (data.topSleeping || []).map(v => `<tr><td>${escapeHtml(v.name)}</td><td class="num">${formatMoney(v.monetary)}</td><td class="num">${v.recencyMonths} мес.</td></tr>`).join('');
     const exc = data.excluded || {};
     const excNote = (exc.wholesale || exc.internal)
@@ -3193,7 +3193,7 @@ async function loadMkRfm() {
       <div class="mk-rfm-cols">
         <div class="mk-rfm-col">
           <div class="mk-rfm-col-title good">👑 Топ-20 VIP <small class="muted">— по сумме покупок (карты лояльности, без опта); предложить премиум, индивидуальный сервис</small></div>
-          ${vipRows ? `<table class="num-table"><thead><tr><th>Карта клиента</th><th class="num">Сумма</th><th class="num" title="Уникальных чеков ККМ за 6 мес">Чеков</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
+          ${vipRows ? `<table class="num-table"><thead><tr><th>Карта клиента</th><th class="num">Выручка, мес</th><th class="num" title="Чеков ККМ за выбранный месяц">Чеков</th></tr></thead><tbody>${vipRows}</tbody></table>` : '<div class="muted" style="font-size:12px">пока нет</div>'}
         </div>
         <div class="mk-rfm-col">
           <div class="mk-rfm-col-title bad">💤 Топ-20 спящих <small class="muted">— реактивировать SMS/push с купоном</small></div>
@@ -3201,7 +3201,7 @@ async function loadMkRfm() {
         </div>
       </div>
       <div class="mk-action-hint">💡 <b>Что делать:</b> VIP — персональные предложения и поздравления; Спящим — точечный push «вернёмся за подарком» с купоном на 1 неделю; Новых — onboarding (карта/бонусы).</div>
-      <div style="font-size:11px;color:var(--muted);padding:0 16px 8px">VIP считаются по дисконтным картам (=клиентам): <b>Чеков</b> — уникальные чеки ККМ за 6 мес, <b>Сумма</b> — продажи по карте. Оптовые/корпоративные виды карт и служебные карты магазинов исключены${data.capped ? '; берётся топ-3000 карт по сумме' : ''}.</div>`;
+      <div style="font-size:11px;color:var(--muted);padding:0 16px 8px">VIP определяются по RFM за 6 мес (по дисконтным картам=клиентам), а <b>выручка и чеки в таблице — за выбранный месяц</b> (наведи на сумму — покажет и 6-мес). Оптовые/корпоративные виды карт и служебные карты магазинов исключены${data.capped ? '; берётся топ-3000 карт по сумме' : ''}.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }

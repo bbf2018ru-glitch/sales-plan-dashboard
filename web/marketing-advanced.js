@@ -99,21 +99,23 @@
 
   function renderTopVip(list) {
     const rows = list.slice(0, 10).map((v, i) => {
-      const m = Number(v.monetary) || 0;
+      const mon = Number(v.monthly) || 0;          // выручка за ВЫБРАННЫЙ месяц
+      const m6 = Number(v.monetary) || 0;          // за 6-мес окно RFM (для контекста)
+      const mf = Number(v.monthlyFreq) || 0;
       return `<tr>
         <td>${i + 1}</td>
         <td>${esc(v.name || '')}</td>
-        <td style="text-align:right" title="${m.toLocaleString('ru-RU')} ₽">${fmtMoney(m)} ₽</td>
-        <td style="text-align:right">${(v.frequency || 0).toLocaleString('ru-RU')}</td>
+        <td style="text-align:right" title="за месяц: ${mon.toLocaleString('ru-RU')} ₽ · за 6 мес: ${m6.toLocaleString('ru-RU')} ₽">${fmtMoney(mon)} ₽</td>
+        <td style="text-align:right">${mf.toLocaleString('ru-RU')}</td>
       </tr>`;
     }).join('');
     return `<div style="margin-top:14px">
-      <div style="font-weight:600;font-size:13px;margin-bottom:6px">Топ-10 VIP клиентов</div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px">Топ-10 VIP клиентов <span style="font-weight:400;color:var(--muted,#64748b)">— выручка за выбранный месяц</span></div>
       <div class="table-wrap"><table style="width:100%;font-size:13px">
-        <thead><tr><th>#</th><th>Клиент</th><th style="text-align:right">Выручка</th><th style="text-align:right" title="Число чеков, не уникальных покупок">Чеков</th></tr></thead>
+        <thead><tr><th>#</th><th>Клиент</th><th style="text-align:right">Выручка, мес</th><th style="text-align:right" title="Чеков ККМ за выбранный месяц">Чеков</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
-      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:6px">Наведите на сумму — точная цифра в всплывающей подсказке. «Чеков» — число транзакций по карте за период.</div>
+      <div style="font-size:11px;color:var(--muted,#64748b);margin-top:6px">VIP определяются по RFM за 6 мес, а <b>выручка и чеки — за выбранный месяц</b> (наведи — покажет и 6-мес сумму). Если у VIP за месяц 0 — он давно не покупал.</div>
     </div>`;
   }
 
