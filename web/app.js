@@ -3445,25 +3445,21 @@ async function loadPromoByAction() {
     const data = await fetchJson(`/api/analytics/promo-by-action?${params.toString()}`);
     if (!data.available || data.error) {
       kpis.innerHTML = '';
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
       return;
     }
     kpis.innerHTML = `
       <div class="kpi-card"><div class="kpi-label">Применений</div><div class="kpi-value">${fmtNum(data.totalApplications || 0)}</div></div>
       <div class="kpi-card"><div class="kpi-label">Заказов / чеков</div><div class="kpi-value">${fmtNum(data.uniqueDocuments || 0)}</div></div>
       <div class="kpi-card"><div class="kpi-label">Сумма скидок</div><div class="kpi-value">${fmtNum(data.totalDiscountSum || 0)} ₽</div></div>`;
-    if (bslNote && data.bslLimitNote) {
-      bslNote.classList.remove('hidden');
-      bslNote.textContent = '⚠ ' + data.bslLimitNote;
-    }
-    tbody.innerHTML = (data.documents || []).map(r => `
+    if (bslNote) bslNote.classList.add('hidden');
+    tbody.innerHTML = (data.actions || []).map(r => `
       <tr>
-        <td style="font-size:12px">${escapeHtml(r.document)}</td>
-        <td>${escapeHtml(r.store)}</td>
-        <td class="num">${fmtNum(r.productCount)}</td>
-        <td class="num">${fmtNum(r.totalSum)} ₽</td>
-        <td style="font-size:11px;color:var(--muted)">${escapeHtml(r.date)}</td>
-      </tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">За период скидок по акциям не найдено</td></tr>`;
+        <td>${escapeHtml(r.action)}</td>
+        <td class="num">${fmtNum(r.applications)}</td>
+        <td class="num">${fmtNum(r.cheques)}</td>
+        <td class="num">${fmtNum(r.discountSum)} ₽</td>
+      </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">За период скидок по акциям не найдено</td></tr>`;
     if (noteEl) {
       noteEl.textContent = data.truncatedNote ? `⚠ ${data.truncatedNote}` : '';
     }

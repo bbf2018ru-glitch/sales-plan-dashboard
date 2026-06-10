@@ -669,60 +669,58 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
 }
 
 // ─── 7) Скидки по акциям (промокоды) ────────────────────────────────────────
-// У Маши «промокод» = название акции в Справочник.Акции (типа "Промокод СУШИ").
-// В отчёте 1С «Скидки по акциям» эта связь идёт через ТЧ документа
-// (Товары.ЗначениеУсловияАвтоматическойСкидки = ссылка на Акции).
-//
-// Текущий BSL /document отдаёт только реквизиты-шапки, до ТЧ не дотягивается.
-// Поэтому пока строим частичный отчёт из РегистрНакопления.ПредоставленныеСкидки
-// (условие `"По акции (ДК)"`) — даём документ/товар/сумму, но без имени акции.
-// После добавления endpoint'а /promo-by-action в BSL — имена появятся.
+// «Акция» = элемент Справочник.Акции (типа "Кофе в подарок 3+1", "Промокод САМОВЫВОЗ",
+// "Офис", "Студенческая карта"). Связь — в ТЧ документа: ЧекККМ.Товары.
+// ЗначениеУсловияАвтоматическойСкидки → Справочник.Акции (доступно через /query_post,
+// БЕЗ доработки BSL). Сумма скидки в самой ТЧ = 0, она в РегистрНакопления.ПредоставленныеСкидки
+// → джойним регистр к ТЧ по (документ + номенклатура) и группируем по акции.
+// Раньше тянули регистр по 5000 строк и фильтровали "По акции" в JS (усечение + без имён акций).
 async function buildPromoByAction(fromYM, toYM) {
-  const months = rangeMonths(fromYM, toYM);
-  const promoRows = [];
-  let truncatedMonths = 0;
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const ny = tm === 12 ? ty + 1 : ty, nm = tm === 12 ? 1 : tm + 1;
+  const DT = `ДАТАВРЕМЯ(${fy},${fm},1)`, DTEND = `ДАТАВРЕМЯ(${ny},${nm},1)`;
+  const ACT = 'ВЫРАЗИТЬ(Т.ЗначениеУсловияАвтоматическойСкидки.Наименование КАК СТРОКА(80))';
+  const NOTEMPTY = 'Т.ЗначениеУсловияАвтоматическойСкидки <> ЗНАЧЕНИЕ(Справочник.Акции.ПустаяСсылка)';
+  const tchWhere = `Т.Ссылка.Дата >= ${DT} И Т.Ссылка.Дата < ${DTEND} И ${NOTEMPTY}`;
 
-  for (const ym of months) {
-    const d = await callRegister('ПредоставленныеСкидки', ym, ym, 5000);
-    const rows = d.rows || [];
-    if (rows.length >= 5000) truncatedMonths += 1;
-    for (const r of rows) {
-      const cond = (r['УсловиеСкидки'] || '').trim();
-      if (!/акци/i.test(cond)) continue;
-      promoRows.push({
-        date: r['Период'] || '',
-        product: (r['Номенклатура'] || '').trim() || '—',
-        document: (r['ДокументСкидки'] || '').trim() || '—',
-        store: (r['ПолучательСкидки'] || '').trim() || '—',
-        condition: cond,
-        sum: parseRu(r['СуммаСкидки'])
-      });
-    }
+  let byAct, sumRows, totRows;
+  try {
+    [byAct, sumRows, totRows] = await Promise.all([
+      // применений (строк ТЧ) и чеков по каждой акции
+      callQuery(`ВЫБРАТЬ ${ACT} КАК Акция, КОЛИЧЕСТВО(*) КАК Прим, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка) КАК Чеков`
+        + ` ИЗ Документ.ЧекККМ.Товары КАК Т ГДЕ ${tchWhere} СГРУППИРОВАТЬ ПО ${ACT}`, { timeoutMs: 90000 }),
+      // сумма скидки по акции — из регистра, джойн к ТЧ по документу+номенклатуре
+      callQuery(`ВЫБРАТЬ ${ACT} КАК Акция, СУММА(Р.СуммаСкидки) КАК Скидка`
+        + ` ИЗ РегистрНакопления.ПредоставленныеСкидки КАК Р`
+        + ` ВНУТРЕННЕЕ СОЕДИНЕНИЕ Документ.ЧекККМ.Товары КАК Т ПО Р.ДокументСкидки = Т.Ссылка И Р.Номенклатура = Т.Номенклатура`
+        + ` ГДЕ Р.Период >= ${DT} И Р.Период < ${DTEND} И ${NOTEMPTY} СГРУППИРОВАТЬ ПО ${ACT}`, { timeoutMs: 120000 }),
+      // итоги для KPI (точный distinct чеков с любой акцией)
+      callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Прим, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка) КАК Чеков`
+        + ` ИЗ Документ.ЧекККМ.Товары КАК Т ГДЕ ${tchWhere}`, { timeoutMs: 90000 }),
+    ]);
+  } catch (e) {
+    return { period: { from: fromYM, to: toYM }, available: false, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
   }
 
-  // Группировка по документу (один заказ/чек = одно «применение промокода»)
-  const byDoc = new Map();
-  for (const r of promoRows) {
-    if (!byDoc.has(r.document)) byDoc.set(r.document, { document: r.document, date: r.date, store: r.store, products: [], totalSum: 0 });
-    const e = byDoc.get(r.document);
-    e.products.push({ product: r.product, sum: Number(r.sum.toFixed(2)) });
-    e.totalSum += r.sum;
-  }
-  const docList = Array.from(byDoc.values())
-    .sort((a, b) => b.totalSum - a.totalSum)
-    .map(d => ({ ...d, totalSum: Number(d.totalSum.toFixed(2)), productCount: d.products.length }));
+  const discBy = new Map();
+  for (const r of sumRows.rows || []) discBy.set((r['Акция'] || '').trim(), parseRu(r['Скидка']) || 0);
+  const actions = (byAct.rows || [])
+    .map(r => {
+      const action = (r['Акция'] || '').trim();
+      return { action, applications: parseRu(r['Прим']) || 0, cheques: parseRu(r['Чеков']) || 0, discountSum: Number((discBy.get(action) || 0).toFixed(2)) };
+    })
+    .filter(a => a.action) // пустую акцию (прочие скидки) не показываем
+    .sort((a, b) => (b.discountSum - a.discountSum) || (b.applications - a.applications));
 
+  const t = (totRows.rows || [])[0] || {};
   return {
     period: { from: fromYM, to: toYM },
-    totalApplications: promoRows.length,
-    uniqueDocuments: byDoc.size,
-    totalDiscountSum: Number(promoRows.reduce((s, r) => s + r.sum, 0).toFixed(2)),
-    truncatedMonths,
-    truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 строк регистра — данные неполные.`
-      : null,
-    bslLimitNote: 'Имя конкретной акции (типа "Промокод СУШИ") пока не показывается — оно в ТЧ документа. Добавь endpoint /promo-by-action в BSL и здесь появится.',
-    documents: docList.slice(0, 200)
+    totalApplications: parseRu(t['Прим']) || 0,
+    uniqueDocuments: parseRu(t['Чеков']) || 0,
+    totalDiscountSum: Number(actions.reduce((s, a) => s + a.discountSum, 0).toFixed(2)),
+    truncatedNote: null, // агрегация в 1С — без потолка
+    actions
   };
 }
 
