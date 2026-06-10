@@ -635,45 +635,54 @@ async function buildProductionKg(_fromYM, _toYM) {
 // Поля: ДисконтнаяКарта, ВладелецДисконтнойКарты, Сумма, Период.
 // Используется для топ-100 клиентов по выручке (не по бонусам).
 async function buildTopCustomersByRevenue(fromYM, toYM) {
-  const months = rangeMonths(fromYM, toYM);
-  const byCard = new Map(); // card -> { card, owner, revenue, transactions }
-  let totalRows = 0;
-  let truncatedMonths = 0;
+  // Серверная группировка в 1С (а не построчное чтение callRegister с лимитом 5000):
+  //  • даёт точные итоги по всем картам без обрезки;
+  //  • ТИПЗНАЧЕНИЯ(Регистратор)=ЧекККМ снимает дубль — отпуск со склада ГП 1С проводит
+  //    И Реализацией, И ЧекомККМ на ту же сумму, регистр иначе задваивает оборот/покупки.
+  // Имя клиента уже содержится в Наименовании карты («КЛП 038231 Иванов И.И.») → owner не тянем.
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const ny = tm === 12 ? ty + 1 : ty;
+  const nm = tm === 12 ? 1 : tm + 1;
+  const DT = `ДАТАВРЕМЯ(${fy},${fm},1)`;
+  const DTEND = `ДАТАВРЕМЯ(${ny},${nm},1)`;
+  const WHERE = `П.Период >= ${DT} И П.Период < ${DTEND}`
+    + ` И П.ДисконтнаяКарта <> ЗНАЧЕНИЕ(Справочник.ИнформационныеКарты.ПустаяСсылка)`
+    + ` И ТИПЗНАЧЕНИЯ(П.Регистратор) = ТИП(Документ.ЧекККМ)`;
 
-  for (const ym of months) {
-    const d = await callRegister('ПродажиПоДисконтнымКартам', ym, ym, 5000);
-    const rows = d.rows || [];
-    totalRows += rows.length;
-    if (rows.length >= 5000) truncatedMonths += 1;
-    for (const r of rows) {
-      const card = (r['ДисконтнаяКарта'] || '').trim();
-      const owner = (r['ВладелецДисконтнойКарты'] || '').trim();
-      const sum = parseRu(r['Сумма']);
-      if (!card) continue;
-      if (!byCard.has(card)) byCard.set(card, { card, owner, revenue: 0, transactions: 0 });
-      const c = byCard.get(card);
-      c.revenue += sum;
-      c.transactions += 1;
-    }
-  }
+  const [top, totals] = await Promise.all([
+    callQuery(
+      `ВЫБРАТЬ ПЕРВЫЕ 100 ВЫРАЗИТЬ(П.ДисконтнаяКарта.Наименование КАК СТРОКА(100)) КАК Карта,`
+      + ` СУММА(П.Сумма) КАК Сумма, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Регистратор) КАК Покупок`
+      + ` ИЗ РегистрНакопления.ПродажиПоДисконтнымКартам КАК П ГДЕ ${WHERE}`
+      + ` СГРУППИРОВАТЬ ПО ВЫРАЗИТЬ(П.ДисконтнаяКарта.Наименование КАК СТРОКА(100))`
+      + ` УПОРЯДОЧИТЬ ПО Сумма УБЫВ`, { timeoutMs: 120000 }),
+    callQuery(
+      `ВЫБРАТЬ СУММА(П.Сумма) КАК Сумма, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.ДисконтнаяКарта) КАК Карт,`
+      + ` КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Регистратор) КАК Покупок`
+      + ` ИЗ РегистрНакопления.ПродажиПоДисконтнымКартам КАК П ГДЕ ${WHERE}`, { timeoutMs: 120000 }),
+  ]);
 
-  const arr = Array.from(byCard.values()).sort((a, b) => b.revenue - a.revenue);
-  const totalRevenue = arr.reduce((s, c) => s + c.revenue, 0);
+  const arr = (top.rows || []).map(r => {
+    const card = (r['Карта'] || '').trim();
+    const revenue = parseRu(r['Сумма']);
+    const transactions = parseRu(r['Покупок']) || 0;
+    return { card, revenue, transactions };
+  }).filter(c => c.card);
+
+  const t = (totals.rows || [])[0] || {};
   return {
     period: { from: fromYM, to: toYM },
-    totalCards: arr.length,
-    totalTransactions: totalRows,
-    totalRevenue: Number(totalRevenue.toFixed(2)),
-    truncatedMonths,
-    truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 строк — данные могут быть неполными.`
-      : null,
-    topCards: arr.slice(0, 100).map(c => ({
+    totalCards: parseRu(t['Карт']) || 0,
+    totalTransactions: parseRu(t['Покупок']) || 0,
+    totalRevenue: Number((parseRu(t['Сумма']) || 0).toFixed(2)),
+    truncatedNote: null,
+    topCards: arr.map(c => ({
       card: c.card,
-      owner: c.owner,
+      owner: '',
       revenue: Number(c.revenue.toFixed(2)),
       transactions: c.transactions,
-      avgTicket: Number((c.revenue / c.transactions).toFixed(2))
+      avgTicket: c.transactions ? Number((c.revenue / c.transactions).toFixed(2)) : 0
     }))
   };
 }
