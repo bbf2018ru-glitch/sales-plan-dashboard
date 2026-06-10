@@ -5866,7 +5866,7 @@ function mktLoadYoY(){
     // помесячной истории (directHistory), live-снимок (+кампании, +баланс) — только текущий.
     var dl=document.getElementById('mktDirectLive');
     if(dl){ var dd=d.external&&d.external.direct;
-      var _MMd=['','января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+      var _MMd=['','январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
       var _selYM=mktSelectedPeriod();
       var _curYM=(window.__metaPeriods__&&window.__metaPeriods__[0])|| (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
       var _isCur=(_selYM===_curYM);
