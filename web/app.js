@@ -4012,15 +4012,25 @@ function renderHeatmap() {
 function renderTopMargin() {
   const tbody = document.querySelector('#analyticsTopMarginTbl tbody');
   if (!tbody) return;
-  const rows = analyticsState.data?.topMargin || [];
+  // По товарам нет построчной себестоимости из 1С (cost=0 у всех) → ранжировать по марже
+  // не из чего (старый topMargin приходил пустым). Ранжируем по ВЫРУЧКЕ, а маржу/наценку
+  // показываем «там, где она есть»: сейчас «—», но колонка сама заполнится, если 1С начнёт
+  // слать себестоимость (или появится STORE_MARKUPS_JSON). Источник — abc (помесячно).
+  const rows = (analyticsState.data?.abc || [])
+    .slice().sort((a, b) => (b.fact || 0) - (a.fact || 0)).slice(0, 30);
+  if (analyticsState.data) analyticsState.data.topMargin = rows; // для CSV-экспорта (та же выборка)
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
+    return;
+  }
   tbody.innerHTML = rows.map((r, i) => `
     <tr>
       <td class="col-num">${i+1}</td>
       <td><b>${escapeHtml(r.productName)}</b></td>
-      <td><span class="muted" style="font-size:11px">${escapeHtml(r.category || '—')}</span></td>
+      <td><span class="muted" style="font-size:11px">${escapeHtml((r.category || '—').trim())}</span></td>
       <td class="num"><span class="abc-badge abc-${r.abc}">${r.abc}</span></td>
       <td class="num">${fmtNum(r.fact)}</td>
-      <td class="num"><b>${fmtNum(r.margin)}</b></td>
+      <td class="num">${r.margin != null ? '<b>' + fmtNum(r.margin) + '</b>' : '—'}</td>
       <td class="num">${fmtPct(r.marginPct)}</td>
       <td class="num">${fmtNum(r.quantity)}</td>
     </tr>
