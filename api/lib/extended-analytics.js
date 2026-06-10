@@ -121,64 +121,52 @@ function peekMonthCards(ym) {
   return null;
 }
 
-// Помесячно: новые карты в каждом месяце с янв пред.года по выбранный включительно.
-// «Новая» = карта появилась впервые ИМЕННО в этом месяце (нет в предыдущих 12 мес и нет
-// в более ранних месяцах того же ряда).
-// Non-blocking: если месяц не в кэше — добавляет _pending плейсхолдер и греет фон.
+// Помесячно: новые/активные карты с янв пред.года по выбранный включительно.
+// «Новая» = карта, чьё ПЕРВОЕ движение бонусов попало в этот месяц (МИНИМУМ(Период)).
+// Считаем агрегацией в 1С: построчное чтение по 5000 строк/мес занижало (карт ~10.8к/мес),
+// и «новизну» определяло на огрызке множеств. Теперь точно и cap-free.
 async function buildNewCustomersMonthly(period) {
   const [y, m] = period.split('-').map(Number);
-  // baseline 12 мес до янв пред.года (для отсечки «новых» от давних)
   const seriesMonths = [];
   for (let yy = y - 1; yy <= y; yy++) {
     const lastM = (yy === y) ? m : 12;
     for (let mm = 1; mm <= lastM; mm++) seriesMonths.push(`${yy}-${String(mm).padStart(2, '0')}`);
   }
-  // baseline: 12 мес до первого месяца ряда
-  const baselineMonths = [];
-  let bm = seriesMonths[0];
-  for (let i = 0; i < 12; i++) { bm = prevMonth(bm); baselineMonths.unshift(bm); }
+  const first = seriesMonths[0], last = seriesMonths[seriesMonths.length - 1];
+  const seriesStart = ymBound(first);          // начало ряда
+  const seriesEnd = ymBound(last, 1);          // месяц после последнего
+  const DEEP = ymBound(first, -24);            // ретро 24 мес для «первого появления»
+  const TBL = 'РегистрНакопления.Бонусы КАК Б';
+  const ymKey = (raw) => { const d = parseRuDate(raw); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : null; };
 
-  // Собираем baseline из того что есть в кэше (синхронно). Недостающее греется фоном.
-  const baselineCards = new Set();
-  let baselinePending = 0;
-  for (const ym of baselineMonths) {
-    const c = monthCardsCache.getCached('cards:' + ym);
-    if (c) {
-      for (const card of c.cards || []) baselineCards.add(card);
-    } else {
-      baselinePending++;
-      if (!monthCardsCache.isPending('cards:' + ym)) {
-        getMonthCards(ym).then(() => console.log(`[new-customers] warm baseline ${ym}`)).catch(() => {});
-      }
-    }
+  let actRows, newRows;
+  try {
+    [actRows, newRows] = await Promise.all([
+      // активные карты по месяцам
+      callQuery(`ВЫБРАТЬ НАЧАЛОПЕРИОДА(Б.Период, МЕСЯЦ) КАК М, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Б.БонуснаяКарта) КАК Акт`
+        + ` ИЗ ${TBL} ГДЕ Б.Период >= ${seriesStart} И Б.Период < ${seriesEnd}`
+        + ` СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Б.Период, МЕСЯЦ)`, { timeoutMs: 90000 }),
+      // новые карты по месяцу первого появления (МИНИМУМ Период по карте, скан с DEEP)
+      callQuery(`ВЫБРАТЬ НАЧАЛОПЕРИОДА(Перв.Первая, МЕСЯЦ) КАК М, КОЛИЧЕСТВО(*) КАК Новых ИЗ`
+        + ` (ВЫБРАТЬ Б.БонуснаяКарта КАК Карта, МИНИМУМ(Б.Период) КАК Первая ИЗ ${TBL}`
+        + ` ГДЕ Б.Период >= ${DEEP} И Б.Период < ${seriesEnd} СГРУППИРОВАТЬ ПО Б.БонуснаяКарта) КАК Перв`
+        + ` ГДЕ Перв.Первая >= ${seriesStart} СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Перв.Первая, МЕСЯЦ)`, { timeoutMs: 120000 }),
+    ]);
+  } catch (e) {
+    return { period, available: false, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
   }
 
-  // Серия по месяцам периода
-  const series = [];
-  const seenCards = new Set(baselineCards); // карты которые уже встречались
-  let seriesPending = 0;
-  for (const ym of seriesMonths) {
-    const c = monthCardsCache.getCached('cards:' + ym);
-    if (!c) {
-      series.push({ ym, newCards: null, activeCards: null, _pending: true });
-      seriesPending++;
-      if (!monthCardsCache.isPending('cards:' + ym)) {
-        getMonthCards(ym).then(() => console.log(`[new-customers] warm series ${ym}`)).catch(() => {});
-      }
-      continue;
-    }
-    let newInMonth = 0;
-    for (const card of c.cards || []) {
-      if (!seenCards.has(card)) { newInMonth++; seenCards.add(card); }
-    }
-    series.push({ ym, newCards: newInMonth, activeCards: (c.cards || []).length });
-  }
+  const actBy = new Map(), newBy = new Map();
+  for (const r of actRows.rows || []) { const k = ymKey(r['М']); if (k) actBy.set(k, parseRu(r['Акт']) || 0); }
+  for (const r of newRows.rows || []) { const k = ymKey(r['М']); if (k) newBy.set(k, parseRu(r['Новых']) || 0); }
+
+  const series = seriesMonths.map(ym => ({ ym, newCards: newBy.get(ym) || 0, activeCards: actBy.get(ym) || 0 }));
   return {
     period,
-    range: { from: seriesMonths[0], to: seriesMonths[seriesMonths.length - 1] },
-    baseline: { months: baselineMonths.length, pending: baselinePending, knownCards: baselineCards.size },
+    range: { from: first, to: last },
+    baseline: { months: 24, note: 'новизна = первое движение карты за 24 мес ретро' },
     series,
-    seriesPending
+    seriesPending: 0
   };
 }
 
