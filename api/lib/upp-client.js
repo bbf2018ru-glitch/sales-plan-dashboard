@@ -14,6 +14,31 @@ const { fetchUppPackage } = require('./upp-pull');
 
 const CACHE_DIR = path.join(__dirname, '..', '..', 'data', 'cache');
 
+// ── Ограничитель одновременных подключений к 1С ──────────────────────────────
+// warm-функции маркетинга дёргают compute() с Promise.all (~8-15 запросов разом).
+// На рестарте (особенно при частых автодеплоях) этот всплеск тапает прод-1С Маши
+// до ECONNREFUSED/EHOSTUNREACH. Кап сглаживает всплеск: не более N подключений
+// зараз, остальные ждут очереди. Авто-pull (upp-pull напрямую из планировщика)
+// идёт МИМО лимита — его 1 лёгкое соединение в минуту не должно ждать warm.
+const MAX_1C = Number(process.env.UPP_MAX_CONCURRENCY) || 3;
+let active1c = 0;
+const wait1c = [];
+function acquire1c() {
+  return new Promise((resolve) => {
+    if (active1c < MAX_1C) { active1c++; resolve(); }
+    else wait1c.push(resolve);
+  });
+}
+function release1c() {
+  const next = wait1c.shift();
+  if (next) next();        // слот передаётся ждущему, active1c не меняется
+  else active1c--;
+}
+async function withLimit(fn) {
+  await acquire1c();
+  try { return await fn(); } finally { release1c(); }
+}
+
 function base() {
   return (process.env.UPP_PULL_URL || '').replace(/\/pull(\?.*)?$/, '');
 }
@@ -70,19 +95,19 @@ function rangeMonths(fromYM, toYM) {
 async function callRegister(name, fromYM, toYM, limit = 999) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/register?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 async function callDocument(name, fromYM, toYM, limit = 999) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/document?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 async function callObject(kind, name) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/object?kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(name)}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 // /pull — полный пакет за месяц; нужен ради products[] с НоменклатурнаяГруппа
@@ -90,21 +115,21 @@ async function callObject(kind, name) {
 async function callPull(period) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/pull?period=${encodeURIComponent(period)}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 // /stores-detail — справочник Склады (code, name, ВидСклада/формат).
 async function callStoresDetail(limit = 2000) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/stores-detail?limit=${limit}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 // /sales-detail — строки чеков (НомерЧека/КартаКод/суммы). Потолка нет (тянет 78k+).
 async function callSalesDetail(period, limit = 500000) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/sales-detail?period=${encodeURIComponent(period)}&limit=${limit}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 // /catalog — у Маши РАБОТАЕТ для справочника «Акции» (проверено 27.05.2026),
@@ -112,7 +137,7 @@ async function callSalesDetail(period, limit = 500000) {
 async function callCatalog(name, limit = 999) {
   if (!base()) throw new Error('UPP_PULL_URL не настроен');
   const url = `${base()}/catalog?name=${encodeURIComponent(name)}&limit=${limit}`;
-  return fetchUppPackage({ url, ...authOpts() });
+  return withLimit(() => fetchUppPackage({ url, ...authOpts() }));
 }
 
 // /query_post — УНИВЕРСАЛЬНЫЙ read-only исполнитель запросов 1С (ВЫБРАТЬ).
@@ -133,7 +158,7 @@ function callQuery(queryText, { timeoutMs = 100000 } = {}) {
   };
   const { username, password } = authOpts();
   if (username) headers['Authorization'] = 'Basic ' + Buffer.from(`${username}:${password || ''}`).toString('base64');
-  return new Promise((resolve, reject) => {
+  return withLimit(() => new Promise((resolve, reject) => {
     const req = lib.request({
       protocol: target.protocol, hostname: target.hostname,
       port: target.port || (isHttps ? 443 : 80),
@@ -152,7 +177,7 @@ function callQuery(queryText, { timeoutMs = 100000 } = {}) {
     req.on('error', reject);
     req.setTimeout(timeoutMs, () => req.destroy(new Error('UPP /query timeout')));
     req.write(body); req.end();
-  });
+  }));
 }
 
 // ─── Простой in-memory cache с TTL ──────────────────────────────────────
