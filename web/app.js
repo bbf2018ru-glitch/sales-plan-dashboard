@@ -3651,6 +3651,7 @@ async function loadAnalytics() {
     renderComparison();
     renderCheques();
     renderDiscounts();
+    loadNetworkChequesFromChannels(); // фоллбэк из channels, если 1С не прислала cheque_stats
     renderNewProducts();
     renderCakeSegments();
     renderByStoreFormat();
@@ -4220,6 +4221,62 @@ function renderDiscounts() {
       <div style="text-align:right;margin-top:8px;font-size:13px;color:var(--muted)">Итого скидок: <b style="color:var(--ink)">${fmtNum(total)} ₽</b></div>
     </div>
   `;
+}
+
+// ── Фоллбэк «Чеки и средний чек» + «Скидки по видам» из marketing channels ──
+// 1С Маши НЕ присылает cheque_stats (старый BSL-модуль) → buildSalesAnalytics
+// отдаёт cheques=null, и оба блока в подвкладке «Сеть» вечно пустые. Но те же
+// чеки/средний чек/%карты УЖЕ считаются live из 1С (sales-detail) в эндпоинте
+// marketing channels (вкладка Маркетинг→Обзор). Берём их оттуда. Разбивку скидок
+// по видам (ручные/авто/сертификаты) cheque_stats тоже не даёт — она есть в
+// подвкладке «Промо»; здесь показываем реальную компоненту (оплачено бонусами)
+// и указываем, где полная разбивка.
+async function loadNetworkChequesFromChannels() {
+  if (analyticsState.data && analyticsState.data.cheques) return; // 1С прислала настоящие — не трогаем
+  try {
+    const ch = await fetchJson('/api/marketing/channels?period=' + state.period);
+    if (!ch || ch.error || !Array.isArray(ch.byStore) || !ch.byStore.length) return;
+    const byStore = ch.byStore
+      .filter(s => s.revenue && s.revenue.cur > 0)
+      .map(s => {
+        const cnt = (s.cheques && s.cheques.cur) || 0;
+        const cardPct = (s.cardPct && s.cardPct.cur) || 0;
+        return {
+          storeId: s.code, storeName: s.name,
+          chequeCount: cnt,
+          withCardCount: Math.round(cnt * cardPct / 100),
+          cardSharePct: cardPct,
+          factSum: (s.revenue && s.revenue.cur) || 0,
+          avgCheque: (s.avgCheck && s.avgCheck.cur) || (cnt ? Math.round(s.revenue.cur / cnt) : 0)
+        };
+      })
+      .sort((a, b) => b.chequeCount - a.chequeCount);
+    if (!byStore.length) return;
+    const totalCheques = (ch.cheques && ch.cheques.cur) || byStore.reduce((s, x) => s + x.chequeCount, 0);
+    const totalFact = (ch.revenue && ch.revenue.cur) || byStore.reduce((s, x) => s + x.factSum, 0);
+    const totalCard = byStore.reduce((s, x) => s + x.withCardCount, 0);
+    const bonus = (ch.bonus && ch.bonus.cur) || 0;
+    analyticsState.data = analyticsState.data || {};
+    analyticsState.data.cheques = {
+      totals: {
+        chequeCount: totalCheques,
+        avgCheque: (ch.avgCheck && ch.avgCheck.cur) || (totalCheques ? Math.round(totalFact / totalCheques) : 0),
+        cardSharePct: (ch.cardPct && ch.cardPct.cur != null) ? ch.cardPct.cur : (totalCheques ? Math.round(totalCard / totalCheques * 1000) / 10 : 0),
+        avgChequesPerStore: byStore.length ? Math.round(totalCheques / byStore.length) : 0
+      },
+      byStore,
+      discountBreakdown: bonus > 0 ? [{ type: 'Оплачено бонусами', amount: bonus }] : [],
+      _fromChannels: true
+    };
+    renderCheques();
+    renderDiscounts();
+    // Пометка источника + указатель на полную разбивку скидок в «Промо».
+    const noteHtml = '<div style="font-size:11px;color:var(--muted);margin-top:6px">Источник — live из 1С (sales-detail), как в «Маркетинг → Обзор». Полная разбивка скидок по видам (ручные / авто / сертификаты) — в подвкладке <b>«Промо»</b>.</div>';
+    const cc = $('analyticsChequesContent');
+    if (cc && !cc.querySelector('.cheques-src-note')) { const d = document.createElement('div'); d.className = 'cheques-src-note'; d.innerHTML = noteHtml; cc.appendChild(d); }
+    const dc = $('analyticsDiscountsContent');
+    if (dc && !dc.querySelector('.cheques-src-note')) { const d = document.createElement('div'); d.className = 'cheques-src-note'; d.innerHTML = noteHtml; dc.appendChild(d); }
+  } catch (_) { /* канал недоступен — остаются пустые состояния */ }
 }
 
 // ── Новые позиции в ассортименте ──────────────────────────────────────
