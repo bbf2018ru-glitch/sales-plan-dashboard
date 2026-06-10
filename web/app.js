@@ -6271,7 +6271,7 @@ function initChartCrosshair(){
     var line=null, tip=null;
     function ensure(){
       if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent,#7c5cff);opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
-      if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,#1c2030);color:var(--ink,#fff);border:1px solid var(--line,#333);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
+      if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,var(--bg));color:var(--ink,#14151a);border:1px solid var(--line,#e4e5ea);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
     }
     function onMove(ev){
       var pts=points(svg); if(!pts.length){ hide(); return; }
