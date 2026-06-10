@@ -155,6 +155,10 @@ const RFM_WHOLESALE_KINDS = /корпоратив|офис|привилег|оп
 // и анонимные карты без владельца (имя оканчивается на «нет»). NB: \b в JS не работает
 // с кириллицей — используем явные границы (^|\s) и (\s|$).
 const RFM_INTERNAL_CARD = /магазин|склад|кондитерск|(^|\s)(нет|дс)(\s|$)/i;
+// Карта БЕЗ ИМЕНИ владельца = только серия+номер (напр. «ВК3 000383», «ВК 077328») —
+// служебные/регистрационные/незаполненные (серия ВК3 = регистрация на точке). У реального
+// клиента в имени есть ФИО после номера. Такие в «топ клиентов» не показываем.
+const RFM_NONAME = /^[а-яёa-z]{1,4}\d*\s+\d+\s*$/i;
 
 async function buildRfmSimple(fromYM, toYM) {
   const today = nowYM();
@@ -182,7 +186,7 @@ async function buildRfmSimple(fromYM, toYM) {
     const kind = String(r['Вид'] || '').trim();
     if (!name) continue;
     if (RFM_WHOLESALE_KINDS.test(kind)) { exclWholesale++; continue; }   // опт/корпоратив
-    if (RFM_INTERNAL_CARD.test(name)) { exclInternal++; continue; }       // магазины/служебные
+    if (RFM_INTERNAL_CARD.test(name) || RFM_NONAME.test(name)) { exclInternal++; continue; } // магазины/служебные/без имени
     list.push({
       name, kind,
       frequency: parseRu(r['Чеков']) || 0,   // ЧЕКИ (РАЗЛИЧНЫЕ Регистратор) за окно RFM
