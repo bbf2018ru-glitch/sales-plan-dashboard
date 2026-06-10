@@ -3580,26 +3580,34 @@ async function loadProduction() {
   }
 }
 
-async function loadChequeCategories() {
+// «Доли категорий в выручке» — из byCategory (тех же помесячных данных 1С, что и
+// «По группам»). Раньше тянули /api/analytics/cheque-categories, который без диапазона
+// отдавал ВСЕ продажи за всё время (не менялся по месяцу) и реконструировал «чеки» по
+// soldAt-до-секунды — а soldAt в БД = время выгрузки (пачки сваливаются), т.е. цифры были
+// артефактами. Здесь — реальные доли в выручке + доля в проданных штуках, за выбранный месяц.
+function loadChequeCategories() {
   const tbody = document.querySelector('#chequeCategoriesTbl tbody');
   const totalEl = $('chequeCategoriesTotal');
   if (!tbody) return;
-  try {
-    const params = new URLSearchParams();
-    if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,10));
-    if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,10));
-    const data = await fetchJson(`/api/analytics/cheque-categories?${params.toString()}`);
-    if (totalEl) totalEl.textContent = fmtNum(data.totalCheques || 0);
-    tbody.innerHTML = (data.byCategory || []).map(r => `
-      <tr>
-        <td><b>${escapeHtml(r.category)}</b></td>
-        <td class="num">${fmtNum(r.chequeCount)}</td>
-        <td class="num">${r.chequePct}%</td>
-        <td class="num">${fmtNum(r.amount)} ₽</td>
-      </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
+  const rows = (analyticsState.data && analyticsState.data.byCategory) || [];
+  if (!rows.length) {
+    if (totalEl) totalEl.textContent = '—';
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
+    return;
   }
+  const totalFact = rows.reduce((s, r) => s + (r.fact || 0), 0);
+  const totalQty = rows.reduce((s, r) => s + (r.quantity || 0), 0);
+  if (totalEl) totalEl.textContent = `${fmtNum(totalFact)} ₽`;
+  tbody.innerHTML = rows.slice().sort((a, b) => (b.fact || 0) - (a.fact || 0)).map(r => {
+    const revShare = (r.share != null) ? r.share : (totalFact > 0 ? r.fact / totalFact * 100 : 0);
+    const qtyShare = totalQty > 0 ? (r.quantity || 0) / totalQty * 100 : 0;
+    return `<tr>
+        <td><b>${escapeHtml((r.category || '—').trim())}</b></td>
+        <td class="num">${fmtNum(r.fact)} ₽</td>
+        <td class="num">${fmtPct(revShare)}</td>
+        <td class="num">${fmtPct(qtyShare)}</td>
+      </tr>`;
+  }).join('');
 }
 
 function renderCustomersFuture(d) {

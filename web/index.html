@@ -884,25 +884,25 @@
             </div>
           </section>
 
-          <!-- Доли категорий в количестве чеков -->
+          <!-- Доли категорий в выручке -->
           <section class="section atab-section" data-atab="products">
             <div class="section-header">
               <div>
-                <div class="section-label">Доли категорий в чеках</div>
-                <div class="section-hint">% чеков, содержащих товар каждой категории. Чек восстанавливается из БД sales по (магазин × время до секунды).</div>
+                <div class="section-label">Доли категорий в выручке</div>
+                <div class="section-hint">Доля каждой категории в выручке и в проданных штуках за выбранный месяц. Источник — 1С (sales), помесячно. «Доля в штуках» ≠ доле в выручке у дешёвых массовых позиций (кофе, добавки).</div>
               </div>
             </div>
             <div class="panel">
               <div style="padding:12px 14px;font-size:12px;color:var(--muted)">
-                Всего чеков за период: <b id="chequeCategoriesTotal">—</b>
+                Выручка за период: <b id="chequeCategoriesTotal">—</b>
               </div>
               <div class="table-wrap">
                 <table id="chequeCategoriesTbl">
                   <thead><tr>
                     <th>Категория</th>
-                    <th class="num">Чеков с категорией</th>
-                    <th class="num">% чеков</th>
-                    <th class="num">Сумма (пропорц.)</th>
+                    <th class="num">Выручка ₽</th>
+                    <th class="num">Доля выручки</th>
+                    <th class="num">Доля в штуках</th>
                   </tr></thead>
                   <tbody></tbody>
                 </table>
@@ -1570,7 +1570,7 @@
       </form>
     </div>
 
-    <script src="/app.js?v=143"></script>
+    <script src="/app.js?v=144"></script>
     <script src="/marketing-advanced.js?v=23"></script>
   </body>
 </html>
