@@ -123,10 +123,12 @@ function warmExtended() {
 setTimeout(warmExtended, 60000);
 setInterval(warmExtended, 24 * 60 * 60 * 1000);
 
-// Помесячный «новые карты лояльности» — ~29 запросов к 1С последовательно (тоже медленный).
+// Помесячный «новые карты лояльности». Теперь cap-free (агрегация в 1С, 2 запроса ~3.5с)
+// — греем сам endpoint, чтобы первый пользователь не ждал. Старый warmNewCustomersMonthly
+// грел кэш month-cards, который после перевода когорт/графика на агрегацию больше не читается.
 function warmNewCustomers() {
-  warmNewCustomersMonthly()
-    .then(r => console.log('[new-customers] warm result', JSON.stringify(r)))
+  getNewCustomersMonthly({})
+    .then(() => console.log('[new-customers] warm ok'))
     .catch(e => console.log('[new-customers] warm error', e.message));
 }
 setTimeout(warmNewCustomers, 90000);
