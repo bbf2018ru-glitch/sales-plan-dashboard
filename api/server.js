@@ -1107,6 +1107,18 @@ const server = http.createServer(async (req, res) => {
                 const avg = Math.round(liveRev / cheqCur);
                 data.avgCheck = { cur: avg, prev: data.avgCheck.prev, deltaPct: dl(avg, data.avgCheck.prev), live: true };
               }
+              // Та же живая цифра — в последнюю точку monthlySeries (текущий месяц): её читают
+              // графики «Динамика по месяцам» (Обзор) и таблица «Продажи и лояльность»
+              // (Лояльность). Иначе headline live, а график/таблица за тот же месяц — из кэша.
+              const ser = data.monthlySeries && data.monthlySeries.cur;
+              if (Array.isArray(ser)) {
+                const pt = ser.find((p) => p && p.ym === period);
+                if (pt) {
+                  pt.revenue = liveRev;
+                  if (liveCheq > 0) { pt.cheques = liveCheq; pt.avgCheck = Math.round(liveRev / liveCheq); }
+                  pt._pending = false; pt.live = true;
+                }
+              }
               data.curLive = true; // cur не из кэша — фронт может показать «live»
             }
           } catch (_) { /* db недоступна — отдаём кэш как есть */ }
