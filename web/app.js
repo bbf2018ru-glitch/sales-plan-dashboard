@@ -4233,8 +4233,10 @@ function renderDiscounts() {
 // и указываем, где полная разбивка.
 async function loadNetworkChequesFromChannels() {
   if (analyticsState.data && analyticsState.data.cheques) return; // 1С прислала настоящие — не трогаем
+  const reqPeriod = state.period; // фиксируем месяц запроса
   try {
-    const ch = await fetchJson('/api/marketing/channels?period=' + state.period);
+    const ch = await fetchJson('/api/marketing/channels?period=' + reqPeriod);
+    if (reqPeriod !== state.period) return; // месяц переключили пока грузилось — не перетираем свежее
     if (!ch || ch.error || !Array.isArray(ch.byStore) || !ch.byStore.length) return;
     const byStore = ch.byStore
       .filter(s => s.revenue && s.revenue.cur > 0)
