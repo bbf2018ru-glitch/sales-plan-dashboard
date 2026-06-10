@@ -5978,7 +5978,7 @@ function mktLoadYoY(){
           info.style.cssText = 'font-size:11px;color:var(--muted);margin-top:6px';
           prTbl.parentNode.parentNode.appendChild(info);
         }
-        if (info) info.textContent = 'Зелёный «live» = ячейка обновлена сегодня автоскрейпом с сайта конкурента (cron вторник 04:30). Обновлено: ' + st;
+        if (info) info.textContent = 'Зелёный «live» = ячейка из автоскрейпа сайта конкурента (cron ежедневно 04:30). Последнее обновление: ' + st;
       }
     }
     // SERP — позиции в Яндексе: Мария vs Стефания (живые данные)
