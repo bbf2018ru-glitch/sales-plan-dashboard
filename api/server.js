@@ -1074,7 +1074,42 @@ const server = http.createServer(async (req, res) => {
       // из кэша (прогрев фоном), той же чувствительности, что и уже публичный summary.
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
-        sendJson(res, 200, await marketingChannels.getChannels(period));
+        const data = await marketingChannels.getChannels(period);
+        // Текущий месяц: заголовочную выручку/чеки берём ЖИВЫМИ из db (как summary и
+        // gross-profit), а не из 6ч-кэша channels — иначе на «Обзоре» висит выручка
+        // часовой давности, расходясь с дашбордом. Тяжёлый YoY/prev-год остаётся из кэша,
+        // перетираем только cur (+ производные avgCheck и deltaPct). Закрытых месяцев не
+        // касаемся: там кэш финальный и совпадает с db.
+        if (data && !data.error && period === monthKey()) {
+          try {
+            const { db } = await getScopedDb(req);
+            // % YoY — та же формула, что в lib/marketing-channels.js (deltaPct).
+            const dl = (cur, prev) => (!prev ? null : Math.round(((cur - prev) / prev) * 1000) / 10);
+            let liveRev = 0;
+            for (const x of db.sales || []) {
+              if (x.storeId === 'undefined' || x.productId === 'undefined' || x.period !== period) continue;
+              liveRev += Number(x.amount || 0);
+            }
+            liveRev = Math.round(liveRev);
+            // Живые чеки — из cheque_stats (тот же источник, что и ingest, обновляется ежеминутно).
+            let liveCheq = 0;
+            for (const c of db.chequeStats || []) {
+              if (c.period === period) liveCheq += Number(c.chequeCount || 0);
+            }
+            if (liveRev > 0 && data.revenue) {
+              data.revenue = { cur: liveRev, prev: data.revenue.prev, deltaPct: dl(liveRev, data.revenue.prev), live: true };
+              // Чеки: если cheque_stats за месяц есть — берём live, иначе оставляем кэш.
+              const cheqCur = liveCheq > 0 ? liveCheq : ((data.cheques && data.cheques.cur) || 0);
+              if (liveCheq > 0 && data.cheques) data.cheques = { cur: liveCheq, prev: data.cheques.prev, deltaPct: dl(liveCheq, data.cheques.prev), live: true };
+              if (cheqCur > 0 && data.avgCheck) {
+                const avg = Math.round(liveRev / cheqCur);
+                data.avgCheck = { cur: avg, prev: data.avgCheck.prev, deltaPct: dl(avg, data.avgCheck.prev), live: true };
+              }
+              data.curLive = true; // cur не из кэша — фронт может показать «live»
+            }
+          } catch (_) { /* db недоступна — отдаём кэш как есть */ }
+        }
+        sendJson(res, 200, data);
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }

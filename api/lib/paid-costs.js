@@ -61,7 +61,10 @@ async function compute(period) {
     key: 'context', name: 'Контекст (Я.Директ)', cost: contextCost,
     costNote: 'расход ' + Math.round(directSpend) + ' ₽ + агентство ' + c.directAgency + ' ₽',
     result: directConv ? directConv + ' конверсий · ' + directClicks + ' кликов' : (directClicks + ' кликов'),
-    cpr: directConv ? 'CPA ' + Math.round(contextCost / directConv) + ' ₽' : null,
+    // CPA «полный» — на расход + агентскую плату (стоимость результата с учётом всех затрат
+    // канала). В «Алертах» отдельно есть CPA «по расходу» (только рекламный расход) — это
+    // другая база, поэтому подписываем явно, чтобы цифры не казались противоречием.
+    cpr: directConv ? 'CPA с агентством ' + Math.round(contextCost / directConv) + ' ₽' : null,
     live: true
   });
   ch.push({

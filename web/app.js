@@ -5164,7 +5164,7 @@ function renderAlerts(d, period){
   var dir=d.external&&d.external.direct;
   if(dir&&dir.totals&&dir.totals.spend){
     var t=dir.totals;
-    if(t.cpa!=null && t.cpa>=400) a.push(['amber','CPA контекста дорогой','Я.Директ: CPA '+mNum(t.cpa)+' ₽/конверсию (расход '+mNum(t.spend)+' ₽, '+mNum(t.conversions)+' конв.). Оптимизировать кампании.']);
+    if(t.cpa!=null && t.cpa>=400) a.push(['amber','CPA контекста дорогой','Я.Директ: CPA по расходу '+mNum(t.cpa)+' ₽/конв. (только рекламный расход '+mNum(t.spend)+' ₽ ÷ '+mNum(t.conversions)+' конв.; без агентской платы — её учитывает «CPA с агентством» в блоке «Платные каналы»). Оптимизировать кампании.']);
     if(dir.balance!=null && t.spend>0 && dir.balance<t.spend) a.push(['red','Баланс Директа кончается','Остаток '+mNum(dir.balance)+' ₽ при расходе ~'+mNum(t.spend)+' ₽/мес (меньше месяца). Пополнить — иначе реклама встанет.']);
   }
   // 2ГИС: позиция в выдаче (актуально всегда)
@@ -5455,7 +5455,10 @@ function mktLoadYoY(){
     }
     var hint=document.getElementById('mktYoYHint');
     if(hint){ var t=d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—';
-      hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.fromCache?' (из кэша)':'')+'.'; }
+      // Для текущего месяца выручка/чеки/ср.чек берутся живыми из БД (curLive) — совпадают
+      // с дашбордом, ежеминутно; «из кэша» относится только к YoY-сравнению и прошлым месяцам.
+      var freshNote = d.curLive ? ' Выручка/чеки за текущий месяц — живые (ежеминутно, как на дашборде); сравнение с прошлым годом — из кэша.' : (d.fromCache?' (из кэша)':'');
+      hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.curLive?'.':'')+freshNote+(d.curLive?'':'.'); }
     // живые товары и категории за выбранный месяц (перекрывают статику)
     var tp=document.getElementById('mktTopProd');
     if(tp && d.topProducts && d.topProducts.length){ tp.innerHTML='<table><thead><tr><th>Товар</th><th class="num">Выручка ₽</th><th class="num">Шт</th></tr></thead><tbody>'+
