@@ -501,7 +501,7 @@ async function buildCohortRetention(monthsBack = 6, endPeriod) {
   for (let i = 0; i < monthsBack; i++) from = prevMonth(from);
   const months = rangeMonths(from, today);     // месяцы-когорты (включая today)
   const windowEnd = ymDt(today, 1);            // конец окна (месяц после today)
-  const deep = ymDt(months[0], -24);           // ретро для «первого появления»
+  const deep = 'ДАТАВРЕМЯ(2020,1,1)';          // раньше старта регистра (12.2022) → истинное первое появление
   const TBL = 'РегистрНакопления.Бонусы КАК Б';
   const ymKey = (raw) => { const d = parseRuDate(raw); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : null; };
 
@@ -540,7 +540,7 @@ async function buildCohortRetention(monthsBack = 6, endPeriod) {
   return {
     monthsBack,
     months,
-    method: 'когорта месяца N = карты с первым движением бонусов в N (МИНИМУМ Период, ретро 24 мес); retention = активные в N+k. Агрегация в 1С, без потолка строк.',
+    method: 'когорта месяца N = карты с первым в истории движением бонусов в N (МИНИМУМ Период); retention = активные в N+k. Агрегация в 1С, без потолка строк.',
     pendingNote: null,
     cohorts
   };

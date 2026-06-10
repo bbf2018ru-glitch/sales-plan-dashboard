@@ -135,7 +135,7 @@ async function buildNewCustomersMonthly(period) {
   const first = seriesMonths[0], last = seriesMonths[seriesMonths.length - 1];
   const seriesStart = ymBound(first);          // начало ряда
   const seriesEnd = ymBound(last, 1);          // месяц после последнего
-  const DEEP = ymBound(first, -24);            // ретро 24 мес для «первого появления»
+  const DEEP = 'ДАТАВРЕМЯ(2020,1,1)';          // раньше старта регистра (12.2022) → истинное первое появление
   const TBL = 'РегистрНакопления.Бонусы КАК Б';
   const ymKey = (raw) => { const d = parseRuDate(raw); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : null; };
 
@@ -164,7 +164,7 @@ async function buildNewCustomersMonthly(period) {
   return {
     period,
     range: { from: first, to: last },
-    baseline: { months: 24, note: 'новизна = первое движение карты за 24 мес ретро' },
+    baseline: { note: 'новизна = карта с первым в истории движением бонусов в этом месяце' },
     series,
     seriesPending: 0
   };
