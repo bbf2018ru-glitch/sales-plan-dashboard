@@ -29,6 +29,14 @@ async function callRegister(name, fromYM, toYM, limit = 10000) {
 // Старый кап 999 (обход бага форматирования) снят: BSL Формат(Лимит,"ЧГ=") задеплоен.
 const REGISTER_CAP = 10000;
 
+// Служебные/безымянные карты — те же фильтры, что в топах по обороту
+// (marketing-analytics.js / extended-analytics.js). Здесь только по названию карты:
+// регистр Бонусы не отдаёт ВидДисконтнойКарты, поэтому опт по виду не отсекаем —
+// но видимый мусор (магазин/склад/«нет»/без ФИО типа «ВК3 000383») уходит.
+const INTERNAL_CARD = /магазин|склад|кондитерск|(^|\s)(нет|дс)(\s|$)/i;
+const NONAME = /^[а-яёa-z]{1,4}\d*\s+\d+\s*$/i;
+const isServiceCard = (name) => INTERNAL_CARD.test(name) || NONAME.test(name);
+
 // Бонусы — движения за период, агрегируем по карте
 async function bonusMovements(fromYM, toYM) {
   const data = await callRegister('Бонусы', fromYM, toYM, REGISTER_CAP);
@@ -49,7 +57,9 @@ async function bonusMovements(fromYM, toYM) {
     // если упёрлись в потолок сервиса — число движений и сумма занижены (это floor, не точное)
     capped: (data.rowsCount || 0) >= REGISTER_CAP,
     totalSum: Number(arr.reduce((s, x) => s + x.sum, 0).toFixed(2)),
-    topCards: arr.slice(0, 100).map(c => ({ ...c, sum: Number(c.sum.toFixed(2)) }))
+    // в Топ-100 показываем только реальных клиентов (служебные карты — мимо)
+    topCards: arr.filter(c => c.card && !isServiceCard(c.card))
+      .slice(0, 100).map(c => ({ ...c, sum: Number(c.sum.toFixed(2)) }))
   };
 }
 
