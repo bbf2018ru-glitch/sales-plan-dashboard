@@ -546,57 +546,51 @@ function buildChequeCategories(db, fromISO, toISO) {
 // акций по периодам; ПредоставленныеСкидки уже даёт фактическую сумму.
 // Здесь мы строим временной ряд по дням для топ-10 акционных товаров.
 async function buildPromoDynamics(fromYM, toYM) {
-  // Берём ПредоставленныеСкидки (уже работает) и разрезаем по дням × товарам
-  const months = rangeMonths(fromYM, toYM);
-  const byProductDay = new Map(); // `${product}|${date}` -> sum
-  const byProductTotal = new Map(); // product -> sum
-  let totalRows = 0;
-  let truncatedMonths = 0;
+  // Агрегация В 1С (раньше читали 5000 строк/мес из ~16к → усечение). Два шага:
+  // 1) топ-10 товаров по сумме скидки; 2) дневной ряд только для этих 10 (IN-список).
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const ny = tm === 12 ? ty + 1 : ty, nm = tm === 12 ? 1 : tm + 1;
+  const WHERE = `П.Период >= ДАТАВРЕМЯ(${fy},${fm},1) И П.Период < ДАТАВРЕМЯ(${ny},${nm},1)`;
+  const NAME = 'ВЫРАЗИТЬ(П.Номенклатура.Наименование КАК СТРОКА(60))';
+  const TBL = 'РегистрНакопления.ПредоставленныеСкидки КАК П';
 
-  for (const ym of months) {
-    const data = await callRegister('ПредоставленныеСкидки', ym, ym, 5000);
-    const rows = data.rows || [];
-    totalRows += rows.length;
-    if (rows.length >= 5000) truncatedMonths += 1;
-    for (const r of rows) {
-      const product = (r['Номенклатура'] || '').trim() || '—';
-      const sum = parseRu(r['СуммаСкидки']);
-      const period = parseRuDate(r['Период']);
-      const day = period ? period.toISOString().slice(0, 10) : ym + '-01';
-      const key = `${product}|${day}`;
-      byProductDay.set(key, (byProductDay.get(key) || 0) + sum);
-      byProductTotal.set(product, (byProductTotal.get(product) || 0) + sum);
+  const topRows = await callQuery(
+    `ВЫБРАТЬ ПЕРВЫЕ 10 ${NAME} КАК Тов, СУММА(П.СуммаСкидки) КАК С ИЗ ${TBL} ГДЕ ${WHERE}`
+    + ` СГРУППИРОВАТЬ ПО ${NAME} УПОРЯДОЧИТЬ ПО С УБЫВ`, { timeoutMs: 90000 });
+  const topProducts = (topRows.rows || [])
+    .map(r => ({ product: (r['Тов'] || '').trim() || '—', sum: Number((parseRu(r['С']) || 0).toFixed(2)) }))
+    .filter(p => p.product && p.product !== '—');
+
+  let series = [], days = [];
+  if (topProducts.length) {
+    // IN-список имён топ-10 (двоим кавычки внутри строкового литерала 1С)
+    const inList = topProducts.map(p => `"${p.product.replace(/"/g, '""')}"`).join(', ');
+    const dayRows = await callQuery(
+      `ВЫБРАТЬ ${NAME} КАК Тов, НАЧАЛОПЕРИОДА(П.Период, ДЕНЬ) КАК День, СУММА(П.СуммаСкидки) КАК С`
+      + ` ИЗ ${TBL} ГДЕ ${WHERE} И ${NAME} В (${inList})`
+      + ` СГРУППИРОВАТЬ ПО ${NAME}, НАЧАЛОПЕРИОДА(П.Период, ДЕНЬ)`, { timeoutMs: 90000 });
+    const seriesByDay = new Map(); // day(YYYY-MM-DD) -> Map(product -> sum)
+    const daySet = new Set();
+    for (const r of dayRows.rows || []) {
+      const product = (r['Тов'] || '').trim();
+      const d = parseRuDate(r['День']);
+      const day = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : fromYM + '-01';
+      daySet.add(day);
+      if (!seriesByDay.has(day)) seriesByDay.set(day, new Map());
+      seriesByDay.get(day).set(product, parseRu(r['С']));
     }
+    days = Array.from(daySet).sort();
+    series = topProducts.map(tp => ({
+      product: tp.product,
+      points: days.map(d => ({ day: d, sum: Number((seriesByDay.get(d)?.get(tp.product) || 0).toFixed(2)) }))
+    }));
   }
-
-  // Топ-10 товаров по суммарной скидке за период
-  const topProducts = Array.from(byProductTotal.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([product, sum]) => ({ product, sum: Number(sum.toFixed(2)) }));
-
-  // Дневная динамика только для топ-10 (иначе массив гигантский)
-  const topNames = new Set(topProducts.map(p => p.product));
-  const seriesByDay = new Map(); // day -> Map(product -> sum)
-  for (const [key, sum] of byProductDay) {
-    const [product, day] = key.split('|');
-    if (!topNames.has(product)) continue;
-    if (!seriesByDay.has(day)) seriesByDay.set(day, new Map());
-    seriesByDay.get(day).set(product, sum);
-  }
-  const days = Array.from(seriesByDay.keys()).sort();
-  const series = topProducts.map(tp => ({
-    product: tp.product,
-    points: days.map(d => ({ day: d, sum: Number((seriesByDay.get(d)?.get(tp.product) || 0).toFixed(2)) }))
-  }));
 
   return {
     period: { from: fromYM, to: toYM },
-    totalRows,
-    truncatedMonths,
-    truncatedNote: truncatedMonths > 0
-      ? `${truncatedMonths} из ${months.length} мес упёрлись в лимит 5000 строк — после обновления BSL лимит поднимется до 100k.`
-      : null,
+    truncatedMonths: 0,
+    truncatedNote: null, // агрегация в 1С — данные полные
     topProducts,
     days,
     series

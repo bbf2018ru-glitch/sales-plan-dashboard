@@ -88,58 +88,50 @@ function buildZombieProducts(db, period, opts = {}) {
 // Сколько маржи мы теряем на скидках. Через РегистрНакопления.ПредоставленныеСкидки —
 // там каждая строка с суммой скидки и УсловиеСкидки (тип акции).
 async function buildDiscountCannibalization(fromYM, toYM, opts = {}) {
+  // Агрегация В 1С (раньше читали по 5000 строк/мес, а скидок ~16к/мес → суммы
+  // занижались ~3x; теперь группировка/тоталы возвращают мало строк, точно и без потолка).
   const months = rangeMonths(fromYM, toYM);
-  const byCondition = new Map();   // УсловиеСкидки -> сумма
-  const byMonth = new Map();       // ym -> сумма
-  const byReceiver = new Map();    // получатель скидки (Контрагент/Сотрудник) -> сумма
-  let totalDiscount = 0;
-  let totalRows = 0;
-  let truncatedMonths = 0;
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const ny = tm === 12 ? ty + 1 : ty, nm = tm === 12 ? 1 : tm + 1;
+  const WHERE = `П.Период >= ДАТАВРЕМЯ(${fy},${fm},1) И П.Период < ДАТАВРЕМЯ(${ny},${nm},1)`;
+  const TBL = 'РегистрНакопления.ПредоставленныеСкидки КАК П';
 
-  for (const ym of months) {
-    const data = await callRegister('ПредоставленныеСкидки', ym, ym, 5000);
-    const rows = data.rows || [];
-    totalRows += rows.length;
-    if (rows.length >= 5000) truncatedMonths += 1;
-    let monthTotal = 0;
-    for (const r of rows) {
-      const sum = parseRu(r['СуммаСкидки']);
-      const cond = (r['УсловиеСкидки'] || '—').trim() || '—';
-      const recv = (r['ПолучательСкидки'] || '—').trim() || '—';
-      byCondition.set(cond, (byCondition.get(cond) || 0) + sum);
-      byReceiver.set(recv, (byReceiver.get(recv) || 0) + sum);
-      monthTotal += sum;
-    }
-    byMonth.set(ym, monthTotal);
-    totalDiscount += monthTotal;
+  let totalsRows, condRows, recvRows, monthRows;
+  try {
+    [totalsRows, condRows, recvRows, monthRows] = await Promise.all([
+      callQuery(`ВЫБРАТЬ СУММА(П.СуммаСкидки) КАК С, КОЛИЧЕСТВО(*) КАК N ИЗ ${TBL} ГДЕ ${WHERE}`, { timeoutMs: 90000 }),
+      callQuery(`ВЫБРАТЬ ПЕРВЫЕ 20 ПРЕДСТАВЛЕНИЕ(П.УсловиеСкидки) КАК Усл, СУММА(П.СуммаСкидки) КАК С ИЗ ${TBL} ГДЕ ${WHERE} СГРУППИРОВАТЬ ПО П.УсловиеСкидки УПОРЯДОЧИТЬ ПО С УБЫВ`, { timeoutMs: 90000 }),
+      callQuery(`ВЫБРАТЬ ПЕРВЫЕ 15 ПРЕДСТАВЛЕНИЕ(П.ПолучательСкидки) КАК Пол, СУММА(П.СуммаСкидки) КАК С ИЗ ${TBL} ГДЕ ${WHERE} СГРУППИРОВАТЬ ПО П.ПолучательСкидки УПОРЯДОЧИТЬ ПО С УБЫВ`, { timeoutMs: 90000 }),
+      callQuery(`ВЫБРАТЬ НАЧАЛОПЕРИОДА(П.Период, МЕСЯЦ) КАК Мес, СУММА(П.СуммаСкидки) КАК С ИЗ ${TBL} ГДЕ ${WHERE} СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(П.Период, МЕСЯЦ)`, { timeoutMs: 90000 }),
+    ]);
+  } catch (e) {
+    return { period: { from: fromYM, to: toYM }, available: false, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
   }
 
-  // Сравниваем с выручкой сети за тот же период (totals из аналитики/sales).
-  // Не у нас здесь, поэтому возвращаем сырые суммы. Frontend может разделить
-  // на свой totals.fact чтобы получить % каннибализации.
+  const t = (totalsRows.rows || [])[0] || {};
+  const monthMap = new Map();
+  for (const r of monthRows.rows || []) {
+    const d = parseRuDate(r['Мес']);
+    const ym = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : fromYM;
+    monthMap.set(ym, parseRu(r['С']));
+  }
 
   return {
     period: { from: fromYM, to: toYM },
     totals: {
-      totalDiscount: Number(totalDiscount.toFixed(2)),
-      totalRows,
+      totalDiscount: Number((parseRu(t['С']) || 0).toFixed(2)),
+      totalRows: parseRu(t['N']) || 0,
       months: months.length,
-      truncatedMonths
+      truncatedMonths: 0
     },
-    byCondition: Array.from(byCondition.entries())
-      .map(([condition, amount]) => ({ condition, amount: Number(amount.toFixed(2)) }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 20),
-    byMonth: Array.from(byMonth.entries())
-      .map(([ym, amount]) => ({ period: ym, amount: Number(amount.toFixed(2)) })),
-    topReceivers: Array.from(byReceiver.entries())
-      .filter(([name]) => name && name !== '—')
-      .map(([name, amount]) => ({ name, amount: Number(amount.toFixed(2)) }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 15),
-    truncationWarning: truncatedMonths > 0
-      ? `${truncatedMonths} мес. из ${months.length} обрезаны лимитом 5000 строк — реальные суммы могут быть выше.`
-      : null
+    byCondition: (condRows.rows || [])
+      .map(r => ({ condition: (r['Усл'] || '—').trim() || '—', amount: Number((parseRu(r['С']) || 0).toFixed(2)) })),
+    byMonth: months.map(ym => ({ period: ym, amount: Number((monthMap.get(ym) || 0).toFixed(2)) })),
+    topReceivers: (recvRows.rows || [])
+      .map(r => ({ name: (r['Пол'] || '—').trim() || '—', amount: Number((parseRu(r['С']) || 0).toFixed(2)) }))
+      .filter(x => x.name && x.name !== '—'),
+    truncationWarning: null // агрегация в 1С — данные полные
   };
 }
 
