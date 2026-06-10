@@ -9,6 +9,16 @@
 // Зависит от UPP_PULL_URL (HTTP-сервис 1С) — не от данных в нашей БД.
 
 const { fetchUppPackage } = require('./upp-pull');
+const { callQuery, parseRu } = require('./upp-client');
+
+// Граница периода YYYY-MM → выражения ДАТАВРЕМЯ для запроса [начало; начало след. месяца).
+function periodBounds(fromYM, toYM) {
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const ny = tm === 12 ? ty + 1 : ty;
+  const nm = tm === 12 ? 1 : tm + 1;
+  return { DT: `ДАТАВРЕМЯ(${fy},${fm},1)`, DTEND: `ДАТАВРЕМЯ(${ny},${nm},1)` };
+}
 
 const BASE_URL = process.env.UPP_PULL_URL || '';
 const BASE = BASE_URL.replace(/\/pull(\?.*)?$/, '');
@@ -37,29 +47,46 @@ const INTERNAL_CARD = /магазин|склад|кондитерск|(^|\s)(н�
 const NONAME = /^[а-яёa-z]{1,4}\d*\s+\d+\s*$/i;
 const isServiceCard = (name) => INTERNAL_CARD.test(name) || NONAME.test(name);
 
-// Бонусы — движения за период, агрегируем по карте
+// Бонусы за период. Агрегируем В 1С (а не построчно): и /register, и /query_post
+// режут выдачу на 5000–10000 строк, а движений в месяц ~33к — построчное чтение
+// занижало активные карты (4.6к↔10.8к) и суммы в 2-3 раза. Группировка/счётчики
+// возвращают мало строк → потолок не мешает, цифры точные.
 async function bonusMovements(fromYM, toYM) {
-  const data = await callRegister('Бонусы', fromYM, toYM, REGISTER_CAP);
-  const byCard = new Map();
-  for (const r of data.rows || []) {
-    const card = r['БонуснаяКарта'] || '';
-    const sum = parseFloat(String(r['Сумма'] || '0').replace(',', '.').replace(/\s+/g, ''));
-    if (!byCard.has(card)) byCard.set(card, { card, sum: 0, movements: 0 });
-    const item = byCard.get(card);
-    item.sum += sum;
-    item.movements += 1;
-  }
-  const arr = Array.from(byCard.values()).sort((a, b) => b.sum - a.sum);
+  const { DT, DTEND } = periodBounds(fromYM, toYM);
+  const WHERE = `Б.Период >= ${DT} И Б.Период < ${DTEND}`;
+  const PRIH = `Б.ВидДвижения = ЗНАЧЕНИЕ(ВидДвиженияНакопления.Приход)`;
+
+  const [sumRows, topRows] = await Promise.all([
+    // Итоги: точные активные карты, число движений, начислено (Приход), списано (Расход)
+    callQuery(
+      `ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Б.БонуснаяКарта) КАК Карт, КОЛИЧЕСТВО(*) КАК Движ,`
+      + ` СУММА(ВЫБОР КОГДА ${PRIH} ТОГДА Б.Сумма ИНАЧЕ 0 КОНЕЦ) КАК Начислено,`
+      + ` СУММА(ВЫБОР КОГДА НЕ (${PRIH}) ТОГДА Б.Сумма ИНАЧЕ 0 КОНЕЦ) КАК Списано`
+      + ` ИЗ РегистрНакопления.Бонусы КАК Б ГДЕ ${WHERE}`, { timeoutMs: 90000 }),
+    // Топ карт по НАЧИСЛЕНО (Приход). Берём 200 — после фильтра служебных режем до 100.
+    callQuery(
+      `ВЫБРАТЬ ПЕРВЫЕ 200 ВЫРАЗИТЬ(Б.БонуснаяКарта.Наименование КАК СТРОКА(100)) КАК Карта,`
+      + ` СУММА(Б.Сумма) КАК Сумма, КОЛИЧЕСТВО(*) КАК Движ`
+      + ` ИЗ РегистрНакопления.Бонусы КАК Б ГДЕ ${WHERE} И ${PRIH}`
+      + ` СГРУППИРОВАТЬ ПО ВЫРАЗИТЬ(Б.БонуснаяКарта.Наименование КАК СТРОКА(100))`
+      + ` УПОРЯДОЧИТЬ ПО Сумма УБЫВ`, { timeoutMs: 90000 }),
+  ]);
+
+  const s = (sumRows.rows || [])[0] || {};
+  const topCards = (topRows.rows || [])
+    .map(r => ({ card: (r['Карта'] || '').trim(), sum: parseRu(r['Сумма']), movements: parseRu(r['Движ']) || 0 }))
+    .filter(c => c.card && !isServiceCard(c.card))
+    .slice(0, 100)
+    .map(c => ({ ...c, sum: Number(c.sum.toFixed(2)) }));
+
   return {
     period: { from: fromYM, to: toYM },
-    totalCards: arr.length,
-    totalMovements: data.rowsCount,
-    // если упёрлись в потолок сервиса — число движений и сумма занижены (это floor, не точное)
-    capped: (data.rowsCount || 0) >= REGISTER_CAP,
-    totalSum: Number(arr.reduce((s, x) => s + x.sum, 0).toFixed(2)),
-    // в Топ-100 показываем только реальных клиентов (служебные карты — мимо)
-    topCards: arr.filter(c => c.card && !isServiceCard(c.card))
-      .slice(0, 100).map(c => ({ ...c, sum: Number(c.sum.toFixed(2)) }))
+    totalCards: parseRu(s['Карт']) || 0,
+    totalMovements: parseRu(s['Движ']) || 0,
+    capped: false, // агрегация в 1С — потолка строк больше нет
+    totalSum: Number((parseRu(s['Начислено']) || 0).toFixed(2)), // «Бонусов начислено» = Приход
+    bonusRedeemed: Number((parseRu(s['Списано']) || 0).toFixed(2)),
+    topCards
   };
 }
 
