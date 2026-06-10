@@ -33,73 +33,60 @@ const monthCardsCache = makeCache(24 * 60 * 60 * 1000, 'month-cards');
 // Считает: новых клиентов в периоде (первая активность карты попадает в from..to)
 // vs постоянных (карта активна до from). Использует ретро 6 мес как baseline —
 // если за 6 мес до from карта была — она «постоянная».
+// Точный счёт без потолка строк. Раньше читали Бонусы по 5000 строк/мес и пересекали
+// множества карт в JS — но в месяце ~10.8к карт > потолка, baseline за 6 мес тем более,
+// так что new/returning молча считались на огрызке. Полные множества (>5000) через
+// HTTP не вытащить (и /register, и /query_post режут до 5000). Зато КОЛИЧЕСТВО(РАЗЛИЧНЫЕ)
+// дешёвое и точное → берём мощности множеств и считаем пересечение по формуле
+// включения-исключения: |тек ∩ base| = |тек| + |base| − |тек ∪ base|.
+function ymBound(ym, plus = 0) {
+  let [y, m] = ym.split('-').map(Number);
+  m += plus;
+  while (m > 12) { m -= 12; y += 1; }
+  while (m < 1) { m += 12; y -= 1; }
+  return `ДАТАВРЕМЯ(${y},${m},1)`;
+}
+
 async function buildCustomersRetention(fromYM, toYM) {
-  // Период baseline: 6 месяцев до fromYM
+  // baseline: 6 месяцев до fromYM
   let baseFrom = fromYM;
   for (let i = 0; i < 6; i++) baseFrom = prevMonth(baseFrom);
   const baseTo = prevMonth(fromYM);
 
-  // 1. Карты в baseline (последовательно по месяцам — лимит /register 5000)
-  const baselineCards = new Set();
-  const baselineMonths = rangeMonths(baseFrom, baseTo);
-  for (const ym of baselineMonths) {
-    try {
-      const d = await callRegister('Бонусы', ym, ym, 5000);
-      for (const r of d.rows || []) {
-        const card = (r['БонуснаяКарта'] || '').trim();
-        if (card) baselineCards.add(card);
-      }
-    } catch {
-      // Молча пропускаем — baseline может быть неполным, это окей
-    }
+  const curStart = ymBound(fromYM);          // начало текущего периода
+  const curEnd = ymBound(toYM, 1);           // начало месяца после toYM
+  const baseStart = ymBound(baseFrom);       // начало baseline (= конец baseline это curStart)
+  const distinct = (fromExpr, toExpr) => callQuery(
+    `ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Б.БонуснаяКарта) КАК К ИЗ РегистрНакопления.Бонусы КАК Б`
+    + ` ГДЕ Б.Период >= ${fromExpr} И Б.Период < ${toExpr}`, { timeoutMs: 60000 })
+    .then(r => parseRu((r.rows || [])[0]?.['К']) || 0);
+
+  let cur, base, union;
+  try {
+    [cur, base, union] = await Promise.all([
+      distinct(curStart, curEnd),    // карты текущего периода
+      distinct(baseStart, curStart), // карты baseline
+      distinct(baseStart, curEnd),   // объединение (baseline ∪ текущий)
+    ]);
+  } catch (e) {
+    return { period: { from: fromYM, to: toYM }, available: false, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
   }
 
-  // 2. Карты в текущем периоде, помесячно
-  const currentCards = new Map(); // card -> { firstSeenInPeriod, movements, sum }
-  const periodMonths = rangeMonths(fromYM, toYM);
-  for (const ym of periodMonths) {
-    const d = await callRegister('Бонусы', ym, ym, 5000);
-    for (const r of d.rows || []) {
-      const card = (r['БонуснаяКарта'] || '').trim();
-      if (!card) continue;
-      const sum = parseRu(r['Сумма']);
-      if (!currentCards.has(card)) {
-        currentCards.set(card, { card, firstSeenInPeriod: ym, movements: 0, sum: 0 });
-      }
-      const c = currentCards.get(card);
-      c.movements += 1;
-      c.sum += sum;
-    }
-  }
-
-  let newCards = 0;
-  let returningCards = 0;
-  let newSum = 0;
-  let returningSum = 0;
-  for (const c of currentCards.values()) {
-    if (baselineCards.has(c.card)) {
-      returningCards += 1;
-      returningSum += c.sum;
-    } else {
-      newCards += 1;
-      newSum += c.sum;
-    }
-  }
-
-  const total = newCards + returningCards;
+  let returningCards = cur + base - union; // |тек ∩ base|
+  if (returningCards < 0) returningCards = 0;
+  if (returningCards > cur) returningCards = cur;
+  const newCards = cur - returningCards;
+  const total = cur;
   return {
+    available: true,
     period: { from: fromYM, to: toYM },
-    baseline: { from: baseFrom, to: baseTo, totalCardsKnown: baselineCards.size },
+    baseline: { from: baseFrom, to: baseTo, totalCardsKnown: base },
     summary: {
       totalActiveCards: total,
       newCards,
       returningCards,
       newPct: total ? Number(((newCards / total) * 100).toFixed(1)) : 0,
       returningPct: total ? Number(((returningCards / total) * 100).toFixed(1)) : 0
-    },
-    bonusFlow: {
-      newCardsBonusSum: Number(newSum.toFixed(2)),
-      returningCardsBonusSum: Number(returningSum.toFixed(2))
     }
   };
 }
