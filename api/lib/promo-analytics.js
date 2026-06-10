@@ -5,6 +5,7 @@
 // чанкуем по неделям чтобы охватить весь месяц. После обновления — лимит 100k.
 
 const { fetchUppPackage } = require('./upp-pull');
+const { callQuery } = require('./upp-client');
 
 const BASE_URL = process.env.UPP_PULL_URL || '';
 const BASE = BASE_URL.replace(/\/pull(\?.*)?$/, '');
@@ -24,64 +25,40 @@ function parseRu(num) {
   return parseFloat(String(num || '0').replace(/\s+/g, '').replace(',', '.')) || 0;
 }
 
-// Чанкуем месяц на куски (всё равно YYYY-MM/YYYY-MM т.к. /register принимает
-// формат YYYY-MM, не дни). Лимит 5000 строк (BSL формат >999 пофикшен).
-async function fetchAllDiscounts(fromYM, toYM) {
-  const data = await callRegister('ПредоставленныеСкидки', fromYM, toYM, 5000);
+// Скидки — агрегация В 1С (раньше /register по 5000 строк из ~16к/мес → занижение ~3x).
+// Группировки (условие/товар/тип документа) возвращают мало строк → потолок не мешает.
+async function buildDiscountsAgg(fromYM, toYM) {
+  const [fy, fm] = fromYM.split('-').map(Number);
+  const [ty, tm] = toYM.split('-').map(Number);
+  const ny = tm === 12 ? ty + 1 : ty, nm = tm === 12 ? 1 : tm + 1;
+  const WHERE = `П.Период >= ДАТАВРЕМЯ(${fy},${fm},1) И П.Период < ДАТАВРЕМЯ(${ny},${nm},1)`;
+  const TBL = 'РегистрНакопления.ПредоставленныеСкидки КАК П';
+  const refChq = 'П.ДокументСкидки ССЫЛКА Документ.ЧекККМ';
+  const refReal = 'П.ДокументСкидки ССЫЛКА Документ.РеализацияТоваровУслуг';
+
+  const [tot, cond, prod] = await Promise.all([
+    // тоталы + разбивка по типу документа (ТИПЗНАЧЕНИЯ в группировке 1С не даёт → CASE+ССЫЛКА)
+    callQuery(`ВЫБРАТЬ СУММА(П.СуммаСкидки) КАК С, КОЛИЧЕСТВО(*) КАК N,`
+      + ` СУММА(ВЫБОР КОГДА ${refChq} ТОГДА П.СуммаСкидки ИНАЧЕ 0 КОНЕЦ) КАК ЧекС, СУММА(ВЫБОР КОГДА ${refChq} ТОГДА 1 ИНАЧЕ 0 КОНЕЦ) КАК ЧекN,`
+      + ` СУММА(ВЫБОР КОГДА ${refReal} ТОГДА П.СуммаСкидки ИНАЧЕ 0 КОНЕЦ) КАК РеалС, СУММА(ВЫБОР КОГДА ${refReal} ТОГДА 1 ИНАЧЕ 0 КОНЕЦ) КАК РеалN`
+      + ` ИЗ ${TBL} ГДЕ ${WHERE}`, { timeoutMs: 90000 }),
+    callQuery(`ВЫБРАТЬ ПРЕДСТАВЛЕНИЕ(П.УсловиеСкидки) КАК Усл, СУММА(П.СуммаСкидки) КАК С, КОЛИЧЕСТВО(*) КАК N ИЗ ${TBL} ГДЕ ${WHERE} СГРУППИРОВАТЬ ПО П.УсловиеСкидки УПОРЯДОЧИТЬ ПО С УБЫВ`, { timeoutMs: 90000 }),
+    callQuery(`ВЫБРАТЬ ПЕРВЫЕ 30 ВЫРАЗИТЬ(П.Номенклатура.Наименование КАК СТРОКА(80)) КАК Тов, СУММА(П.СуммаСкидки) КАК С, КОЛИЧЕСТВО(*) КАК N ИЗ ${TBL} ГДЕ ${WHERE} СГРУППИРОВАТЬ ПО ВЫРАЗИТЬ(П.Номенклатура.Наименование КАК СТРОКА(80)) УПОРЯДОЧИТЬ ПО С УБЫВ`, { timeoutMs: 90000 }),
+  ]);
+
+  const t = (tot.rows || [])[0] || {};
+  const byDocType = [
+    { docType: 'Чек ККМ', sum: Number((parseRu(t['ЧекС']) || 0).toFixed(2)), count: parseRu(t['ЧекN']) || 0 },
+    { docType: 'Реализация товаров и услуг', sum: Number((parseRu(t['РеалС']) || 0).toFixed(2)), count: parseRu(t['РеалN']) || 0 },
+  ].filter(x => x.count > 0).sort((a, b) => b.sum - a.sum);
+
   return {
-    rows: data.rows || [],
-    truncated: (data.rowsCount || 0) >= 5000  // признак что упёрлись в лимит
-  };
-}
-
-function aggregateDiscounts(rows) {
-  const byCondition = new Map();
-  const byProduct = new Map();
-  const byDoc = new Map();
-  let totalSum = 0;
-
-  for (const r of rows) {
-    const sum = parseRu(r['СуммаСкидки']);
-    totalSum += sum;
-
-    const cond = (r['УсловиеСкидки'] || '').trim() || '—';
-    if (!byCondition.has(cond)) byCondition.set(cond, { condition: cond, sum: 0, count: 0 });
-    const c = byCondition.get(cond);
-    c.sum += sum;
-    c.count += 1;
-
-    const prod = (r['Номенклатура'] || '').trim() || '—';
-    if (!byProduct.has(prod)) byProduct.set(prod, { product: prod, sum: 0, count: 0 });
-    const p = byProduct.get(prod);
-    p.sum += sum;
-    p.count += 1;
-
-    const doc = (r['ДокументСкидки'] || '').trim() || '—';
-    // Извлекаем тип документа БЕЗ номера (Чек ККМ / Реализация товаров /
-    // Отчёт о розничных продажах). Останавливаемся на первом слове с цифрами
-    // или капсом который похож на номер документа.
-    const words = doc.split(' ');
-    const typeWords = [];
-    for (const w of words) {
-      // Слово начинается с цифры/букв в верхнем регистре подряд (типа ЦБКА1052441) — это номер
-      if (/^[А-ЯA-Z]{2,}\d+/.test(w) || /^\d{5,}/.test(w)) break;
-      typeWords.push(w);
-      if (typeWords.length >= 4) break; // безопасный потолок
-    }
-    const docType = typeWords.join(' ').trim() || doc.slice(0, 30);
-    if (!byDoc.has(docType)) byDoc.set(docType, { docType, sum: 0, count: 0 });
-    const d = byDoc.get(docType);
-    d.sum += sum;
-    d.count += 1;
-  }
-
-  const sortBySum = (a, b) => b.sum - a.sum;
-  return {
-    totalSum: Number(totalSum.toFixed(2)),
-    totalRows: rows.length,
-    byCondition: Array.from(byCondition.values()).sort(sortBySum).map(x => ({ ...x, sum: Number(x.sum.toFixed(2)) })),
-    byProduct: Array.from(byProduct.values()).sort(sortBySum).slice(0, 30).map(x => ({ ...x, sum: Number(x.sum.toFixed(2)) })),
-    byDocType: Array.from(byDoc.values()).sort(sortBySum).map(x => ({ ...x, sum: Number(x.sum.toFixed(2)) }))
+    totalSum: Number((parseRu(t['С']) || 0).toFixed(2)),
+    totalRows: parseRu(t['N']) || 0,
+    byCondition: (cond.rows || []).map(r => ({ condition: (r['Усл'] || '—').trim() || '—', sum: Number((parseRu(r['С']) || 0).toFixed(2)), count: parseRu(r['N']) || 0 })),
+    byProduct: (prod.rows || []).map(r => ({ product: (r['Тов'] || '—').trim() || '—', sum: Number((parseRu(r['С']) || 0).toFixed(2)), count: parseRu(r['N']) || 0 })),
+    byDocType,
+    truncated: false
   };
 }
 
@@ -142,21 +119,13 @@ async function buildPromoAnalytics(opts = {}) {
   try {
     // ПОСЛЕДОВАТЕЛЬНО (не Promise.all): старый IIS 1С не любит параллельных
     // запросов, один из них падает по таймауту. С последовательным — стабильно.
-    const discountsRaw = await fetchAllDiscounts(fromYM, toYM).catch(e => ({ error: e.message }));
+    const discounts = await buildDiscountsAgg(fromYM, toYM).catch(e => ({ error: e.message }));
     const gifts = await fetchGiftCertificates(fromYM, toYM);
     const coffee = await fetchCoffeeCertificates(fromYM, toYM);
 
-    if (discountsRaw.error) {
-      result.discounts = { error: discountsRaw.error };
-    } else {
-      result.discounts = {
-        ...aggregateDiscounts(discountsRaw.rows),
-        truncated: discountsRaw.truncated,
-        truncatedNote: discountsRaw.truncated
-          ? 'Показаны первые 5000 строк скидок за период. После обновления BSL HTTP-сервиса (Формат(Лимит, "ЧГ=")) лимит поднимется до 100 000.'
-          : null
-      };
-    }
+    result.discounts = discounts.error
+      ? { error: discounts.error }
+      : { ...discounts, truncatedNote: null };
     result.giftCertificates = gifts;
     result.coffeeCertificates = coffee;
   } catch (e) {

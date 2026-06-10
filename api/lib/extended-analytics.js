@@ -175,35 +175,25 @@ const promoMonthCache = makeCache(24 * 60 * 60 * 1000);
 
 async function getUdsMonthlyAggregate(ym) {
   return promoMonthCache.wrap('uds:' + ym, async () => {
-    const codes = new Map(); // code → { uses, revenue, bonusUsed }
+    // Агрегация В 1С (раньше callDocument('ЧекККМ',5000) — брал первые 5000 из ~42к чеков/мес,
+    // ~12% → коды/выручка занижались). Группировка по uds_КодСкидки даёт полные данные;
+    // расход (оплата бонусами) считаем тем же запросом через СуммаОплатыБонусами.
+    const [y, m] = ym.split('-').map(Number);
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    const range = `Ч.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Ч.Дата < ДАТАВРЕМЯ(${ny},${nm},1)`;
     try {
-      // 1) Получаем чеки с UDS-кодом
-      const d = await callDocument('ЧекККМ', ym, ym, 5000);
-      const rows = d.rows || [];
-      const truncated = rows.length >= 5000;
-      const chequeByNum = new Map(); // Номер → code
-      for (const r of rows) {
-        const code = (r['uds_КодСкидки'] || '').trim();
-        const num = (r['Номер'] || '').trim();
-        if (!code) continue;
-        const sum = parseRu(r['СуммаДокумента']) || 0;
-        if (!codes.has(code)) codes.set(code, { code, uses: 0, revenue: 0, bonusUsed: 0 });
-        const c = codes.get(code); c.uses += 1; c.revenue += sum;
-        if (num) chequeByNum.set(num, code);
-      }
-      // 2) Подтягиваем расход = оплата бонусами по тем же чекам (из marketing-channels кэша)
-      // Если aggSales уже в кэше — используем без запроса; иначе ничего не считаем для bonus
-      try {
-        const mc = require('./marketing-channels')._internal;
-        const cached = mc.monthCache.getCached('agg:' + ym);
-        if (cached && cached.chequeBonus) {
-          for (const [num, code] of chequeByNum) {
-            const b = cached.chequeBonus.get(num);
-            if (b) codes.get(code).bonusUsed += b;
-          }
-        }
-      } catch (_) { /* mc недоступен */ }
-      return { codes: Array.from(codes.values()), truncated };
+      const d = await callQuery(
+        `ВЫБРАТЬ Ч.uds_КодСкидки КАК Код, КОЛИЧЕСТВО(*) КАК Прим,`
+        + ` СУММА(ЕСТЬNULL(Ч.СуммаДокумента,0)) КАК Выручка, СУММА(ЕСТЬNULL(Ч.СуммаОплатыБонусами,0)) КАК Бонусы`
+        + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.Проведен И Ч.uds_КодСкидки <> ""`
+        + ` СГРУППИРОВАТЬ ПО Ч.uds_КодСкидки`, { timeoutMs: 120000 });
+      const codes = (d.rows || []).map(r => ({
+        code: (r['Код'] || '').trim(),
+        uses: parseRu(r['Прим']) || 0,
+        revenue: parseRu(r['Выручка']) || 0,
+        bonusUsed: parseRu(r['Бонусы']) || 0
+      })).filter(c => c.code);
+      return { codes, truncated: false };
     } catch (e) { return { codes: [], _err: e.message }; }
   });
 }
