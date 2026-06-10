@@ -104,7 +104,9 @@ async function compute(period) {
 
 function getPaidCosts(period) {
   const p = period || upp.nowYM();
-  return cache.wrap('paidcosts:' + p, () => compute(p));
+  // v2 — после переименования cpr контекста в «CPA с агентством» (старый снапшот
+  // «CPA 1787 ₽» жил бы в 6ч-кэше; бамп ключа применяет подпись сразу).
+  return cache.wrap('paidcosts2:' + p, () => compute(p));
 }
 
 module.exports = { getPaidCosts };
