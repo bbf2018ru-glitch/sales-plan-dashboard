@@ -5859,11 +5859,36 @@ function mktLoadYoY(){
           '<div style="font-size:11px;color:var(--muted);margin-top:8px">Скрейп 2ГИС по расписанию на сервере. Обновлено: '+st+(g.sessionExpired?' · ⚠️ сессия 2ГИС протухла, нужен релогин':'')+'.</div>';
       } else { gl.innerHTML='<div style="font-size:12px;color:var(--muted)">2ГИС-данные ещё не собраны (cron-скрейп запустится по расписанию).</div>'; }
     }
-    // живой Я.Директ из cron-скрейпа (d.external.direct)
+    // живой Я.Директ из cron-скрейпа (d.external.direct).
+    // ВАЖНО: снимок direct.json — ВСЕГДА текущий месяц (кабинет month-to-date). Для
+    // ПРОШЛОГО выбранного месяца показывать его нельзя — иначе под мартом висит июньская
+    // воронка, противоречащая таблице выше. Для прошлых месяцев строим воронку из
+    // помесячной истории (directHistory), live-снимок (+кампании, +баланс) — только текущий.
     var dl=document.getElementById('mktDirectLive');
     if(dl){ var dd=d.external&&d.external.direct;
-      if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—';
-        dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка месяца <span class="mkt-scope dyn">live</span></div>'+
+      var _MMd=['','января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+      var _selYM=mktSelectedPeriod();
+      var _curYM=(window.__metaPeriods__&&window.__metaPeriods__[0])|| (new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'));
+      var _isCur=(_selYM===_curYM);
+      if(!_isCur){
+        // Прошлый месяц — воронка из помесячной истории кабинета (без live-снимка).
+        var _dh=d.external&&d.external.directHistory;
+        var _hm=(_dh&&_dh.months||[]).find(function(m){return m&&m.ym===_selYM&&m.spend;});
+        var _ml=(function(){var p=_selYM.split('-');return _MMd[Number(p[1])]+' '+p[0];})();
+        if(_hm){
+          var _st2=_dh.scrapedAt?new Date(_dh.scrapedAt).toLocaleString('ru-RU'):'—';
+          dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка за '+_ml+' <span class="mkt-scope fix" title="Историческая сводка из кабинета за выбранный месяц. Live-воронка с разбивкой по кампаниям и остатком счёта — только для текущего месяца.">из истории</span></div>'+
+            '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
+            '<li><b>Воронка:</b> показы <b>'+mNum(_hm.impressions)+'</b> → клики <b>'+mNum(_hm.clicks)+'</b> (CTR '+mNum1(_hm.ctrPct||0)+'%) → конверсии <b>'+mNum(_hm.conversions)+'</b> (CR '+mNum1(_hm.crPct||0)+'%).</li>'+
+            '<li><b>Расход:</b> '+mNum(_hm.spend)+' ₽ · <b>CPC</b> '+mNum1(_hm.cpc||0)+' ₽ · <b>CPA</b> '+mNum(_hm.cpa||0)+' ₽.</li>'+
+            (_hm.daysCovered&&_hm.daysCovered<28?'<li style="color:var(--muted)">Данные за '+_hm.daysCovered+' дн. месяца (неполный охват скрейпа).</li>':'')+
+            '</ul>'+
+            '<div style="font-size:11px;color:var(--muted);margin-top:8px">Историческая помесячная сводка кабинета Директа. Разбивка по кампаниям и остаток счёта доступны только для текущего месяца (live). Обновлено: '+_st2+'.</div>';
+        } else {
+          dl.innerHTML='<div style="font-size:12px;color:var(--muted)">За '+_ml+' данных Я.Директа в помесячной истории нет (см. таблицу выше). Live-воронка показывается только для текущего месяца.</div>';
+        }
+      } else if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—';
+        dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка текущего месяца <span class="mkt-scope dyn">live</span></div>'+
           '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
           '<li><b>Воронка:</b> показы <b>'+mNum(t.impressions)+'</b> → клики <b>'+mNum(t.clicks)+'</b> (CTR '+mNum1(t.ctrPct||0)+'%) → конверсии <b>'+mNum(t.conversions)+'</b> (CR '+mNum1(t.crPct||0)+'%).</li>'+
           '<li><b>Расход:</b> '+mNum(t.spend)+' ₽ · <b>CPC</b> '+mNum1(t.cpc||0)+' ₽ · <b>CPA</b> '+mNum(t.cpa||0)+' ₽.</li>'+
