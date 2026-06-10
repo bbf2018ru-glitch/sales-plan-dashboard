@@ -16,18 +16,12 @@ const {
   parseRuDate,
   prevMonth,
   rangeMonths,
-  callRegister,
-  callDocument,
   callQuery,
   makeCache,
   nowYM
 } = require('./upp-client');
 
 const cache = makeCache(5 * 60 * 1000);
-// 24-час кэш per-month уникальных карт. Прошлые месяцы не меняются — большие TTL ок.
-// Персистентен (значения — плоские {cards: [строки]}): после деплоя когорты и
-// «Новые карты» не ждут 30-мин прогрева 29 месяцев. Файл ~10МБ — терпимо.
-const monthCardsCache = makeCache(24 * 60 * 60 * 1000, 'month-cards');
 
 // ─── 1) Customers retention ─────────────────────────────────────────────────
 // Считает: новых клиентов в периоде (первая активность карты попадает в from..to)
@@ -89,36 +83,6 @@ async function buildCustomersRetention(fromYM, toYM) {
       returningPct: total ? Number(((returningCards / total) * 100).toFixed(1)) : 0
     }
   };
-}
-
-// Получает уникальные карты, активные в месяце ym (через регистр «Бонусы»).
-// Кэшируется per-month (24ч) — прошлые месяцы не меняются.
-async function getMonthCards(ym) {
-  return monthCardsCache.wrap('cards:' + ym, async () => {
-    const set = new Set();
-    try {
-      const d = await callRegister('Бонусы', ym, ym, 5000);
-      for (const r of d.rows || []) {
-        const card = (r['БонуснаяКарта'] || '').trim();
-        if (card) set.add(card);
-      }
-    } catch (e) {
-      return { cards: Array.from(set), _err: e.message };
-    }
-    return { cards: Array.from(set) };
-  });
-}
-
-// Синхронный доступ к картам месяца из кэша (+фоновый прогрев при промахе).
-// Используется когортами в marketing-analytics — чтобы «новые карты» считались
-// ОДНОЙ методикой с графиком «Новые карты лояльности» (baseline 12 мес).
-function peekMonthCards(ym) {
-  const c = monthCardsCache.getCached('cards:' + ym);
-  if (c) return c;
-  if (!monthCardsCache.isPending('cards:' + ym)) {
-    getMonthCards(ym).then(() => console.log(`[month-cards] warm ${ym}`)).catch(() => {});
-  }
-  return null;
 }
 
 // Помесячно: новые/активные карты с янв пред.года по выбранный включительно.
@@ -416,27 +380,6 @@ async function buildCakeOfMonthSeries(period) {
     seriesPending: salesPendingCount,
     productsConsidered: series.filter(s => s.name).length
   };
-}
-
-// Прогрев per-month кэша карт для всей расширенной серии — фоном из server.js.
-async function warmNewCustomersMonthly(period) {
-  const p = period || nowYM();
-  const [y, m] = p.split('-').map(Number);
-  const months = [];
-  // baseline 12 мес + series 17 мес = 29 месяцев
-  let bm = `${y - 1}-01`;
-  for (let i = 0; i < 12; i++) { bm = prevMonth(bm); months.unshift(bm); }
-  for (let yy = y - 1; yy <= y; yy++) {
-    const lastM = (yy === y) ? m : 12;
-    for (let mm = 1; mm <= lastM; mm++) months.push(`${yy}-${String(mm).padStart(2, '0')}`);
-  }
-  let ok = 0, fail = 0;
-  for (const ym of months) {
-    try { await getMonthCards(ym); ok++; }
-    catch { fail++; }
-  }
-  console.log(`[new-customers] warm done: ok=${ok} fail=${fail} months=${months.length}`);
-  return { ok, fail, total: months.length };
 }
 
 // ─── 2) Sales-kg ────────────────────────────────────────────────────────────
@@ -929,8 +872,6 @@ async function getTopCustomersByRevenue(opts = {}) {
 module.exports = {
   getCustomersRetention,
   getNewCustomersMonthly,
-  peekMonthCards,
-  warmNewCustomersMonthly,
   getPromoCodesMonthly,
   warmPromoCodesMonthly,
   getCakeOfMonthSeries,

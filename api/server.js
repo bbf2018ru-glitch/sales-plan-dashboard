@@ -34,7 +34,6 @@ const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
   getCustomersRetention,
   getNewCustomersMonthly,
-  warmNewCustomersMonthly,
   getPromoCodesMonthly,
   warmPromoCodesMonthly,
   getCakeOfMonthSeries,
@@ -123,9 +122,8 @@ function warmExtended() {
 setTimeout(warmExtended, 60000);
 setInterval(warmExtended, 24 * 60 * 60 * 1000);
 
-// Помесячный «новые карты лояльности». Теперь cap-free (агрегация в 1С, 2 запроса ~3.5с)
-// — греем сам endpoint, чтобы первый пользователь не ждал. Старый warmNewCustomersMonthly
-// грел кэш month-cards, который после перевода когорт/графика на агрегацию больше не читается.
+// Помесячный «новые карты лояльности» — cap-free (агрегация в 1С, 2 запроса ~3.5с).
+// Греем сам endpoint, чтобы первый пользователь не ждал.
 function warmNewCustomers() {
   getNewCustomersMonthly({})
     .then(() => console.log('[new-customers] warm ok'))

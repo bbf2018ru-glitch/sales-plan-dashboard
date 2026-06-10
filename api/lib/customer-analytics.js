@@ -8,7 +8,6 @@
 //
 // Зависит от UPP_PULL_URL (HTTP-сервис 1С) — не от данных в нашей БД.
 
-const { fetchUppPackage } = require('./upp-pull');
 const { callQuery, parseRu } = require('./upp-client');
 
 // Граница периода YYYY-MM → выражения ДАТАВРЕМЯ для запроса [начало; начало след. месяца).
@@ -22,22 +21,6 @@ function periodBounds(fromYM, toYM) {
 
 const BASE_URL = process.env.UPP_PULL_URL || '';
 const BASE = BASE_URL.replace(/\/pull(\?.*)?$/, '');
-
-async function callRegister(name, fromYM, toYM, limit = 10000) {
-  if (!BASE) throw new Error('UPP_PULL_URL не настроен');
-  const url = `${BASE}/register?name=${encodeURIComponent(name)}&from=${fromYM}&to=${toYM}&limit=${limit}`;
-  return fetchUppPackage({
-    url,
-    username: process.env.UPP_PULL_USER,
-    password: process.env.UPP_PULL_PASSWORD,
-    period: ''
-  });
-}
-
-// Жёсткий потолок /register в HTTP-сервисе 1С: вернёт максимум 10 000 строк
-// (limit=50000/200000 всё равно даёт ровно 10 000 — проверено 27.05.2026).
-// Старый кап 999 (обход бага форматирования) снят: BSL Формат(Лимит,"ЧГ=") задеплоен.
-const REGISTER_CAP = 10000;
 
 // Служебные/безымянные карты — те же фильтры, что в топах по обороту
 // (marketing-analytics.js / extended-analytics.js). Здесь только по названию карты:
@@ -88,20 +71,6 @@ async function bonusMovements(fromYM, toYM) {
     bonusRedeemed: Number((parseRu(s['Списано']) || 0).toFixed(2)),
     topCards
   };
-}
-
-// Получить все карты с активными движениями за период
-async function activeCardsCount(fromYM, toYM) {
-  try {
-    const data = await callRegister('Бонусы', fromYM, toYM, REGISTER_CAP);
-    const cards = new Set();
-    for (const r of data.rows || []) {
-      if (r['БонуснаяКарта']) cards.add(r['БонуснаяКарта']);
-    }
-    return { activeCards: cards.size, totalMovements: data.rowsCount };
-  } catch (e) {
-    return { error: e.message };
-  }
 }
 
 // Дни рождения на этой неделе — будет работать после обновления HTTP-сервиса
