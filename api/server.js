@@ -29,6 +29,7 @@ const { returnsLive } = require('./lib/returns-live');
 const { wholesaleLive } = require('./lib/wholesale-live');
 const { dailyLive } = require('./lib/daily-live');
 const { timeLive } = require('./lib/time-live');
+const { chequeLive } = require('./lib/cheque-live');
 const { buildCustomerAnalytics } = require('./lib/customer-analytics');
 const { buildPromoAnalytics } = require('./lib/promo-analytics');
 const {
@@ -1017,6 +1018,14 @@ const server = http.createServer(async (req, res) => {
         const tl = await timeLive(period);
         if (tl) { out.daily = tl.daily; out.byHour = tl.byHour; out.byWeekday = tl.byWeekday; out.weekly = tl.weekly; out.heatmap = tl.heatmap; out.timeSource = tl.source; }
       } catch (e) { /* 1С недоступна — остаются БД-разрезы (soldAt) */ }
+      // Чеки (средний чек/кол-во/% с картой/скидки/форматы) — live из 1С (ЧекККМ).
+      // cheque_stats на проде пуст (старый push-BSL), поэтому chequeReports/byStoreFormat
+      // дают null. Берём напрямую — формат точки тоже из 1С (ВидСклада). Фоллбэк: при
+      // недоступности 1С остаётся null → фронт подхватит фоллбэк из channels.
+      try {
+        const cl = await chequeLive(period);
+        if (cl && cl.cheques) { out.cheques = cl.cheques; out.byStoreFormat = cl.byStoreFormat; }
+      } catch (e) { /* 1С недоступна — cheques остаётся из cheque_stats (обычно null) */ }
       sendJson(res, 200, out);
       return;
     }
