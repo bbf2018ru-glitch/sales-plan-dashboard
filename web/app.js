@@ -2483,9 +2483,13 @@ document.addEventListener('click', (e) => {
 
 async function loadSummary() {
   if (!state.period) return;
-  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(state.period)}&trend_window=24`);
+  const reqPeriod = state.period;
+  const summary = await fetchJson(`/api/dashboard/summary?period=${encodeURIComponent(reqPeriod)}&trend_window=24`);
+  // Гонка last-completed-wins: пока грузили, пользователь мог сменить месяц —
+  // не затираем свежие данные ответом устаревшего периода.
+  if (state.period !== reqPeriod) return;
   state.summary = summary;
-  state.summaryCache.set(state.period, summary);
+  state.summaryCache.set(reqPeriod, summary);
   // Раньше автоматически выбирался первый магазин из списка — это разворачивало
   // огромный блок «По товарам» (8000+ пикселей) на главной для случайного
   // магазина. Теперь не выбираем — пользователь сам кликает на строку.
@@ -2880,16 +2884,27 @@ function switchAnalyticsTab(tab) {
   if (pageEl) pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// Ключ текущего диапазона аналитики (range из пикера дат → фоллбэк state.period).
+// Захватывается до fetch и сверяется после await: медленный ответ старого периода
+// не должен затирать данные нового (гонка last-completed-wins, как в loadSummary).
+function analyticsRangeKey() {
+  const f = analyticsState.range.from ? analyticsState.range.from.slice(0, 7) : state.period;
+  const t = analyticsState.range.to ? analyticsState.range.to.slice(0, 7) : state.period;
+  return f + '|' + t;
+}
+
 async function loadCustomers() {
   const availEl = $('customersAvailability');
   const contentEl = $('customersContent');
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/customers?${params.toString()}`);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     if (!data.available) {
       availEl.classList.remove('hidden');
       availEl.innerHTML = `<b>Канал к 1С не настроен.</b> ${escapeHtml(data.note || '')}`;
@@ -3265,12 +3280,14 @@ async function loadPromo() {
   const contentEl = $('promoContent');
   const truncEl = $('promoTruncated');
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/promo?${params.toString()}`);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     if (!data.available) {
       availEl.classList.remove('hidden');
       availEl.innerHTML = `<b>Канал к 1С не настроен.</b> ${escapeHtml(data.note || '')}`;
@@ -3363,12 +3380,14 @@ async function loadTopCustomers() {
   const noteEl = $('topCustomersNote');
   if (!tbody) return;
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/top-customers?${params.toString()}`);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     if (!data.available || data.error) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
       return;
@@ -3398,12 +3417,14 @@ async function loadRetention() {
   const noteEl = $('retentionBaselineNote');
   if (!availEl || !contentEl) return;
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/customers-retention?${params.toString()}`);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     if (!data.available || data.error) {
       availEl.classList.remove('hidden');
       availEl.innerHTML = `<b>Недоступно:</b> ${escapeHtml(data.note || data.error || '')}`;
@@ -3437,12 +3458,14 @@ async function loadPromoByAction() {
   const noteEl = $('promoActionNote');
   if (!tbody || !kpis) return;
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/promo-by-action?${params.toString()}`);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     if (!data.available || data.error) {
       kpis.innerHTML = '';
       tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
@@ -3473,12 +3496,14 @@ async function loadPromoDynamics() {
   const noteEl = $('promoDynamicsNote');
   if (!tbody) return;
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,7));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,7));
     if (!params.has('from')) params.set('from', state.period);
     if (!params.has('to')) params.set('to', state.period);
     const data = await fetchJson(`/api/analytics/promo-dynamics?${params.toString()}`);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     if (!data.available || data.error) {
       tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">${escapeHtml(data.note || data.error || 'Нет данных')}</td></tr>`;
       return;
@@ -3509,6 +3534,7 @@ async function loadProduction() {
   const contentEl = $('productionContent');
   if (!availEl || !contentEl) return;
   try {
+    const reqKey = analyticsRangeKey();
     const params = new URLSearchParams();
     if (analyticsState.range.from) params.set('from', analyticsState.range.from.slice(0,10));
     if (analyticsState.range.to) params.set('to', analyticsState.range.to.slice(0,10));
@@ -3521,6 +3547,7 @@ async function loadProduction() {
       fetchJson(`/api/analytics/sales-kg?${params.toString()}`).catch(e => ({ available: false, error: e.message })),
       fetchJson(`/api/analytics/production-kg?from=${fromYM}&to=${toYM}`).catch(e => ({ available: false, error: e.message }))
     ]);
+    if (analyticsRangeKey() !== reqKey) return; // период сменился — ответ устарел
     analyticsState.productionData = { salesKg, prodKg };
 
     // Sales-kg
