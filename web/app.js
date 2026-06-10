@@ -5549,7 +5549,10 @@ function mktLoadYoY(){
       for(var ii=0;ii<rawCs.length;ii++){
         if(rawCs[ii]._pending) continue;
         cs.push(rawCs[ii]);
-        ps.push(rawPs[ii]&&!rawPs[ii]._pending ? rawPs[ii] : { revenue:0, cheques:0, avgCheck:0, cardPct:0 });
+        // Нет данных за прошлый год (или ещё греются) → null: разрыв на графике и
+        // исключение из YoY-итога. НЕ подставляем 0 — иначе прошлый год занижается,
+        // а % роста завышается (правило проекта «только реальные данные»).
+        ps.push(rawPs[ii]&&!rawPs[ii]._pending ? rawPs[ii] : null);
       }
       // Если все pending — рисуем плейсхолдер вместо пустоты
       if(!cs.length){
@@ -5575,21 +5578,26 @@ function mktLoadYoY(){
         var dc=dl==null?'':(dl>0?'color:#10a05a':(dl<0?'color:#e0466a':''));
         el.innerHTML=label+' <span style="font-size:11px;font-weight:600;'+dc+'">'+ds+'</span>';
       }
-      var cRev=sumK(cs,'revenue'), pRev=sumK(ps,'revenue');
-      var cChq=sumK(cs,'cheques'), pChq=sumK(ps,'cheques');
+      // YoY-итоги (проценты в подписях) — только по месяцам, где есть И текущий,
+      // И прошлогодний факт (честное like-for-like; месяцы без прошлого года — ps[j]===null).
+      var csM=[], psM=[];
+      for(var jj=0;jj<cs.length;jj++){ if(ps[jj]){ csM.push(cs[jj]); psM.push(ps[jj]); } }
+      var cRev=sumK(csM,'revenue'), pRev=sumK(psM,'revenue');
+      var cChq=sumK(csM,'cheques'), pChq=sumK(psM,'cheques');
       var cAvg=cChq?cRev/cChq:0, pAvg=pChq?pRev/pChq:0;
-      var cCardW=cChq?cs.reduce(function(a,c){return a+c.cardPct*c.cheques;},0)/cChq:0;
-      var pCardW=pChq?ps.reduce(function(a,c){return a+c.cardPct*c.cheques;},0)/pChq:0;
+      var cCardW=cChq?csM.reduce(function(a,c){return a+c.cardPct*c.cheques;},0)/cChq:0;
+      var pCardW=pChq?psM.reduce(function(a,c){return a+c.cardPct*c.cheques;},0)/pChq:0;
       setT('mktChartRevT','Выручка, ₽', cRev, pRev);
       setT('mktChartCheqT','Чеков, шт', cChq, pChq);
       setT('mktChartAvgT','Средний чек, ₽', cAvg, pAvg);
       setT('mktChartCardT','Карта лояльности, %', cCardW, pCardW, true);
       var leg=document.getElementById('mktChartRevLeg');
       if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>факт месяца</span><span class="mkt-lg"><i style="background:#b8860b"></i>год назад (YoY)</span>'; }
-      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m.revenue;}), 'var(--accent)', '#b8860b', ' ₽');
-      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m.cheques;}), 'var(--accent)', '#b8860b', ' шт');
-      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m.avgCheck;}), 'var(--accent)', '#b8860b', ' ₽');
-      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m.cardPct;}), 'var(--accent)', '#b8860b', ' %');
+      // Прошлый год: null там, где данных нет → разрыв (нулевой столбик), а не выдуманный 0.
+      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m?m.revenue:null;}), 'var(--accent)', '#b8860b', ' ₽');
+      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m?m.cheques:null;}), 'var(--accent)', '#b8860b', ' шт');
+      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m?m.avgCheck:null;}), 'var(--accent)', '#b8860b', ' ₽');
+      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m?m.cardPct:null;}), 'var(--accent)', '#b8860b', ' %');
     }
     // Партнёры (Bitrix iblock 88) — список с UTM-метками
     if (d.external && d.external.partners) {
