@@ -225,8 +225,16 @@ async function compute(period) {
     const storeCode = storeFilter ? storeFilter.code : null;
     const delNote = storeFilter ? ' · ' + storeFilter.label : '';
     // Уникальные получатели кампании — один раз (для конверсии и затрат, без дублей-ресендов).
-    let recipients = g.sends;
-    try { recipients = upp.parseRu((await upp.callQuery(uniqueRecipQuery(g.dts))).rows[0].У) || g.sends; } catch (_) {}
+    // g.sends включает ресенды (завышено) — это лишь ВЕРХНЯЯ ГРАНИЦА. Если запрос уникальных
+    // карт упал/пуст, оставляем g.sends, но помечаем recipientsApprox: затраты (recipients×цена)
+    // и конверсия (buyers/recipients) по нему — ОЦЕНКА, а не точные данные (правило проекта
+    // «только реальные данные»). Раньше fallback был молчаливым → цифры выглядели достоверными.
+    let recipients = g.sends, recipientsApprox = true;
+    try {
+      const u = upp.parseRu((await upp.callQuery(uniqueRecipQuery(g.dts))).rows[0].У);
+      if (u > 0) { recipients = u; recipientsApprox = false; }
+    } catch (_) {}
+    base.recipientsApprox = recipientsApprox;
     try {
       if (offer.end && !offer.isAll && offer.products.length) {
         // Тип A: продукт + срок.
@@ -284,7 +292,9 @@ async function compute(period) {
     sends: sum('sends'), recipients: sum('recipients'), cost: sum('cost'), dupCost: sum('dupCost'),
     revenue: sum('revenue'), buyers: sum('buyers'), sweetReg: sum('sweetReg'), smsPrice,
     incremental: sum('incremental'), incRevenue: sum('incRevenue'),
-    conversionPct: sum('recipients') ? Math.round(sum('buyers') / sum('recipients') * 1000) / 10 : 0
+    conversionPct: sum('recipients') ? Math.round(sum('buyers') / sum('recipients') * 1000) / 10 : 0,
+    // true если хоть у одной кампании получатели оценены по отправкам (уник. карты из 1С не пришли)
+    recipientsApprox: campaigns.some((c) => c.recipientsApprox)
   };
 
   return {
@@ -321,7 +331,8 @@ function getSmsMonthly(period) {
       ym, campaigns: c.campaignsCount || 0,
       recipients: t.recipients || 0, sends: t.sends || 0, cost: t.cost || 0,
       buyers: t.buyers || 0, revenue: t.revenue || 0, conversionPct: t.conversionPct || 0,
-      sweetReg: t.sweetReg || 0, incremental: t.incremental || 0
+      sweetReg: t.sweetReg || 0, incremental: t.incremental || 0,
+      recipientsApprox: !!t.recipientsApprox
     };
   });
   return { period: p, months: out, monthsPending: pending, smsPrice: Number(process.env.MKT_SMS_PRICE) || 8.5 };

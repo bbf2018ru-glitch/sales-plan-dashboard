@@ -4791,8 +4791,12 @@ function renderSmsAttribution(sa){
           '<div style="font-size:11px;max-width:340px">'+(c.text?esc(c.text):'')+'</div>';
         var offer=(typeBadge[c.type]||c.type||'')+'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(c.product||'')+'</div>';
         var sweet = (c.sweetReg!=null) ? '<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(c.sweetReg)+' рег. в «Сладком чеке»</div>' : '';
-        var sentCell='<td class="num">'+mNum(c.recipients)+'</td>';
-        var costCell='<td class="num">'+mNum(c.cost)+'</td>';
+        // recipientsApprox: уникальные карты из 1С недоступны → получатели/затраты
+        // оценены по числу отправок (с ресендами, верхняя граница). Помечаем «≈» + тултип.
+        var apx=c.recipientsApprox;
+        var apxTip=apx?' title="≈ оценка по числу отправок: точное число уникальных карт из 1С не получено. Получатели и затраты — верхняя граница (ресенды учтены)"':'';
+        var sentCell='<td class="num"'+apxTip+'>'+(apx?'≈ ':'')+mNum(c.recipients)+'</td>';
+        var costCell='<td class="num"'+apxTip+'>'+(apx?'≈ ':'')+mNum(c.cost)+'</td>';
         if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+'<td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td>'+costCell+'</tr>';
         if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+'<td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td>'+costCell+'</tr>';
         var cc=convColor(c.conversionPct);
@@ -4803,11 +4807,11 @@ function renderSmsAttribution(sa){
           '<td class="num">'+(c.revenue==null?'<span style="color:var(--muted)">—</span>':mNum(c.revenue))+'</td>'+costCell+'</tr>';
       }).join('')+
       '<tr class="mkt-total"><td><b>Итого</b></td><td></td>'+
-        '<td class="num"><b>'+mNum(t.recipients||0)+'</b></td>'+
+        '<td class="num"'+(t.recipientsApprox?' title="часть кампаний — оценка по отправкам (уник. карты из 1С недоступны)"':'')+'><b>'+(t.recipientsApprox?'≈':'')+mNum(t.recipients||0)+'</b></td>'+
         '<td class="num"><b>'+mNum(t.buyers||0)+'</b>'+(t.sweetReg?'<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
         '<td class="num">'+mNum1(t.conversionPct||0)+' %'+(t.incremental?'<div style="font-size:10px;color:#10a05a">≈'+mNum(t.incremental)+' доп.</div>':'')+'</td>'+
         '<td class="num"><b>'+mNum(t.revenue||0)+'</b></td>'+
-        '<td class="num"><b>'+mNum(t.cost||0)+'</b></td></tr>'+
+        '<td class="num"'+(t.recipientsApprox?' title="часть кампаний — оценка по отправкам (уник. карты из 1С недоступны)"':'')+'><b>'+(t.recipientsApprox?'≈':'')+mNum(t.cost||0)+'</b></td></tr>'+
       '</tbody></table></div>';
   } else {
     html+='<div style="font-size:12px;color:var(--muted)">Маркетинговых рассылок («Реклама»/«Акция») за период не найдено.</div>';
@@ -4822,19 +4826,23 @@ function renderSmsMonthly(sm){
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var ready=sm.months.filter(function(m){return !m._pending;});
   if(!ready.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячные итоги SMS прогреваются из 1С (~10 сек/мес). Обнови страницу через минуту.</div>'; return; }
-  var rec=0,cost=0,buy=0,rev=0;
+  var rec=0,cost=0,buy=0,rev=0,apxAny=false;
   var selYM=mktSelectedPeriod();
   var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
   var rows=sm.months.map(function(m){
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
     if(m._pending) return '<tr><td>'+lbl+'</td><td class="num" colspan="6" style="color:var(--muted);text-align:left">прогрев…</td></tr>';
     rec+=m.recipients||0; cost+=m.cost||0; buy+=m.buyers||0; rev+=m.revenue||0;
+    // ≈ — получатели/затраты оценены по отправкам (уник. карты из 1С недоступны).
+    if(m.recipientsApprox) apxAny=true;
+    var ax=m.recipientsApprox?'≈':'', axT=m.recipientsApprox?' title="оценка по отправкам (уник. карты из 1С недоступны)"':'';
     var cc=m.conversionPct>=10?'#10a05a':(m.conversionPct>=3?'#b8860b':'#e0466a');
-    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.campaigns)+'</td><td class="num">'+mNum(m.recipients)+'</td><td class="num">'+mNum(m.cost)+'</td><td class="num">'+mNum(m.buyers)+'</td><td class="num">'+(m.revenue?mNum(m.revenue):'—')+'</td><td class="num" style="color:'+cc+'">'+mNum1(m.conversionPct||0)+' %</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.campaigns)+'</td><td class="num"'+axT+'>'+ax+mNum(m.recipients)+'</td><td class="num"'+axT+'>'+ax+mNum(m.cost)+'</td><td class="num">'+mNum(m.buyers)+'</td><td class="num">'+(m.revenue?mNum(m.revenue):'—')+'</td><td class="num" style="color:'+cc+'">'+mNum1(m.conversionPct||0)+' %</td></tr>';
   }).reverse().join('');
   var tconv=rec?Math.round(buy/rec*1000)/10:0;
+  var tax=apxAny?'≈':'', taxT=apxAny?' title="часть месяцев — оценка по отправкам (уник. карты из 1С недоступны)"':'';
   el.innerHTML='<table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Рассылок</th><th class="num">Получателей</th><th class="num">Затраты ₽</th><th class="num">Купили/перешли</th><th class="num">Выручка ₽</th><th class="num">Конверсия</th></tr></thead><tbody>'+rows+
-    '<tr class="mkt-total"><td>Итого</td><td class="num">—</td><td class="num">'+mNum(rec)+'</td><td class="num">'+mNum(cost)+'</td><td class="num">'+mNum(buy)+'</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum1(tconv)+' %</td></tr>'+
+    '<tr class="mkt-total"><td>Итого</td><td class="num">—</td><td class="num"'+taxT+'>'+tax+mNum(rec)+'</td><td class="num"'+taxT+'>'+tax+mNum(cost)+'</td><td class="num">'+mNum(buy)+'</td><td class="num">'+mNum(rev)+'</td><td class="num">'+mNum1(tconv)+' %</td></tr>'+
     '</tbody></table>'+
     (sm.monthsPending?'<div style="font-size:11px;color:var(--muted);margin-top:4px">'+sm.monthsPending+' мес. ещё прогреваются (тяжёлый расчёт атрибуции). Обнови позже.</div>':'');
 }
@@ -4945,8 +4953,8 @@ function mktExport(){
   // SMS-атрибуция (чистые данные)
   if(_mktSms && _mktSms.totals){ var t=_mktSms.totals;
     push(['SMS-рассылки — атрибуция (за месяц, чистые данные)']); push(['Показатель','Значение']);
-    push(['Получателей (уник. карт)', mktCsvN(t.recipients||0)]);
-    push(['Затраты руб (получатели × '+(_mktSms.price||8.5)+')', mktCsvN(t.cost||0)]);
+    push(['Получателей ('+(t.recipientsApprox?'оценка по отправкам — уник. карты из 1С недоступны':'уник. карт')+')', mktCsvN(t.recipients||0)]);
+    push(['Затраты руб (получатели × '+(_mktSms.price||8.5)+')'+(t.recipientsApprox?' — оценка':''), mktCsvN(t.cost||0)]);
     push(['Купивших/перешедших', mktCsvN(t.buyers||0)]);
     push(['Выручка атрибут. руб', mktCsvN(t.revenue||0)]);
     if(t.sweetReg!=null) push(['Регистраций в «Сладком чеке»', mktCsvN(t.sweetReg)]);
