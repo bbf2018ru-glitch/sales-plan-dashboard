@@ -9,8 +9,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Только localhost: приложение ходит в БД по docker-сети (db:5432), наружу
+    # публиковать незачем. Раньше "5432:5432" открывал Postgres на всех интерфейсах —
+    # на публичном VDS это БД в интернете. Для psql с хоста localhost-проброса хватает.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro

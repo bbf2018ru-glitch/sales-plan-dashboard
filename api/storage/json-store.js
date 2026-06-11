@@ -21,7 +21,14 @@ class JsonStore {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(this.dbPath)) {
-      fs.copyFileSync(this.sampleDbPath, this.dbPath);
+      // Первый запуск: засеиваем из демо-сэмпла, если он есть. В прод-образе
+      // sample-db.json исключён (.dockerignore) — тогда стартуем с пустой БД,
+      // а не падаем на copyFileSync с ENOENT.
+      if (this.sampleDbPath && fs.existsSync(this.sampleDbPath)) {
+        fs.copyFileSync(this.sampleDbPath, this.dbPath);
+      } else {
+        fs.writeFileSync(this.dbPath, '{}');
+      }
     }
   }
 
