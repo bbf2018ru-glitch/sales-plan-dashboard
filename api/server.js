@@ -423,9 +423,19 @@ function parseBody(req) {
   });
 }
 
+// Сравнение секретов в постоянном времени (защита от timing-атак). timingSafeEqual
+// бросает на буферах разной длины — поэтому сначала тип/длина (утечка длины приемлема),
+// пустой/нестроковый вход → false (напр. отсутствующий заголовок, null API_KEY).
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length || a.length === 0) {
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 function requireApiKey(req, res) {
   const key = req.headers['x-api-key'];
-  if (key !== API_KEY) { sendJson(res, 401, { error: 'Invalid API key' }); return false; }
+  if (!safeEqual(key, API_KEY)) { sendJson(res, 401, { error: 'Invalid API key' }); return false; }
   return true;
 }
 
@@ -539,7 +549,7 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 200, { ok: true, token: null, pinRequired: false });
         return;
       }
-      if (body.pin === DASHBOARD_PIN) {
+      if (safeEqual(String(body.pin || ''), DASHBOARD_PIN)) {
         recordPinAttempt(ip, true);
         const sessionToken = createSession();
         setSessionCookie(res, sessionToken, req);
@@ -1464,7 +1474,7 @@ const server = http.createServer(async (req, res) => {
       // больше не работает — дальше нужен X-User-Token админа.
       const existingUsers = await store.listUsers();
       const isBootstrap = existingUsers.length === 0
-        && req.headers['x-api-key'] === API_KEY;
+        && safeEqual(req.headers['x-api-key'], API_KEY);
 
       if (!isBootstrap) {
         const actor = await resolveUser(req);
@@ -1760,7 +1770,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/admin/import-snapshot' && req.method === 'POST') {
       const user = await resolveUser(req);
       const apiKey = req.headers['x-api-key'];
-      if (!(user && user.role === 'admin') && !(apiKey && apiKey === API_KEY)) {
+      if (!(user && user.role === 'admin') && !safeEqual(apiKey, API_KEY)) {
         sendJson(res, 401, { error: 'Admin token or X-API-Key required' });
         return;
       }
@@ -1858,7 +1868,7 @@ const server = http.createServer(async (req, res) => {
       // Авторизация: либо admin-токен, либо ingest-api-key (для bootstrap, когда
       // админ-юзер ещё не создан после миграции БД).
       const isAdmin = user && user.role === 'admin';
-      const isApiKey = apiKey && apiKey === API_KEY;
+      const isApiKey = safeEqual(apiKey, API_KEY);
       if (!isAdmin && !isApiKey) {
         sendJson(res, 401, { error: 'Admin token or X-API-Key required' });
         return;
