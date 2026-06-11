@@ -1,14 +1,22 @@
 /* ============================================================
-   maria-design — ПИЛОТ-оверлей поверх styles.css.
-   Активен ТОЛЬКО при <html data-design="maria"> (флаг ?design=maria),
-   иначе ничего не меняет. Перекрашивает через существующие CSS-переменные
-   + меняет шрифты (Inter Tight → Onest, бренд → Prata, KPI-числа → JetBrains Mono).
-   Полностью обратимо: убрать флаг/ссылку — дашборд как был.
+   maria-design — раскатано на весь дашборд (поверх styles.css).
+   Подключается БЕЗУСЛОВНО после styles.css → выигрывает по порядку каскада
+   при равной специфичности. Скоуп — сами тематические селекторы
+   ([data-theme=dark]/[data-theme=light]), которыми управляет приложение,
+   поэтому переключение темы НЕ сбивает оформление (в отличие от прежнего
+   флага data-design, который SPA затирал).
+
+   Что меняем: палитру (тёмная розовый→бордо, тёплые нейтрали; светлая →
+   тёплая слоновая кость) + шрифты (Inter Tight→Onest, бренд→Prata,
+   KPI-числа→JetBrains Mono). Семантические good/warn/bad НЕ трогаем —
+   они согласованы с захардкоженными литералами в компонентах.
+
    Требует подключённого fonts-maria.css (Onest + Prata, self-hosted).
+   ОТКАТ: снять <link> на этот файл и fonts-maria.css в index.html.
    ============================================================ */
 
-/* ---- Тёмная тема (дефолт): розовый → фирменное вино ---- */
-[data-design="maria"]{
+/* ---- Тёмная тема (дефолт): розовый акцент → фирменное вино, тёплые нейтрали ---- */
+:root, [data-theme=dark] {
   --bg:#1A1517;            /* тёплый уголь вместо холодного #0a0b0f */
   --paper:#221C1F;
   --ink:#F2EBE7;
@@ -17,53 +25,46 @@
   --line:#322A2D;
   --accent:#C7566A;        /* бордо, осветлённое под тёмный фон (было #ff6b8a розовый) */
   --accent-soft:rgba(199,86,106,.16);
-  --good:#5BB58A;  --good-soft:rgba(91,181,138,.16);
-  --warn:#D69A52;  --warn-soft:rgba(214,154,82,.16);
-  --bad:#D06A6A;   --bad-soft:rgba(208,106,106,.16);
-  --glass:#221C1F; --glass-strong:#2A2327; --glass-edge:#3A3034;
   --glow-accent:0 0 0 1px rgba(199,86,106,.32);
+  --glass:#221C1F;
+  --glass-strong:#2A2327;
+  --glass-edge:#3A3034;
   --glow-card:0 2px 10px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
 /* ---- Светлая тема: холодный серый → тёплая слоновая кость ---- */
-[data-design="maria"][data-theme=light]{
+[data-theme=light] {
   --bg:#FAF7F2;            /* тёплая слоновая кость вместо #f5f5f7 */
   --paper:#FFFFFF;
   --ink:#211A1C;
   --muted:#6B5F62;
   --hint:#8C8184;
   --line:#E9E1DA;          /* тёплая разделительная линия */
-  --accent:#8A2A3B;        /* фирменный бордо (как уже было в светлой — сохранён) */
+  --accent:#8A2A3B;        /* фирменный бордо (как уже было — сохранён) */
   --accent-soft:rgba(138,42,59,.08);
-  --good:#2E7D5B;  --good-soft:rgba(46,125,91,.10);
-  --warn:#B5722A;  --warn-soft:rgba(181,114,42,.12);
-  --bad:#A33A3A;   --bad-soft:rgba(163,58,58,.10);
-  --glass:#FFFFFF; --glass-strong:#FFFFFF; --glass-edge:#E9E1DA;
   --glow-accent:0 0 0 1px rgba(138,42,59,.20), 0 4px 14px -4px rgba(138,42,59,.16);
+  --glass:#FFFFFF;
+  --glass-strong:#FFFFFF;
+  --glass-edge:#E9E1DA;
   --glow-card:0 1px 2px rgba(33,26,28,.04), 0 2px 8px rgba(33,26,28,.06);
 }
+/* карточки в светлой — на тёплом фоне белые держатся, контраст ок */
+[data-theme=light] .panel,
+[data-theme=light] .kpi { background:#FFFFFF; }
 
 /* ---- Типографика ---- */
-/* UI-текст: Inter Tight → Onest (выигрывает по специфичности у body{}) */
-[data-design="maria"] body{
+/* UI-текст: Inter Tight → Onest (тот же селектор body, грузится позже → выигрывает) */
+body {
   font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
 /* KPI-числа: настоящий моноширинный (было "Inter Tight","JetBrains Mono") */
-[data-design="maria"] .kpi-value,
-[data-design="maria"] .spot-value,
-[data-design="maria"] .rec-kpi-val,
-[data-design="maria"] .abc-stat-pct{
+.kpi-value, .spot-value, .rec-kpi-val, .abc-stat-pct {
   font-family:'JetBrains Mono','Consolas',monospace;
   letter-spacing:-.02em;
 }
 /* Бренд / заголовок входа: элегантная засечка Prata */
-[data-design="maria"] .brand-name,
-[data-design="maria"] .pin-title{
+.brand-name, .pin-title {
   font-family:'Prata',Georgia,serif;
   font-weight:400;
   letter-spacing:.3px;
-}
-
-@media (prefers-reduced-motion:reduce){
-  [data-design="maria"] *{animation:none!important;transition:none!important}
 }

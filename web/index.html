@@ -8,24 +8,18 @@
     <link rel="icon" type="image/png" href="/logo-girl.png" />
     <link rel="apple-touch-icon" href="/logo-girl.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#0a0814" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#f4eee2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1A1517" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FAF7F2" media="(prefers-color-scheme: light)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Мария" />
-    <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-cyrillic.woff2" crossorigin />
-    <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-latin.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/onest-gNMKW3F-SZuj7xmb-HY6EQ.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/prata-6xKhdSpbNNCT-sWLCm7JLQ.woff2" crossorigin />
     <link rel="stylesheet" href="/fonts.css?v=1" />
     <link rel="stylesheet" href="/styles.css?v=74" />
-    <!-- maria-design ПИЛОТ: активен ТОЛЬКО при ?design=maria; обычный URL дашборда не меняется -->
-    <script>
-      if (location.search.indexOf('design=maria') !== -1) {
-        document.documentElement.dataset.design = 'maria';
-        ['/fonts-maria.css?v=1', '/styles-maria.css?v=1'].forEach(function (h) {
-          var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = h; document.head.appendChild(l);
-        });
-      }
-    </script>
+    <!-- maria-design: раскатано на весь дашборд. ОТКАТ — снять эти 2 ссылки. -->
+    <link rel="stylesheet" href="/fonts-maria.css?v=1" />
+    <link rel="stylesheet" href="/styles-maria.css?v=2" />
   </head>
   <body>
 
