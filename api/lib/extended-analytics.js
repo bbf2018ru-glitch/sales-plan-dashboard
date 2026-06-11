@@ -23,6 +23,22 @@ const {
 
 const cache = makeCache(5 * 60 * 1000);
 
+// allSettled-обёртка: один упавший тяжёлый запрос (таймаут «старого IIS Маши») НЕ должен
+// ронять весь отчёт. Возвращает { results, failed, allFailed }: упавшие позиции в results = null
+// (downstream берёт res?.rows, а метрику упавшего запроса ставит null → фронт «—»),
+// failed = метки упавших запросов (для partialNote), allFailed — легли все (честное «недоступно»).
+async function settleQueries(promises, labels) {
+  const settled = await Promise.allSettled(promises);
+  const results = [], failed = [];
+  settled.forEach((s, i) => {
+    if (s.status === 'fulfilled') { results.push(s.value); return; }
+    results.push(null);
+    failed.push((labels && labels[i]) || String(i));
+    console.warn(`[extended-analytics] запрос 1С «${(labels && labels[i]) || i}» упал: ${String((s.reason && s.reason.message) || s.reason).slice(0, 120)}`);
+  });
+  return { results, failed, allFailed: failed.length === settled.length };
+}
+
 // ─── 1) Customers retention ─────────────────────────────────────────────────
 // Считает: новых клиентов в периоде (первая активность карты попадает в from..to)
 // vs постоянных (карта активна до from). Использует ретро 6 мес как baseline —
@@ -103,9 +119,7 @@ async function buildNewCustomersMonthly(period) {
   const TBL = 'РегистрНакопления.Бонусы КАК Б';
   const ymKey = (raw) => { const d = parseRuDate(raw); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : null; };
 
-  let actRows, newRows;
-  try {
-    [actRows, newRows] = await Promise.all([
+  const { results: [actRows, newRows], failed, allFailed } = await settleQueries([
       // активные карты по месяцам
       callQuery(`ВЫБРАТЬ НАЧАЛОПЕРИОДА(Б.Период, МЕСЯЦ) КАК М, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Б.БонуснаяКарта) КАК Акт`
         + ` ИЗ ${TBL} ГДЕ Б.Период >= ${seriesStart} И Б.Период < ${seriesEnd}`
@@ -115,22 +129,26 @@ async function buildNewCustomersMonthly(period) {
         + ` (ВЫБРАТЬ Б.БонуснаяКарта КАК Карта, МИНИМУМ(Б.Период) КАК Первая ИЗ ${TBL}`
         + ` ГДЕ Б.Период >= ${DEEP} И Б.Период < ${seriesEnd} СГРУППИРОВАТЬ ПО Б.БонуснаяКарта) КАК Перв`
         + ` ГДЕ Перв.Первая >= ${seriesStart} СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Перв.Первая, МЕСЯЦ)`, { timeoutMs: 120000 }),
-    ]);
-  } catch (e) {
-    return { period, available: false, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
-  }
+    ], ['активные карты', 'новые карты']);
+  if (allFailed) return { period, available: false, note: 'Источник 1С недоступен (карты лояльности)' };
 
   const actBy = new Map(), newBy = new Map();
-  for (const r of actRows.rows || []) { const k = ymKey(r['М']); if (k) actBy.set(k, parseRu(r['Акт']) || 0); }
-  for (const r of newRows.rows || []) { const k = ymKey(r['М']); if (k) newBy.set(k, parseRu(r['Новых']) || 0); }
+  for (const r of actRows?.rows || []) { const k = ymKey(r['М']); if (k) actBy.set(k, parseRu(r['Акт']) || 0); }
+  for (const r of newRows?.rows || []) { const k = ymKey(r['М']); if (k) newBy.set(k, parseRu(r['Новых']) || 0); }
 
-  const series = seriesMonths.map(ym => ({ ym, newCards: newBy.get(ym) || 0, activeCards: actBy.get(ym) || 0 }));
+  // Упавший запрос → null (не 0): фронт фильтрует newCards!=null и рисует разрыв, а не «0 новых».
+  const series = seriesMonths.map(ym => ({
+    ym,
+    newCards: newRows ? (newBy.get(ym) || 0) : null,
+    activeCards: actRows ? (actBy.get(ym) || 0) : null
+  }));
   return {
     period,
     range: { from: first, to: last },
     baseline: { note: 'новизна = карта с первым в истории движением бонусов в этом месяце' },
     series,
-    seriesPending: 0
+    seriesPending: 0,
+    partialNote: failed.length ? 'Не загружено из 1С: ' + failed.join(', ') : null
   };
 }
 
@@ -553,7 +571,7 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
     + ` И ТИПЗНАЧЕНИЯ(П.Регистратор) = ТИП(Документ.ЧекККМ)`;
 
   // Берём с запасом (300), т.к. служебные/опт карты ниже отфильтруем в JS до 100.
-  const [top, totals] = await Promise.all([
+  const { results: [top, totals], failed, allFailed } = await settleQueries([
     callQuery(
       `ВЫБРАТЬ ПЕРВЫЕ 300 ВЫРАЗИТЬ(П.ДисконтнаяКарта.Наименование КАК СТРОКА(100)) КАК Карта,`
       + ` ВЫРАЗИТЬ(П.ДисконтнаяКарта.ВидДисконтнойКарты.Наименование КАК СТРОКА(50)) КАК Вид,`
@@ -566,14 +584,15 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
       `ВЫБРАТЬ СУММА(П.Сумма) КАК Сумма, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.ДисконтнаяКарта) КАК Карт,`
       + ` КОЛИЧЕСТВО(РАЗЛИЧНЫЕ П.Регистратор) КАК Покупок`
       + ` ИЗ РегистрНакопления.ПродажиПоДисконтнымКартам КАК П ГДЕ ${WHERE}`, { timeoutMs: 120000 }),
-  ]);
+  ], ['топ-карты', 'итоги']);
+  if (allFailed) return { period: { from: fromYM, to: toYM }, available: false, note: 'Источник 1С недоступен (топ клиентов)' };
 
   // Те же исключения, что в маркетинговом топе лояльности (marketing-analytics.js):
   // опт/корпоратив по виду карты + служебные/магазинные/безымянные по названию.
   const WHOLESALE_KINDS = /корпоратив|офис|привилег|оптов|промоакц/i;
   const INTERNAL_CARD = /магазин|склад|кондитерск|(^|\s)(нет|дс)(\s|$)/i;
   const NONAME = /^[а-яёa-z]{1,4}\d*\s+\d+\s*$/i;
-  const arr = (top.rows || []).map(r => {
+  const arr = (top?.rows || []).map(r => {
     const card = (r['Карта'] || '').trim();
     const kind = String(r['Вид'] || '').trim();
     const revenue = parseRu(r['Сумма']);
@@ -584,13 +603,14 @@ async function buildTopCustomersByRevenue(fromYM, toYM) {
     && !INTERNAL_CARD.test(c.card) && !NONAME.test(c.card)
   ).slice(0, 100);
 
-  const t = (totals.rows || [])[0] || {};
+  const t = (totals?.rows || [])[0] || {};
   return {
     period: { from: fromYM, to: toYM },
-    totalCards: parseRu(t['Карт']) || 0,
-    totalTransactions: parseRu(t['Покупок']) || 0,
-    totalRevenue: Number((parseRu(t['Сумма']) || 0).toFixed(2)),
+    totalCards: totals ? (parseRu(t['Карт']) || 0) : null,
+    totalTransactions: totals ? (parseRu(t['Покупок']) || 0) : null,
+    totalRevenue: totals ? Number((parseRu(t['Сумма']) || 0).toFixed(2)) : null,
     truncatedNote: null,
+    partialNote: failed.length ? 'Не загружено из 1С: ' + failed.join(', ') : null,
     topCards: arr.map(c => ({
       card: c.card,
       owner: '',
@@ -619,9 +639,7 @@ async function buildPromoByAction(fromYM, toYM) {
   const NOTEMPTY = `${ACT} <> ""`;
   const tchWhere = `Т.Ссылка.Дата >= ${DT} И Т.Ссылка.Дата < ${DTEND} И ${NOTEMPTY}`;
 
-  let byAct, sumRows, totRows;
-  try {
-    [byAct, sumRows, totRows] = await Promise.all([
+  const { results: [byAct, sumRows, totRows], failed, allFailed } = await settleQueries([
       // применений (строк ТЧ) и чеков по каждой акции
       callQuery(`ВЫБРАТЬ ${ACT} КАК Акция, КОЛИЧЕСТВО(*) КАК Прим, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка) КАК Чеков`
         + ` ИЗ Документ.ЧекККМ.Товары КАК Т ГДЕ ${tchWhere} СГРУППИРОВАТЬ ПО ${ACT}`, { timeoutMs: 90000 }),
@@ -633,28 +651,28 @@ async function buildPromoByAction(fromYM, toYM) {
       // итоги для KPI (точный distinct чеков с любой акцией)
       callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Прим, КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка) КАК Чеков`
         + ` ИЗ Документ.ЧекККМ.Товары КАК Т ГДЕ ${tchWhere}`, { timeoutMs: 90000 }),
-    ]);
-  } catch (e) {
-    return { period: { from: fromYM, to: toYM }, available: false, note: 'Источник 1С недоступен: ' + String(e.message || e).slice(0, 80) };
-  }
+    ], ['акции', 'суммы скидок', 'итоги']);
+  if (allFailed) return { period: { from: fromYM, to: toYM }, available: false, note: 'Источник 1С недоступен (скидки по акциям)' };
 
   const discBy = new Map();
-  for (const r of sumRows.rows || []) discBy.set((r['Акция'] || '').trim(), parseRu(r['Скидка']) || 0);
-  const actions = (byAct.rows || [])
+  for (const r of sumRows?.rows || []) discBy.set((r['Акция'] || '').trim(), parseRu(r['Скидка']) || 0);
+  // Если запрос сумм скидок упал — discountSum=null (фронт «—»), а не 0 (выглядело бы как «без скидки»).
+  const actions = (byAct?.rows || [])
     .map(r => {
       const action = (r['Акция'] || '').trim();
-      return { action, applications: parseRu(r['Прим']) || 0, cheques: parseRu(r['Чеков']) || 0, discountSum: Number((discBy.get(action) || 0).toFixed(2)) };
+      return { action, applications: parseRu(r['Прим']) || 0, cheques: parseRu(r['Чеков']) || 0, discountSum: sumRows ? Number((discBy.get(action) || 0).toFixed(2)) : null };
     })
     .filter(a => a.action) // пустую акцию (прочие скидки) не показываем
-    .sort((a, b) => (b.discountSum - a.discountSum) || (b.applications - a.applications));
+    .sort((a, b) => (((b.discountSum || 0) - (a.discountSum || 0)) || (b.applications - a.applications)));
 
-  const t = (totRows.rows || [])[0] || {};
+  const t = (totRows?.rows || [])[0] || {};
   return {
     period: { from: fromYM, to: toYM },
-    totalApplications: parseRu(t['Прим']) || 0,
-    uniqueDocuments: parseRu(t['Чеков']) || 0,
-    totalDiscountSum: Number(actions.reduce((s, a) => s + a.discountSum, 0).toFixed(2)),
+    totalApplications: totRows ? (parseRu(t['Прим']) || 0) : null,
+    uniqueDocuments: totRows ? (parseRu(t['Чеков']) || 0) : null,
+    totalDiscountSum: sumRows ? Number(actions.reduce((s, a) => s + (a.discountSum || 0), 0).toFixed(2)) : null,
     truncatedNote: null, // агрегация в 1С — без потолка
+    partialNote: failed.length ? 'Не загружено из 1С: ' + failed.join(', ') : null,
     actions
   };
 }
@@ -672,7 +690,7 @@ async function buildUdsPromoCodes(fromYM, toYM) {
   const range = `Ч.Проведен И Ч.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Ч.Дата < ДАТАВРЕМЯ(${ny},${nm},1)`;
 
   // 1) Все проведённые чеки месяца (для доли) + итоги по чекам с промокодом
-  const [totalRes, promoRes, topRes, recentRes] = await Promise.all([
+  const { results: [totalRes, promoRes, topRes, recentRes], failed, allFailed } = await settleQueries([
     callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Всего ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range}`, { timeoutMs: 120000 }),
     callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.uds_КодСкидки) КАК Кодов, КОЛИЧЕСТВО(*) КАК Применений,`
       + ` СУММА(ЕСТЬNULL(Ч.СуммаДокумента,0)) КАК Выручка, СУММА(ЕСТЬNULL(Ч.СуммаОплатыБонусами,0)) КАК Бонусы`
@@ -685,27 +703,30 @@ async function buildUdsPromoCodes(fromYM, toYM) {
     callQuery(`ВЫБРАТЬ ПЕРВЫЕ 100 Ч.Дата КАК Дата, Ч.uds_КодСкидки КАК Код, Ч.Номер КАК Номер,`
       + ` Ч.Склад.Наименование КАК Точка, ЕСТЬNULL(Ч.СуммаДокумента,0) КАК Сумма`
       + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> "" УПОРЯДОЧИТЬ ПО Ч.Дата УБЫВ`, { timeoutMs: 120000 })
-  ]);
+  ], ['всего чеков', 'итоги промо', 'топ кодов', 'свежие применения']);
+  if (allFailed) return { period: { from: ym, to: ym }, periodYM: ym, available: false, note: 'Источник 1С недоступен (UDS-промокоды)' };
 
-  const totalChecks = parseRu((totalRes.rows || [])[0]?.['Всего']) || 0;
-  const pr = (promoRes.rows || [])[0] || {};
-  const uniqueCodes = parseRu(pr['Кодов']) || 0;
-  const checksWithPromocode = parseRu(pr['Применений']) || 0;
-  const bonusUsed = Math.round(parseRu(pr['Бонусы']) || 0);
-  const revenue = Math.round(parseRu(pr['Выручка']) || 0);
+  // Упавший запрос → метрика null (фронт «—»), а не 0 (выглядело бы как реальный ноль).
+  const totalChecks = totalRes ? (parseRu((totalRes.rows || [])[0]?.['Всего']) || 0) : null;
+  const pr = (promoRes?.rows || [])[0] || {};
+  const uniqueCodes = promoRes ? (parseRu(pr['Кодов']) || 0) : null;
+  const checksWithPromocode = promoRes ? (parseRu(pr['Применений']) || 0) : null;
+  const bonusUsed = promoRes ? Math.round(parseRu(pr['Бонусы']) || 0) : null;
+  const revenue = promoRes ? Math.round(parseRu(pr['Выручка']) || 0) : null;
 
   return {
     period: { from: ym, to: ym },
     periodYM: ym,
     totalChecksScanned: totalChecks,
     checksWithPromocode,
-    promocodeRate: totalChecks ? Number(((checksWithPromocode / totalChecks) * 100).toFixed(2)) : 0,
+    promocodeRate: (totalChecks && checksWithPromocode != null) ? Number(((checksWithPromocode / totalChecks) * 100).toFixed(2)) : null,
     uniqueCodes,
     revenue,
     bonusUsed,
-    drr: revenue ? Number(((bonusUsed / revenue) * 100).toFixed(1)) : 0,
+    drr: (revenue && bonusUsed != null) ? Number(((bonusUsed / revenue) * 100).toFixed(1)) : null,
     truncatedNote: null,
-    topCodes: (topRes.rows || []).map(r => ({
+    partialNote: failed.length ? 'Не загружено из 1С: ' + failed.join(', ') : null,
+    topCodes: (topRes?.rows || []).map(r => ({
       code: (r['Код'] || '').trim(),
       uses: parseRu(r['Применений']) || 0,
       totalSum: Math.round(parseRu(r['Выручка']) || 0),
@@ -713,7 +734,7 @@ async function buildUdsPromoCodes(fromYM, toYM) {
       stores: parseRu(r['Точек']) || 0,
       firstDate: r['Первый'] || ''
     })),
-    recentApplications: (recentRes.rows || []).map(r => ({
+    recentApplications: (recentRes?.rows || []).map(r => ({
       date: r['Дата'] || '',
       code: (r['Код'] || '').trim(),
       docNumber: r['Номер'] || '',

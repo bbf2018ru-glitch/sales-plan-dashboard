@@ -3402,9 +3402,11 @@ async function loadTopCustomers() {
         <td class="num">${fmtNum(r.avgTicket)} ₽</td>
       </tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Нет данных за период</td></tr>`;
     if (noteEl) {
-      noteEl.textContent = data.truncatedNote
+      noteEl.textContent = data.partialNote
+        ? `⚠ ${data.partialNote}`
+        : data.truncatedNote
         ? `⚠ ${data.truncatedNote}`
-        : `${fmtNum(data.totalCards || 0)} карт, ${fmtNum(data.totalTransactions || 0)} операций, ${fmtNum(data.totalRevenue || 0)} ₽ оборота`;
+        : `${fmtNum(data.totalCards)} карт, ${fmtNum(data.totalTransactions)} операций, ${fmtNum(data.totalRevenue)} ₽ оборота`;
     }
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
@@ -3472,19 +3474,19 @@ async function loadPromoByAction() {
       return;
     }
     kpis.innerHTML = `
-      <div class="kpi-card"><div class="kpi-label">Применений</div><div class="kpi-value">${fmtNum(data.totalApplications || 0)}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Заказов / чеков</div><div class="kpi-value">${fmtNum(data.uniqueDocuments || 0)}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Сумма скидок</div><div class="kpi-value">${fmtNum(data.totalDiscountSum || 0)} ₽</div></div>`;
+      <div class="kpi-card"><div class="kpi-label">Применений</div><div class="kpi-value">${fmtNum(data.totalApplications)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Заказов / чеков</div><div class="kpi-value">${fmtNum(data.uniqueDocuments)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Сумма скидок</div><div class="kpi-value">${fmtNum(data.totalDiscountSum)} ₽</div></div>`;
     if (bslNote) bslNote.classList.add('hidden');
     tbody.innerHTML = (data.actions || []).map(r => `
       <tr>
         <td>${escapeHtml(r.action)}</td>
         <td class="num">${fmtNum(r.applications)}</td>
         <td class="num">${fmtNum(r.cheques)}</td>
-        <td class="num">${fmtNum(r.discountSum)} ₽</td>
+        <td class="num">${r.discountSum==null?'—':fmtNum(r.discountSum)+' ₽'}</td>
       </tr>`).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px">За период скидок по акциям не найдено</td></tr>`;
     if (noteEl) {
-      noteEl.textContent = data.truncatedNote ? `⚠ ${data.truncatedNote}` : '';
+      noteEl.textContent = data.partialNote ? `⚠ ${data.partialNote}` : data.truncatedNote ? `⚠ ${data.truncatedNote}` : '';
     }
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px">Ошибка: ${escapeHtml(e.message)}</td></tr>`;
@@ -5764,20 +5766,21 @@ function mktLoadYoY(){
       if(!uds || !uds.recentApplications) return;
       var el=document.getElementById('mktPromoFresh');
       if(!el) return;
-      var rate = uds.totalChecksScanned ? (uds.checksWithPromocode/uds.totalChecksScanned*100) : 0;
-      var rateC = rate < 2 ? 'color:#e0466a' : (rate < 5 ? 'color:#b8860b' : 'color:#10a05a');
-      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
-        '<div class="mkt-kpi"><div class="mkt-v">'+mNum(uds.totalChecksScanned)+'</div><div class="mkt-l">Чеков просмотрено</div></div>'+
-        '<div class="mkt-kpi"><div class="mkt-v">'+mNum(uds.checksWithPromocode)+'</div><div class="mkt-l">С промокодом</div></div>'+
-        '<div class="mkt-kpi"><div class="mkt-v" style="'+rateC+'">'+mNum1(rate)+' %</div><div class="mkt-l">Доля чеков с промо</div></div>'+
-        '<div class="mkt-kpi"><div class="mkt-v">'+mNum(uds.uniqueCodes)+'</div><div class="mkt-l">Уникальных кодов</div></div>'+
+      var rate = uds.promocodeRate;  // null-aware с сервера: «—» если данных нет (не выдуманный 0)
+      var rateC = rate==null ? 'color:var(--muted)' : rate < 2 ? 'color:#e0466a' : (rate < 5 ? 'color:#b8860b' : 'color:#10a05a');
+      el.innerHTML = (uds.partialNote?'<div style="font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:6px 10px;border-radius:6px;margin-bottom:10px">⚠ '+uds.partialNote+'</div>':'')+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.totalChecksScanned)+'</div><div class="mkt-l">Чеков просмотрено</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.checksWithPromocode)+'</div><div class="mkt-l">С промокодом</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v" style="'+rateC+'">'+(rate==null?'—':mNum1(rate)+' %')+'</div><div class="mkt-l">Доля чеков с промо</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.uniqueCodes)+'</div><div class="mkt-l">Уникальных кодов</div></div>'+
         '</div>'+
         '<div class="mkt-chart-t">Последние '+(uds.recentApplications||[]).length+' применений (свежее наверху)</div>'+
         '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Промокод</th><th>Чек №</th><th class="num">Сумма ₽</th><th>Точка</th></tr></thead><tbody>'+
         (uds.recentApplications||[]).slice(0,40).map(function(r){
           return '<tr><td style="font-size:11px">'+(r.date||'')+'</td><td><b>'+r.code+'</b></td><td style="font-size:11px;color:var(--muted)">'+(r.docNumber||'—')+'</td><td class="num">'+mNum(r.sum)+'</td><td style="font-size:11px;color:var(--muted)">'+((r.store||'—')+'').slice(0,30)+'</td></tr>';
         }).join('')+'</tbody></table></div>'+
-        '<div style="font-size:11px;color:var(--muted);margin-top:6px">За '+(uds.periodYM||period)+' · выручка чеков с промокодом '+mNum(uds.revenue||0)+' ₽ · бонусов списано '+mNum(uds.bonusUsed||0)+' ₽ (ДРР '+mNum1(uds.drr||0)+' %).'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px">За '+(uds.periodYM||period)+' · выручка чеков с промокодом '+fmtNum(uds.revenue)+' ₽ · бонусов списано '+fmtNum(uds.bonusUsed)+' ₽ (ДРР '+(uds.drr==null?'—':mNum1(uds.drr)+' %')+').'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
     }).catch(function(){});
 
     // Промокоды UDS — помесячная матрица.
@@ -5876,7 +5879,7 @@ function mktLoadYoY(){
       if(hint){
         var pending=nc.seriesPending||0;
         var sum=ready.reduce(function(a,s){return a+s.newCards;},0);
-        hint.textContent='Сумма по '+ready.length+' мес.: '+mNum(sum)+' новых карт. Baseline 12 мес до старта (отсекает «не новых»).'+(pending?' · '+pending+' мес. ещё прогреваются':'');
+        hint.textContent='Сумма по '+ready.length+' мес.: '+mNum(sum)+' новых карт. Baseline 12 мес до старта (отсекает «не новых»).'+(pending?' · '+pending+' мес. ещё прогреваются':'')+(nc.partialNote?' · ⚠ '+nc.partialNote:'');
       }
     }).catch(function(){});
     // По точкам — маркетинг
