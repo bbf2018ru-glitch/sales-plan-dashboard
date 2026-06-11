@@ -355,7 +355,7 @@
                     <th data-sort="percent" class="sortable num">%</th>
                     <th data-sort="margin" class="sortable num col-margin">Маржа</th>
                     <th data-sort="marginPct" class="sortable num col-margin">Марж.%</th>
-                    <th data-sort="avgCheck" class="sortable num">Ср. чек</th>
+                    <th data-sort="avgCheck" class="sortable num" title="Средняя цена за единицу = выручка / штуки (НЕ средний чек)">Ср. цена ед.</th>
                     <th data-sort="quantity" class="sortable num">Шт</th>
                     <th class="num" title="Изменение % выполнения относительно того же магазина в прошлом месяце">Тренд</th>
                     <th class="num col-hide-md" title="Изменение % выполнения относительно того же месяца год назад (или ранее, если данных за прошлый год нет)">YoY</th>
@@ -1204,7 +1204,7 @@
             <div class="panel">
               <div class="panel-header">
                 <div><div class="panel-title">🏬 Кластеризация магазинов</div>
-                <div class="panel-subtitle">k-means по % выполнения / маржинальности / среднему чеку — где сильные, где слабые группы</div></div>
+                <div class="panel-subtitle">k-means по % выполнения / маржинальности / средней цене ед. — где сильные, где слабые группы</div></div>
                 <div class="panel-actions"><button class="btn-mini" id="mkClustersCsv">CSV</button> <button class="btn-mini" id="mkClustersRefresh">Обновить</button></div>
               </div>
               <div id="mkClusters" class="mk-block"></div>
@@ -1487,7 +1487,7 @@
 
           <section class="section" id="mkt-s-clusters" data-mgroup="products">
             <div class="section-title">🧭 Кластеры точек</div>
-            <div class="section-hint">k-means по выручке/среднему чеку/маржинальности. Группирует похожие точки — чтобы видеть «семьи» магазинов.</div>
+            <div class="section-hint">k-means по % выполнения/средней цене ед./маржинальности. Группирует похожие точки — чтобы видеть «семьи» магазинов.</div>
             <div id="mktClusters"></div>
           </section>
 

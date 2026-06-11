@@ -1188,7 +1188,7 @@ function renderStores(summary) {
 
   const sortLabels = {
     storeName: 'Точка', fact: 'Факт', plan: 'План', percent: '%',
-    margin: 'Маржа', marginPct: 'Марж.%', avgCheck: 'Ср. чек', quantity: 'Шт'
+    margin: 'Маржа', marginPct: 'Марж.%', avgCheck: 'Ср. цена ед.', quantity: 'Шт'
   };
   document.querySelectorAll('#storesTableEl th.sortable').forEach(th => {
     const k = th.dataset.sort;
@@ -2710,7 +2710,7 @@ async function init() {
     const d = analyticsState.mkClustersData?.clusters || [];
     if (!d.length) return alert('Нет данных');
     const rows = [];
-    for (const c of d) for (const s of c.stores) rows.push({ 'Кластер': c.name, 'Магазин': s.storeName, 'Выполнение_%': s.pctCompletion, 'Маржа_%': s.marginPct, 'Ср_чек': s.avgCheck, 'Факт': s.fact });
+    for (const c of d) for (const s of c.stores) rows.push({ 'Кластер': c.name, 'Магазин': s.storeName, 'Выполнение_%': s.pctCompletion, 'Маржа_%': s.marginPct, 'Ср_цена_ед': s.avgCheck, 'Факт': s.fact });
     exportCsv(rows, `store-clusters-${state.period}.csv`);
   });
   $('mkCohortsCsv')?.addEventListener('click', () => {
@@ -3028,7 +3028,7 @@ async function loadMkClusters() {
     }
     const cards = data.clusters.map(c => {
       const toneCls = c.tone === 'good' ? 'mk-seg-good' : c.tone === 'bad' ? 'mk-seg-bad' : c.tone === 'warn' ? 'mk-seg-warn' : '';
-      const topStores = c.stores.slice(0, 5).map(s => `<div style="font-size:12px"><b>${escapeHtml(s.storeName)}</b> · ${s.pctCompletion}% · чек ${s.avgCheck}₽</div>`).join('');
+      const topStores = c.stores.slice(0, 5).map(s => `<div style="font-size:12px"><b>${escapeHtml(s.storeName)}</b> · ${s.pctCompletion}% · ср.цена ${s.avgCheck} ₽</div>`).join('');
       return `
         <div class="mk-seg ${toneCls}">
           <div class="mk-seg-name">${escapeHtml(c.name)}</div>
@@ -3036,14 +3036,14 @@ async function loadMkClusters() {
           <div style="font-size:11px;color:var(--muted);margin-top:4px">средние:</div>
           <div style="font-size:12px">% выполн.: <b>${c.avg.pctCompletion}%</b></div>
           <div style="font-size:12px">маржа: <b>${c.avg.marginPct}%</b></div>
-          <div style="font-size:12px">ср.чек: <b>${c.avg.avgCheck}₽</b></div>
+          <div style="font-size:12px">ср. цена ед.: <b>${c.avg.avgCheck} ₽</b></div>
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--line)">${topStores}</div>
         </div>`;
     }).join('');
     el.innerHTML = `
       <div class="mk-stat-line">Всего магазинов в кластерах: <b>${data.total}</b> · ${data.clusters.length} групп</div>
       <div class="mk-segs">${cards}</div>
-      <div class="mk-action-hint">💡 <b>Что делать:</b> «Лидеры» — изучить их практики и масштабировать; «Отстающие» — внутренний обмен опытом с лидерами того же формата; высокий чек ≠ высокая маржа — следить за обоими показателями.</div>`;
+      <div class="mk-action-hint">💡 <b>Что делать:</b> «Лидеры» — изучить их практики и масштабировать; «Отстающие» — внутренний обмен опытом с лидерами того же формата; высокая ср. цена ед. ≠ высокая маржа — следить за обоими показателями.</div>`;
   } catch (e) {
     el.innerHTML = `<div class="empty-state" style="padding:14px;color:var(--bad)">Ошибка: ${escapeHtml(e.message)}</div>`;
   }

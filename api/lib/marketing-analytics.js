@@ -348,7 +348,9 @@ function buildHolidayYoy(db, windowDays = 60) {
 }
 
 // ─── 5) Store clusters ──────────────────────────────────────────────────────
-// k-means по 3 признакам (выполнение %, маржинальность %, средний чек).
+// k-means по 3 признакам (выполнение %, маржинальность %, средняя цена ед. = fact/quantity).
+// NB: avgCheck тут — историческое имя поля, по сути это средняя ЦЕНА ЗА ЕДИНИЦУ (выручка/штуки),
+// а НЕ средний чек (чек = выручка/кол-во чеков). UI подписан «ср. цена ед.».
 // Без библиотеки — реализация k-means на ~50 строк. k=4 фиксировано
 // (Лидеры / Маржинальные / Массовые / Отстающие).
 function buildStoreClusters(db, period) {
@@ -439,15 +441,17 @@ function buildStoreClusters(db, period) {
   // Если у двух кластеров близкий avgPct (разница <3 п.п.), но разный чек —
   // помечаем по чеку, чтобы не было одинаковых имён.
   // FIX 2026-06-04: брать ВСЕГДА базовое имя (baseLabels[i-1]), а не labels[i-1] —
-  // иначе при 3+ близких кластерах суффикс «(высокий чек)» накладывался итеративно
-  // и получались имена вроде «Лидеры (низкий чек) (высокий чек)».
+  // иначе при 3+ близких кластерах суффикс «(высокая ср. цена)» накладывался итеративно
+  // и получались имена вроде «Лидеры (низкая ср. цена) (высокая ср. цена)».
   for (let i = 1; i < raw.length; i++) {
     if (Math.abs(raw[i].avgPct - raw[i - 1].avgPct) < 3) {
       const base = baseLabels[i - 1];
-      const checkSuffix = (a, b) => a > b ? ' (высокий чек)' : ' (низкий чек)';
-      labels[i] = base + checkSuffix(raw[i].avgCheck, raw[i - 1].avgCheck);
-      if (!labels[i - 1].includes('чек')) {
-        labels[i - 1] = base + checkSuffix(raw[i - 1].avgCheck, raw[i].avgCheck);
+      // avgCheck = fact/quantity (средняя цена за ед.) — различаем близкие по %-выполнению
+      // кластеры по ценовому уровню ассортимента, а не по «чеку».
+      const priceSuffix = (a, b) => a > b ? ' (высокая ср. цена)' : ' (низкая ср. цена)';
+      labels[i] = base + priceSuffix(raw[i].avgCheck, raw[i - 1].avgCheck);
+      if (!labels[i - 1].includes('цена')) {
+        labels[i - 1] = base + priceSuffix(raw[i - 1].avgCheck, raw[i].avgCheck);
       }
     }
   }
