@@ -80,19 +80,29 @@ async function aggSales(period) {
   return agg;
 }
 
+// MTD-агрегат: тот же месяц, но только дни 1..asOfDay (для честного сравнения с прошлым
+// годом за период с начала месяца по сегодня). Без asOfDay = полный месяц (как aggSales).
+async function aggSalesAsOf(period, asOfDay) {
+  if (!asOfDay) return aggSales(period);
+  return monthCache.wrap(`agg:${period}:d${asOfDay}`, () => _aggSalesUncached(period, asOfDay));
+}
+
 // Нетто-выручка = Σ ЧекККМ.СуммаДокумента (продажа) − Σ СуммаДокумента (возврат), по Склад.Код.
 // ВАЖНО: sales-detail суммирует Товары.Сумма — это БРУТТО (до вычета оплаты бонусами и
 // подарочными сертификатами) И прибавляет возвраты как плюс, поэтому завышает выручку на
 // ~5%. СуммаДокумента = реально оплачено = Товары.Сумма − ОплатаБонусами − ОплатаСертификатами
 // (проверено: совпадает с план/факт дашборда до рубля по каждой точке). Запрос лёгкий —
 // агрегат в 1С, на выходе ~20 строк (точка×ВидОперации).
-async function netRevenueByStore(period) {
+// asOfDay (опц.): обрезать период по день месяца включительно (1..asOfDay) — для честного
+// MTD-сравнения с прошлым годом (период с начала месяца по сегодня), а не за полный месяц.
+async function netRevenueByStore(period, asOfDay) {
   const [y, m] = period.split('-').map(Number);
   const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  const upper = asOfDay ? `ДАТАВРЕМЯ(${y},${m},${asOfDay + 1})` : `ДАТАВРЕМЯ(${ny},${nm},1)`;
   const q = 'ВЫБРАТЬ Чек.Склад.Код КАК Код, Чек.ВидОперации КАК Вид,'
     + ' СУММА(ЕСТЬNULL(Чек.СуммаДокумента,0)) КАК Выручка, КОЛИЧЕСТВО(Чек.Ссылка) КАК Чеков'
     + ' ИЗ Документ.ЧекККМ КАК Чек'
-    + ` ГДЕ Чек.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Чек.Дата < ДАТАВРЕМЯ(${ny},${nm},1) И Чек.Проведен`
+    + ` ГДЕ Чек.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Чек.Дата < ${upper} И Чек.Проведен`
     + ' СГРУППИРОВАТЬ ПО Чек.Склад.Код, Чек.ВидОперации';
   const r = await callQuery(q, { timeoutMs: 100000 });
   const byStore = new Map(); // код → { revenue, cheques }  (нетто продажа−возврат)
@@ -111,9 +121,16 @@ async function netRevenueByStore(period) {
 }
 
 // Агрегаты продаж за период из sales-detail (по чекам + по товарам + по точкам, в одном проходе)
-async function _aggSalesUncached(period) {
+// asOfDay (опц.): считать только дни 1..asOfDay месяца — для MTD-сравнения с прошлым годом.
+async function _aggSalesUncached(period, asOfDay) {
   const d = await callSalesDetail(period);
-  const rows = d.rows || [];
+  let rows = d.rows || [];
+  if (asOfDay) {
+    rows = rows.filter(r => {
+      const dd = parseInt(String(r.date || '').slice(8, 10), 10);
+      return dd && dd <= asOfDay;
+    });
+  }
   const cheque = new Map(); // chequeNo -> { sum, hasCard, store, bonus }
   const products = new Map(); // productCode -> { sum, qty }
   const storeAcc = new Map(); // storeCode -> { revenue, cheques(Set), withCard(Set), bonus }
@@ -165,7 +182,7 @@ async function _aggSalesUncached(period) {
   }
   // Нетто-выручка/чеки из ЧекККМ.СуммаДокумента (продажа−возврат) — авторитетный источник.
   let net = null;
-  try { net = await netRevenueByStore(period); }
+  try { net = await netRevenueByStore(period, asOfDay); }
   catch (e) { console.log(`[marketing-channels] netRevenue ${period} fail: ${e.message}`); }
   const revenue = net ? net.revenue : Math.round(grossRevenue);
   const cheques = net ? net.cheques : grossCheques;
@@ -388,11 +405,19 @@ async function compute(period) {
   // YoY-серию фронт построит сам как cur[i-12] — это экономит 17 лишних запросов к 1С.
   const curMonths = monthsExtendedSeries(period);
 
+  // ЧЕСТНЫЙ YoY: для незакрытого (текущего) месяца тек.данные 1С естественно обрезаны по
+  // сегодня (MTD), поэтому прошлый год тоже берём за тот же период 1-е..сегодня, а не за
+  // полный месяц — иначе MTD vs полный месяц давал ложный обвал (-60% и т.п.). Закрытые
+  // месяцы (period в прошлом) сравниваются целиком: asOfDay=null.
+  const now = new Date();
+  const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const asOfDay = (period === curYM) ? now.getDate() : null;
+
   // 1С отдаёт один месяц за ~100с. Поэтому 17 точек тянуть синхронно нельзя — TTFB упадёт в 502.
   // Вместо этого собираем серию из того что лежит в кэше СЕЙЧАС, а недостающие месяцы пинаем
   // в фон без await (aggSales кэширован per-month с дедупом одновременных запросов).
   const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards] = await Promise.all([
-    aggSales(period), aggSales(py), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
+    aggSales(period), aggSalesAsOf(py, asOfDay), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
   ]);
   const curSeries = [];
   for (const ym of curMonths) {
@@ -463,6 +488,7 @@ async function compute(period) {
 
   return {
     period, periodYoY: py,
+    yoyAsOfDay: asOfDay,   // null = сравнение за полный месяц; число = MTD (1..день) для тек. месяца
     monthName: M[Number(period.split('-')[1])],
     revenue: metric('revenue'),
     cheques: metric('cheques'),

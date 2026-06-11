@@ -5568,7 +5568,10 @@ function mktLoadYoY(){
       // Для текущего месяца выручка/чеки/ср.чек берутся живыми из БД (curLive) — совпадают
       // с дашбордом, ежеминутно; «из кэша» относится только к YoY-сравнению и прошлым месяцам.
       var freshNote = d.curLive ? ' Выручка/чеки за текущий месяц — живые (ежеминутно, как на дашборде); сравнение с прошлым годом — из кэша.' : (d.fromCache?' (из кэша)':'');
-      hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.curLive?'.':'')+freshNote+(d.curLive?'':'.'); }
+      // Честный YoY: для незакрытого месяца сравниваем тот же период 1-е..сегодня год к году
+      // (а не MTD vs полный месяц). Поясняем окно, чтобы −% не читался как ложный обвал.
+      var mtdNote = d.yoyAsOfDay ? (' Сравнение за равный период: 1–'+d.yoyAsOfDay+' '+d.monthName+' '+period.slice(0,4)+' к 1–'+d.yoyAsOfDay+' '+d.monthName+' '+d.periodYoY.slice(0,4)+' (месяц ещё не закрыт).') : '';
+      hint.innerHTML='Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК). '+d.monthName+' '+period.slice(0,4)+' vs '+d.periodYoY+'. Обновлено: '+t+(d.curLive?'.':'')+freshNote+mtdNote+(d.curLive?'':'.'); }
     // живые товары и категории за выбранный месяц (перекрывают статику)
     var tp=document.getElementById('mktTopProd');
     if(tp && d.topProducts && d.topProducts.length){ tp.innerHTML='<table><thead><tr><th>Товар</th><th class="num">Выручка ₽</th><th class="num">Шт</th></tr></thead><tbody>'+
