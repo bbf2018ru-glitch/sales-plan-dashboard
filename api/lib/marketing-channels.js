@@ -216,18 +216,30 @@ async function _aggSalesUncached(period, asOfDay) {
   };
 }
 
-// Сладкий чек за период: карты, баллы, разбивка по заданиям
-async function aggSweet(period) {
+// День месяца (1..31) из значения даты — понимает ISO (YYYY-MM-DD) и RU (DD.MM.YYYY).
+// null = не распознано (тогда строку не отфильтровываем — без регрессии).
+function dayOfMonth(v) {
+  const s = String(v || '');
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);   if (m) return parseInt(m[3], 10);
+  m = s.match(/(\d{2})\.(\d{2})\.(\d{4})/);       if (m) return parseInt(m[1], 10);
+  return null;
+}
+
+// Сладкий чек за период: карты, баллы, разбивка по заданиям.
+// asOfDay (опц.): только движения 1..asOfDay месяца — для MTD-сравнения с прошлым годом.
+async function aggSweet(period, asOfDay) {
   try {
     const d = await callRegister('СладкийЧек', period, period, 10000);
     const rows = d.rows || [];
-    const cards = new Set(); let points = 0; const tasks = {};
+    const cards = new Set(); let points = 0; const tasks = {}; let used = 0;
     for (const r of rows) {
+      if (asOfDay) { const dd = dayOfMonth(r['Период'] || r['Дата']); if (dd && dd > asOfDay) continue; }
+      used++;
       if (r['БонуснаяКарта']) cards.add(r['БонуснаяКарта']);
       points += parseRu(r['Баллы']);
       const t = r['Задание'] || '?'; tasks[t] = (tasks[t] || 0) + 1;
     }
-    return { cards: cards.size, points: Math.round(points), events: rows.length, tasks };
+    return { cards: cards.size, points: Math.round(points), events: used, tasks };
   } catch (e) { return { cards: 0, points: 0, events: 0, tasks: {}, error: e.message }; }
 }
 
@@ -417,7 +429,7 @@ async function compute(period) {
   // Вместо этого собираем серию из того что лежит в кэше СЕЙЧАС, а недостающие месяцы пинаем
   // в фон без await (aggSales кэширован per-month с дедупом одновременных запросов).
   const [cur, prev, sweetCur, sweetPrev, promos, pmap, smap, loyaltyCards] = await Promise.all([
-    aggSales(period), aggSalesAsOf(py, asOfDay), aggSweet(period), aggSweet(py), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
+    aggSales(period), aggSalesAsOf(py, asOfDay), aggSweet(period), aggSweet(py, asOfDay), activePromos(), getProductMap(period), getStoreMap(), aggLoyaltyCards(period)
   ]);
   const curSeries = [];
   for (const ym of curMonths) {
@@ -447,6 +459,13 @@ async function compute(period) {
     const i = ymIndex.get(py12);
     return i != null ? curSeries[i] : null;
   });
+  // Для текущего (незакрытого) месяца линия cur на графике — MTD (данные по сегодня),
+  // поэтому точку «год назад» в этой же позиции берём тоже за MTD прошлого года (prev),
+  // а не за полный прошлый месяц — иначе текущий месяц выглядит провалом YoY.
+  if (asOfDay) {
+    const ci = ymIndex.get(period);
+    if (ci != null) prevSeries[ci] = headline(py, prev);
+  }
   const M = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
   const metric = (k) => ({ cur: cur[k], prev: prev[k], deltaPct: deltaPct(cur[k], prev[k]) });
 
@@ -559,9 +578,9 @@ async function getChannels(period) {
   // promoUsage — мимо channels-кэша (у него собственный 6ч кэш + лёгкие запросы),
   // иначе свежезадеплоенный код ждал бы истечения старого снапшота.
   const [r, promoUse] = await Promise.all([
-    // ch2: бамп ключа после фикса MTD-YoY (compute изменил формат prev) — иначе старый
-    // снапшот с полным прошлым месяцем висел бы до истечения 6ч TTL.
-    cache.wrap('ch2:' + p, () => compute(p)),
+    // ch3: бамп ключа после MTD-фиксов (prev каналов + сладкий чек + точка тек. месяца в
+    // monthlySeries.prev) — иначе старый снапшот висел бы до истечения 6ч TTL.
+    cache.wrap('ch3:' + p, () => compute(p)),
     promoUsage(p).catch(e => ({ error: e.message, byPromo: [] })),
   ]);
   // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
