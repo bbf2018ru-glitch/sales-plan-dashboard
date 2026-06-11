@@ -166,6 +166,24 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
   animation: mfxBar .55s cubic-bezier(.2,.7,.2,1) both;
   animation-delay: var(--d, 0ms);
 }
+/* стаггер через nth-child — переживает ре-рендер контента (инлайн --d от JS слетает) */
+#page-marketing.fx-in .mkt-yoy-card:nth-child(1),#page-marketing.fx-in .mkt-kpi:nth-child(1){--d:0ms}
+#page-marketing.fx-in .mkt-yoy-card:nth-child(2),#page-marketing.fx-in .mkt-kpi:nth-child(2){--d:55ms}
+#page-marketing.fx-in .mkt-yoy-card:nth-child(3),#page-marketing.fx-in .mkt-kpi:nth-child(3){--d:110ms}
+#page-marketing.fx-in .mkt-yoy-card:nth-child(4),#page-marketing.fx-in .mkt-kpi:nth-child(4){--d:165ms}
+#page-marketing.fx-in .mkt-yoy-card:nth-child(5),#page-marketing.fx-in .mkt-kpi:nth-child(5){--d:220ms}
+#page-marketing.fx-in .mkt-yoy-card:nth-child(6),#page-marketing.fx-in .mkt-kpi:nth-child(6){--d:275ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(1),#page-marketing.fx-in .mkt-dbar:nth-child(1){--d:0ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(2),#page-marketing.fx-in .mkt-dbar:nth-child(2){--d:30ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(3),#page-marketing.fx-in .mkt-dbar:nth-child(3){--d:60ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(4),#page-marketing.fx-in .mkt-dbar:nth-child(4){--d:90ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(5),#page-marketing.fx-in .mkt-dbar:nth-child(5){--d:120ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(6),#page-marketing.fx-in .mkt-dbar:nth-child(6){--d:150ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(7){--d:180ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(8){--d:210ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(9){--d:240ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(10){--d:270ms}
+#page-marketing.fx-in .mkt-topbar:nth-child(n+11){--d:300ms}
 /* LIVE/динамические бейджи — бегущий золотой шиммер */
 #page-marketing .mkt-scope.dyn {
   background-image: linear-gradient(100deg, transparent 25%, var(--gold-soft) 50%, transparent 75%);
