@@ -17,6 +17,15 @@
     <link rel="preload" as="font" type="font/woff2" href="/fonts/intertight-500-latin.woff2" crossorigin />
     <link rel="stylesheet" href="/fonts.css?v=1" />
     <link rel="stylesheet" href="/styles.css?v=74" />
+    <!-- maria-design ПИЛОТ: активен ТОЛЬКО при ?design=maria; обычный URL дашборда не меняется -->
+    <script>
+      if (location.search.indexOf('design=maria') !== -1) {
+        document.documentElement.dataset.design = 'maria';
+        ['/fonts-maria.css?v=1', '/styles-maria.css?v=1'].forEach(function (h) {
+          var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = h; document.head.appendChild(l);
+        });
+      }
+    </script>
   </head>
   <body>
 
