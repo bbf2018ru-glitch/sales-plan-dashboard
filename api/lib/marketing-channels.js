@@ -559,7 +559,9 @@ async function getChannels(period) {
   // promoUsage — мимо channels-кэша (у него собственный 6ч кэш + лёгкие запросы),
   // иначе свежезадеплоенный код ждал бы истечения старого снапшота.
   const [r, promoUse] = await Promise.all([
-    cache.wrap('ch:' + p, () => compute(p)),
+    // ch2: бамп ключа после фикса MTD-YoY (compute изменил формат prev) — иначе старый
+    // снапшот с полным прошлым месяцем висел бы до истечения 6ч TTL.
+    cache.wrap('ch2:' + p, () => compute(p)),
     promoUsage(p).catch(e => ({ error: e.message, byPromo: [] })),
   ]);
   // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
