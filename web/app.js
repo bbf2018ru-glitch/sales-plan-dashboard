@@ -2893,6 +2893,15 @@ function analyticsRangeKey() {
   return f + '|' + t;
 }
 
+// Дружелюбное сообщение для admin-only разделов (401 «Admin required») вместо сырой ошибки.
+function adminGateHtml(e, section) {
+  if (/admin|401|unauthor/i.test(String((e && e.message) || ''))) {
+    return `<b>🔒 Раздел${section ? ' «' + section + '»' : ''} доступен администратору.</b> ` +
+      `Откройте дашборд по админ-ссылке (с токеном доступа) — и данные появятся.`;
+  }
+  return `<b>Ошибка:</b> ${escapeHtml((e && e.message) || '')}`;
+}
+
 async function loadCustomers() {
   const availEl = $('customersAvailability');
   const contentEl = $('customersContent');
@@ -2929,7 +2938,7 @@ async function loadCustomers() {
   } catch (e) {
     if (availEl) {
       availEl.classList.remove('hidden');
-      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
+      availEl.innerHTML = adminGateHtml(e, 'Клиенты');
     }
     if (contentEl) contentEl.style.display = 'none';
   }
@@ -3369,7 +3378,7 @@ async function loadPromo() {
   } catch (e) {
     if (availEl) {
       availEl.classList.remove('hidden');
-      availEl.innerHTML = `<b>Ошибка:</b> ${escapeHtml(e.message)}`;
+      availEl.innerHTML = adminGateHtml(e, 'Промо');
     }
     if (contentEl) contentEl.style.display = 'none';
   }
