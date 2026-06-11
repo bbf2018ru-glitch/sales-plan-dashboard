@@ -5863,7 +5863,16 @@ function mktLoadYoY(){
 
     // Новые карты лояльности по месяцам — отдельный endpoint (тоже non-blocking).
     // 17 точек: с янв пред.года по выбранный. Бар = сколько НОВЫХ карт активировались впервые в этом месяце.
-    fetchJson('/api/analytics/new-customers-monthly?period='+period).then(function(nc){
+    // Эндпоинт admin-only (PII по картам лояльности). Без admin-сессии НЕ дёргаем —
+    // иначе браузер сыплет 401 в консоль (его из JS не подавить), показываем заглушку.
+    var _ncAdmin = !!(state.currentUser && state.currentUser.role === 'admin');
+    if(!_ncAdmin){
+      var _ncEl=document.getElementById('mktChartNewCust');
+      if(_ncEl) _ncEl.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Доступно после входа администратора (данные по картам клиентов).</div>';
+      var _ncHint=document.getElementById('mktChartNewCustHint');
+      if(_ncHint) _ncHint.textContent='Нужна авторизация администратора';
+    }
+    (_ncAdmin ? fetchJson('/api/analytics/new-customers-monthly?period='+period) : Promise.resolve(null)).then(function(nc){
       if(!nc||!nc.available||!nc.series) return;
       var hint=document.getElementById('mktChartNewCustHint');
       var MM2=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
