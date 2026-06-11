@@ -35,6 +35,10 @@ services:
       PORT: ${PORT}
       INGEST_API_KEY: ${INGEST_API_KEY}
       DATABASE_URL: ${DATABASE_URL}
+      # CORS: по умолчанию '*' (открыто всем origin'ам — как исторически). Чтобы запереть
+      # на конкретный домен — задать CORS_ORIGIN в .env (напр. https://dashboard.example.ru),
+      # либо пусто = same-origin (без CORS-заголовков).
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
     ports:
       - "3000:3000"
     depends_on:

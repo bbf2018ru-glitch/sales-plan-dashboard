@@ -375,10 +375,12 @@ async function checkAndAlertStores(db, period) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-// CORS: по умолчанию same-origin (дашборд и API на одном origin — браузеру CORS-заголовки
-// не нужны). Кросс-доменный доступ открываем ТОЛЬКО если задан CORS_ORIGIN (env: конкретный
-// домен или '*'). Раньше был жёстко зашит '*' — любой сайт мог читать публичную финаналитику.
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '';
+// CORS: по умолчанию '*' (открыто всем origin'ам — исторически, по решению владельца).
+// Чтобы ЗАПЕРЕТЬ на свой домен — задать env CORS_ORIGIN=https://maria-sales.duckdns.org
+// (тогда отдаём заголовки только для него); пустая строка CORS_ORIGIN= → same-origin без
+// CORS-заголовков. Прод (systemd за nginx) и дашборд на одном origin, так что для самого
+// дашборда CORS вообще не нужен — '*' влияет лишь на доступ сторонних сайтов к API.
+const CORS_ORIGIN = process.env.CORS_ORIGIN === undefined ? '*' : process.env.CORS_ORIGIN;
 const CORS_HEADERS = CORS_ORIGIN ? {
   'Access-Control-Allow-Origin': CORS_ORIGIN,
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
