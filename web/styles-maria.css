@@ -149,22 +149,31 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
 @keyframes mfxShimmer{ 0%{background-position:-140% 0} 100%{background-position:240% 0} }
 @keyframes mfxWin    { 0%,100%{box-shadow:0 0 0 0 rgba(143,168,107,0)} 50%{box-shadow:0 0 0 3px rgba(143,168,107,.28)} }
 @keyframes mfxGold   { 0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,0)}   50%{box-shadow:0 0 0 3px rgba(201,162,39,.30)} }
+@keyframes mfxChartWipe{ from{clip-path:inset(100% 0 0 0)} to{clip-path:inset(0 0 0 0)} }
 
 /* Эффектный вход вкладки/подвкладки — стаггер-подъём (триггерит maria-fx.js → .fx-in, --d на каждом) */
 #page-marketing.fx-in .mkt-yoy-card,
 #page-marketing.fx-in .mkt-kpi,
-#page-marketing.fx-in .mkt-chart,
 #page-marketing.fx-in .mkt-alert,
 #page-marketing.fx-in .mkt-comp-card {
   animation: mfxRise .5s cubic-bezier(.2,.7,.2,1) both;
   animation-delay: var(--d, 0ms);
 }
-/* бар-чарты «вырастают» снизу со стаггером */
+/* HTML бар-чарты «вырастают» снизу со стаггером */
 #page-marketing.fx-in .mkt-topbar,
-#page-marketing.fx-in .mkt-dbar {
+#page-marketing.fx-in .mkt-dbar,
+#page-marketing.fx-in .mkt-fbar {
   transform-origin: bottom;
   animation: mfxBar .55s cubic-bezier(.2,.7,.2,1) both;
   animation-delay: var(--d, 0ms);
+}
+/* SVG-чарты Каналов/Лояльности — bottom-up «проявление» (бары/линии растут от базовой
+   линии). Покрывает все 206 rect'ов разом, без риска per-rect. Лёгкая задержка --d. */
+#page-marketing.fx-in .mkt-chart svg,
+#page-marketing.fx-in .chart-wrap svg,
+#page-marketing.fx-in .mkt-charts svg {
+  animation: mfxChartWipe .7s cubic-bezier(.2,.7,.2,1) both;
+  animation-delay: var(--d, 80ms);
 }
 /* стаггер через nth-child — переживает ре-рендер контента (инлайн --d от JS слетает) */
 #page-marketing.fx-in .mkt-yoy-card:nth-child(1),#page-marketing.fx-in .mkt-kpi:nth-child(1){--d:0ms}
