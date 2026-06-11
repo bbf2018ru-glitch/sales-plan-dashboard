@@ -1,72 +1,104 @@
 /* ============================================================
-   maria-design — раскатано на весь дашборд (поверх styles.css).
-   Подключается БЕЗУСЛОВНО после styles.css → выигрывает по порядку каскада
-   при равной специфичности. Скоуп — сами тематические селекторы
-   ([data-theme=dark]/[data-theme=light]), которыми управляет приложение,
-   поэтому переключение темы НЕ сбивает оформление (в отличие от прежнего
-   флага data-design, который SPA затирал).
+   maria-design «ГАНАШ & ЗОЛОТО» — премиум-патисери для дашборда «Мария».
+   Поверх styles.css, безусловно, скоуп — тематические селекторы (тоггл темы не сбивает).
 
-   Что меняем: палитру (тёмная розовый→бордо, тёплые нейтрали; светлая →
-   тёплая слоновая кость) + шрифты (Inter Tight→Onest, бренд→Prata,
-   KPI-числа→JetBrains Mono). Семантические good/warn/bad НЕ трогаем —
-   они согласованы с захардкоженными литералами в компонентах.
-
-   Требует подключённого fonts-maria.css (Onest + Prata, self-hosted).
-   ОТКАТ: снять <link> на этот файл и fonts-maria.css в index.html.
+   Концепция (по frontend-design: один смелый ход + сигнатура из мира продукта):
+   - База: глубокое КАКАО (ганаш), текст — КРЕМ.
+   - Функциональный акцент (меню/кнопки/графики) — винный: на нём читается светлый текст.
+   - СИГНАТУРА: ЗОЛОТО (поталь) — печать % выполнения плана, золотой рул героя,
+     состояния «план выполнен». Золото = достижение, тратится точечно.
+   Шрифты: Onest (UI), Prata (бренд+герой), JetBrains Mono (числа).
+   ОТКАТ: снять <link> на этот файл + fonts-maria.css в index.html.
    ============================================================ */
 
-/* ---- Тёмная тема (дефолт): розовый акцент → фирменное вино, тёплые нейтрали ---- */
+/* ───────── Палитра ───────── */
+/* Тёмная (дефолт): какао-ганаш + крем + винный акцент + золото-сигнатура */
 :root, [data-theme=dark] {
-  --bg:#1A1517;            /* тёплый уголь вместо холодного #0a0b0f */
-  --paper:#221C1F;
-  --ink:#F2EBE7;
-  --muted:#A99FA0;
-  --hint:#857B7C;
-  --line:#322A2D;
-  --accent:#C7566A;        /* бордо, осветлённое под тёмный фон (было #ff6b8a розовый) */
+  --bg:#161210;            /* глубокое какао-чёрное */
+  --paper:#211A16;         /* тёплая какао-поверхность */
+  --ink:#F3ECE4;           /* крем */
+  --muted:#B3A595;         /* тёплый таупе */
+  --hint:#8A7C6E;
+  --line:#382C22;          /* тёплая какао-линия */
+  --accent:#C7566A;        /* винный — функциональный акцент (светлый текст читается) */
   --accent-soft:rgba(199,86,106,.16);
   --glow-accent:0 0 0 1px rgba(199,86,106,.32);
-  --glass:#221C1F;
-  --glass-strong:#2A2327;
-  --glass-edge:#3A3034;
-  --glow-card:0 2px 10px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.04);
+  --gold:#C9A227;          /* ЗОЛОТО — сигнатура (поталь, печать, «выполнено») */
+  --gold-soft:rgba(201,162,39,.15);
+  --glass:#211A16; --glass-strong:#2A211C; --glass-edge:#3D3025;
+  --glow-card:0 2px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.035);
 }
-
-/* ---- Светлая тема: холодный серый → тёплая слоновая кость ---- */
+/* Светлая: патисери-лайт — тёплая бумага + какао-ink + золото */
 [data-theme=light] {
-  --bg:#FAF7F2;            /* тёплая слоновая кость вместо #f5f5f7 */
-  --paper:#FFFFFF;
-  --ink:#211A1C;
-  --muted:#6B5F62;
-  --hint:#8C8184;
-  --line:#E9E1DA;          /* тёплая разделительная линия */
-  --accent:#8A2A3B;        /* фирменный бордо (как уже было — сохранён) */
+  --bg:#F6F1E8;            /* тёплая бумага (НЕ дефолтный холодный/кремовый) */
+  --paper:#FFFDF9;
+  --ink:#2A211C;           /* какао-ink */
+  --muted:#7A6A5C;
+  --hint:#9A8B7C;
+  --line:#E7DECF;
+  --accent:#8A2A3B;        /* винный */
   --accent-soft:rgba(138,42,59,.08);
-  --glow-accent:0 0 0 1px rgba(138,42,59,.20), 0 4px 14px -4px rgba(138,42,59,.16);
-  --glass:#FFFFFF;
-  --glass-strong:#FFFFFF;
-  --glass-edge:#E9E1DA;
-  --glow-card:0 1px 2px rgba(33,26,28,.04), 0 2px 8px rgba(33,26,28,.06);
+  --glow-accent:0 0 0 1px rgba(138,42,59,.18), 0 4px 14px -4px rgba(138,42,59,.16);
+  --gold:#A9851C;          /* золото темнее для контраста на светлом */
+  --gold-soft:rgba(169,133,28,.14);
+  --glass:#FFFDF9; --glass-strong:#FFFDF9; --glass-edge:#E7DECF;
+  --glow-card:0 1px 2px rgba(42,33,28,.05), 0 2px 10px rgba(42,33,28,.07);
 }
-/* карточки в светлой — на тёплом фоне белые держатся, контраст ок */
-[data-theme=light] .panel,
-[data-theme=light] .kpi { background:#FFFFFF; }
+[data-theme=light] .panel, [data-theme=light] .kpi { background:var(--paper); }
 
-/* ---- Типографика ---- */
-/* UI-текст: Inter Tight → Onest (тот же селектор body, грузится позже → выигрывает) */
-body {
-  font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif;
-}
-/* KPI-числа: настоящий моноширинный (было "Inter Tight","JetBrains Mono") */
+/* ───────── Типографика ───────── */
+body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
 .kpi-value, .spot-value, .rec-kpi-val, .abc-stat-pct {
-  font-family:'JetBrains Mono','Consolas',monospace;
-  letter-spacing:-.02em;
+  font-family:'JetBrains Mono','Consolas',monospace; letter-spacing:-.02em;
 }
-/* Бренд / заголовок входа: элегантная засечка Prata */
-.brand-name, .pin-title {
-  font-family:'Prata',Georgia,serif;
-  font-weight:400;
-  letter-spacing:.3px;
-}
-/* Страница входа: кнопка — убрать градиент бордо→оранж #ff9a76 → сплошной бордо (maria-design) */
+/* KPI крупнее (Executive-altitude) */
+.kpi-value { font-size:clamp(24px, 2.5vw, 34px); font-weight:500; }
+.brand-name, .pin-title { font-family:'Prata',Georgia,serif; font-weight:400; letter-spacing:.3px; }
 .pin-btn { background:var(--accent); }
+
+/* ───────── ГЕРОЙ + СИГНАТУРА-ПЕЧАТЬ ───────── */
+/* Герой-бэнд: какао-градиент + золотой рул сверху + тёплая глубина */
+.summary-hero .hero-card {
+  background:linear-gradient(135deg, #241C17 0%, #181310 100%);
+  border:1px solid var(--line);
+  border-top:2px solid var(--gold);
+  border-radius:16px;
+  box-shadow:0 10px 34px -16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+  position:relative; overflow:hidden;
+}
+/* faint золотая «поталь» в углу — премиум-деталь */
+.summary-hero .hero-card::after {
+  content:""; position:absolute; top:-40%; right:-10%; width:340px; height:340px;
+  background:radial-gradient(circle, rgba(201,162,39,.10), transparent 65%);
+  pointer-events:none;
+}
+[data-theme=light] .summary-hero .hero-card {
+  background:linear-gradient(135deg, #FFFDF9 0%, #F4EEE2 100%);
+}
+/* Заголовок героя — крупный, Prata, редакторский */
+.summary-hero .hero-headline {
+  font-family:'Prata',Georgia,serif !important;
+  font-size:clamp(17px, 2vw, 23px); font-weight:400; letter-spacing:.2px;
+  line-height:1.25; color:var(--ink);
+}
+/* СИГНАТУРА: % выполнения → золотая глянцевая ПЕЧАТЬ-медальон */
+.summary-hero .hero-headline b {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:2.7em; padding:.18em .5em; margin:0 .15em;
+  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:.82em;
+  letter-spacing:-.03em; color:#2A1E08;
+  background:radial-gradient(circle at 32% 26%, #ECCF63 0%, #C9A227 52%, #9C7A12 100%);
+  border:1px solid rgba(255,255,255,.28); border-radius:999px;
+  box-shadow:0 5px 16px -5px rgba(201,162,39,.6), inset 0 1px 0 rgba(255,255,255,.45),
+             inset 0 -2px 5px rgba(80,55,0,.3);
+  vertical-align:baseline;
+}
+/* отстаём от плана (.hero-bad) → печать гасится в приглушённый таупе (золото = только успех) */
+.summary-hero .hero-card.hero-bad .hero-headline b {
+  background:radial-gradient(circle at 32% 26%, #6A5E50, #4A4036 70%);
+  color:#E8DFD2; box-shadow:0 4px 12px -6px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12);
+}
+/* топ-по-выручке в герое — золотой акцент (достижение) */
+.summary-hero .hero-store-good b { color:var(--gold); }
+
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
