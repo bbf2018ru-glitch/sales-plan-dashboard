@@ -54,6 +54,12 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
 /* KPI крупнее (Executive-altitude) */
 .kpi-value { font-size:clamp(24px, 2.5vw, 34px); font-weight:500; }
 .brand-name, .pin-title { font-family:'Prata',Georgia,serif; font-weight:400; letter-spacing:.3px; }
+/* Экран входа в духе «Ганаш & золото»: заголовок крем→золото, золотой рул на карточке */
+.pin-title {
+  background:linear-gradient(135deg, var(--ink), var(--gold));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.pin-box { border-top:2px solid var(--gold); }
 .pin-btn { background:var(--accent); }
 
 /* ───────── ГЕРОЙ + СИГНАТУРА-ПЕЧАТЬ ───────── */
@@ -81,22 +87,33 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
   font-size:clamp(17px, 2vw, 23px); font-weight:400; letter-spacing:.2px;
   line-height:1.25; color:var(--ink);
 }
-/* СИГНАТУРА: % выполнения → золотая глянцевая ПЕЧАТЬ-медальон */
+/* СИГНАТУРА: % выполнения → золотая глянцевая МЕДАЛЬ (печать-знак качества) */
 .summary-hero .hero-headline b {
   display:inline-flex; align-items:center; justify-content:center;
-  min-width:2.7em; padding:.18em .5em; margin:0 .15em;
-  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:.82em;
-  letter-spacing:-.03em; color:#2A1E08;
-  background:radial-gradient(circle at 32% 26%, #ECCF63 0%, #C9A227 52%, #9C7A12 100%);
-  border:1px solid rgba(255,255,255,.28); border-radius:999px;
-  box-shadow:0 5px 16px -5px rgba(201,162,39,.6), inset 0 1px 0 rgba(255,255,255,.45),
-             inset 0 -2px 5px rgba(80,55,0,.3);
-  vertical-align:baseline;
+  min-width:3.1em; min-height:3.1em; padding:.28em .5em; margin:0 .35em;
+  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1.02em;
+  letter-spacing:-.03em; color:#3A2A08;
+  background:
+    radial-gradient(circle at 50% 16%, rgba(255,255,255,.55), transparent 44%),
+    radial-gradient(circle at 34% 30%, #F1D779 0%, #CDA62B 50%, #957210 100%);
+  border-radius:999px;
+  box-shadow:
+    0 0 0 3px #1B1410,                      /* зазор к фону героя */
+    0 0 0 5px rgba(201,162,39,.85),         /* внешнее золотое кольцо медали */
+    0 0 20px rgba(201,162,39,.4),           /* мягкое золотое свечение */
+    0 10px 26px -7px rgba(201,162,39,.62),  /* падающая тень */
+    inset 0 1.5px 0 rgba(255,255,255,.65),  /* верхний блик-глянец */
+    inset 0 -3px 8px rgba(70,48,0,.45);     /* нижний объём */
+  vertical-align:middle;
 }
-/* отстаём от плана (.hero-bad) → печать гасится в приглушённый таупе (золото = только успех) */
+/* отстаём от плана (.hero-bad) → медаль гасится в таупе (золото = только успех) */
 .summary-hero .hero-card.hero-bad .hero-headline b {
-  background:radial-gradient(circle at 32% 26%, #6A5E50, #4A4036 70%);
-  color:#E8DFD2; box-shadow:0 4px 12px -6px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12);
+  color:#EDE3D5;
+  background:radial-gradient(circle at 34% 30%, #786A58, #4A4036 72%);
+  box-shadow:
+    0 0 0 3px #1B1410, 0 0 0 5px rgba(150,135,115,.55),
+    0 8px 20px -8px rgba(0,0,0,.55),
+    inset 0 1.5px 0 rgba(255,255,255,.2), inset 0 -3px 8px rgba(0,0,0,.3);
 }
 /* топ-по-выручке в герое — золотой акцент (достижение) */
 .summary-hero .hero-store-good b { color:var(--gold); }
