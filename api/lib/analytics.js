@@ -2,9 +2,9 @@ function monthKey(input) {
   if (typeof input === 'string' && /^\d{4}-\d{2}$/.test(input)) {
     return input;
   }
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${now.getFullYear()}-${month}`;
+  const now = nowIrk(); // текущий месяц — по Иркутску (UTC+8), не по UTC сервера
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${now.getUTCFullYear()}-${month}`;
 }
 
 function toNumber(value) {
@@ -125,7 +125,8 @@ function daysInPeriod(period) {
   if (!parsed) {
     return 30;
   }
-  return new Date(parsed.year, parsed.month, 0).getDate();
+  // UTC-явно: число дней в месяце TZ-инвариантно, но избегаем локального getDate().
+  return new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate();
 }
 
 function previousPeriod(period) {
@@ -151,14 +152,22 @@ function shiftPeriod(period, offset) {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
+// «Сейчас» по Иркутску (UTC+8): бизнес «Марии» в Иркутске, а прод-контейнер без TZ = UTC.
+// Сдвигаем эпоху на +8ч и читаем UTC-поля (тот же приём, что irkNow в aggregateDashboard).
+// Без этого в первые 8ч иркутских суток getDate() давал «вчера» → elapsedDays занижался
+// на 1 → averagePerDay завышался → прогноз и алерт «план под угрозой» врали.
+const IRK_OFFSET_MS = 8 * 3600 * 1000;
+function nowIrk() { return new Date(Date.now() + IRK_OFFSET_MS); }
+function toIrk(date) { return new Date(date.getTime() + IRK_OFFSET_MS); }
+
 function effectiveElapsedDays(period, lastSaleAt) {
   const parsedPeriod = parsePeriod(period);
   if (!parsedPeriod) {
     return 0;
   }
 
-  const now = new Date();
-  const currentPeriod = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  const now = nowIrk();
+  const currentPeriod = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
   const relative = comparePeriods(parsedPeriod, currentPeriod);
   const totalDays = daysInPeriod(period);
 
@@ -170,24 +179,26 @@ function effectiveElapsedDays(period, lastSaleAt) {
     if (!lastSaleAt) {
       return 0;
     }
-    const lastSaleDate = new Date(lastSaleAt);
-    return Number.isNaN(lastSaleDate.getTime()) ? 0 : Math.min(lastSaleDate.getDate(), totalDays);
+    const raw = new Date(lastSaleAt);
+    if (Number.isNaN(raw.getTime())) return 0;
+    return Math.min(toIrk(raw).getUTCDate(), totalDays);
   }
 
-  // Текущий период: учитываем только сегодняшнюю дату.
+  // Текущий период: учитываем только сегодняшнюю дату (по Иркутску).
   // Старая логика брала max(now.getDate(), lastSaleAt.getDate()), но если
   // в 1С BSL soldAt = дата выгрузки (а не реальная дата чека), то lastSaleAt
   // мог быть из ПРЕДЫДУЩЕГО месяца с днём 30 — и elapsedDays некорректно
   // прыгал на 30 при 4-м числе текущего месяца.
   // Учитываем lastSaleAt только если он попадает в этот же месяц И позже сегодня.
-  let day = now.getDate();
+  let day = now.getUTCDate();
   if (lastSaleAt) {
-    const lastSaleDate = new Date(lastSaleAt);
-    if (!Number.isNaN(lastSaleDate.getTime())) {
-      const sameMonth = lastSaleDate.getFullYear() === parsedPeriod.year
-        && lastSaleDate.getMonth() + 1 === parsedPeriod.month;
+    const raw = new Date(lastSaleAt);
+    if (!Number.isNaN(raw.getTime())) {
+      const lastSaleDate = toIrk(raw);
+      const sameMonth = lastSaleDate.getUTCFullYear() === parsedPeriod.year
+        && lastSaleDate.getUTCMonth() + 1 === parsedPeriod.month;
       if (sameMonth) {
-        day = Math.max(day, lastSaleDate.getDate());
+        day = Math.max(day, lastSaleDate.getUTCDate());
       }
     }
   }
@@ -480,7 +491,7 @@ function buildDailySeries(period, plans, sales) {
     if (Number.isNaN(soldAt.getTime())) {
       continue;
     }
-    const dayIndex = soldAt.getDate() - 1;
+    const dayIndex = soldAt.getUTCDate() - 1; // как в buildYoyForecast (271): день по UTC, не локальный
     if (dayIndex >= 0 && dayIndex < totalDays) {
       dailyFact[dayIndex] += toNumber(row.amount);
     }
@@ -990,7 +1001,7 @@ function aggregateDashboard(db, period, opts = {}) {
   // на КОНЕЦ сегодняшнего дня вводит в заблуждение: к 13:00 факт сделал 50%
   // дня, а план уже 100% — выходит, что выполнили план хотя на самом деле нет.
   const elapsedDays = f.elapsedDays || 0;
-  const irkNow = new Date(Date.now() + 8 * 3600 * 1000);
+  const irkNow = nowIrk();
   const todayMonthKey = `${irkNow.getUTCFullYear()}-${String(irkNow.getUTCMonth() + 1).padStart(2, '0')}`;
   const isCurrentMonth = period === todayMonthKey;
   let elapsedDaysEffective = elapsedDays;
@@ -1054,7 +1065,7 @@ function aggregateDashboard(db, period, opts = {}) {
 // (сумма с начала месяца до сегодня), а не на полный месячный.
 // Срабатывает когда currentPlan ≈ previousPlan × (elapsedDays / daysInMonth).
 function assessPlanHealth(db, period, currentPlan) {
-  const now = new Date();
+  const now = nowIrk();
   const todayMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const isCurrentMonth = period === todayMonth;
   if (!isCurrentMonth || !currentPlan || currentPlan <= 0) {
