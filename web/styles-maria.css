@@ -126,17 +126,19 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
           mask:radial-gradient(circle, transparent 61%, #000 63%);
   filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
 }
-/* отстаём от плана (.hero-bad) → медаль + насечка гасятся в таупе (золото = только успех) */
+/* отстаём от плана (.hero-bad): монета гаснет в таупе (золото = только успех),
+   но РАНТ-НАСЕЧКА становится ВИННОЙ + мягкое винное свечение → читается как тревога */
 .summary-hero .hero-card.hero-bad .hero-headline b {
-  color:#EDE3D5;
-  background:radial-gradient(circle at 34% 30%, #786A58, #4A4036 72%);
+  color:#F1E6E2;
+  background:radial-gradient(circle at 34% 30%, #6E5E54, #45382F 72%);
   box-shadow:
     0 0 0 3px #1B1410,
+    0 0 17px rgba(199,86,106,.4),          /* винное свечение тревоги */
     0 8px 20px -8px rgba(0,0,0,.55),
-    inset 0 1.5px 0 rgba(255,255,255,.2), inset 0 -3px 8px rgba(0,0,0,.3);
+    inset 0 1.5px 0 rgba(255,255,255,.2), inset 0 -3px 8px rgba(0,0,0,.32);
 }
 .summary-hero .hero-card.hero-bad .hero-headline b::before {
-  background:repeating-conic-gradient(from 0deg, #7C7060 0deg 6deg, #463F2E 6deg 12deg);
+  background:repeating-conic-gradient(from 0deg, #C7566A 0deg 6deg, #74293A 6deg 12deg);
 }
 /* топ-по-выручке в герое — золотой акцент (достижение) */
 .summary-hero .hero-store-good b { color:var(--gold); }
