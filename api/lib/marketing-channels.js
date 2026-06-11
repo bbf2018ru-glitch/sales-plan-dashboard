@@ -503,6 +503,10 @@ async function compute(period) {
     };
   })
   .filter(r => r.revenue.cur > 0 || r.revenue.prev > 0)
+  // Отсеиваем служебные/нерозничные коды складов (ЦБ0000007, А00000160…): имя не
+  // разрешилось в smap (name===code) И код в формате «1-3 буквы + ≥5 цифр». Именованные
+  // точки (в т.ч. «Склад готовой продукции»=Сайт) не трогаем — у них name ≠ code.
+  .filter(r => !(r.name === r.code && /^[A-Za-zА-Яа-яЁё]{1,3}\d{5,}$/.test(String(r.code))))
   .sort((a, b) => (b.revenue.cur || 0) - (a.revenue.cur || 0));
 
   return {
@@ -578,9 +582,9 @@ async function getChannels(period) {
   // promoUsage — мимо channels-кэша (у него собственный 6ч кэш + лёгкие запросы),
   // иначе свежезадеплоенный код ждал бы истечения старого снапшота.
   const [r, promoUse] = await Promise.all([
-    // ch3: бамп ключа после MTD-фиксов (prev каналов + сладкий чек + точка тек. месяца в
+    // ch4: бамп ключа после MTD-фиксов (prev каналов + сладкий чек + точка тек. месяца в
     // monthlySeries.prev) — иначе старый снапшот висел бы до истечения 6ч TTL.
-    cache.wrap('ch3:' + p, () => compute(p)),
+    cache.wrap('ch4:' + p, () => compute(p)),
     promoUsage(p).catch(e => ({ error: e.message, byPromo: [] })),
   ]);
   // external всегда свежий (мимо кэша) — перекрываем закэшированный снимок.
