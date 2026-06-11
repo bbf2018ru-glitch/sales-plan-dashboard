@@ -5408,6 +5408,10 @@ function renderOtherChannels(d){
 // пришло за месяц, текущие задания, покупки участников за период действия.
 var _MM_SWEET=['','января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 function smMonth(ym){ if(!ym) return ''; var p=ym.split('-'); return _MM_SWEET[Number(p[1])]+' '+p[0]; }
+// Именительный/винительный падеж — для «за <месяц>» (за июнь, не за июня). Родительный
+// (_MM_SWEET) оставляем для «с <месяца>»/«1 <месяца>».
+var _MM_NOM=['','январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+function smMonthNom(ym){ if(!ym) return ''; var p=ym.split('-'); return _MM_NOM[Number(p[1])]+' '+p[0]; }
 function renderSweetDetail(sd){
   var el=document.getElementById('mktSweetLive'); if(!el) return;
   if(!sd || sd.available===false){ return; } // оставляем быстрый рендер из d.sweet, если детализация недоступна
@@ -5419,7 +5423,7 @@ function renderSweetDetail(sd){
     '<div style="font-size:11px;color:var(--muted);margin:2px 0 8px">Геймификация: баллы за задания по картам лояльности. Программа действует с '+smMonth(sd.programStartMonth)+'.</div>'+
     '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:8px 0">'+
       kpi('<b>'+mNum(sd.totalParticipants||0)+'</b>','Всего участников')+
-      kpi('+'+mNum(sd.newThisMonth||0),'Пришло за '+(sd.monthName||smMonth(sd.period)))+
+      kpi('+'+mNum(sd.newThisMonth||0),'Пришло за '+smMonthNom(sd.period))+
       kpi(mNum(sd.monthCards||0),'Карт в заданиях (мес)')+
       kpi(mNum(sd.monthEvents||0),'Выполнений (мес)')+
       kpi(mNum(sd.monthPoints||0),'Баллов (мес)')+
@@ -5427,7 +5431,7 @@ function renderSweetDetail(sd){
     '<div class="mkt-comp-ins" style="margin:8px 0;background:#eafaf0;border:1px solid #b6e3c8;color:#0a6b3a;padding:8px 10px;border-radius:6px">'+
       '<b>Участники купили продукции на '+mNum(pur.net||0)+' ₽</b> за период действия (с '+smMonth(pur.since)+'): '+mNum(pur.cheques||0)+' чеков, '+mNum(pur.cards||0)+' карт'+
       (pur.returns?' · возвраты −'+mNum(pur.returns)+' ₽':'')+'.</div>'+
-    '<div class="mkt-chart-t" style="margin-top:10px">Текущие задания за '+(sd.monthName||smMonth(sd.period))+'</div>'+
+    '<div class="mkt-chart-t" style="margin-top:10px">Текущие задания за '+smMonthNom(sd.period)+'</div>'+
     (tasks.length?'<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Задание</th><th class="num">Выполнений</th><th class="num">Карт</th><th class="num">Баллов</th><th class="num">Доля</th></tr></thead><tbody>'+
       tasks.map(function(t){ var pct=t.events/totalEv*100; return '<tr><td>'+t.name+'</td><td class="num">'+mNum(t.events)+'</td><td class="num">'+mNum(t.cards)+'</td><td class="num">'+mNum(t.points)+'</td><td class="num">'+mNum1(pct)+' %</td></tr>'; }).join('')+
       '</tbody></table></div>':'<div style="font-size:12px;color:var(--muted)">Заданий в этом месяце не было.</div>');
