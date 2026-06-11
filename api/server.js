@@ -375,13 +375,21 @@ async function checkAndAlertStores(db, period) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// CORS: по умолчанию same-origin (дашборд и API на одном origin — браузеру CORS-заголовки
+// не нужны). Кросс-доменный доступ открываем ТОЛЬКО если задан CORS_ORIGIN (env: конкретный
+// домен или '*'). Раньше был жёстко зашит '*' — любой сайт мог читать публичную финаналитику.
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '';
+const CORS_HEADERS = CORS_ORIGIN ? {
+  'Access-Control-Allow-Origin': CORS_ORIGIN,
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token, X-User-Token'
+} : {};
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token, X-User-Token'
+    ...CORS_HEADERS
   });
   res.end(JSON.stringify(payload));
 }
@@ -513,11 +521,7 @@ const server = http.createServer(async (req, res) => {
   const pathname = parsedUrl.pathname || '/';
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token, X-User-Token'
-    });
+    res.writeHead(204, { ...CORS_HEADERS });
     res.end();
     return;
   }
@@ -595,7 +599,7 @@ const server = http.createServer(async (req, res) => {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
-        'Access-Control-Allow-Origin': '*'
+        ...CORS_HEADERS
       });
       res.write('\n');
       clients.add(res);
@@ -1968,6 +1972,11 @@ const server = http.createServer(async (req, res) => {
       if (!user || user.role !== 'admin') { sendJson(res, 401, { error: 'Admin required' }); return; }
       const path = parsedUrl.searchParams.get('path'); // напр. "object?kind=Справочник&name=Номенклатура"
       if (!path) { sendJson(res, 400, { error: 'path required (e.g. object?kind=Справочник&name=Номенклатура)' }); return; }
+      // Путь приклеивается к ${base}/${path}. Хост фиксирован (base из env), но запрещаем
+      // обход маршрутов IIS / смену схемы: без ../, ://, ведущего слэша/бэкслэша.
+      if (/^[/\\]/.test(path) || path.includes('..') || path.includes('://') || path.includes('\\')) {
+        sendJson(res, 400, { error: 'invalid path' }); return;
+      }
       if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
       try {
         const { fetchUppPackage } = require('./lib/upp-pull');
@@ -2062,6 +2071,10 @@ const server = http.createServer(async (req, res) => {
       if (!requireApiKey(req, res)) return;
       const orgId = String(parsedUrl.searchParams.get('org') || '1548649242829424');
       const city = String(parsedUrl.searchParams.get('city') || 'irkutsk');
+      // Идут в argv стороннего скрипта — валидируем, чтобы исключить argument-injection
+      // (значения с ведущим '-', метасимволами, путями) во второй процесс.
+      if (!/^\d+$/.test(orgId)) { sendJson(res, 400, { error: 'org must be numeric' }); return; }
+      if (!/^[a-z][a-z0-9-]{1,40}$/.test(city)) { sendJson(res, 400, { error: 'invalid city (lowercase slug)' }); return; }
       try {
         const { execFile } = require('node:child_process');
         const out = await new Promise((resolve, reject) => {
@@ -2082,6 +2095,9 @@ const server = http.createServer(async (req, res) => {
       const id = String(parsedUrl.searchParams.get('id') || '');
       const city = String(parsedUrl.searchParams.get('city') || 'irkutsk');
       if (!id) { sendJson(res, 400, { error: 'id required' }); return; }
+      // Идут в argv стороннего скрипта — валидируем против argument-injection.
+      if (!/^\d+$/.test(id)) { sendJson(res, 400, { error: 'id must be numeric' }); return; }
+      if (!/^[a-z][a-z0-9-]{1,40}$/.test(city)) { sendJson(res, 400, { error: 'invalid city (lowercase slug)' }); return; }
       try {
         const { execFile } = require('node:child_process');
         const out = await new Promise((resolve, reject) => {
@@ -2178,7 +2194,10 @@ const server = http.createServer(async (req, res) => {
     serveStatic(res, pathname);
 
   } catch (error) {
-    sendJson(res, 500, { error: error.message || 'Internal server error' });
+    // Детали (1С/SQL/пути/стек) — только в серверный лог. Клиенту в проде — общий текст,
+    // чтобы не раскрывать внутренности. В dev оставляем message для отладки.
+    console.error(`[unhandled] ${req.method} ${pathname}:`, (error && error.stack) || error);
+    sendJson(res, 500, { error: IS_PROD ? 'Internal server error' : (error.message || 'Internal server error') });
   }
 });
 
