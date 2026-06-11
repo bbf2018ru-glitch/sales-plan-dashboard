@@ -25,6 +25,10 @@
   --glow-accent:0 0 0 1px rgba(199,86,106,.32);
   --gold:#C9A227;          /* ЗОЛОТО — сигнатура (поталь, печать, «выполнено») */
   --gold-soft:rgba(201,162,39,.15);
+  /* семантика — тёплая, без бирюзы (была #34d399) */
+  --good:#8FA86B; --good-soft:rgba(143,168,107,.16);
+  --warn:#D6A24A; --warn-soft:rgba(214,162,74,.16);
+  --bad:#D06A6A;  --bad-soft:rgba(208,106,106,.16);
   --glass:#211A16; --glass-strong:#2A211C; --glass-edge:#3D3025;
   --glow-card:0 2px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.035);
 }
@@ -41,10 +45,18 @@
   --glow-accent:0 0 0 1px rgba(138,42,59,.18), 0 4px 14px -4px rgba(138,42,59,.16);
   --gold:#A9851C;          /* золото темнее для контраста на светлом */
   --gold-soft:rgba(169,133,28,.14);
+  --good:#5E8A48; --good-soft:rgba(94,138,72,.12);
+  --warn:#B5722A; --warn-soft:rgba(181,114,42,.12);
+  --bad:#A33A3A;  --bad-soft:rgba(163,58,58,.10);
   --glass:#FFFDF9; --glass-strong:#FFFDF9; --glass-edge:#E7DECF;
   --glow-card:0 1px 2px rgba(42,33,28,.05), 0 2px 10px rgba(42,33,28,.07);
 }
 [data-theme=light] .panel, [data-theme=light] .kpi { background:var(--paper); }
+
+/* KPI-состояния: захардкоженный бирюзовый/розовый glow в styles.css → тёплая семантика */
+.kpi.good { background:radial-gradient(circle at 100% 0%, rgba(143,168,107,.15), transparent 55%), var(--glass); border-color:rgba(143,168,107,.26); }
+.kpi.warn { background:radial-gradient(circle at 100% 0%, rgba(214,162,74,.16), transparent 55%), var(--glass); border-color:rgba(214,162,74,.26); }
+.kpi.bad  { background:radial-gradient(circle at 100% 0%, rgba(208,106,106,.16), transparent 55%), var(--glass); border-color:rgba(208,106,106,.26); }
 
 /* ───────── Типографика ───────── */
 body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
@@ -89,8 +101,9 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
 }
 /* СИГНАТУРА: % выполнения → золотая глянцевая МЕДАЛЬ (печать-знак качества) */
 .summary-hero .hero-headline b {
+  position:relative; z-index:0; isolation:isolate;
   display:inline-flex; align-items:center; justify-content:center;
-  min-width:3.1em; min-height:3.1em; padding:.28em .5em; margin:0 .35em;
+  min-width:3.1em; min-height:3.1em; padding:.28em .5em; margin:0 .55em;
   font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1.02em;
   letter-spacing:-.03em; color:#3A2A08;
   background:
@@ -98,22 +111,32 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
     radial-gradient(circle at 34% 30%, #F1D779 0%, #CDA62B 50%, #957210 100%);
   border-radius:999px;
   box-shadow:
-    0 0 0 3px #1B1410,                      /* зазор к фону героя */
-    0 0 0 5px rgba(201,162,39,.85),         /* внешнее золотое кольцо медали */
-    0 0 20px rgba(201,162,39,.4),           /* мягкое золотое свечение */
-    0 10px 26px -7px rgba(201,162,39,.62),  /* падающая тень */
+    0 0 0 3px #1B1410,                      /* зазор между монетой и насечкой */
+    0 0 22px rgba(201,162,39,.4),           /* золотое свечение */
+    0 10px 26px -7px rgba(201,162,39,.55),  /* падающая тень */
     inset 0 1.5px 0 rgba(255,255,255,.65),  /* верхний блик-глянец */
     inset 0 -3px 8px rgba(70,48,0,.45);     /* нижний объём */
   vertical-align:middle;
 }
-/* отстаём от плана (.hero-bad) → медаль гасится в таупе (золото = только успех) */
+/* НАСЕЧКА-СУРГУЧ: рифлёный золотой рант по краю медали */
+.summary-hero .hero-headline b::before {
+  content:""; position:absolute; inset:-7px; z-index:-1; border-radius:inherit;
+  background:repeating-conic-gradient(from 0deg, #E6C652 0deg 6deg, #876510 6deg 12deg);
+  -webkit-mask:radial-gradient(circle, transparent 61%, #000 63%);
+          mask:radial-gradient(circle, transparent 61%, #000 63%);
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+}
+/* отстаём от плана (.hero-bad) → медаль + насечка гасятся в таупе (золото = только успех) */
 .summary-hero .hero-card.hero-bad .hero-headline b {
   color:#EDE3D5;
   background:radial-gradient(circle at 34% 30%, #786A58, #4A4036 72%);
   box-shadow:
-    0 0 0 3px #1B1410, 0 0 0 5px rgba(150,135,115,.55),
+    0 0 0 3px #1B1410,
     0 8px 20px -8px rgba(0,0,0,.55),
     inset 0 1.5px 0 rgba(255,255,255,.2), inset 0 -3px 8px rgba(0,0,0,.3);
+}
+.summary-hero .hero-card.hero-bad .hero-headline b::before {
+  background:repeating-conic-gradient(from 0deg, #7C7060 0deg 6deg, #463F2E 6deg 12deg);
 }
 /* топ-по-выручке в герое — золотой акцент (достижение) */
 .summary-hero .hero-store-good b { color:var(--gold); }
