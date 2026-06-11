@@ -83,6 +83,13 @@
 var YOY=false, AUTO=null;
 function n1(x){ return x==null?'':(Math.round(x*10)/10).toLocaleString('ru'); }
 function tomorrowISO(){ var t=new Date(Date.now()+86400000); return t.toISOString().slice(0,10); }
+// Относительный день для даты плана (динамически, не хардкод): сегодня/завтра/послезавтра/дата.
+function relDay(iso){
+  if(!iso) return '';
+  var n=new Date(), t0=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+  var pd=new Date(iso+'T00:00:00'); var diff=Math.round((pd-t0)/86400000);
+  return diff===0?'сегодня':diff===1?'завтра':diff===2?'послезавтра':(diff>0?('через '+diff+' дн'):(-diff+' дн назад'));
+}
 function fetchPlan(){
   var date=document.getElementById('date').value||tomorrowISO();
   document.getElementById('sub').textContent='загрузка плана на '+date+'…';
@@ -94,7 +101,7 @@ function fetchPlan(){
 function render(d){
   document.getElementById('err').textContent='';
   if(d.error){ document.getElementById('err').textContent='Ошибка 1С: '+d.error; return; }
-  document.getElementById('sub').innerHTML='на <b>'+d.date+'</b> ('+d.weekday+') · послезавтра '+d.nextWeekday+
+  document.getElementById('sub').innerHTML='на <b>'+d.date+'</b> ('+d.weekday+' · '+relDay(d.date)+')'+
     ' · <span class="dot"></span>обновлено '+new Date(d.refreshedAt).toLocaleTimeString('ru');
   var t=d.totals||{};
   // баннер предупреждений о неполноте/контексте данных (защита от «принять неполное за факт»)
