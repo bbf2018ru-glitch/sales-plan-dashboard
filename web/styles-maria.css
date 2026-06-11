@@ -68,3 +68,5 @@ body {
   font-weight:400;
   letter-spacing:.3px;
 }
+/* Страница входа: кнопка — убрать градиент бордо→оранж #ff9a76 → сплошной бордо (maria-design) */
+.pin-btn { background:var(--accent); }

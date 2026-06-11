@@ -5,14 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Мария — План выпуска</title>
 <link rel="icon" type="image/png" href="/logo-girl.png" />
+<!-- maria-design: фирменные шрифты (Onest/Prata). ОТКАТ страницы — снять эту ссылку и вернуть токены/шрифт ниже. -->
+<link rel="stylesheet" href="/fonts-maria.css?v=1" />
 <style>
-  :root{ --bg:#0e1118; --paper:#191d28; --paper2:#1f2532; --line:#2a3140; --ink:#e8ecf4; --muted:#8b94a7;
-    --good:#10a05a; --bad:#e0466a; --warn:#d9a528; --accent:#5b8cff; }
+  /* maria-design — бренд-палитра (тёмная): синий акцент → фирменное бордо, тёплые нейтрали */
+  :root{ --bg:#1A1517; --paper:#221C1F; --paper2:#2A2327; --line:#322A2D; --ink:#F2EBE7; --muted:#A99FA0;
+    --good:#5BB58A; --bad:#D06A6A; --warn:#D69A52; --accent:#C7566A; }
   *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:'Inter Tight',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
+    font-family:'Onest',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
   .wrap{max-width:1500px;margin:0 auto;padding:18px}
   header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px}
-  h1{font-size:20px;margin:0;font-weight:700}
+  h1{font-size:22px;margin:0;font-weight:400;font-family:'Prata',Georgia,serif;letter-spacing:.3px}
   .sub{color:var(--muted);font-size:12px}
   .ctrl{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap}
   input[type=date],button{background:var(--paper2);color:var(--ink);border:1px solid var(--line);
@@ -26,7 +29,7 @@
   th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   th{position:sticky;top:0;background:var(--paper2);z-index:2;color:var(--muted);font-weight:600;font-size:11px}
   td:first-child,th:first-child{text-align:left}
-  tr.ceh td{background:#222a3a;font-weight:700;color:#cdd6e8;border-top:2px solid var(--accent)}
+  tr.ceh td{background:#2A2327;font-weight:700;color:#E8DFD9;border-top:2px solid var(--accent)}
   tr.def td{background:rgba(224,70,106,.08)}
   .task{color:var(--good);font-weight:700}
   .neg{color:var(--bad)} .pos{color:var(--good)} .mut{color:var(--muted)}
