@@ -30,14 +30,16 @@
 }
 [data-theme=light][data-design="glass"] body::before {
   background:
-    radial-gradient(40% 44% at 12% 10%, rgba(201,162,39,.22), transparent 60%),
-    radial-gradient(36% 40% at 88% 14%, rgba(199,86,106,.16), transparent 60%),
-    radial-gradient(48% 52% at 76% 94%, rgba(138,42,59,.14), transparent 64%),
-    radial-gradient(42% 46% at 24% 86%, rgba(201,162,39,.16), transparent 60%);
+    radial-gradient(42% 46% at 10% 8%, rgba(201,162,39,.34), transparent 62%),
+    radial-gradient(40% 44% at 90% 14%, rgba(199,86,106,.26), transparent 62%),
+    radial-gradient(52% 56% at 78% 96%, rgba(138,42,59,.22), transparent 66%),
+    radial-gradient(46% 50% at 22% 88%, rgba(201,162,39,.26), transparent 62%),
+    radial-gradient(60% 60% at 50% 45%, rgba(201,162,39,.07), transparent 70%);
+  filter: saturate(1.15);
 }
 /* фон чуть глубже, чтобы свечение читалось */
 [data-design="glass"] { --bg: #120E0C; }
-[data-theme=light][data-design="glass"] { --bg: #F3ECDF; }
+[data-theme=light][data-design="glass"] { --bg: #ECE1CE; }
 
 /* ───────── Стеклянные карточки (frosted) ───────── */
 /* Тёмная: полупрозрачное какао + blur + светлая кромка + мягкая глубина */
@@ -71,9 +73,10 @@
 [data-theme=light][data-design="glass"] .mkt-comp-card,
 [data-theme=light][data-design="glass"] .mkt-alert,
 [data-theme=light][data-design="glass"] .forecast-card {
-  background: rgba(255, 253, 249, .62) !important;
-  border: 1px solid rgba(255,255,255,.7) !important;
-  box-shadow: 0 10px 30px -14px rgba(80,55,20,.28), inset 0 1px 0 rgba(255,255,255,.8) !important;
+  /* плотнее (≈.86) + верхний блик → карточки «парят» над более тёплым фоном */
+  background: linear-gradient(157deg, rgba(255,255,255,.92), rgba(255,255,255,.45) 46%), rgba(255,252,246,.86) !important;
+  border: 1px solid rgba(120,82,30,.16) !important;
+  box-shadow: 0 16px 36px -14px rgba(92,62,22,.34), 0 2px 6px -2px rgba(92,62,22,.14), inset 0 1px 0 rgba(255,255,255,.95) !important;
 }
 
 /* Сайдбар — тоже стекло, отделён от aurora */
@@ -87,8 +90,8 @@
 }
 [data-theme=light][data-design="glass"] .sidebar,
 [data-theme=light][data-design="glass"] aside {
-  background: rgba(255,253,249,.66) !important;
-  border-right: 1px solid rgba(255,255,255,.7) !important;
+  background: rgba(255,252,246,.80) !important;
+  border-right: 1px solid rgba(120,82,30,.12) !important;
 }
 
 /* ───────── Воздух + современные скругления + крупные KPI ───────── */
