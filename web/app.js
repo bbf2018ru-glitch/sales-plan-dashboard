@@ -305,10 +305,10 @@ function renderTrendChart(summary) {
       </linearGradient>
     </defs>
     ${grids}
-    <path d="${areaD}" fill="url(#tg)"/>
+    <path class="ch-area" d="${areaD}" fill="url(#tg)"/>
     <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="2" stroke-dasharray="6,4"/>
     ${pyHasAny ? `<path d="${pyD.trim()}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="2,3" opacity="0.85"/>${pyDots}` : ''}
-    <path d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="ch-line" d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${dots}${xlabels}
     <text x="${pad.l}" y="${H - 4}" fill="var(--hint)" font-size="10">─ ─ план</text>
     <text x="${pad.l + 54}" y="${H - 4}" fill="var(--accent)" font-size="10">─── факт</text>
@@ -3943,8 +3943,9 @@ function renderDaily() {
   });
   const linePath = cumPoints.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ',' + p.y).join(' ');
   chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:260px">
+    <defs><linearGradient id="chSheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.2"/><stop offset="55%" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
     ${[0, .25, .5, .75, 1].map(t => `
-      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.08"/>
+      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.06" stroke-dasharray="2,4"/>
       <text x="${padL-6}" y="${padT + innerH*(1-t) + 4}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">${fmtAxis(max*t)}</text>
     `).join('')}
     ${rows.map((r, i) => {
@@ -3952,14 +3953,16 @@ function renderDaily() {
       const x = padL + step*i + (step - barW)/2;
       const y = padT + innerH - bh;
       const day = Number(r.date.slice(-2));
+      const d = (i*0.012).toFixed(3);
       return `<g>
-        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2" fill="var(--accent)" opacity="0.75">
+        <rect class="ch-bar" style="animation-delay:${d}s" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2.5" fill="var(--accent)" opacity="0.82">
           <title>${r.date}: ${fmtNum(r.fact)} ₽</title>
         </rect>
+        <rect class="ch-bar" style="animation-delay:${d}s" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2.5" fill="url(#chSheen)" pointer-events="none"/>
         ${day % 5 === 0 || i === rows.length - 1 ? `<text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity="0.6">${day}</text>` : ''}
       </g>`;
     }).join('')}
-    <path d="${linePath}" stroke="var(--gold)" stroke-width="2" fill="none" opacity="0.9"/>
+    <path class="ch-line" d="${linePath}" stroke="var(--gold)" stroke-width="2" fill="none" opacity="0.9"/>
     ${cumPoints.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2" fill="var(--gold)"/>`).join('')}
   </svg>
   <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px">Золотая линия — накопительная доля выручки</div>`;
@@ -3994,19 +3997,22 @@ function renderHourChart() {
   const step = innerW / 24;
   const barW = step * 0.7;
   chart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:260px">
+    <defs><linearGradient id="chSheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.22"/><stop offset="55%" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
     ${[0, .25, .5, .75, 1].map(t => `
-      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.08"/>
+      <line x1="${padL}" y1="${padT + innerH*(1-t)}" x2="${w-padR}" y2="${padT + innerH*(1-t)}" stroke="currentColor" stroke-opacity="0.06" stroke-dasharray="2,4"/>
       <text x="${padL-6}" y="${padT + innerH*(1-t) + 4}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">${fmtAxis(max*t)}</text>
     `).join('')}
-    ${rows.map(r => {
+    ${rows.map((r, i) => {
       const bh = max > 0 ? (r.fact / max) * innerH : 0;
       const x = padL + step*r.hour + (step - barW)/2;
       const y = padT + innerH - bh;
       const peak = r.fact / max > 0.7;
+      const d = (i*0.02).toFixed(2);
       return `<g>
-        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${peak ? 'var(--gold)' : 'var(--accent)'}" opacity="${peak ? 0.95 : 0.78}">
+        <rect class="ch-bar" style="animation-delay:${d}s" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3.5" fill="${peak ? 'var(--gold)' : 'var(--accent)'}" opacity="${peak ? 0.95 : 0.8}">
           <title>${r.hour}:00 — ${fmtNum(r.fact)} ₽ · ${r.txCount} строк</title>
         </rect>
+        <rect class="ch-bar" style="animation-delay:${d}s" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3.5" fill="url(#chSheen)" pointer-events="none"/>
         ${r.hour % 2 === 0 ? `<text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.65">${r.hour}</text>` : ''}
       </g>`;
     }).join('')}
@@ -4600,11 +4606,19 @@ function mTbl(cols, rows, total){
 function mAxisFmt(n){ n=Math.round(n); if(n>=1e6) return (Math.round(n/1e5)/10).toLocaleString('ru-RU')+' млн'; if(n>=1e3) return Math.round(n/1e3)+'к'; return ''+n; }
 function mBars(elId, labels, values, color, unit){
   var el=document.getElementById(elId); if(!el) return;
-  var w=720,h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
+  var w=720,h=230,padL=58,padR=14,padT=20,padB=32, iw=w-padL-padR, ih=h-padT-padB;
   var max=Math.max.apply(null, values.concat([1])), step=iw/labels.length, bw=step*0.6;
-  var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.08"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
-  var bars=labels.map(function(lb,i){ var bh=values[i]/max*ih, x=padL+step*i+(step-bw)/2, y=padT+ih-bh; return '<g><rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(bh,0).toFixed(1)+'" rx="3" fill="'+color+'" opacity="0.85"><title>'+lb+': '+mNum(values[i])+(unit||'')+'</title></rect><text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
-  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px">'+grid+bars+'</svg>';
+  var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.06" stroke-dasharray="2,4"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
+  var bars=labels.map(function(lb,i){
+    var bh=Math.max(values[i]/max*ih,0), x=padL+step*i+(step-bw)/2, y=padT+ih-bh, d=(i*0.03).toFixed(2);
+    return '<g>'+
+      '<rect class="ch-bar" style="animation-delay:'+d+'s" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="4" fill="'+color+'"><title>'+lb+': '+mNum(values[i])+(unit||'')+'</title></rect>'+
+      '<rect class="ch-bar" style="animation-delay:'+d+'s" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="4" fill="url(#chSheen)" pointer-events="none"/>'+
+      '<text class="ch-val" style="animation-delay:'+(+d+0.3).toFixed(2)+'s" x="'+(x+bw/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="9.5" font-weight="600" fill="currentColor" fill-opacity="0.78">'+mAxisFmt(values[i])+'</text>'+
+      '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text>'+
+    '</g>';
+  }).join('');
+  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px"><defs><linearGradient id="chSheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.22"/><stop offset="55%" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>'+grid+bars+'</svg>';
 }
 function mGroup(elId, labels, a, b, ca, cb, unit, nameA, nameB){
   var el=document.getElementById(elId); if(!el) return;
@@ -4612,11 +4626,20 @@ function mGroup(elId, labels, a, b, ca, cb, unit, nameA, nameB){
   // «Контекст: X ₽» (наследие первого графика затрат) — и «Карта лояльности, %»
   // при наведении показывала проценты как рубли SMS.
   unit=unit||''; nameA=nameA||'факт'; nameB=nameB||'год назад';
-  var w=Math.max(720, labels.length*60),h=230,padL=58,padR=14,padT=14,padB=32, iw=w-padL-padR, ih=h-padT-padB;
+  var w=Math.max(720, labels.length*60),h=230,padL=58,padR=14,padT=18,padB=32, iw=w-padL-padR, ih=h-padT-padB;
   var max=Math.max.apply(null, a.concat(b).concat([1])), step=iw/labels.length, bw=step*0.30;
-  var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.08"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
-  var bars=labels.map(function(lb,i){ var x0=padL+step*i+(step-bw*2-4)/2, ha=a[i]/max*ih, hb=b[i]/max*ih; return '<g><rect x="'+x0.toFixed(1)+'" y="'+(padT+ih-ha).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(ha,0).toFixed(1)+'" rx="2" fill="'+ca+'" opacity="0.85"><title>'+lb+' '+nameA+': '+mNum(a[i])+unit+'</title></rect><rect x="'+(x0+bw+4).toFixed(1)+'" y="'+(padT+ih-hb).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(hb,0).toFixed(1)+'" rx="2" fill="'+cb+'" opacity="0.85"><title>'+lb+' '+nameB+': '+mNum(b[i])+unit+'</title></rect><text x="'+(x0+bw+2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text></g>'; }).join('');
-  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px">'+grid+bars+'</svg>';
+  var grid=[0,.25,.5,.75,1].map(function(t){ var y=padT+ih*(1-t); return '<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="currentColor" stroke-opacity="0.06" stroke-dasharray="2,4"/><text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">'+mAxisFmt(max*t)+'</text>'; }).join('');
+  var bars=labels.map(function(lb,i){
+    var x0=padL+step*i+(step-bw*2-4)/2, ha=Math.max(a[i]/max*ih,0), hb=Math.max(b[i]/max*ih,0), ya=padT+ih-ha, yb=padT+ih-hb, x1=x0+bw+4, d=(i*0.035).toFixed(3);
+    return '<g>'+
+      '<rect class="ch-bar" style="animation-delay:'+d+'s" x="'+x0.toFixed(1)+'" y="'+ya.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+ha.toFixed(1)+'" rx="3" fill="'+ca+'"><title>'+lb+' '+nameA+': '+mNum(a[i])+unit+'</title></rect>'+
+      '<rect class="ch-bar" style="animation-delay:'+d+'s" x="'+x0.toFixed(1)+'" y="'+ya.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+ha.toFixed(1)+'" rx="3" fill="url(#chSheen)" pointer-events="none"/>'+
+      '<rect class="ch-bar" style="animation-delay:'+d+'s" x="'+x1.toFixed(1)+'" y="'+yb.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hb.toFixed(1)+'" rx="3" fill="'+cb+'" opacity="0.92"><title>'+lb+' '+nameB+': '+mNum(b[i])+unit+'</title></rect>'+
+      '<rect class="ch-bar" style="animation-delay:'+d+'s" x="'+x1.toFixed(1)+'" y="'+yb.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hb.toFixed(1)+'" rx="3" fill="url(#chSheen)" pointer-events="none"/>'+
+      '<text x="'+(x0+bw+2).toFixed(1)+'" y="'+(h-padB+14)+'" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.6">'+lb+'</text>'+
+    '</g>';
+  }).join('');
+  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" width="100%" preserveAspectRatio="xMidYMid meet" style="max-height:230px"><defs><linearGradient id="chSheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.2"/><stop offset="55%" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>'+grid+bars+'</svg>';
 }
 function mktRender(){
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
