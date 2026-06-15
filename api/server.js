@@ -1142,6 +1142,33 @@ const server = http.createServer(async (req, res) => {
                   pt._pending = false; pt.live = true;
                 }
               }
+              // СВОДИМ «По точкам» с живым хедлайном: revenue.cur каждой точки — из db.sales
+              // (storeId == код Склада), как и заголовок (раньше byStore был 1С-нетто из кэша →
+              // сумма таблицы расходилась с хедлайном на ~0.15%). prev/YoY оставляем из кэша.
+              // Служебные склады (нет в рознице db.sales) → cur=0 и отсеиваются. Итог = liveRev,
+              // и теперь совпадает с план/фактом (он тоже из db.sales).
+              if (Array.isArray(data.byStore)) {
+                const liveByStore = {};
+                for (const x of db.sales || []) {
+                  if (x.period !== period || x.storeId === 'undefined') continue;
+                  liveByStore[x.storeId] = (liveByStore[x.storeId] || 0) + Number(x.amount || 0);
+                }
+                const isServiceCode = (s) => s.name === s.code && /^[A-Za-zА-Яа-яЁё]{1,3}\d{5,}$/.test(String(s.code));
+                data.byStore = data.byStore.map((s) => {
+                  const lv = Math.round(liveByStore[s.code] || 0);
+                  const prevR = s.revenue ? s.revenue.prev : null;
+                  const chq = (s.cheques && s.cheques.cur) || 0;
+                  return Object.assign({}, s, {
+                    revenue: { cur: lv, prev: prevR, deltaPct: dl(lv, prevR), live: true },
+                    avgCheck: s.avgCheck
+                      ? { cur: chq ? Math.round(lv / chq) : 0, prev: s.avgCheck.prev, deltaPct: dl(chq ? Math.round(lv / chq) : 0, s.avgCheck.prev) }
+                      : s.avgCheck
+                  });
+                })
+                .filter((s) => !(isServiceCode(s) && (s.revenue.cur || 0) === 0))
+                .filter((s) => (s.revenue.cur || 0) > 0 || (s.revenue.prev || 0) > 0)
+                .sort((a, b) => (b.revenue.cur || 0) - (a.revenue.cur || 0));
+              }
               data.curLive = true; // cur не из кэша — фронт может показать «live»
             }
           } catch (_) { /* db недоступна — отдаём кэш как есть */ }
