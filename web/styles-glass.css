@@ -1,0 +1,128 @@
+/* ============================================================
+   ПИЛОТ «Стекло + атмосферное свечение» — модерн-оболочка 2026 поверх maria-design.
+   Активен ТОЛЬКО при <html data-design="glass"> (флаг ?design=glass).
+   Что меняет: aurora-свечение (золото/вино/какао mesh), стеклянные карточки
+   (backdrop-blur, прозрачность, светлая кромка, мягкая тень-elevation), крупные
+   скругления, воздух, увеличенные KPI-числа. Бренд/палитра/медаль — из maria-design.
+   ОТКАТ: снять <link> и opt-in скрипт в index.html.
+   Фаза 2 (позже): бенто-плитки разного размера + area-графики с градиентом.
+   ============================================================ */
+
+/* ───────── Aurora: атмосферное золото-какао свечение фона ───────── */
+[data-design="glass"] body { position: relative; }
+[data-design="glass"] body::before {
+  content: ""; position: fixed; inset: -10%; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(38% 42% at 14% 12%, rgba(201,162,39,.16), transparent 62%),
+    radial-gradient(34% 38% at 86% 16%, rgba(199,86,106,.13), transparent 62%),
+    radial-gradient(46% 50% at 74% 92%, rgba(138,42,59,.12), transparent 66%),
+    radial-gradient(40% 44% at 26% 84%, rgba(201,162,39,.10), transparent 62%);
+  filter: saturate(1.15);
+  animation: glassAurora 18s ease-in-out infinite alternate;
+}
+@keyframes glassAurora {
+  from { transform: translate3d(0,0,0) scale(1); }
+  to   { transform: translate3d(2.5%, -1.5%, 0) scale(1.07); }
+}
+[data-theme=light][data-design="glass"] body::before {
+  background:
+    radial-gradient(40% 44% at 12% 10%, rgba(201,162,39,.22), transparent 60%),
+    radial-gradient(36% 40% at 88% 14%, rgba(199,86,106,.16), transparent 60%),
+    radial-gradient(48% 52% at 76% 94%, rgba(138,42,59,.14), transparent 64%),
+    radial-gradient(42% 46% at 24% 86%, rgba(201,162,39,.16), transparent 60%);
+}
+/* фон чуть глубже, чтобы свечение читалось */
+[data-design="glass"] { --bg: #120E0C; }
+[data-theme=light][data-design="glass"] { --bg: #F3ECDF; }
+
+/* ───────── Стеклянные карточки (frosted) ───────── */
+/* Тёмная: полупрозрачное какао + blur + светлая кромка + мягкая глубина */
+[data-design="glass"] .panel,
+[data-design="glass"] .kpi,
+[data-design="glass"] .kpi-card,
+[data-design="glass"] .insights-panel,
+[data-design="glass"] .summary-hero .hero-card,
+[data-design="glass"] .mkt-yoy-card,
+[data-design="glass"] .mkt-kpi,
+[data-design="glass"] .mkt-chart,
+[data-design="glass"] .mkt-comp-card,
+[data-design="glass"] .mkt-alert,
+[data-design="glass"] .forecast-card,
+[data-design="glass"] .pin-box {
+  background: rgba(36, 28, 24, .52) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid rgba(255,255,255,.09) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 10px 34px -14px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.07) !important;
+}
+[data-theme=light][data-design="glass"] .panel,
+[data-theme=light][data-design="glass"] .kpi,
+[data-theme=light][data-design="glass"] .kpi-card,
+[data-theme=light][data-design="glass"] .insights-panel,
+[data-theme=light][data-design="glass"] .summary-hero .hero-card,
+[data-theme=light][data-design="glass"] .mkt-yoy-card,
+[data-theme=light][data-design="glass"] .mkt-kpi,
+[data-theme=light][data-design="glass"] .mkt-chart,
+[data-theme=light][data-design="glass"] .mkt-comp-card,
+[data-theme=light][data-design="glass"] .mkt-alert,
+[data-theme=light][data-design="glass"] .forecast-card {
+  background: rgba(255, 253, 249, .62) !important;
+  border: 1px solid rgba(255,255,255,.7) !important;
+  box-shadow: 0 10px 30px -14px rgba(80,55,20,.28), inset 0 1px 0 rgba(255,255,255,.8) !important;
+}
+
+/* Сайдбар — тоже стекло, отделён от aurora */
+[data-design="glass"] .sidebar,
+[data-design="glass"] aside,
+[data-design="glass"] nav.sidebar {
+  background: rgba(28, 22, 19, .58) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border-right: 1px solid rgba(255,255,255,.07) !important;
+}
+[data-theme=light][data-design="glass"] .sidebar,
+[data-theme=light][data-design="glass"] aside {
+  background: rgba(255,253,249,.66) !important;
+  border-right: 1px solid rgba(255,255,255,.7) !important;
+}
+
+/* ───────── Воздух + современные скругления + крупные KPI ───────── */
+[data-design="glass"] .kpi,
+[data-design="glass"] .kpi-card { padding: 22px 24px !important; }
+[data-design="glass"] .kpi-value { font-size: clamp(28px, 3vw, 42px) !important; letter-spacing: -.03em; }
+[data-design="glass"] .panel { padding: 22px 24px !important; }
+/* чуть больше зазоров в сетках KPI/панелей */
+[data-design="glass"] .kpi-grid,
+[data-design="glass"] .panels-grid,
+[data-design="glass"] [class*="grid"] { gap: 18px !important; }
+
+/* Кнопки/инпуты — мягче, скруглённее, стеклянные */
+[data-design="glass"] button,
+[data-design="glass"] select,
+[data-design="glass"] .btn,
+[data-design="glass"] input {
+  border-radius: 12px !important;
+}
+[data-design="glass"] .nav-btn { border-radius: 14px !important; }
+[data-design="glass"] .nav-btn.nav-active {
+  background: rgba(199,86,106,.22) !important;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+
+/* Плавные ховеры карточек (modern lift) */
+[data-design="glass"] .kpi,
+[data-design="glass"] .kpi-card,
+[data-design="glass"] .mkt-yoy-card,
+[data-design="glass"] .panel { transition: transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s; }
+[data-design="glass"] .kpi:hover,
+[data-design="glass"] .kpi-card:hover,
+[data-design="glass"] .mkt-yoy-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 44px -16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-design="glass"] body::before { animation: none !important; }
+  [data-design="glass"] * { transition: none !important; }
+}
