@@ -9,9 +9,11 @@
    ============================================================ */
 
 /* ───────── Aurora: атмосферное золото-какао свечение фона ───────── */
-[data-design="glass"] body { position: relative; }
+/* База-цвет на html, body ПРОЗРАЧНЫЙ — иначе непрозрачный body перекрывает aurora-::before. */
+[data-design="glass"] html { background: var(--bg) !important; }
+[data-design="glass"] body { position: relative; background: transparent !important; }
 [data-design="glass"] body::before {
-  content: ""; position: fixed; inset: -10%; z-index: -2; pointer-events: none;
+  content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
   background:
     radial-gradient(38% 42% at 14% 12%, rgba(201,162,39,.16), transparent 62%),
     radial-gradient(34% 38% at 86% 16%, rgba(199,86,106,.13), transparent 62%),
