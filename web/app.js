@@ -267,7 +267,7 @@ function renderTrendChart(summary) {
     }
   });
   const pyDots = pyHasAny ? pts.map((p, i) => p.factPrevYear == null ? '' :
-    `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.factPrevYear).toFixed(1)}" r="2.5" fill="#a855f7"><title>${bpMonthLabel(p.prevYearPeriod)}: ${fmtAxis(p.factPrevYear)}</title></circle>`).join('') : '';
+    `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.factPrevYear).toFixed(1)}" r="2.5" fill="var(--gold)"><title>${bpMonthLabel(p.prevYearPeriod)}: ${fmtAxis(p.factPrevYear)}</title></circle>`).join('') : '';
 
   const grids = Array.from({ length: 5 }, (_, i) => {
     const v = maxVal / 4 * i, y = yp(v);
@@ -281,10 +281,10 @@ function renderTrendChart(summary) {
 
   const dotR = dense ? 3.5 : 5;
   const dots = pts.map((p, i) => {
-    const clr = p.completion >= 100 ? '#16a34a' : p.completion >= 80 ? '#f59e0b' : '#ef4444';
+    const clr = p.completion >= 100 ? 'var(--good)' : p.completion >= 80 ? 'var(--warn)' : 'var(--bad)';
     const pctLabel = dense ? '' : `<text x="${xp(i).toFixed(1)}" y="${(yp(p.fact) - 9).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${p.completion}%</text>`;
-    return `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.fact).toFixed(1)}" r="${dotR}" fill="${clr}" stroke="white" stroke-width="2"><title>${bpMonthLabel(p.period)}: факт ${fmtAxis(p.fact)} · ${p.completion}% плана</title></circle>
-    <circle cx="${xp(i).toFixed(1)}" cy="${yp(p.plan).toFixed(1)}" r="2.5" fill="white" stroke="#9ca3af" stroke-width="1.5"><title>${bpMonthLabel(p.period)}: план ${fmtAxis(p.plan)}</title></circle>${pctLabel}`;
+    return `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.fact).toFixed(1)}" r="${dotR}" fill="${clr}" stroke="var(--paper)" stroke-width="2"><title>${bpMonthLabel(p.period)}: факт ${fmtAxis(p.fact)} · ${p.completion}% плана</title></circle>
+    <circle cx="${xp(i).toFixed(1)}" cy="${yp(p.plan).toFixed(1)}" r="2.5" fill="var(--paper)" stroke="var(--hint)" stroke-width="1.5"><title>${bpMonthLabel(p.period)}: план ${fmtAxis(p.plan)}</title></circle>${pctLabel}`;
   }).join('');
 
   const xlabels = pts.map((p, i) => {
@@ -300,19 +300,19 @@ function renderTrendChart(summary) {
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
     <defs>
       <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#0f766e" stop-opacity="0.14"/>
-        <stop offset="100%" stop-color="#0f766e" stop-opacity="0"/>
+        <stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.22"/>
+        <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0"/>
       </linearGradient>
     </defs>
     ${grids}
     <path d="${areaD}" fill="url(#tg)"/>
     <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="2" stroke-dasharray="6,4"/>
-    ${pyHasAny ? `<path d="${pyD.trim()}" fill="none" stroke="#a855f7" stroke-width="2" stroke-dasharray="2,3" opacity="0.85"/>${pyDots}` : ''}
+    ${pyHasAny ? `<path d="${pyD.trim()}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="2,3" opacity="0.85"/>${pyDots}` : ''}
     <path d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${dots}${xlabels}
     <text x="${pad.l}" y="${H - 4}" fill="var(--hint)" font-size="10">─ ─ план</text>
     <text x="${pad.l + 54}" y="${H - 4}" fill="var(--accent)" font-size="10">─── факт</text>
-    ${pyHasAny ? `<text x="${pad.l + 108}" y="${H - 4}" fill="#a855f7" font-size="10">··· факт пр. года</text>` : ''}
+    ${pyHasAny ? `<text x="${pad.l + 108}" y="${H - 4}" fill="var(--gold)" font-size="10">··· факт пр. года</text>` : ''}
   </svg>`;
 }
 
@@ -3859,10 +3859,10 @@ function renderCategoryChart() {
   const labelW = 180;
   el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px;padding:8px 4px">${rows.map(r => {
     const w = max > 0 ? (r.fact / max * 100) : 0;
-    const tone = r.marginPct === null ? '#94a3b8'
-      : r.marginPct >= 70 ? '#22c55e'
-      : r.marginPct >= 30 ? '#eab308'
-      : '#f43f5e';
+    const tone = r.marginPct === null ? 'var(--muted)'
+      : r.marginPct >= 70 ? 'var(--good)'
+      : r.marginPct >= 30 ? 'var(--warn)'
+      : 'var(--bad)';
     return `<div style="display:flex;align-items:center;gap:10px;font-size:12px">
       <div style="width:${labelW}px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.category)}">${escapeHtml(r.category)}</div>
       <div style="flex:1;height:22px;background:var(--glass-soft);border-radius:6px;position:relative">
@@ -3959,10 +3959,10 @@ function renderDaily() {
         ${day % 5 === 0 || i === rows.length - 1 ? `<text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="9" fill="currentColor" fill-opacity="0.6">${day}</text>` : ''}
       </g>`;
     }).join('')}
-    <path d="${linePath}" stroke="#f43f5e" stroke-width="2" fill="none" opacity="0.7"/>
-    ${cumPoints.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2" fill="#f43f5e" opacity="0.8"/>`).join('')}
+    <path d="${linePath}" stroke="var(--gold)" stroke-width="2" fill="none" opacity="0.9"/>
+    ${cumPoints.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2" fill="var(--gold)"/>`).join('')}
   </svg>
-  <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px">Красная линия — накопительная доля выручки</div>`;
+  <div style="text-align:right;font-size:11px;color:var(--muted);margin-top:4px">Золотая линия — накопительная доля выручки</div>`;
 }
 
 function renderStoreMarkup() {
@@ -4004,7 +4004,7 @@ function renderHourChart() {
       const y = padT + innerH - bh;
       const peak = r.fact / max > 0.7;
       return `<g>
-        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${peak ? '#22c55e' : 'var(--accent)'}" opacity="${peak ? 0.95 : 0.75}">
+        <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${peak ? 'var(--gold)' : 'var(--accent)'}" opacity="${peak ? 0.95 : 0.78}">
           <title>${r.hour}:00 — ${fmtNum(r.fact)} ₽ · ${r.txCount} строк</title>
         </rect>
         ${r.hour % 2 === 0 ? `<text x="${x + barW/2}" y="${h - padB + 14}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.65">${r.hour}</text>` : ''}
@@ -4259,7 +4259,7 @@ function renderDiscounts() {
   if (!chart) return;
   const items = c.discountBreakdown;
   const total = items.reduce((s, i) => s + i.amount, 0);
-  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899'];
+  const colors = ['var(--gold)', 'var(--accent)', 'var(--good)', 'var(--warn)'];
   chart.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:8px;padding:8px 4px">
       ${items.map((d, i) => {
@@ -4439,7 +4439,7 @@ function renderComparison() {
 
   // Рисуем сетку из 4 магазинов на чарт (топ-4 по выручке), иначе перекрытие
   const top = stores.slice(0, 4);
-  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899'];
+  const colors = ['var(--gold)', 'var(--accent)', 'var(--good)', 'var(--warn)'];
   const w = 600, h = 480, cx = w/2, cy = h/2 + 10, R = 160;
   const N = metrics.length;
   const angle = (i) => (Math.PI * 2 * i / N) - Math.PI/2;
@@ -4644,7 +4644,7 @@ function renderSalesMonthly(d){
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var rev=0,chq=0,bon=0,cardW=0;
   var selYM=mktSelectedPeriod();
-  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
+  var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
   var rows=ms.map(function(m){ rev+=m.revenue||0; chq+=m.cheques||0; bon+=m.bonus||0; cardW+=(m.cardPct||0)*(m.cheques||0);
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
     return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.revenue)+'</td><td class="num">'+mNum(m.cheques)+'</td><td class="num">'+mNum(m.avgCheck||(m.cheques?m.revenue/m.cheques:0))+'</td><td class="num">'+mNum1(m.cardPct||0)+' %</td><td class="num">'+mNum(m.bonus||0)+'</td></tr>';
@@ -4665,10 +4665,10 @@ function renderDirectMonthly(d){
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var sp=0,im=0,cl=0,cv=0;
   var selYM=mktSelectedPeriod();
-  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
+  var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
   var rows=ms.map(function(m){ sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=m.conversions||0;
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.daysCovered&&m.daysCovered<28?' (1–'+m.daysCovered+')':'');
-    var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:#10a05a':(m.cpa<=800?'color:#b8860b':'color:#e0466a'));
+    var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:var(--good)':(m.cpa<=800?'color:var(--gold)':'color:var(--bad)'));
     return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.spend)+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+mNum(m.clicks)+'</td><td class="num">'+mNum1(m.ctrPct||0)+' %</td><td class="num">'+mNum(m.conversions)+'</td><td class="num">'+mNum1(m.crPct||0)+' %</td><td class="num">'+mNum1(m.cpc||0)+'</td><td class="num" style="'+cpaC+'">'+(m.cpa==null?'—':mNum(m.cpa))+'</td></tr>';
   }).reverse().join('');
   var tcpc=cl?Math.round(sp/cl*100)/100:0, tctr=im?Math.round(cl/im*1000)/10:0, tcpa=cv?Math.round(sp/cv):0, tcr=cl?Math.round(cv/cl*1000)/10:0;
@@ -4688,7 +4688,7 @@ function renderGisMonthly(d){
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   var imp=0,pv=0,sc=0,rt=0,cl=0,so=0,me=0,pr=0;
   var selYM=mktSelectedPeriod();
-  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
+  var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
   var nv=function(v){ return v==null?'—':mNum(v); };
   var rows=ms.map(function(m){ imp+=m.impressions||0; pv+=m.pageVisits||0; sc+=m.siteClicks||0; rt+=m.routes||0; cl+=m.calls||0; so+=m.socialClicks||0; me+=m.messengerClicks||0; pr+=m.priceViews||0;
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.partial?' <span style="font-size:10px;color:var(--muted)">(идёт)</span>':'');
@@ -4718,9 +4718,9 @@ function renderGisFunnel(d){
   var pct=function(n,base){ return base?Math.round(n/base*1000)/10:null; };
   var mp=m.ym.split('-'); var mlbl=MM[Number(mp[1])]+' '+mp[0];
   var steps=[
-    {l:'Показы в поиске 2ГИС', sub:'сколько раз карточку показали', n:imp, conv:null, color:'#7c5cff'},
-    {l:'Переходы на карточку', sub:'открыли страницу компании', n:pv, conv:pct(pv,imp), color:'#5b8def'},
-    {l:'Целевые действия', sub:'на сайт + маршруты + звонки', n:target, conv:pct(target,pv||imp), color:'#10a05a'}
+    {l:'Показы в поиске 2ГИС', sub:'сколько раз карточку показали', n:imp, conv:null, color:'var(--accent)'},
+    {l:'Переходы на карточку', sub:'открыли страницу компании', n:pv, conv:pct(pv,imp), color:'var(--gold)'},
+    {l:'Целевые действия', sub:'на сайт + маршруты + звонки', n:target, conv:pct(target,pv||imp), color:'var(--good)'}
   ];
   var rows=steps.map(function(s){
     var w=imp?Math.max(3,Math.round(s.n/imp*100)):0;
@@ -4746,8 +4746,8 @@ function renderGisCharts(d){
   var rt=ms.map(function(m){return m.routes||0;});
   el.innerHTML='<div class="mkt-chart-t">Показы в 2ГИС по месяцам</div><div id="mktGisChImp"></div>'+
     '<div class="mkt-chart-t" style="margin-top:14px">Переходы на сайт и маршруты по месяцам</div><div id="mktGisChTr"></div>';
-  try{ mBars('mktGisChImp', labels, imp, '#7c5cff', ''); }catch(_){}
-  try{ mGroup('mktGisChTr', labels, site, rt, '#10a05a', '#5b8def', '', 'На сайт', 'Маршруты'); }catch(_){}
+  try{ mBars('mktGisChImp', labels, imp, 'var(--accent)', ''); }catch(_){}
+  try{ mGroup('mktGisChTr', labels, site, rt, 'var(--good)', 'var(--gold)', '', 'На сайт', 'Маршруты'); }catch(_){}
 }
 // Платные каналы — затраты и отдача (бюджет маркетинга) из /api/marketing/paid-costs.
 function renderPaidCosts(pc){
@@ -4783,7 +4783,7 @@ function renderPaidCosts(pc){
 function renderSmsAttribution(sa){
   var el=document.getElementById('mktSmsAttr'); if(!el) return;
   if(!sa || sa.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных атрибуции: '+((sa&&sa.error)||'ошибка')+'</div>'; return; }
-  var convColor=function(p){ return p>=10?'#10a05a':(p>=3?'#b8860b':'#e0466a'); };
+  var convColor=function(p){ return p>=10?'var(--good)':(p>=3?'var(--gold)':'var(--bad)'); };
   var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   var typeBadge={
     'A':'<span style="font-size:10px;background:#eafaf0;color:#0a6b3a;padding:1px 6px;border-radius:3px">продукт+срок</span>',
@@ -4811,7 +4811,7 @@ function renderSmsAttribution(sa){
         if(c.error) return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+'<td class="num" colspan="3" style="color:var(--muted);text-align:left">ошибка: '+esc(c.error.slice(0,40))+'</td>'+costCell+'</tr>';
         if(c.linkPending) return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+'<td colspan="3" style="font-size:11px;color:var(--muted)">переходы — пока нет данных Метрики'+(sweet?' · '+sweet:'')+'</td>'+costCell+'</tr>';
         var cc=convColor(c.conversionPct);
-        var liftLine = (c.liftPct!=null) ? '<div style="font-size:10px;color:'+(c.liftPct>0?'#10a05a':'#e0466a')+'">прирост '+(c.liftPct>0?'+':'')+mNum1(c.liftPct)+' п.п.'+(c.incremental?' · ≈'+mNum(c.incremental)+' доп.':'')+'</div>' : '';
+        var liftLine = (c.liftPct!=null) ? '<div style="font-size:10px;color:'+(c.liftPct>0?'var(--good)':'var(--bad)')+'">прирост '+(c.liftPct>0?'+':'')+mNum1(c.liftPct)+' п.п.'+(c.incremental?' · ≈'+mNum(c.incremental)+' доп.':'')+'</div>' : '';
         return '<tr><td>'+head+'</td><td>'+offer+'</td>'+sentCell+
           '<td class="num">'+mNum(c.buyers)+'<div style="font-size:10px;color:var(--muted)">'+(c.metric||'')+'</div>'+sweet+'</td>'+
           '<td class="num" style="color:'+cc+'">'+mNum1(c.conversionPct)+' %'+liftLine+'</td>'+
@@ -4820,7 +4820,7 @@ function renderSmsAttribution(sa){
       '<tr class="mkt-total"><td><b>Итого</b></td><td></td>'+
         '<td class="num"'+(t.recipientsApprox?' title="часть кампаний — оценка по отправкам (уник. карты из 1С недоступны)"':'')+'><b>'+(t.recipientsApprox?'≈':'')+mNum(t.recipients||0)+'</b></td>'+
         '<td class="num"><b>'+mNum(t.buyers||0)+'</b>'+(t.sweetReg?'<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
-        '<td class="num">'+mNum1(t.conversionPct||0)+' %'+(t.incremental?'<div style="font-size:10px;color:#10a05a">≈'+mNum(t.incremental)+' доп.</div>':'')+'</td>'+
+        '<td class="num">'+mNum1(t.conversionPct||0)+' %'+(t.incremental?'<div style="font-size:10px;color:var(--good)">≈'+mNum(t.incremental)+' доп.</div>':'')+'</td>'+
         '<td class="num"><b>'+mNum(t.revenue||0)+'</b></td>'+
         '<td class="num"'+(t.recipientsApprox?' title="часть кампаний — оценка по отправкам (уник. карты из 1С недоступны)"':'')+'><b>'+(t.recipientsApprox?'≈':'')+mNum(t.cost||0)+'</b></td></tr>'+
       '</tbody></table></div>';
@@ -4839,7 +4839,7 @@ function renderSmsMonthly(sm){
   if(!ready.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячные итоги SMS прогреваются из 1С (~10 сек/мес). Обнови страницу через минуту.</div>'; return; }
   var rec=0,cost=0,buy=0,rev=0,apxAny=false;
   var selYM=mktSelectedPeriod();
-  var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
+  var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
   var rows=sm.months.map(function(m){
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])];
     if(m._pending) return '<tr><td>'+lbl+'</td><td class="num" colspan="6" style="color:var(--muted);text-align:left">прогрев…</td></tr>';
@@ -4847,7 +4847,7 @@ function renderSmsMonthly(sm){
     // ≈ — получатели/затраты оценены по отправкам (уник. карты из 1С недоступны).
     if(m.recipientsApprox) apxAny=true;
     var ax=m.recipientsApprox?'≈':'', axT=m.recipientsApprox?' title="оценка по отправкам (уник. карты из 1С недоступны)"':'';
-    var cc=m.conversionPct>=10?'#10a05a':(m.conversionPct>=3?'#b8860b':'#e0466a');
+    var cc=m.conversionPct>=10?'var(--good)':(m.conversionPct>=3?'var(--gold)':'var(--bad)');
     return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.campaigns)+'</td><td class="num"'+axT+'>'+ax+mNum(m.recipients)+'</td><td class="num"'+axT+'>'+ax+mNum(m.cost)+'</td><td class="num">'+mNum(m.buyers)+'</td><td class="num">'+(m.revenue?mNum(m.revenue):'—')+'</td><td class="num" style="color:'+cc+'">'+mNum1(m.conversionPct||0)+' %</td></tr>';
   }).reverse().join('');
   var tconv=rec?Math.round(buy/rec*1000)/10:0;
@@ -4898,7 +4898,7 @@ function renderProductionKg(pk){
   if(!pk || pk.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных выпуска: '+((pk&&pk.error)||'ошибка')+'</div>'; return; }
   var kpi=function(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; };
   var c=pk.current||{kg:0,units:0,momPct:null};
-  var momStr = c.momPct==null ? '—' : '<span style="color:'+(c.momPct>=0?'#10a05a':'#e0466a')+'">'+(c.momPct>0?'+':'')+mNum1(c.momPct)+' %</span>';
+  var momStr = c.momPct==null ? '—' : '<span style="color:'+(c.momPct>=0?'var(--good)':'var(--bad)')+'">'+(c.momPct>0?'+':'')+mNum1(c.momPct)+' %</span>';
   el.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+
     kpi(mNum(c.kg)+' кг','Выпуск за месяц')+
     kpi(mNum(c.units)+' шт','Штук произведено')+
@@ -5063,7 +5063,7 @@ function renderCompetitors(d){
   }
   function ratOf(c){
     var lr=liveRat[c.name];
-    if(lr) return '2ГИС <b>'+mNum1(lr.rating)+'</b>'+(lr.reviews?' ('+mNum(lr.reviews)+')':'')+' <span style="font-size:10px;color:#10a05a">live</span>';
+    if(lr) return '2ГИС <b>'+mNum1(lr.rating)+'</b>'+(lr.reviews?' ('+mNum(lr.reviews)+')':'')+' <span style="font-size:10px;color:var(--good)">live</span>';
     return ((REVIEWS[c.name]||{}).rating)||c.rating;
   }
   var cols=['Компания','Точки','Соцсети / подписчики','Рейтинг','Программа лояльности','Онлайн-заказ'];
@@ -5591,7 +5591,7 @@ function mktLoadYoY(){
       d.topProducts.map(function(r,i){ return '<tr><td>'+(i+1)+'. '+r.name+'</td><td class="num">'+mNum(r.revenue)+'</td><td class="num">'+mNum(r.qty)+'</td></tr>'; }).join('')+'</tbody></table>'; }
     var ct=document.getElementById('mktCats');
     if(ct && d.categories && d.categories.length){ ct.innerHTML='<table><thead><tr><th>Категория</th><th class="num">Выручка ₽</th><th class="num">Доля</th><th class="num">YoY</th></tr></thead><tbody>'+
-      d.categories.map(function(r){ var dl=r.deltaPct; var ds=(dl==null?'—':(dl>0?'+':'')+mNum1(dl)+'%'); var dc=(dl==null?'':(dl>0?'color:#10a05a':(dl<0?'color:#e0466a':''))); return '<tr><td>'+r.group+'</td><td class="num">'+mNum(r.cur)+'</td><td class="num">'+mNum1(r.sharePct)+'%</td><td class="num" style="'+dc+'">'+ds+'</td></tr>'; }).join('')+'</tbody></table>'; }
+      d.categories.map(function(r){ var dl=r.deltaPct; var ds=(dl==null?'—':(dl>0?'+':'')+mNum1(dl)+'%'); var dc=(dl==null?'':(dl>0?'color:var(--good)':(dl<0?'color:var(--bad)':''))); return '<tr><td>'+r.group+'</td><td class="num">'+mNum(r.cur)+'</td><td class="num">'+mNum1(r.sharePct)+'%</td><td class="num" style="'+dc+'">'+ds+'</td></tr>'; }).join('')+'</tbody></table>'; }
     // Помесячные ряды + YoY на графиках динамики (1С данные).
     // 17 точек: с янв прошлого года до выбранного месяца. ps — те же точки минус год (для YoY).
     // Точки с _pending — 1С греется в фоне (~100с/мес). Их пока не рисуем, при следующем
@@ -5617,7 +5617,7 @@ function mktLoadYoY(){
       var pendingCount=rawCs.filter(function(m){return m._pending;}).length;
       if(pendingCount){
         var hint=document.getElementById('mktYoYHint');
-        if(hint) hint.innerHTML+=' <span style="color:#b8860b">· '+pendingCount+' мес. ещё прогреваются из 1С</span>';
+        if(hint) hint.innerHTML+=' <span style="color:var(--gold)">· '+pendingCount+' мес. ещё прогреваются из 1С</span>';
       }
       var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
       // Метка: «25-Янв» (год'-месяц) — для расширенного окна 17 месяцев
@@ -5628,7 +5628,7 @@ function mktLoadYoY(){
         var dl=null, ds='';
         if(isPp){ dl=Math.round((cV-pV)*10)/10; ds=' · YoY '+(dl>=0?'+':'')+mNum1(dl)+' п.п.'; }
         else { dl=pV?Math.round((cV-pV)/pV*1000)/10:null; ds=dl==null?'':' · YoY '+(dl>0?'+':'')+mNum1(dl)+'%'; }
-        var dc=dl==null?'':(dl>0?'color:#10a05a':(dl<0?'color:#e0466a':''));
+        var dc=dl==null?'':(dl>0?'color:var(--good)':(dl<0?'color:var(--bad)':''));
         el.innerHTML=label+' <span style="font-size:11px;font-weight:600;'+dc+'">'+ds+'</span>';
       }
       // YoY-итоги (проценты в подписях) — только по месяцам, где есть И текущий,
@@ -5645,12 +5645,12 @@ function mktLoadYoY(){
       setT('mktChartAvgT','Средний чек, ₽', cAvg, pAvg);
       setT('mktChartCardT','Карта лояльности, %', cCardW, pCardW, true);
       var leg=document.getElementById('mktChartRevLeg');
-      if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>факт месяца</span><span class="mkt-lg"><i style="background:#b8860b"></i>год назад (YoY)</span>'; }
+      if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>факт месяца</span><span class="mkt-lg"><i style="background:var(--gold)"></i>год назад (YoY)</span>'; }
       // Прошлый год: null там, где данных нет → разрыв (нулевой столбик), а не выдуманный 0.
-      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m?m.revenue:null;}), 'var(--accent)', '#b8860b', ' ₽');
-      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m?m.cheques:null;}), 'var(--accent)', '#b8860b', ' шт');
-      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m?m.avgCheck:null;}), 'var(--accent)', '#b8860b', ' ₽');
-      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m?m.cardPct:null;}), 'var(--accent)', '#b8860b', ' %');
+      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m?m.revenue:null;}), 'var(--accent)', 'var(--gold)', ' ₽');
+      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m?m.cheques:null;}), 'var(--accent)', 'var(--gold)', ' шт');
+      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m?m.avgCheck:null;}), 'var(--accent)', 'var(--gold)', ' ₽');
+      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m?m.cardPct:null;}), 'var(--accent)', 'var(--gold)', ' %');
     }
     // Партнёры (Bitrix iblock 88) — список с UTM-метками
     if (d.external && d.external.partners) {
@@ -5668,8 +5668,8 @@ function mktLoadYoY(){
           (utm||'').split('&').forEach(function(p){ var kv = p.split('='); if (kv[0]) utmObj[kv[0]] = decodeURIComponent(kv[1]||''); });
           var utmTags = ['utm_source','utm_medium','utm_campaign'].map(function(k){ return utmObj[k] ? '<span style="font-size:10px;background:#eaeaea;padding:2px 6px;border-radius:3px;margin-right:4px">'+k.replace('utm_','')+': '+utmObj[k].slice(0,20)+'</span>' : ''; }).join('');
           var clicks = pr.metrikaClicks != null ? mNum(pr.metrikaClicks) : '<span style="color:var(--muted)">—</span>';
-          var ac = pr.active === false ? 'color:#e0466a' : '';
-          return '<tr><td><b style="'+ac+'">'+pr.name+'</b></td><td style="font-size:11px"><a href="'+url+'" target="_blank" style="color:#0066cc">'+(clean||'').replace(/^https?:\/\/(www\.)?/,'').slice(0,40)+'</a></td><td style="font-size:11px">'+(utmTags||'<span style="color:var(--muted)">без UTM</span>')+'</td><td class="num">'+clicks+'</td><td style="font-size:11px;color:'+(pr.active===false?'#e0466a':'#10a05a')+'">'+(pr.active===false?'выкл':'актив')+'</td></tr>';
+          var ac = pr.active === false ? 'color:var(--bad)' : '';
+          return '<tr><td><b style="'+ac+'">'+pr.name+'</b></td><td style="font-size:11px"><a href="'+url+'" target="_blank" style="color:#0066cc">'+(clean||'').replace(/^https?:\/\/(www\.)?/,'').slice(0,40)+'</a></td><td style="font-size:11px">'+(utmTags||'<span style="color:var(--muted)">без UTM</span>')+'</td><td class="num">'+clicks+'</td><td style="font-size:11px;color:'+(pr.active===false?'var(--bad)':'var(--good)')+'">'+(pr.active===false?'выкл':'актив')+'</td></tr>';
         }).join('');
         pEl.innerHTML = '<table style="font-size:12px"><thead><tr><th>Партнёр</th><th>Ссылка</th><th>UTM</th><th class="num">Переходов</th><th>Статус</th></tr></thead><tbody>'+rows+'</tbody></table>';
       }
@@ -5727,7 +5727,7 @@ function mktLoadYoY(){
           '</div>'+
           '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blPickedN)+' / '+mNum(blTotal)+'</div><div class="mkt-l">Забрали карту</div></div>'+
-          '<div class="mkt-kpi"><div class="mkt-v" style="'+(blWasted.length?'color:#e0466a':'')+'">'+mNum(blWasted.length)+' · '+mNum(blWastedSum)+' ₽</div><div class="mkt-l">Взяли, но не выложили (впустую)</div></div>'+
+          '<div class="mkt-kpi"><div class="mkt-v" style="'+(blWasted.length?'color:var(--bad)':'')+'">'+mNum(blWasted.length)+' · '+mNum(blWastedSum)+' ₽</div><div class="mkt-l">Взяли, но не выложили (впустую)</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(blClicks)+'</div><div class="mkt-l">Переходов к нам (из '+mNum(blClickers.length)+' с метрикой)</div></div>'+
           '<div class="mkt-kpi"><div class="mkt-v">'+(blCpc?mNum(blCpc)+' ₽':'—')+'</div><div class="mkt-l">CPC (депозит ÷ переходы, по замеренным)</div></div>'+
           '</div>';
@@ -5739,15 +5739,15 @@ function mktLoadYoY(){
             var subs = b.subscribers ? mNum(b.subscribers) : '<span style="color:var(--muted)">?</span>';
             var dep = b.depositRub ? mNum(b.depositRub) : '—';
             var pickup = (b.pickupDate||'').slice(0,30);
-            var pickC = /не\s*забрал/i.test(pickup) ? 'color:#e0466a' : '';
+            var pickC = /не\s*забрал/i.test(pickup) ? 'color:var(--bad)' : '';
             var posted = (b.posted||'').slice(0,30);
             var didPost = blPosted(b);
-            var postC = didPost ? 'color:#10a05a' : 'color:var(--muted)';
+            var postC = didPost ? 'color:var(--good)' : 'color:var(--muted)';
             // подсветка строки: взял депозит и не выложил
             var rowBg = (blPicked(b) && !didPost && (b.depositRub||0)>0) ? ' style="background:rgba(224,70,106,.07)"' : '';
             var cl = b.clicks!=null ? mNum(b.clicks) : '<span style="color:var(--muted)">—</span>';
             var notes = (b.notes||'').slice(0,50);
-            return '<tr'+rowBg+'><td><b>'+b.handle+'</b></td><td class="num">'+subs+'</td><td class="num">'+dep+'</td><td style="font-size:11px">'+(b.pickupAddress||'').slice(0,30)+'</td><td style="font-size:11px;'+pickC+'">'+pickup+'</td><td style="font-size:11px;'+postC+'">'+(posted||(didPost?'':'<span style="color:#e0466a">не выложил</span>'))+'</td><td class="num">'+cl+'</td><td style="font-size:11px;color:var(--muted)">'+notes+'</td></tr>';
+            return '<tr'+rowBg+'><td><b>'+b.handle+'</b></td><td class="num">'+subs+'</td><td class="num">'+dep+'</td><td style="font-size:11px">'+(b.pickupAddress||'').slice(0,30)+'</td><td style="font-size:11px;'+pickC+'">'+pickup+'</td><td style="font-size:11px;'+postC+'">'+(posted||(didPost?'':'<span style="color:var(--bad)">не выложил</span>'))+'</td><td class="num">'+cl+'</td><td style="font-size:11px;color:var(--muted)">'+notes+'</td></tr>';
           }).join('')+'</tbody></table>';
       }
       if (blHintEl) {
@@ -5772,7 +5772,7 @@ function mktLoadYoY(){
           '<div class="mkt-kpi"><div class="mkt-v">'+(sp.cards?mNum(sp.cards):'—')+'</div><div class="mkt-l">Карт год назад</div></div>'+
           '</div>'+
           (tasksArr.length?'<div class="table-wrap"><table><thead><tr><th>Задание</th><th class="num">Выполнений</th><th class="num">Доля</th></tr></thead><tbody>'+
-            tasksArr.map(function(t){ var pct=t.events/totalEv*100; var pc=pct>=50?'color:#e0466a':(pct>=20?'color:#b8860b':''); return '<tr><td>'+t.name+'</td><td class="num">'+mNum(t.events)+'</td><td class="num" style="'+pc+'">'+mNum1(pct)+' %</td></tr>'; }).join('')+
+            tasksArr.map(function(t){ var pct=t.events/totalEv*100; var pc=pct>=50?'color:var(--bad)':(pct>=20?'color:var(--gold)':''); return '<tr><td>'+t.name+'</td><td class="num">'+mNum(t.events)+'</td><td class="num" style="'+pc+'">'+mNum1(pct)+' %</td></tr>'; }).join('')+
             '</tbody></table></div>':
             '<div style="font-size:12px;color:var(--muted)">Заданий не было.</div>');
       }
@@ -5783,7 +5783,7 @@ function mktLoadYoY(){
       var el=document.getElementById('mktPromoFresh');
       if(!el) return;
       var rate = uds.promocodeRate;  // null-aware с сервера: «—» если данных нет (не выдуманный 0)
-      var rateC = rate==null ? 'color:var(--muted)' : rate < 2 ? 'color:#e0466a' : (rate < 5 ? 'color:#b8860b' : 'color:#10a05a');
+      var rateC = rate==null ? 'color:var(--muted)' : rate < 2 ? 'color:var(--bad)' : (rate < 5 ? 'color:var(--gold)' : 'color:var(--good)');
       el.innerHTML = (uds.partialNote?'<div style="font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:6px 10px;border-radius:6px;margin-bottom:10px">⚠ '+uds.partialNote+'</div>':'')+
         '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
         '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.totalChecksScanned)+'</div><div class="mkt-l">Чеков просмотрено</div></div>'+
@@ -5824,7 +5824,7 @@ function mktLoadYoY(){
           var ttl=m.uses+' исп. · '+mNum(m.revenue)+' ₽'+(m.bonusUsed?' · бонусы '+mNum(m.bonusUsed):'');
           return '<td class="num" title="'+ttl+'">'+mNum(m.revenue)+'</td>';
         }).join('');
-        var drrC=c.drrPct>=20?'color:#e0466a':(c.drrPct>=10?'color:#b8860b':'');
+        var drrC=c.drrPct>=20?'color:var(--bad)':(c.drrPct>=10?'color:var(--gold)':'');
         return '<tr><td><b>'+c.code+'</b></td><td class="num">'+mNum(c.totalUses)+'</td><td class="num">'+mNum(c.totalRevenue)+'</td><td class="num">'+mNum(c.avgTicket)+'</td><td class="num">'+(c.totalBonusUsed?mNum(c.totalBonusUsed):'<span style="color:var(--muted)">—</span>')+'</td><td class="num" style="'+drrC+'">'+(c.totalBonusUsed?mNum1(c.drrPct)+' %':'—')+'</td>'+monthCells+'</tr>';
       }).join('');
       el.innerHTML='<table style="font-size:12px"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>';
@@ -5850,7 +5850,7 @@ function mktLoadYoY(){
         return;
       }
       var selYM=mktSelectedPeriod();
-      var hlRow=function(ym){ return ym===selYM?' style="background:rgba(124,92,255,.10);box-shadow:inset 3px 0 0 #7c5cff"':''; };
+      var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
       el.innerHTML='<table><thead><tr><th>Месяц</th><th>Торт месяца (акция)</th><th class="num">Скидка</th><th class="num">Скидок выдано ₽</th><th class="num">Дней акции</th><th class="num">Выручка ₽</th><th class="num" title="Продано в килограммах (целый торт продаётся весовым)">Продано, кг</th><th class="num" title="≈ штук = килограммы ÷ вес одного торта (оценка)">≈ шт</th><th class="num">Доля в тортах</th></tr></thead><tbody>'+
         ready.slice().reverse().map(function(s){
           var p=s.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM3[Number(p[1])];
@@ -5862,7 +5862,7 @@ function mktLoadYoY(){
           }
           var nm='<b>'+s.name+'</b>'+(s.partialMonth?' <span style="color:var(--muted);font-size:10px">(месяц идёт)</span>':'');
           var pctCell = s.discountPct!=null
-            ? '<td class="num" style="color:#e0466a;font-weight:600" title="Эффективная скидка: скидки ÷ полная цена (скидки + выручка). Номинал акции обычно круглый: ~'+Math.round(s.discountPct/5)*5+'%">−'+mNum1(s.discountPct)+' %</td>'
+            ? '<td class="num" style="color:var(--bad);font-weight:600" title="Эффективная скидка: скидки ÷ полная цена (скидки + выручка). Номинал акции обычно круглый: ~'+Math.round(s.discountPct/5)*5+'%">−'+mNum1(s.discountPct)+' %</td>'
             : '<td class="num" style="color:var(--muted)">—</td>';
           var kgVal = (s.kg!=null?s.kg:s.qty);
           var unitsCell = s.units!=null ? mNum(s.units) : '<span style="color:var(--muted)">—</span>';
@@ -5913,8 +5913,8 @@ function mktLoadYoY(){
       bs.innerHTML='<table><thead><tr><th>Точка</th><th class="num">Выручка ₽</th><th class="num">YoY</th><th class="num">Чеки</th><th class="num">Ср. чек</th><th class="num">Карта лоял.</th><th class="num">Δ карты</th></tr></thead><tbody>'+
         d.byStore.map(function(r){
           var dr=r.revenue.deltaPct, dcl=r.cardPct.deltaPp;
-          var drs=(dr==null?'нов.':(dr>0?'+':'')+mNum1(dr)+'%'); var drc=(dr==null?'color:var(--muted)':(dr>0?'color:#10a05a':(dr<0?'color:#e0466a':'')));
-          var dcls=(dcl==null?'—':(dcl>0?'+':'')+mNum1(dcl)+' п.п.'); var dclc=(dcl>=0?'color:#10a05a':'color:#e0466a');
+          var drs=(dr==null?'нов.':(dr>0?'+':'')+mNum1(dr)+'%'); var drc=(dr==null?'color:var(--muted)':(dr>0?'color:var(--good)':(dr<0?'color:var(--bad)':'')));
+          var dcls=(dcl==null?'—':(dcl>0?'+':'')+mNum1(dcl)+' п.п.'); var dclc=(dcl>=0?'color:var(--good)':'color:var(--bad)');
           return '<tr><td><b>'+r.name+'</b></td><td class="num">'+mNum(r.revenue.cur)+'</td><td class="num" style="'+drc+'">'+drs+'</td><td class="num">'+mNum(r.cheques.cur)+'</td><td class="num">'+mNum(r.avgCheck.cur)+' ₽</td><td class="num">'+mNum1(r.cardPct.cur)+'%</td><td class="num" style="'+dclc+'">'+dcls+'</td></tr>';
         }).join('')+'</tbody></table>';
     }
@@ -5957,7 +5957,7 @@ function mktLoadYoY(){
           (tags.length ? '<div style="margin:8px 0"><b>Темы отзывов:</b> ' + tags.map(function(t){return '<span style="font-size:11px;background:#eaeaea;padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '') +
           '<div class="table-wrap" style="max-height:400px;overflow-y:auto"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Платформа</th><th>Автор</th><th>Отзыв</th></tr></thead><tbody>' +
           items.slice(0, 25).map(function(r){
-            var pc = r.platform === '2GIS' ? 'color:#10a05a' : (r.platform === 'Google maps' ? 'color:#b8860b' : 'color:var(--muted)');
+            var pc = r.platform === '2GIS' ? 'color:var(--good)' : (r.platform === 'Google maps' ? 'color:var(--gold)' : 'color:var(--muted)');
             return '<tr><td style="font-size:11px;white-space:nowrap">'+r.date+'</td><td style="font-size:11px;'+pc+'">'+r.platform+'</td><td style="font-size:11px"><b>'+r.author+'</b></td><td style="font-size:11px">'+r.text.slice(0, 200)+(r.text.length>200?'…':'')+'</td></tr>';
           }).join('') +
           '</tbody></table></div>';
@@ -5977,7 +5977,7 @@ function mktLoadYoY(){
             '<div class="table-wrap"><table><thead><tr><th>Рубрика</th><th class="num" title="Скользящее окно 2ГИС — последние ~30 дней, не календарный месяц">Показы (30 дн)</th><th class="num">Позиция (ср.)</th><th class="num">Диапазон</th></tr></thead><tbody>'+
             g.appearanceByRubric.map(function(b){
               if(b.error) return '<tr><td>'+b.rubric+'</td><td class="num" colspan="3" style="color:var(--muted);text-align:left">— '+b.error+'</td></tr>';
-              var posColor=b.positionAvg<=5?'color:#10a05a':(b.positionAvg<=15?'':(b.positionAvg<=50?'color:#b8860b':'color:#e0466a'));
+              var posColor=b.positionAvg<=5?'color:var(--good)':(b.positionAvg<=15?'':(b.positionAvg<=50?'color:var(--gold)':'color:var(--bad)'));
               return '<tr><td><b>'+b.rubric+'</b></td><td class="num">'+mNum(b.impressions||0)+'</td><td class="num" style="'+posColor+'"><b>'+(b.positionAvg||'?')+'</b></td><td class="num">'+(b.positionMin||'?')+'–'+(b.positionMax||'?')+'</td></tr>';
             }).join('')+'</tbody></table></div>';
         }
@@ -6044,7 +6044,7 @@ function mktLoadYoY(){
             '<div class="mkt-chart-t" style="margin-top:14px">По кампаниям за месяц</div>'+
             '<div class="table-wrap"><table><thead><tr><th>Кампания</th><th>Статус</th><th class="num">Расход ₽</th><th class="num">Клики</th><th class="num">Конв.</th><th class="num">CPA ₽</th><th class="num">CTR</th><th class="num">CR</th></tr></thead><tbody>'+
             dd.campaigns.map(function(c){
-              var cpaC = c.cpa==null?'color:var(--muted)':(c.cpa<=300?'color:#10a05a':(c.cpa<=800?'color:#b8860b':'color:#e0466a'));
+              var cpaC = c.cpa==null?'color:var(--muted)':(c.cpa<=300?'color:var(--good)':(c.cpa<=800?'color:var(--gold)':'color:var(--bad)'));
               return '<tr><td><b>'+c.name+'</b></td><td><span style="font-size:11px;color:var(--muted)">'+c.status+'</span></td><td class="num">'+mNum(c.spend)+'</td><td class="num">'+mNum(c.clicks)+'</td><td class="num">'+mNum(c.conversions)+'</td><td class="num" style="'+cpaC+'"><b>'+(c.cpa==null?'—':mNum(c.cpa))+'</b></td><td class="num">'+(c.ctrPct==null?'—':mNum1(c.ctrPct)+'%')+'</td><td class="num">'+(c.crPct==null?'—':mNum1(c.crPct)+'%')+'</td></tr>';
             }).join('')+'</tbody></table></div>'
           ) : '')+
@@ -6063,7 +6063,7 @@ function mktLoadYoY(){
           var k = brandKeyByName[name]; if (!k) return;
           var br = d.external.social.brands[k];
           if (br && br.telegram && br.telegram.subscribers) {
-            tr.children[1].innerHTML = mNum(br.telegram.subscribers) + ' <span style="font-size:10px;color:#10a05a">live</span>';
+            tr.children[1].innerHTML = mNum(br.telegram.subscribers) + ' <span style="font-size:10px;color:var(--good)">live</span>';
             anyLive = true;
           } else if (br && br.telegram === null) {
             tr.children[1].innerHTML = 'н/д <span style="font-size:10px;color:var(--muted)">live</span>';
@@ -6071,7 +6071,7 @@ function mktLoadYoY(){
           }
           // VK live (5-я колонка, index 5)
           if (br && br.vk && br.vk.subscribers) {
-            tr.children[5].innerHTML = br.vk.handle + ' · ' + mNum(br.vk.subscribers) + ' <span style="font-size:10px;color:#10a05a">live</span>';
+            tr.children[5].innerHTML = br.vk.handle + ' · ' + mNum(br.vk.subscribers) + ' <span style="font-size:10px;color:var(--good)">live</span>';
             anyLive = true;
           }
         });
@@ -6112,7 +6112,7 @@ function mktLoadYoY(){
             for (var i=0;i<keys.length;i++) { if (comp.categories[keys[i]]) { match = comp.categories[keys[i]]; break; } }
             var newVal = fmtPrice(match);
             if (newVal && tr.children[col]) {
-              tr.children[col].innerHTML = newVal + ' <span style="font-size:10px;color:#10a05a">live</span>';
+              tr.children[col].innerHTML = newVal + ' <span style="font-size:10px;color:var(--good)">live</span>';
             }
           }
         });
@@ -6135,7 +6135,7 @@ function mktLoadYoY(){
       if(seo && seo.queries){
         var s=seo.summary||{};
         var rankBadge=function(r){ if(r==null) return '<span style="color:var(--muted)">—</span>';
-          var clr=r<=3?'#10a05a':(r<=10?'#b8860b':'#e0466a');
+          var clr=r<=3?'var(--good)':(r<=10?'var(--gold)':'var(--bad)');
           return '<span style="color:'+clr+';font-weight:700">'+r+'</span>'; };
         var rows=seo.queries.map(function(q){
           if(q.captcha) return '<tr><td>'+q.q+'</td><td colspan="4" style="font-size:11px;color:var(--muted)">— Яндекс показал капчу, обновится на следующем запуске</td></tr>';
@@ -6145,9 +6145,9 @@ function mktLoadYoY(){
         var st=seo.scrapedAt?new Date(seo.scrapedAt).toLocaleString('ru-RU'):'—';
         sl.innerHTML='<div class="mkt-chart-t">Позиции в Яндексе (lr=63 Иркутск): Мария vs конкуренты <span class="mkt-scope dyn">live</span></div>'+
           '<div style="font-size:12px;color:var(--muted);margin:4px 0 10px;line-height:1.55">Что показывает: <b>место сайта в обычной (бесплатной) выдаче Яндекса</b> по конкретному поисковому запросу — то, на какой строке Яндекс показывает сайт человеку из Иркутска (<b>lr=63</b> — код региона Иркутска). <b>1</b> = первая строка, <b>чем меньше число — тем выше</b> и тем больше переходов; «<b>—</b>» = сайта нет в топ-50. Это <b>не Я.Метрика и не реклама</b>, а живой замер поисковой выдачи (скрейп раз в неделю). Столбцы «Мария / Стефания / Cake Home» — позиция каждого по этому запросу; «Топ-1» — кто реально стоит на 1-м месте.</div>'+
-          '<div style="margin:6px 0 10px;font-size:13px"><b>В топ-10:</b> Мария — <span style="color:'+(s.mariaTop10>=s.stefaniaTop10?'#10a05a':'#e0466a')+';font-weight:700">'+(s.mariaTop10||0)+'</span> запросов · Стефания — <span style="color:#b8860b;font-weight:700">'+(s.stefaniaTop10||0)+'</span> · <b>Средняя позиция</b> (по запросам где обе ранжируются): Мария '+(s.avgRankMaria||'—')+', Стефания '+(s.avgRankStefania||'—')+'.</div>'+
+          '<div style="margin:6px 0 10px;font-size:13px"><b>В топ-10:</b> Мария — <span style="color:'+(s.mariaTop10>=s.stefaniaTop10?'var(--good)':'var(--bad)')+';font-weight:700">'+(s.mariaTop10||0)+'</span> запросов · Стефания — <span style="color:var(--gold);font-weight:700">'+(s.stefaniaTop10||0)+'</span> · <b>Средняя позиция</b> (по запросам где обе ранжируются): Мария '+(s.avgRankMaria||'—')+', Стефания '+(s.avgRankStefania||'—')+'.</div>'+
           '<div class="table-wrap"><table><thead><tr><th title="Поисковый запрос, который человек вводит в Яндексе">Запрос</th><th class="num" title="Позиция сайта maria-irk.ru в выдаче Яндекса по этому запросу (1 = первая строка)">Мария</th><th class="num" title="Позиция сайта Стефании по этому запросу">Стефания</th><th class="num" title="Позиция сайта Cake Home по этому запросу">Cake Home</th><th title="Кто фактически занимает 1-е место выдачи по этому запросу">Топ-1</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-          '<div style="font-size:11px;color:var(--muted);margin-top:6px">Цвет позиции: <b style="color:#10a05a">≤3</b> топ — отлично · <b style="color:#b8860b">≤10</b> первая страница · <b style="color:#e0466a">&gt;10</b> вторая+ страница (почти не кликают) · «—» нет в топ-50. Скрейп живой выдачи Яндекса по расписанию (еженедельно). Обновлено: '+st+'.</div>';
+          '<div style="font-size:11px;color:var(--muted);margin-top:6px">Цвет позиции: <b style="color:var(--good)">≤3</b> топ — отлично · <b style="color:var(--gold)">≤10</b> первая страница · <b style="color:var(--bad)">&gt;10</b> вторая+ страница (почти не кликают) · «—» нет в топ-50. Скрейп живой выдачи Яндекса по расписанию (еженедельно). Обновлено: '+st+'.</div>';
       } else {
         sl.innerHTML='<div style="font-size:12px;color:var(--muted)">Позиции в Яндексе ещё не собраны (cron-скрейп запустится по расписанию).</div>';
       }
@@ -6351,7 +6351,7 @@ function initChartCrosshair(){
     svg.__xh=true;
     var line=null, tip=null;
     function ensure(){
-      if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent,#7c5cff);opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
+      if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent,var(--accent));opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
       if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,var(--bg));color:var(--ink,#14151a);border:1px solid var(--line,#e4e5ea);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
     }
     function onMove(ev){
