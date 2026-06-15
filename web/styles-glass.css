@@ -1,11 +1,12 @@
 /* ============================================================
-   ПИЛОТ «Стекло + атмосферное свечение» — модерн-оболочка 2026 поверх maria-design.
-   Активен ТОЛЬКО при <html data-design="glass"> (флаг ?design=glass).
+   «Стекло + атмосферное свечение» — ДЕФОЛТНАЯ модерн-оболочка 2026 поверх maria-design.
+   Активна при <html data-design="glass"> (зашит в index.html, раскатано на всех).
    Что меняет: aurora-свечение (золото/вино/какао mesh), стеклянные карточки
    (backdrop-blur, прозрачность, светлая кромка, мягкая тень-elevation), крупные
    скругления, воздух, увеличенные KPI-числа. Бренд/палитра/медаль — из maria-design.
-   ОТКАТ: снять <link> и opt-in скрипт в index.html.
-   Фаза 2 (позже): бенто-плитки разного размера + area-графики с градиентом.
+   Фаза 2: бенто-сетка KPI (фичевые плитки Факт/Прогноз ×2) + модерн-бары (градиент+
+   скругление); главный тренд уже area+линия с золотым свечением.
+   ОТКАТ: снять <link styles-glass.css> и атрибут data-design в index.html.
    ============================================================ */
 
 /* ───────── Aurora: атмосферное золото-какао свечение фона ───────── */
@@ -124,6 +125,40 @@
   transform: translateY(-3px);
   box-shadow: 0 18px 44px -16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.1) !important;
 }
+
+/* ───────── ФАЗА 2: бенто-сетка KPI (асимметрия) ─────────
+   Только главный экран #kpis (6 карточек .kpi в порядке План·Факт·Выполнение·
+   Маржа·Прогноз·Нужно). Прочие секции с .kpi-grid/.kpi-card НЕ трогаем. */
+@media (min-width: 880px) {
+  [data-design="glass"] #kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-auto-rows: 1fr;
+    gap: 16px !important;
+  }
+  /* Факт (2-я) и Прогноз (5-я) — широкие фичевые плитки (×2) → ритм бенто:
+     ряд1 План·Факт·Выполнение, ряд2 Маржа·Прогноз·Нужно */
+  [data-design="glass"] #kpis > .kpi:nth-child(2),
+  [data-design="glass"] #kpis > .kpi:nth-child(5) { grid-column: span 2; }
+  /* у фичевых плиток число ещё крупнее */
+  [data-design="glass"] #kpis > .kpi:nth-child(2) .kpi-value,
+  [data-design="glass"] #kpis > .kpi:nth-child(5) .kpi-value { font-size: clamp(34px, 3.6vw, 50px) !important; }
+}
+
+/* ───────── ФАЗА 2: модерн-бары (скругл + градиент) ───────── */
+[data-design="glass"] .mkt-topbar,
+[data-design="glass"] .mkt-dbar,
+[data-design="glass"] .mkt-fbar,
+[data-design="glass"] .bar {
+  border-radius: 7px 7px 3px 3px !important;
+  background: linear-gradient(180deg, var(--accent), rgba(199,86,106,.22)) !important;
+}
+[data-theme=light][data-design="glass"] .mkt-topbar,
+[data-theme=light][data-design="glass"] .mkt-dbar,
+[data-theme=light][data-design="glass"] .mkt-fbar {
+  background: linear-gradient(180deg, var(--accent), rgba(138,42,59,.18)) !important;
+}
+/* SVG-area главного тренда — мягкое золотое свечение под линией */
+[data-design="glass"] #trendChart svg { filter: drop-shadow(0 6px 18px rgba(201,162,39,.12)); }
 
 @media (prefers-reduced-motion: reduce) {
   [data-design="glass"] body::before { animation: none !important; }

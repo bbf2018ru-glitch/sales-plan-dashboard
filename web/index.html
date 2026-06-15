@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-theme="dark">
+<html lang="ru" data-theme="dark" data-design="glass">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -20,15 +20,9 @@
     <!-- maria-design: раскатано на весь дашборд. ОТКАТ — снять эти 2 ссылки. -->
     <link rel="stylesheet" href="/fonts-maria.css?v=1" />
     <link rel="stylesheet" href="/styles-maria.css?v=10" />
-    <!-- ПИЛОТ «Стекло»: модерн-оболочка (бенто+стекло+aurora) поверх maria-design. Активна
-         ТОЛЬКО при ?design=glass — дефолт не трогает. -->
-    <script>
-      if (location.search.indexOf('design=glass') !== -1) {
-        document.documentElement.dataset.design = 'glass';
-        var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/styles-glass.css?v=3';
-        document.head.appendChild(l);
-      }
-    </script>
+    <!-- «Стекло» (бенто + стекло + aurora) — ДЕФОЛТНАЯ оболочка поверх maria-design.
+         Флаг data-design="glass" на <html>. ОТКАТ — снять этот <link> и атрибут data-design. -->
+    <link rel="stylesheet" href="/styles-glass.css?v=4" />
   </head>
   <body>
 
