@@ -38,9 +38,14 @@ const PRODUCTS = [
   { kw: /пирог/i, patterns: ['%пирог%'], label: 'пироги' },
   { kw: /десерт|пирожн/i, patterns: ['%десерт%', '%пирожн%'], label: 'десерты' },
   { kw: /кофе|капучино|латте/i, patterns: ['%кофе%'], label: 'кофе' },
-  { kw: /бенто/i, patterns: ['%бенто%'], label: 'бенто-торты' }
+  { kw: /бенто/i, patterns: ['%бенто%'], label: 'бенто-торты' },
+  // Кухня (готовится на кухне, НЕ готовая продукция-кондитерка): НоменклатурныеГруппы
+  // «Блюда», «Стрит фуд», «Еда». «Завтраки» — не отдельная группа, входят сюда.
+  { kw: /блюд|завтрак|кухн|обед|перекус|стрит/i, patterns: ['%блюд%', '%стрит%', '%еда%'], label: 'блюда (кухня)' }
 ];
-const ALL_RE = /на всё|на все|всё в марии|все в марии|весь ассортимент/i;
+// Сильный сигнал «весь ассортимент» — перебивает категорию (на всё/на все мы НЕ ловим как
+// «всё»: «на все блюда»/«на блюда» — это категория, а не весь ассортимент).
+const STRONG_ALL_RE = /всё в марии|все в марии|весь ассортимент|на всё[!,. ]|скидка на всё/i;
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function parseDt(s) {
@@ -69,7 +74,10 @@ function parseOffer(text, year) {
   if (dm) { const d = +dm[1], mo = +dm[2]; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) end = { y: year, m: mo, d }; }
   const hasLink = LINK_RE.test(t);
   const prods = PRODUCTS.filter((p) => p.kw.test(t));
-  const isAll = ALL_RE.test(t) || (!prods.length);
+  // Если найдена конкретная категория — оффер на неё (не «всё»), кроме явного «весь
+  // ассортимент». Нет категории — «всё». Раньше «на блюда» падало в «всё», т.к. «блюда»
+  // не было в категориях, и любая покупка (вкл. готовую продукцию) считалась конверсией.
+  const isAll = prods.length ? STRONG_ALL_RE.test(t) : true;
   return { end, hasLink, products: prods, isAll, text: t };
 }
 
@@ -307,7 +315,7 @@ async function compute(period) {
 
 function getSmsAttribution(period) {
   const p = period || upp.nowYM();
-  return cache.wrap('sms2:' + p, () => compute(p));
+  return cache.wrap('sms3:' + p, () => compute(p));
 }
 
 // Помесячный обзор SMS (Янв текущего года … выбранный месяц). Берёт ИТОГИ из того же
