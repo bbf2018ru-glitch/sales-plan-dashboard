@@ -163,6 +163,17 @@
 /* SVG-area главного тренда — мягкое золотое свечение под линией */
 [data-design="glass"] #trendChart svg { filter: drop-shadow(0 6px 18px rgba(201,162,39,.12)); }
 
+/* ───────── Светлая: bad-KPI «горят» винным (как в тёмной) ─────────
+   В светлой белые плитки почти не меняли фон при bad-тоне — сигнал держался
+   только на красном тексте. Даём розово-винную заливку + винную левую кромку. */
+[data-theme=light][data-design="glass"] .kpi.bad,
+[data-theme=light][data-design="glass"] .kpi-card.bad {
+  background: linear-gradient(157deg, rgba(255,255,255,.82), rgba(255,255,255,.38) 46%), rgba(250,232,234,.92) !important;
+  border: 1px solid rgba(138,42,59,.26) !important;
+  border-left: 4px solid rgba(138,42,59,.62) !important;
+  box-shadow: 0 16px 36px -14px rgba(120,30,45,.30), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-design="glass"] body::before { animation: none !important; }
   [data-design="glass"] * { transition: none !important; }
