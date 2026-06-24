@@ -5081,9 +5081,12 @@ function renderCompetitors(d){
     var nameMap=[['стефан','Стефания'],['etika','Этика'],['этик','Этика'],['cake home','Cake Home'],['toti','Toti'],['la tarte','La tarte'],['яхонт','ЯХОНТ'],['мария','Мария']];
     gc.companies.forEach(function(co){ var low=(co.name||'').toLowerCase();
       var hit=nameMap.find(function(m){return low.indexOf(m[0])>=0;});
-      if(hit&&co.rating) liveRat[hit[1]]={rating:co.rating,reviews:co.reviews};
+      if(hit&&co.rating) liveRat[hit[1]]={rating:co.rating,reviews:co.reviews,branches:co.branches};
     });
   }
+  // Точки: точное число филиалов из 2ГИС (live), иначе ресёрч-оценка-фоллбэк.
+  function pointsOf(c){ var lv=liveRat[c.name];
+    return (lv&&lv.branches) ? '<b>'+lv.branches+'</b> <span style="font-size:10px;color:var(--good)">2ГИС</span>' : c.points; }
   function ratOf(c){
     var lr=liveRat[c.name];
     if(lr) return '2ГИС <b>'+mNum1(lr.rating)+'</b>'+(lr.reviews?' ('+mNum(lr.reviews)+')':'')+' <span style="font-size:10px;color:var(--good)">live</span>';
@@ -5092,42 +5095,63 @@ function renderCompetitors(d){
   var cols=['Компания','Точки','Соцсети / подписчики','Рейтинг','Программа лояльности','Онлайн-заказ'];
   var th=cols.map(function(c){ return '<th>'+c+'</th>'; }).join('');
   var trs=COMPETITORS.map(function(c){
-    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+c.points+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+ratOf(c)+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
+    return '<tr'+(c.us?' class="mkt-total"':'')+'><td>'+c.name+'</td><td>'+pointsOf(c)+'</td><td>'+(c.followers&&c.followers!=='н/д'?c.followers:c.social)+'</td><td>'+ratOf(c)+'</td><td>'+c.loyalty+'</td><td>'+c.online+'</td></tr>';
   }).join('');
   function r(k,v){ return v?'<dt>'+k+'</dt><dd>'+v+'</dd>':''; }
   var cards=COMPETITORS.map(function(c){
     return '<div class="mkt-comp-card'+(c.us?' mkt-comp-us':'')+'">'+
       '<div class="mkt-comp-h">'+c.name+(c.us?' <span class="mkt-badge">это мы</span>':'')+'</div>'+
       (c.site?'<div class="mkt-comp-site"><a href="https://'+c.site+'" target="_blank" rel="noopener">'+c.site+'</a></div>':'')+
-      '<dl class="mkt-comp-dl">'+ r('Точки',c.points)+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',ratOf(c))+r('Хвалят (отзывы)',(REVIEWS[c.name]||{}).pros)+r('Ругают (отзывы)',(REVIEWS[c.name]||{}).cons)+
+      '<dl class="mkt-comp-dl">'+ r('Точки',pointsOf(c))+r('Продукция',c.products)+r('Акции/предложения',c.promos)+r('Соцсети',c.social)+r('Рейтинг',ratOf(c))+r('Хвалят (отзывы)',(REVIEWS[c.name]||{}).pros)+r('Ругают (отзывы)',(REVIEWS[c.name]||{}).cons)+
       (c.strong?'<dt class="ok">Сильные стороны</dt><dd>'+c.strong+'</dd>':'')+
       (c.weak?'<dt class="bad">Слабые стороны</dt><dd>'+c.weak+'</dd>':'')+ '</dl></div>';
   }).join('');
-  var ins='<div class="mkt-comp-ins"><div class="mkt-chart-t">Ключевые выводы</div><ul>'+COMP_INSIGHTS.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';
-  // блок оценок выручки/рекламной активности
+  // Вывод про охват/рейтинг — пересобираем из ТОЧНЫХ live-чисел 2ГИС (если есть).
+  var insDyn=COMP_INSIGHTS.slice();
+  var mL=liveRat['Мария'], sL=liveRat['Стефания'];
+  if(mL&&sL&&mL.branches&&sL.branches){
+    insDyn[1]='<b>Охват и рейтинг — отставание от Стефании:</b> у неё больше точек ('+sL.branches+' vs '+mL.branches+' филиалов), отзывов ('+mNum(sL.reviews)+' vs '+mNum(mL.reviews)+') и выше рейтинг 2ГИС ('+mNum1(sL.rating)+' vs '+mNum1(mL.rating)+'). Все цифры — live из 2ГИС. Приоритет — подтянуть слабые точки и работать с отзывами.';
+  }
+  var ins='<div class="mkt-comp-ins"><div class="mkt-chart-t">Ключевые выводы</div><ul>'+insDyn.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul></div>';
+  // блок оценок выручки/рекламной активности — точки берём точные (2ГИС), выручка остаётся оценкой
   var estRows=COMP_ESTIMATES.map(function(e){
-    return '<tr'+(e.us?' class="mkt-total"':'')+'><td>'+e.name+'</td><td>'+e.points+'</td><td>'+e.rev+'</td><td>'+e.ad+'</td><td style="font-size:12px;color:var(--muted)">'+e.sig+'</td></tr>';
+    var lv=liveRat[e.name]; var pts=(lv&&lv.branches)?lv.branches+' (2ГИС)':e.points;
+    return '<tr'+(e.us?' class="mkt-total"':'')+'><td>'+e.name+'</td><td>'+pts+'</td><td>'+e.rev+'</td><td>'+e.ad+'</td><td style="font-size:12px;color:var(--muted)">'+e.sig+'</td></tr>';
   }).join('');
   var est='<div class="section-label" style="margin-top:24px">Оценка масштаба и рекламной активности</div>'+
     '<div class="section-hint">⚠️ Выручка и бюджеты конкурентов <b>публично не раскрываются</b>. Это <b>оценка ±30–40%</b> по модели: число точек × бенчмарк выручки на точку (калибровка на факте «Марии» ~1,5 млн ₽/точка/мес), с поправкой на сегмент. Рекламная активность — по наблюдаемым сигналам (лотереи, Директ, соцсети), не по реальным тратам.</div>'+
     '<div class="table-wrap"><table><thead><tr><th>Компания</th><th>Точек</th><th>Оценка выручки, ₽/год</th><th>Реклама</th><th>Сигналы</th></tr></thead><tbody>'+estRows+'</tbody></table></div>';
-  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div><div class="mkt-comp-cards">'+cards+'</div>'+est+ins;
+  var srcLine = gcAt ? '<div style="font-size:11px;color:var(--muted);margin:6px 0">Точки · рейтинг · отзывы — <b>live из 2ГИС</b> (обновлено '+String(gcAt).slice(0,10)+'). Подписчики Telegram — live (см. «Соцсети»). Выручка и охваты соцсетей — оценка (публично не раскрываются).</div>' : '';
+  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+srcLine+'<div class="mkt-comp-cards">'+cards+'</div>'+est+ins;
 }
 var SOCIAL = [
-  { name:'Мария', us:true, tg:'3 920', tgReach:'~200–440', ig:'~32 000', igReels:'~3,8 тыс (0,6–10к)', vk:'н/д' },
-  { name:'Стефания', tg:'73 871', tgReach:'~5 000–8 800', ig:'~45 000', igReels:'~15 тыс (7–25к)', vk:'н/д' },
-  { name:'Cake Home', tg:'5 340', tgReach:'~700–1 100', ig:'~38 000', igReels:'~7,5 тыс (вир. до 107к)', vk:'н/д' },
-  { name:'Этика', tg:'2 070', tgReach:'~650–1 230 (выс. ER)', ig:'~22 000', igReels:'~4,6 тыс', vk:'н/д' },
-  { name:'ЯХОНТ', tg:'359', tgReach:'~80–390', ig:'н/д', igReels:'~0,6 тыс', vk:'н/д' }
+  { name:'Мария', key:'maria', us:true, tg:'2 150', tgReach:'~200–440', ig:'~32 000', igReels:'~3,8 тыс (0,6–10к)', vk:'н/д' },
+  { name:'Стефания', key:'stefania', tg:'72 800', tgReach:'~5 000–8 800', ig:'~45 000', igReels:'~15 тыс (7–25к)', vk:'н/д' },
+  { name:'Cake Home', key:'cakehome', tg:'5 340', tgReach:'~700–1 100', ig:'~38 000', igReels:'~7,5 тыс (вир. до 107к)', vk:'н/д' },
+  { name:'Этика', key:'etika', tg:'2 040', tgReach:'~650–1 230 (выс. ER)', ig:'~22 000', igReels:'~4,6 тыс', vk:'н/д' },
+  { name:'ЯХОНТ', key:'yahont', tg:'353', tgReach:'~80–390', ig:'н/д', igReels:'~0,6 тыс', vk:'н/д' }
 ];
-function renderSocial(){
+function renderSocial(d){
   var el=document.getElementById('mktSocial'); if(!el) return;
+  // Точные Telegram-подписчики из live (social.json через external.social), ежедневный скрейп.
+  var liveSoc=(d&&d.external&&d.external.social&&d.external.social.brands)||null;
+  var socAt=(d&&d.external&&d.external.social&&d.external.social.scrapedAt)||null;
+  function tgOf(s){
+    var b=liveSoc&&liveSoc[s.key];
+    var tg=b&&b.telegram&&b.telegram.subscribers;
+    return tg ? mNum(tg)+' <span style="font-size:10px;color:var(--good)">live</span>' : s.tg;
+  }
+  // Соотношение TG-подписчиков Стефания/Мария — из точных чисел, если есть.
+  var mTg=liveSoc&&liveSoc.maria&&liveSoc.maria.telegram&&liveSoc.maria.telegram.subscribers;
+  var sTg=liveSoc&&liveSoc.stefania&&liveSoc.stefania.telegram&&liveSoc.stefania.telegram.subscribers;
+  var tgRatio=(mTg&&sTg)?Math.round(sTg/mTg):34;
   // Помечаем колонки-оценки явно — числа без live-источника
-  var cols=['Компания','Telegram, подп.','TG охват (оценка)','Instagram (оценка)','IG Reels (оценка)','VK'];
+  var cols=['Компания','Telegram, подп. (live)','TG охват (оценка)','Instagram (оценка)','IG Reels (оценка)','VK'];
   var th=cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
-  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+s.tg+'</td><td class="num" style="color:var(--muted)">'+s.tgReach+'</td><td class="num" style="color:var(--muted)">'+s.ig+'</td><td class="num" style="color:var(--muted)">'+(s.igReels||'н/д')+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
-  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+
-    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>IG Reels</b>: ~3,8 тыс просм./рилс vs ~15 тыс у Стефании (×4) и ~7,5 тыс у Cake Home (с виральными до 107к); сопоставимо с Этикой, выше ЯХОНТа. <b>Telegram</b>: подписчиков ×19 и охвата поста ×15–20 меньше Стефании — самый недоиспользованный канал. Instagram-подписчики — паритет (3-е место, 32к). VK-охваты приватны (счётчик подписчиков под анти-ботом — снять вручную с залогиненного VK). Просмотры IG Reels — публичные (счётчик на рилсе), по 12 последним.</div>';
+  var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+tgOf(s)+'</td><td class="num" style="color:var(--muted)">'+s.tgReach+'</td><td class="num" style="color:var(--muted)">'+s.ig+'</td><td class="num" style="color:var(--muted)">'+(s.igReels||'н/д')+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
+  var srcLine = socAt ? '<div style="font-size:11px;color:var(--muted);margin:6px 0">Telegram-подписчики — <b>live</b> (обновлено '+String(socAt).slice(0,10)+'). Охваты TG/IG, Instagram-подписчики и IG Reels — <b>оценка</b> (приватная аналитика / Meta блокирует автосбор).</div>' : '';
+  el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+srcLine+
+    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>Telegram</b>: подписчиков ×'+tgRatio+' меньше Стефании (live) — самый недоиспользованный канал. <b>IG Reels</b> (оценка): ~3,8 тыс просм./рилс vs ~15 тыс у Стефании, ~7,5 тыс у Cake Home; сопоставимо с Этикой, выше ЯХОНТа. Instagram-подписчики (оценка) — паритет (3-е место, ~32к). VK-охваты приватны.</div>';
 }
 var TOP_PRODUCTS = [
   ['Торт Шоколадно-вишнёвый',3555711,2930],['Торт Три шоколада',3546145,1737],['Торт Банан-солёная карамель',2935843,1814],['Кофе Большой Капучино',2879729,11390],['Торт Зебра ср.',2808533,1902],['Торт Лавандовый',2464113,1770],['Торт Медовик малиновый',2446459,1776],['Торт Домашний с брусникой мини',2345314,1504],['Торт Молочная девочка',2290454,1716],['Торт Ореум',2138496,1563],['Торт Молочная девочка с клубникой',2087554,1283],['Торт Графские развалины ср',1999805,1524],['Торт Медовик ср',1962977,1568],['Торт Карамельная девочка',1891129,1305],['Торт Королевский',1835230,1335]
@@ -5560,8 +5584,10 @@ function mktLoadYoY(){
     try { renderDemand(d); } catch(_){}
     // Воронка лояльности — реальная mini-воронка из Метрики+1С (заменили выдуманную).
     try { renderFunnel(d); } catch(_){}
-    // Конкуренты — оверлей live-рейтингов 2ГИС (кабинет «Сравнение») на ресёрч-снимок.
+    // Конкуренты — точные точки/рейтинг/отзывы из live 2ГИС на ресёрч-снимок.
     try { renderCompetitors(d); } catch(_){}
+    // Соцсети — точные Telegram-подписчики из live (external.social).
+    try { renderSocial(d); } catch(_){}
     // Прочие каналы — действующие акции + база лояльности, live из 1С.
     try { renderOtherChannels(d); } catch(_){}
     // Платные каналы — затраты + отдача (бюджет маркетинга), отдельный эндпоинт.
