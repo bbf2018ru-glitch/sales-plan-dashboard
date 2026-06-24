@@ -6115,7 +6115,7 @@ function mktLoadYoY(){
             tr.children[1].innerHTML = mNum(br.telegram.subscribers) + ' <span style="font-size:10px;color:var(--good)">live</span>';
             anyLive = true;
           } else if (br && br.telegram === null) {
-            tr.children[1].innerHTML = 'н/д <span style="font-size:10px;color:var(--muted)">live</span>';
+            tr.children[1].innerHTML = 'н/д <span style="font-size:10px;color:var(--muted)">канал не найден</span>';
             anyLive = true;
           }
           // VK live (5-я колонка, index 5)
