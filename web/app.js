@@ -5195,7 +5195,7 @@ function renderPrices(){
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+
     PRICES.map(function(r){ return '<tr><td>'+r[0]+'</td><td class="mkt-priceus">'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td><td>'+r[5]+'</td></tr>'; }).join('')+'</tbody></table></div>'+
     '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по ценам:</b> «Мария» — в середине. Бенто от 690 ₽ — самый дешёвый старт на рынке (трафик-драйвер). Целые торты дороже эконом-сетей (Стефания от 525 ₽/кг, ЯХОНТ от 640 ₽/шт), но дешевле премиума (Этика от 2090 ₽/кг, Cake Home до 2990 ₽/кг). Кофе-меню — единственное публичное на рынке.</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:6px">* «Просто торты» (готовые целые в наличии): Мария — реальные цены продаж из 1С (чеки 25.05–24.06.2026, 42 позиции); Стефания/Этика/Cake Home — автоскрейп сайтов (зелёный «live», дата под таблицей); ЯХОНТ — снимок карточки 2ГИС 05.06.2026 (своего сайта нет). Наведи на ячейку — источник и детали. Сопоставление: Мария ходовые 1 363–1 932 ₽/шт — между эконом (Стефания 625–1 395 ₽/кг) и премиумом (Этика 1 290–3 480 ₽, Cake Home 1 690–2 990 ₽/кг).</div>';
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">* «Просто торты» (готовые целые в наличии): Мария — реальные цены продаж из 1С (чеки 25.05–24.06.2026, 42 позиции); Стефания/Этика/Cake Home — автоскрейп сайтов (зелёный «live», дата под таблицей); ЯХОНТ — торты live из карточки 2ГИС (автоскрейп, своего сайта нет); бенто/макаронс — снимок 05.06 (в прайсе 2ГИС их нет). Наведи на ячейку — источник и детали. Сопоставление: Мария ходовые 1 363–1 932 ₽/шт — между эконом (Стефания 625–1 395 ₽/кг) и премиумом (Этика 1 290–3 480 ₽, Cake Home 1 690–2 990 ₽/кг).</div>';
 }
 // Воронка: классическая визит→корзина→оплата невозможна (нет ecommerce-целей в Метрике).
 // Строим РЕАЛЬНУЮ mini-воронку «путь к регистрации в лояльности» из живых источников:
@@ -6179,6 +6179,23 @@ function mktLoadYoY(){
           prTbl.parentNode.parentNode.appendChild(info);
         }
         if (info) info.textContent = 'Зелёный «live» = ячейка из автоскрейпа сайта конкурента (cron ежедневно 04:30). Последнее обновление: ' + st;
+      }
+    }
+    // ЯХОНТ цены — live из карточки 2ГИС (своего сайта нет), отдельный скрейпер scrape-yahont-prices.js
+    if (d.external && d.external.yahontPrices && d.external.yahontPrices.categories) {
+      var yp = d.external.yahontPrices;
+      var yTbl = document.querySelector('#mktPrices table');
+      if (yTbl) {
+        var yfmt = function(s){ if(!s) return null; var u=s.unit?(' ₽/'+s.unit):' ₽'; return s.min===s.max ? (s.min+u) : (s.min+'–'+s.max+u); };
+        var yRowCat = { 'Торт на заказ':'tort_zakaz', 'Просто торты (готовые, в наличии)*':'tort_gotovyj', 'Бенто-торт':'bento', 'Кусочек / пирожное':['kusochki','pirozhnoe','desserts'], 'Макаронс, ₽/шт':'macarons' };
+        yTbl.querySelectorAll('tbody tr').forEach(function(tr){
+          var label = (tr.children[0]||{}).textContent.trim();
+          var ck = yRowCat[label]; if (!ck) return;
+          var keys = Array.isArray(ck) ? ck : [ck];
+          var match = null; for (var i=0;i<keys.length;i++){ if (yp.categories[keys[i]]) { match = yp.categories[keys[i]]; break; } }
+          var nv = yfmt(match);
+          if (nv && tr.children[5]) { tr.children[5].innerHTML = nv + ' <span style="font-size:10px;color:var(--good)">live</span>'; }
+        });
       }
     }
     // SERP — позиции в Яндексе: Мария vs Стефания (живые данные)

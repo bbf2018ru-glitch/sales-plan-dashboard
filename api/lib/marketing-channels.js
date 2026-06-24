@@ -569,6 +569,7 @@ function externalBlock() {
     smsClicks: readExternal('sms-clicks.json'),
     seo: readExternal('seo.json'),
     prices: readExternal('prices.json'),
+    yahontPrices: readExternal('yahont-prices.json'),
     social: readExternal('social.json'),
     bloggers: readExternal('bloggers.json'),
     partners: readExternal('partners.json')
