@@ -5015,21 +5015,21 @@ function mktExport(){
 }
 var COMPETITORS = [
   { name:'Мария', us:true, site:'maria-irk.ru', points:'~17–22 (Иркутск) + Ангарск',
-    social:'IG @fabrika_maria ~32 тыс.; VK, Telegram, ОК', followers:'~32 тыс. (IG)', rating:'2ГИС ~4,4 (разброс 4,1–4,7)',
+    social:'IG @fabrika_maria 31 699; TG 2 150; VK, ОК', followers:'31 699 (IG)', rating:'2ГИС ~4,4 (разброс 4,1–4,7)',
     loyalty:'«Любимый покупатель»: кэшбэк 5/7/10 %, оплата до 30 % бонусами, 600 приветств.; клуб «Мария для своих» (100к+); геймификация «Сладкий чек»',
     online:'да + ЛК', products:'торты (флагман «Зебра»), бенто от 690 ₽, пирожные, пироги, выпечка, кофе, конфеты ручной работы',
     promos:'торт месяца −20 %, комбо кофе+круассан 349 ₽, розыгрыш «Сладкий чек» (iPhone 17/MacBook), 1000 бонусов за отзыв',
     strong:'лучшая на рынке программа лояльности (кэшбэк + клуб 100к+), окупаемый SEO-контент (~70 % трафика сайта, 46 тыс ₽/мес), TG Mini App',
     weak:'часть точек проседает по рейтингу (4,1–4,3); охват и подписчики меньше, чем у Стефании' },
   { name:'Стефания', site:'stefanycake.ru', points:'~31–39 (Иркутск, Ангарск, Шелехов, Усолье, Черемхово)',
-    social:'IG @stefanycake ~45 тыс. (2233 поста); VK, ОК, Telegram, Viber', followers:'~45 тыс. (IG)', rating:'2ГИС 4,7 (~1412 оценок) — топ рынка',
+    social:'IG @stefanycake 44 865; TG 72 800; VK, ОК, Viber', followers:'44 865 (IG)', rating:'2ГИС 4,7 (~1412 оценок) — топ рынка',
     loyalty:'Накопительной программы публично НЕТ; «кофейная карта», −10 % на пироги от 5 кг',
     online:'да + ЛК', products:'торты, бенто, десерты, пироги, выпечка, мороженое, вареники, меню кафе',
     promos:'лотерея ДОБРОКАР (авто Jaecoo J7), «кофейная карта»',
     strong:'лидер по числу точек и подписчикам, узнаваемость, премиум-эстетика, стабильно высокий рейтинг',
     weak:'нет накопительной программы лояльности (отстаёт от «Марии»), акции разовые' },
   { name:'Этика', site:'etikacakes.ru', points:'~7 (Иркутск) + суб-бренд etika.bakery',
-    social:'IG @etika.cakes ~22 тыс. + @etika.bakery ~5,4 тыс.', followers:'~27 тыс. (IG)', rating:'2ГИС 4,4 (~435); «Лучшая кондитерская 2023»',
+    social:'IG @etika.cakes 22 353 (+@etika.bakery)', followers:'22 353 (IG)', rating:'2ГИС 4,4 (~435); «Лучшая кондитерская 2023»',
     loyalty:'Программы баллов публично не найдено',
     online:'да', products:'торты на заказ от 2090 ₽, бенто от 1590 ₽, пирожные, макаронс, трайфлы, кофе',
     promos:'н/д', strong:'молодёжный кофейня-формат, эстетика, премия «Лучшая кондитерская 2023»',
@@ -5041,7 +5041,7 @@ var COMPETITORS = [
     promos:'н/д', strong:'единственный с конструктором торта, семейный крафт-образ, широкая сеть',
     weak:'мало отзывов (~90), слабое присутствие в соцсетях' },
   { name:'ЯХОНТ', site:'', points:'~16–18 (Иркутск) + Хомутово, Братск, Улан-Удэ (28+ регион)',
-    social:'н/д', followers:'н/д', rating:'2ГИС нестабильно (2,8–4,7); жалобы на сроки',
+    social:'IG @yahont_irk 4 072; TG 353', followers:'4 072 (IG)', rating:'2ГИС нестабильно (2,8–4,7); жалобы на сроки',
     loyalty:'Не найдено',
     online:'да (партнёрство со «Сладким клубом» — фотопечать)', products:'торты (шоколадные/ягодные/детские/муссовые), макаронс, кейк-попсы, нарезка (Наполеон, Медовик), 675–1890 ₽/кг',
     promos:'н/д', strong:'широкая региональная сеть, массовое производство, без выходных',
@@ -5124,12 +5124,15 @@ function renderCompetitors(d){
   var srcLine = gcAt ? '<div style="font-size:11px;color:var(--muted);margin:6px 0">Точки · рейтинг · отзывы — <b>live из 2ГИС</b> (обновлено '+String(gcAt).slice(0,10)+'). Подписчики Telegram — live (см. «Соцсети»). Выручка и охваты соцсетей — оценка (публично не раскрываются).</div>' : '';
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+srcLine+'<div class="mkt-comp-cards">'+cards+'</div>'+est+ins;
 }
+// IG подписчики — точный снимок 24.06.2026 (Meta блокирует автоскрейп с сервера;
+// снято вручную через web_profile_info). IG Reels — среднее по последним 4–11 видео
+// (малая выборка → оценка). Cake Home IG — офиц. аккаунт не подтверждён → н/д.
 var SOCIAL = [
-  { name:'Мария', key:'maria', us:true, tg:'2 150', tgReach:'~200–440', ig:'~32 000', igReels:'~3,8 тыс (0,6–10к)', vk:'н/д' },
-  { name:'Стефания', key:'stefania', tg:'72 800', tgReach:'~5 000–8 800', ig:'~45 000', igReels:'~15 тыс (7–25к)', vk:'н/д' },
-  { name:'Cake Home', key:'cakehome', tg:'5 340', tgReach:'~700–1 100', ig:'~38 000', igReels:'~7,5 тыс (вир. до 107к)', vk:'н/д' },
-  { name:'Этика', key:'etika', tg:'2 040', tgReach:'~650–1 230 (выс. ER)', ig:'~22 000', igReels:'~4,6 тыс', vk:'н/д' },
-  { name:'ЯХОНТ', key:'yahont', tg:'353', tgReach:'~80–390', ig:'н/д', igReels:'~0,6 тыс', vk:'н/д' }
+  { name:'Мария', key:'maria', us:true, tg:'2 150', tgReach:'~200–440', ig:'31 699', igReels:'~2,3 тыс', vk:'н/д' },
+  { name:'Стефания', key:'stefania', tg:'72 800', tgReach:'~5 000–8 800', ig:'44 865', igReels:'~8,1 тыс', vk:'н/д' },
+  { name:'Cake Home', key:'cakehome', tg:'н/д', tgReach:'~700–1 100', ig:'н/д', igReels:'н/д', vk:'н/д' },
+  { name:'Этика', key:'etika', tg:'2 040', tgReach:'~650–1 230 (выс. ER)', ig:'22 353', igReels:'~1,4 тыс', vk:'н/д' },
+  { name:'ЯХОНТ', key:'yahont', tg:'353', tgReach:'~80–390', ig:'4 072', igReels:'~0,2 тыс', vk:'н/д' }
 ];
 function renderSocial(d){
   var el=document.getElementById('mktSocial'); if(!el) return;
@@ -5146,12 +5149,12 @@ function renderSocial(d){
   var sTg=liveSoc&&liveSoc.stefania&&liveSoc.stefania.telegram&&liveSoc.stefania.telegram.subscribers;
   var tgRatio=(mTg&&sTg)?Math.round(sTg/mTg):34;
   // Помечаем колонки-оценки явно — числа без live-источника
-  var cols=['Компания','Telegram, подп. (live)','TG охват (оценка)','Instagram (оценка)','IG Reels (оценка)','VK'];
+  var cols=['Компания','Telegram, подп. (live)','TG охват (оценка)','Instagram (снимок 24.06)','IG Reels, ср. (оценка)','VK'];
   var th=cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
   var trs=SOCIAL.map(function(s){ return '<tr'+(s.us?' class="mkt-total"':'')+'><td>'+s.name+'</td><td class="num">'+tgOf(s)+'</td><td class="num" style="color:var(--muted)">'+s.tgReach+'</td><td class="num" style="color:var(--muted)">'+s.ig+'</td><td class="num" style="color:var(--muted)">'+(s.igReels||'н/д')+'</td><td class="num">'+s.vk+'</td></tr>'; }).join('');
-  var srcLine = socAt ? '<div style="font-size:11px;color:var(--muted);margin:6px 0">Telegram-подписчики — <b>live</b> (обновлено '+String(socAt).slice(0,10)+'). Охваты TG/IG, Instagram-подписчики и IG Reels — <b>оценка</b> (приватная аналитика / Meta блокирует автосбор).</div>' : '';
+  var srcLine = '<div style="font-size:11px;color:var(--muted);margin:6px 0">Telegram-подписчики — <b>live</b> (автоскрейп t.me'+(socAt?', обновлено '+String(socAt).slice(0,10):'')+'). Instagram-подписчики — <b>точный снимок 24.06.2026</b> (Meta блокирует автосбор с сервера, снято вручную). TG-охваты и IG Reels (среднее по 4–11 видео) — <b>оценка</b>.</div>';
   el.innerHTML='<div class="table-wrap"><table><thead><tr>'+th+'</tr></thead><tbody>'+trs+'</tbody></table></div>'+srcLine+
-    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>Telegram</b>: подписчиков ×'+tgRatio+' меньше Стефании (live) — самый недоиспользованный канал. <b>IG Reels</b> (оценка): ~3,8 тыс просм./рилс vs ~15 тыс у Стефании, ~7,5 тыс у Cake Home; сопоставимо с Этикой, выше ЯХОНТа. Instagram-подписчики (оценка) — паритет (3-е место, ~32к). VK-охваты приватны.</div>';
+    '<div class="mkt-comp-ins" style="margin-top:12px"><b>Вывод по соцсетям:</b> по видео «Мария» отстаёт. <b>Telegram</b>: подписчиков ×'+tgRatio+' меньше Стефании (live) — самый недоиспользованный канал. <b>IG Reels</b> (оценка): ~2,3 тыс просм./рилс у «Марии» vs ~8,1 тыс у Стефании (×3,5); выше Этики (~1,4к) и ЯХОНТа (~0,2к). <b>Instagram</b>: 31 699 подписчиков — 2-е место, после Стефании (44 865) и выше Этики (22 353) и ЯХОНТа (4 072). VK-охваты приватны.</div>';
 }
 var TOP_PRODUCTS = [
   ['Торт Шоколадно-вишнёвый',3555711,2930],['Торт Три шоколада',3546145,1737],['Торт Банан-солёная карамель',2935843,1814],['Кофе Большой Капучино',2879729,11390],['Торт Зебра ср.',2808533,1902],['Торт Лавандовый',2464113,1770],['Торт Медовик малиновый',2446459,1776],['Торт Домашний с брусникой мини',2345314,1504],['Торт Молочная девочка',2290454,1716],['Торт Ореум',2138496,1563],['Торт Молочная девочка с клубникой',2087554,1283],['Торт Графские развалины ср',1999805,1524],['Торт Медовик ср',1962977,1568],['Торт Карамельная девочка',1891129,1305],['Торт Королевский',1835230,1335]
