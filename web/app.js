@@ -2803,7 +2803,7 @@ async function init() {
       <main style="padding:56px 24px;text-align:center;color:var(--ink,#e5e5e5);font-family:system-ui">
         <div style="font-size:40px;margin-bottom:12px">⚠️</div>
         <div style="font-size:18px;font-weight:600;margin-bottom:6px">Не удалось загрузить данные</div>
-        <div style="color:#dc2626;margin-bottom:22px">${err.message}</div>
+        <div style="color:var(--bad);margin-bottom:22px">${err.message}</div>
         <button onclick="location.reload()" style="background:#c14456;color:#fff;border:none;padding:11px 24px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer">Повторить</button>
       </main>`;
   }
@@ -4826,14 +4826,14 @@ function renderSmsAttribution(sa){
   var convColor=function(p){ return p>=10?'var(--good)':(p>=3?'var(--gold)':'var(--bad)'); };
   var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   var typeBadge={
-    'A':'<span style="font-size:10px;background:#eafaf0;color:#0a6b3a;padding:1px 6px;border-radius:3px">продукт+срок</span>',
-    'A*':'<span style="font-size:10px;background:#fff8e6;color:#8b6a14;padding:1px 6px;border-radius:3px">всё+срок</span>',
-    'B':'<span style="font-size:10px;background:#eef1ff;color:#3a4ba0;padding:1px 6px;border-radius:3px">ссылка</span>',
-    'C':'<span style="font-size:10px;background:#f0f0f0;color:#777;padding:1px 6px;border-radius:3px">оценка</span>'
+    'A':'<span class="b-chip b-good">продукт+срок</span>',
+    'A*':'<span class="b-chip b-warn">всё+срок</span>',
+    'B':'<span class="b-chip b-info">ссылка</span>',
+    'C':'<span class="b-chip b-neutral">оценка</span>'
   };
   var camps=sa.campaigns||[];
   var html='';
-  if(sa.caveat) html+='<div class="mkt-comp-ins" style="margin-bottom:10px;font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:8px 10px;border-radius:6px">'+sa.caveat+'</div>';
+  if(sa.caveat) html+='<div class="mkt-comp-ins" style="margin-bottom:10px;font-size:12px;background:var(--warn-soft);border:1px solid var(--warn);color:var(--warn);padding:8px 10px;border-radius:6px">'+sa.caveat+'</div>';
   if(camps.length){
     var t=sa.totals||{};
     html+='<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Рассылка (дата · текст)</th><th>Оффер</th><th class="num">Получателей</th><th class="num">Купили / перешли</th><th class="num">Конверсия</th><th class="num">Выручка ₽</th><th class="num">Затраты ₽</th></tr></thead><tbody>'+
@@ -4841,7 +4841,7 @@ function renderSmsAttribution(sa){
         var head='<div><b style="white-space:nowrap">'+(c.firstDate||'')+'</b>'+(c.endDate?' <span style="color:var(--muted);font-size:10px">→ до '+c.endDate+'</span>':'')+'</div>'+
           '<div style="font-size:11px;max-width:340px">'+(c.text?esc(c.text):'')+'</div>';
         var offer=(typeBadge[c.type]||c.type||'')+'<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(c.product||'')+'</div>';
-        var sweet = (c.sweetReg!=null) ? '<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(c.sweetReg)+' рег. в «Сладком чеке»</div>' : '';
+        var sweet = (c.sweetReg!=null) ? '<div style="font-size:10px;color:var(--good)">🍰 +'+mNum(c.sweetReg)+' рег. в «Сладком чеке»</div>' : '';
         // recipientsApprox: уникальные карты из 1С недоступны → получатели/затраты
         // оценены по числу отправок (с ресендами, верхняя граница). Помечаем «≈» + тултип.
         var apx=c.recipientsApprox;
@@ -4859,7 +4859,7 @@ function renderSmsAttribution(sa){
       }).join('')+
       '<tr class="mkt-total"><td><b>Итого</b></td><td></td>'+
         '<td class="num"'+(t.recipientsApprox?' title="часть кампаний — оценка по отправкам (уник. карты из 1С недоступны)"':'')+'><b>'+(t.recipientsApprox?'≈':'')+mNum(t.recipients||0)+'</b></td>'+
-        '<td class="num"><b>'+mNum(t.buyers||0)+'</b>'+(t.sweetReg?'<div style="font-size:10px;color:#0a6b3a">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
+        '<td class="num"><b>'+mNum(t.buyers||0)+'</b>'+(t.sweetReg?'<div style="font-size:10px;color:var(--good)">🍰 +'+mNum(t.sweetReg)+' рег.</div>':'')+'</td>'+
         '<td class="num">'+mNum1(t.conversionPct||0)+' %'+(t.incremental?'<div style="font-size:10px;color:var(--good)">≈'+mNum(t.incremental)+' доп.</div>':'')+'</td>'+
         '<td class="num"><b>'+mNum(t.revenue||0)+'</b></td>'+
         '<td class="num"'+(t.recipientsApprox?' title="часть кампаний — оценка по отправкам (уник. карты из 1С недоступны)"':'')+'><b>'+(t.recipientsApprox?'≈':'')+mNum(t.cost||0)+'</b></td></tr>'+
@@ -5505,7 +5505,7 @@ function renderSweetDetail(sd){
       kpi(mNum(sd.monthEvents||0),'Выполнений (мес)')+
       kpi(mNum(sd.monthPoints||0),'Баллов (мес)')+
     '</div>'+
-    '<div class="mkt-comp-ins" style="margin:8px 0;background:#eafaf0;border:1px solid #b6e3c8;color:#0a6b3a;padding:8px 10px;border-radius:6px">'+
+    '<div class="mkt-comp-ins" style="margin:8px 0;background:var(--good-soft);border:1px solid var(--good);color:var(--good);padding:8px 10px;border-radius:6px">'+
       '<b>Участники купили продукции на '+mNum(pur.net||0)+' ₽</b> за период действия (с '+smMonth(pur.since)+'): '+mNum(pur.cheques||0)+' чеков, '+mNum(pur.cards||0)+' карт'+
       (pur.returns?' · возвраты −'+mNum(pur.returns)+' ₽':'')+'.</div>'+
     '<div class="mkt-chart-t" style="margin-top:10px">Текущие задания за '+smMonthNom(sd.period)+'</div>'+
@@ -5736,10 +5736,10 @@ function mktLoadYoY(){
           // короткий парс UTM
           var utmObj = {};
           (utm||'').split('&').forEach(function(p){ var kv = p.split('='); if (kv[0]) utmObj[kv[0]] = decodeURIComponent(kv[1]||''); });
-          var utmTags = ['utm_source','utm_medium','utm_campaign'].map(function(k){ return utmObj[k] ? '<span style="font-size:10px;background:#eaeaea;padding:2px 6px;border-radius:3px;margin-right:4px">'+k.replace('utm_','')+': '+utmObj[k].slice(0,20)+'</span>' : ''; }).join('');
+          var utmTags = ['utm_source','utm_medium','utm_campaign'].map(function(k){ return utmObj[k] ? '<span style="font-size:10px;background:var(--line);padding:2px 6px;border-radius:3px;margin-right:4px">'+k.replace('utm_','')+': '+utmObj[k].slice(0,20)+'</span>' : ''; }).join('');
           var clicks = pr.metrikaClicks != null ? mNum(pr.metrikaClicks) : '<span style="color:var(--muted)">—</span>';
           var ac = pr.active === false ? 'color:var(--bad)' : '';
-          return '<tr><td><b style="'+ac+'">'+pr.name+'</b></td><td style="font-size:11px"><a href="'+url+'" target="_blank" style="color:#0066cc">'+(clean||'').replace(/^https?:\/\/(www\.)?/,'').slice(0,40)+'</a></td><td style="font-size:11px">'+(utmTags||'<span style="color:var(--muted)">без UTM</span>')+'</td><td class="num">'+clicks+'</td><td style="font-size:11px;color:'+(pr.active===false?'var(--bad)':'var(--good)')+'">'+(pr.active===false?'выкл':'актив')+'</td></tr>';
+          return '<tr><td><b style="'+ac+'">'+pr.name+'</b></td><td style="font-size:11px"><a href="'+url+'" target="_blank" style="color:var(--info)">'+(clean||'').replace(/^https?:\/\/(www\.)?/,'').slice(0,40)+'</a></td><td style="font-size:11px">'+(utmTags||'<span style="color:var(--muted)">без UTM</span>')+'</td><td class="num">'+clicks+'</td><td style="font-size:11px;color:'+(pr.active===false?'var(--bad)':'var(--good)')+'">'+(pr.active===false?'выкл':'актив')+'</td></tr>';
         }).join('');
         pEl.innerHTML = '<table style="font-size:12px"><thead><tr><th>Партнёр</th><th>Ссылка</th><th>UTM</th><th class="num">Переходов</th><th>Статус</th></tr></thead><tbody>'+rows+'</tbody></table>';
       }
@@ -5749,7 +5749,7 @@ function mktLoadYoY(){
         var totalClicks = (pj.partners||[]).reduce(function(s,p){return s+(p.metrikaClicks||0);},0);
         var clicksUpd = pj.metrikaClicksUpdatedAt ? new Date(pj.metrikaClicksUpdatedAt).toLocaleString('ru-RU') : null;
         var trackNote = clicksUpd
-          ? '<div style="margin-top:10px;font-size:12px;background:#eafaf0;padding:8px 10px;border-radius:6px;border:1px solid #b6e6c9;color:#0a6b3a">✓ <b>Трекинг переходов включён.</b> Цель <code>partner_click</code> в Метрике + JS на сайте; клики копятся и матчатся к партнёру по домену ссылки. Сейчас: <b>'+mNum(totalClicks)+'</b> переходов у <b>'+withClicks+'</b> партнёров за '+(pj.metrikaClicksPeriod||'последние 30 дней')+'. Обновляется ежедневно (скрейп Метрики). Данные '+clicksUpd+'.</div>'
+          ? '<div style="margin-top:10px;font-size:12px;background:var(--good-soft);padding:8px 10px;border-radius:6px;border:1px solid var(--good);color:var(--good)">✓ <b>Трекинг переходов включён.</b> Цель <code>partner_click</code> в Метрике + JS на сайте; клики копятся и матчатся к партнёру по домену ссылки. Сейчас: <b>'+mNum(totalClicks)+'</b> переходов у <b>'+withClicks+'</b> партнёров за '+(pj.metrikaClicksPeriod||'последние 30 дней')+'. Обновляется ежедневно (скрейп Метрики). Данные '+clicksUpd+'.</div>'
           : '<div style="margin-top:10px;font-size:12px;color:var(--muted)">Переходы появятся после ближайшего скрейпа Метрики.</div>';
         pHint.innerHTML = 'Всего <b>'+pj.total+'</b> партнёров · активных <b>'+active+'</b>. Источник: Bitrix CMS iblock 88 (список от '+(pj.scrapedAt?new Date(pj.scrapedAt).toLocaleDateString('ru-RU'):'?')+')'+(pj.metrikaClicksUpdatedAt?' · переходы из Метрики обновлены '+new Date(pj.metrikaClicksUpdatedAt).toLocaleString('ru-RU')+(pj.metrikaClicksPeriod?' (окно: '+pj.metrikaClicksPeriod+')':''):'')+'.' + trackNote;
       }
@@ -5854,7 +5854,7 @@ function mktLoadYoY(){
       if(!el) return;
       var rate = uds.promocodeRate;  // null-aware с сервера: «—» если данных нет (не выдуманный 0)
       var rateC = rate==null ? 'color:var(--muted)' : rate < 2 ? 'color:var(--bad)' : (rate < 5 ? 'color:var(--gold)' : 'color:var(--good)');
-      el.innerHTML = (uds.partialNote?'<div style="font-size:12px;background:#fff8e6;border:1px solid #f0d27a;color:#8b6a14;padding:6px 10px;border-radius:6px;margin-bottom:10px">⚠ '+uds.partialNote+'</div>':'')+
+      el.innerHTML = (uds.partialNote?'<div style="font-size:12px;background:var(--warn-soft);border:1px solid var(--warn);color:var(--warn);padding:6px 10px;border-radius:6px;margin-bottom:10px">⚠ '+uds.partialNote+'</div>':'')+
         '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">'+
         '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.totalChecksScanned)+'</div><div class="mkt-l">Чеков просмотрено</div></div>'+
         '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.checksWithPromocode)+'</div><div class="mkt-l">С промокодом</div></div>'+
@@ -6000,7 +6000,7 @@ function mktLoadYoY(){
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(st.storiesViews||0)+'</div><div class="mkt-l">Просмотров сторис</div></div>' +
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(st.buttonClicks||0)+'</div><div class="mkt-l">Кликов в кнопку</div></div>' +
           '</div>' +
-          (topics.length ? '<div style="margin:6px 0;font-size:12px;line-height:1.8"><b>Темы сторис:</b> ' + topics.map(function(t){return '<span style="background:#eaeaea;padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '');
+          (topics.length ? '<div style="margin:6px 0;font-size:12px;line-height:1.8"><b>Темы сторис:</b> ' + topics.map(function(t){return '<span style="background:var(--line);padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '');
       }
     }
 
@@ -6024,7 +6024,7 @@ function mktLoadYoY(){
           (gmTotal ? '<div class="mkt-kpi"><div class="mkt-v">'+mNum(gmTotal)+'</div><div class="mkt-l">Отзывов на Google Maps</div></div>' : '<div></div>') +
           '<div class="mkt-kpi"><div class="mkt-v">'+mNum(tags.length)+'</div><div class="mkt-l">Тегов от клиентов</div></div>' +
           '</div>' +
-          (tags.length ? '<div style="margin:8px 0"><b>Темы отзывов:</b> ' + tags.map(function(t){return '<span style="font-size:11px;background:#eaeaea;padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '') +
+          (tags.length ? '<div style="margin:8px 0"><b>Темы отзывов:</b> ' + tags.map(function(t){return '<span style="font-size:11px;background:var(--line);padding:2px 8px;border-radius:10px;margin-right:4px;display:inline-block;margin-bottom:4px">'+t+'</span>';}).join('') + '</div>' : '') +
           '<div class="table-wrap" style="max-height:400px;overflow-y:auto"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Платформа</th><th>Автор</th><th>Отзыв</th></tr></thead><tbody>' +
           items.slice(0, 25).map(function(r){
             var pc = r.platform === '2GIS' ? 'color:var(--good)' : (r.platform === 'Google maps' ? 'color:var(--gold)' : 'color:var(--muted)');
