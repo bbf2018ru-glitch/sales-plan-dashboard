@@ -169,8 +169,7 @@
 [data-theme=light][data-design="glass"] .kpi.bad,
 [data-theme=light][data-design="glass"] .kpi-card.bad {
   background: linear-gradient(157deg, rgba(255,255,255,.82), rgba(255,255,255,.38) 46%), rgba(250,232,234,.92) !important;
-  border: 1px solid rgba(138,42,59,.26) !important;
-  border-left: 4px solid rgba(138,42,59,.62) !important;
+  border: 1px solid rgba(138,42,59,.34) !important;
   box-shadow: 0 16px 36px -14px rgba(120,30,45,.30), inset 0 1px 0 rgba(255,255,255,.9) !important;
 }
 
@@ -184,7 +183,7 @@
 .ch-line { stroke-dasharray: 3200; stroke-dashoffset: 3200; animation: chDraw 1.15s ease-out .05s forwards; }
 .ch-area { animation: chFade .9s ease .3s both; }
 .ch-val  { animation: chFade .5s ease both; }
-.ch-dot  { transform-box: fill-box; transform-origin: center; animation: chPop .4s cubic-bezier(.2,1.4,.4,1) both; }
+.ch-dot  { transform-box: fill-box; transform-origin: center; animation: chPop .4s cubic-bezier(.25,1,.5,1) both; }
 @media (prefers-reduced-motion: reduce) {
   .ch-bar, .ch-line, .ch-area, .ch-val, .ch-dot {
     animation: none !important; stroke-dashoffset: 0 !important; transform: none !important; opacity: 1 !important;
