@@ -211,7 +211,7 @@ async function handlePinSubmit() {
 
 // ── Dark theme ─────────────────────────────────────────────────────────────
 function initDarkTheme() {
-  const saved = localStorage.getItem('maria_theme') || 'dark';
+  const saved = localStorage.getItem('maria_theme') || 'light';
   setTheme(saved);
   $('themeToggle').addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
