@@ -759,7 +759,7 @@ function renderKpis(summary) {
       tip: 'Целевая сумма выручки сети к концу месяца (только СТС-точки из 1С УПП).' },
     { id: 'fact', label: 'Факт', value: moneyShort(summary.totals.fact),
       sub: factSub, tone: 'neutral',
-      tip: 'Фактическая выручка сети с начала месяца на текущий момент. Сравнение «vs прошл.год» — с тем же днём (а не месяц целиком), чтобы было справедливо для незавершённого периода.' },
+      tip: 'Фактическая выручка сети с начала месяца на текущий момент. Только розница (СТС-точки с планом); опт/сайт/B2B/агрегаторы сюда НЕ входят и показаны отдельно во вкладке Аналитика → По каналам. Сравнение «vs прошл.год» — с тем же днём (а не месяц целиком), чтобы было справедливо для незавершённого периода.' },
     { id: 'completion', label: 'Выполнение плана', value: completionVal,
       sub: completionSubV2, tone: completionTone,
       tip: 'Процент факта от плана МЕСЯЦА (до конца месяца). Подпись — темп: % факта от плана-на-сегодня (план месяца, пропорционально пройденным дням с учётом часа в Иркутске).' },
@@ -768,7 +768,7 @@ function renderKpis(summary) {
       tone: !isNum(summary.totals.margin) ? 'neutral' : summary.totals.margin >= 0 ? 'good' : 'bad', cls: 'kpi-margin',
       tip: 'Валовая прибыль = факт − себестоимость. Когда 1С не передаёт себестоимость напрямую, считается через STORE_MARKUPS_JSON env (per-store markup% из отчёта «Валовая прибыль»).' },
     { id: 'projected', label: 'Прогноз', value: planIncomplete ? '—' : moneyShort(f.projectedFact), sub: projectedSubV2, tone: projectedTone,
-      tip: 'Экстраполяция выручки до конца месяца. Приоритет методов: 1) YoY — дни прошлого года × коэффициент роста (учитывает праздники и сезонность); 2) Per-store — каждому магазину свой темп с учётом дня первой продажи (правильно для новых точек); 3) сезонный по дням недели; 4) линейный fallback. Кликни ▾ для деталей.' },
+      tip: 'Экстраполяция выручки до конца месяца. Считается по рознице (та же база, что План и Факт); опт/сайт/B2B без плана в прогноз не входят — полную выручку по всем каналам см. Аналитика → По каналам. Приоритет методов: 1) YoY — дни прошлого года × коэффициент роста (учитывает праздники и сезонность); 2) Per-store — каждому магазину свой темп с учётом дня первой продажи (правильно для новых точек); 3) сезонный по дням недели; 4) линейный fallback. Кликни ▾ для деталей.' },
     { id: 'required', label: 'Нужно/день', value: planIncomplete ? '—' : moneyShort(f.requiredPerDayToPlan), sub: requiredSub, tone: requiredTone,
       tip: 'Сколько нужно делать выручки каждый оставшийся день, чтобы выйти ровно в план месяца. Если средний факт/день меньше этой цифры — план рискует.' }
   ];
@@ -3770,9 +3770,13 @@ function renderByChannel() {
   if (nonRetail.length) {
     const retailFact = retail.reduce((s, r) => s + (r.fact || 0), 0);
     const nrFact = (d.nonRetailTotal != null) ? d.nonRetailTotal : nonRetail.reduce((s, r) => s + (r.fact || 0), 0);
-    html += `<tr><td colspan="9" style="background:var(--surface-2,rgba(0,0,0,.04));font-size:11px;color:var(--muted);padding:6px 8px">Сверх розницы — опт / сайт / агрегаторы (реализации 1С, своего плана нет)</td></tr>`;
+    // Розничный подытог = база План/Факт/Прогноза на вкладке Дашборд. Опт/сайт/B2B
+    // плана не имеют и в дашбордные план/факт/прогноз НЕ входят — показываем этот
+    // подытог явно, чтобы «Итого по всем каналам» не читалось как «Дашборд врёт».
+    html += `<tr style="border-top:1px solid var(--line)"><td title="Эта сумма = Факт и база Прогноза на вкладке Дашборд (там только розница: у опта/сайта нет плана)."><b>Розничный подытог</b> <span style="font-size:11px;color:var(--muted)">= План/Факт/Прогноз на Дашборде</span></td><td></td><td></td><td class="num"><b>${fmtNum(retailFact)}</b></td><td colspan="5"></td></tr>`;
+    html += `<tr><td colspan="9" style="background:var(--surface-2,rgba(0,0,0,.04));font-size:11px;color:var(--muted);padding:6px 8px">Сверх розницы — опт / сайт / агрегаторы (реализации 1С, своего плана нет → в план/прогноз Дашборда не входят)</td></tr>`;
     html += nonRetail.map(r => rowHtml(r, true)).join('');
-    html += `<tr style="border-top:2px solid var(--line)"><td><b>Итого (розница + опт/сайт)</b></td><td></td><td></td><td class="num"><b>${fmtNum(retailFact + nrFact)}</b></td><td colspan="5"></td></tr>`;
+    html += `<tr style="border-top:2px solid var(--line)"><td><b>Итого по всем каналам</b> <span style="font-size:11px;color:var(--muted)">(розница + опт/сайт)</span></td><td></td><td></td><td class="num"><b>${fmtNum(retailFact + nrFact)}</b></td><td colspan="5"></td></tr>`;
   }
   tbody.innerHTML = html;
 }
