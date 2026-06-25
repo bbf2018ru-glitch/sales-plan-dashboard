@@ -101,8 +101,8 @@ async function fetchJson(path, opts = {}) {
     try {
       const res = await fetch(path, o);
       if (res.ok) return await res.json();
-      const b = await res.json().catch(() => ({ error: 'Ошибка запроса' }));
-      const err = new Error(b.error || 'Ошибка запроса');
+      const b = await res.json().catch(() => ({ error: 'Не удалось загрузить данные' }));
+      const err = new Error(b.error || 'Не удалось загрузить данные');
       err.status = res.status;
       err.retriable = idempotent && res.status >= 500; // транзиентные серверные
       throw err;
@@ -119,7 +119,7 @@ async function fetchJson(path, opts = {}) {
     }
     await new Promise(r => setTimeout(r, attempt * 700)); // бэкофф 0.7с, 1.4с
   }
-  throw lastErr || new Error('Ошибка запроса');
+  throw lastErr || new Error('Не удалось загрузить данные');
 }
 
 // ── PIN Auth ───────────────────────────────────────────────────────────────
@@ -2709,7 +2709,7 @@ async function init() {
   });
   $('mkCannibaCsv')?.addEventListener('click', () => {
     const d = analyticsState.mkCannibaData?.byCondition || [];
-    if (!d.length) return alert('Нет данных');
+    if (!d.length) return alert('Нет данных для экспорта');
     exportCsv(d.map(x => ({ 'Условие_скидки': x.condition, 'Сумма': x.amount })), `discount-cannibalization-${state.period}.csv`);
   });
   $('mkRfmCsvVip')?.addEventListener('click', () => {
@@ -2724,14 +2724,14 @@ async function init() {
   });
   $('mkClustersCsv')?.addEventListener('click', () => {
     const d = analyticsState.mkClustersData?.clusters || [];
-    if (!d.length) return alert('Нет данных');
+    if (!d.length) return alert('Нет данных для экспорта');
     const rows = [];
     for (const c of d) for (const s of c.stores) rows.push({ 'Кластер': c.name, 'Магазин': s.storeName, 'Выполнение_%': s.pctCompletion, 'Маржа_%': s.marginPct, 'Ср_цена_ед': s.avgCheck, 'Факт': s.fact });
     exportCsv(rows, `store-clusters-${state.period}.csv`);
   });
   $('mkCohortsCsv')?.addEventListener('click', () => {
     const d = analyticsState.mkCohortsData?.cohorts || [];
-    if (!d.length) return alert('Нет данных');
+    if (!d.length) return alert('Нет данных для экспорта');
     const rows = [];
     for (const c of d) for (const r of c.retention) rows.push({ 'Когорта': c.firstMonth, 'Total': c.total, 'Offset_M': r.offset, 'Активных': r.count, 'Retention_%': r.pct });
     exportCsv(rows, `cohort-retention.csv`);
@@ -3119,7 +3119,7 @@ async function loadMkCohorts() {
 async function loadMkZombie() {
   const el = $('mkZombie');
   if (!el) return;
-  el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю…</div>';
+  el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю зомби-товары…</div>';
   try {
     const data = await fetchJson(`/api/marketing/zombie-products?period=${encodeURIComponent(state.period)}`);
     analyticsState.mkZombieData = data;
