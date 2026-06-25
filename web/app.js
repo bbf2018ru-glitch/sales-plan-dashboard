@@ -2018,9 +2018,12 @@ function initMobileCompact() {
 let deferredInstallPrompt = null;
 function initPwa() {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
+    // app.js грузится async (не ждёт render-blocking CSS), поэтому может исполниться
+    // уже ПОСЛЕ события window.load — тогда слушатель не сработал бы. Регистрируем
+    // сразу, если документ уже загружен; иначе по load.
+    const regSw = () => navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if (document.readyState === 'complete') regSw();
+    else window.addEventListener('load', regSw);
   }
   // beforeinstallprompt — Chrome/Edge/Android. iOS не поддерживает (там через Share → Add to Home Screen).
   window.addEventListener('beforeinstallprompt', (e) => {
