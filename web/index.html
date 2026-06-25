@@ -16,7 +16,7 @@
     <link rel="preload" as="font" type="font/woff2" href="/fonts/onest-gNMKW3F-SZuj7xmb-HY6EQ.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/prata-6xKhdSpbNNCT-sWLCm7JLQ.woff2" crossorigin />
     <link rel="stylesheet" href="/fonts.css?v=1" />
-    <link rel="stylesheet" href="/styles.css?v=76" />
+    <link rel="stylesheet" href="/styles.css?v=77" />
     <!-- maria-design: раскатано на весь дашборд. ОТКАТ — снять эти 2 ссылки. -->
     <link rel="stylesheet" href="/fonts-maria.css?v=1" />
     <link rel="stylesheet" href="/styles-maria.css?v=10" />
@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="/styles-glass.css?v=8" />
   </head>
   <body>
+    <a href="#mainContent" class="skip-link">Перейти к содержимому</a>
 
     <!-- ═══ PIN OVERLAY ═══ -->
     <div id="pinOverlay" class="pin-overlay hidden">
@@ -101,7 +102,7 @@
             </div>
           </div>
           <div class="brand-actions">
-            <button id="themeToggle" class="tool-btn" title="Тёмная тема"></button>
+            <button id="themeToggle" class="tool-btn" title="Тёмная тема" aria-label="Переключить тему оформления"></button>
             <button id="printBtn" class="tool-btn" title="Печать / PDF">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             </button>
@@ -168,7 +169,8 @@
       </aside>
 
       <!-- ═══ MAIN ═══ -->
-      <main class="content">
+      <main class="content" id="mainContent">
+        <h1 class="sr-only">Панель продаж «Мария» — план/факт</h1>
 
         <div id="page-dashboard">
 
@@ -1576,7 +1578,7 @@
       </form>
     </div>
 
-    <script src="/app.js?v=162"></script>
+    <script src="/app.js?v=163"></script>
     <script src="/marketing-advanced.js?v=23"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

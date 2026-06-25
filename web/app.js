@@ -219,6 +219,22 @@ function initDarkTheme() {
   });
 }
 
+// A11y: повышаем div-лейблы секций до заголовков для скринридеров (role=heading + aria-level).
+// Покрывает и статику index.html, и динамически отрисованные блоки (через MutationObserver).
+function promoteHeadings(root) {
+  const scope = root || document;
+  scope.querySelectorAll('.section-label:not([role])').forEach((el) => { el.setAttribute('role', 'heading'); el.setAttribute('aria-level', '2'); });
+  scope.querySelectorAll('.mkt-chart-t:not([role]), .mkt-comp-h:not([role])').forEach((el) => { el.setAttribute('role', 'heading'); el.setAttribute('aria-level', '3'); });
+}
+function initHeadings() {
+  promoteHeadings(document);
+  const main = document.querySelector('.content');
+  if (main && 'MutationObserver' in window) {
+    let t;
+    new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => promoteHeadings(document), 200); }).observe(main, { childList: true, subtree: true });
+  }
+}
+
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('maria_theme', theme);
@@ -546,7 +562,7 @@ function renderSummaryHero(summary) {
 
   const todayGapTxt = gapToday > 0
     ? `<b class="hero-gap">отстаём на сегодня: ${fmtMoneyShort(gapToday)}</b>`
-    : `<b style="color:rgb(34,197,94)">опережаем на сегодня: ${fmtMoneyShort(-gapToday)}</b>`;
+    : `<b style="color:var(--good)">опережаем на сегодня: ${fmtMoneyShort(-gapToday)}</b>`;
 
   el.innerHTML = `
     <div class="hero-card hero-${mood}">
@@ -2724,6 +2740,7 @@ async function init() {
   // Навигация сайдбара и список pending-отчётов работают независимо
   // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
   initPageNav();
+  initHeadings();
   renderPendingReports();
 
   try {
