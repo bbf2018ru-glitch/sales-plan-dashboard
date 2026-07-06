@@ -2251,6 +2251,9 @@ function startPullSchedulerWithInterval(intervalMin) {
     onResult: (run) => {
       console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
       if (run.status === 'success') {
+        // Ingest прошёл в worker-инстансе store → сбрасываем кэш снимка ЗДЕСЬ (главный
+        // инстанс), иначе getDb ниже и запросы дашборда отдавали бы устаревшие данные до TTL.
+        store.invalidateDb?.();
         (async () => {
           const db = await store.getDb();
           const summary = aggregateDashboard(db, run.period);

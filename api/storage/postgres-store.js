@@ -273,6 +273,11 @@ class PostgresStore {
   // Сброс кэша снимка БД — вызывать после записи в stores/plans/sales/products.
   _invalidateDb() { this._dbCache = null; this._dbCacheAt = 0; }
 
+  // Публичная инвалидация снимка. Нужна когда ingest прошёл в ДРУГОМ инстансе store
+  // (worker-поток пула) — тогда этот, главный, инстанс должен сбросить свой кэш,
+  // иначе дашборд отдаёт устаревшие данные до истечения TTL.
+  invalidateDb() { this._invalidateDb(); }
+
   // Версия снимка (меняется при перезагрузке/инвалидации) — для result-кэшей выше.
   getDbStamp() { return this._dbCacheAt || 0; }
 
