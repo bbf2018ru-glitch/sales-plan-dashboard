@@ -68,8 +68,8 @@ function fetchUppPackageOnce({ url, username, password, period, timeoutMs }) {
   });
 }
 
-// Прогоняет fetch+ingest в worker-потоке (вне главного event-loop). Резолвит
-// объект run либо реджектит ошибкой (реальной пула/ingest или инфраструктурной).
+// Прогоняет fetch+ingest+aggregate в worker-потоке (вне главного event-loop).
+// Резолвит { run, totals } либо реджектит ошибкой (реальной пула/ingest или инфра).
 function runPullIngestInWorker({ uppConfig, period, storeOptions }) {
   const { Worker } = require('node:worker_threads');
   return new Promise((resolve, reject) => {
@@ -87,7 +87,7 @@ function runPullIngestInWorker({ uppConfig, period, storeOptions }) {
     }
     worker.once('message', (msg) => {
       worker.terminate();
-      if (msg && msg.ok) done(resolve, msg.run);
+      if (msg && msg.ok) done(resolve, { run: msg.run, totals: msg.totals });
       else done(reject, new Error((msg && msg.error) || 'worker ingest failed'));
     });
     worker.once('error', (err) => { err.workerInfra = true; done(reject, err); });
@@ -115,11 +115,11 @@ function startPullScheduler({ config, store, storeOptions, intervalMs, onResult,
   const trigger = async () => {
     try {
       const period = config.currentPeriod ? config.currentPeriod() : undefined;
-      let run;
+      let run, totals;  // totals — сводка, посчитанная воркером (иначе main посчитает сам)
       if (useWorker) {
         try {
           const uppConfig = { url: config.url, username: config.username, password: config.password, timeoutMs: config.timeoutMs };
-          run = await runPullIngestInWorker({ uppConfig, period, storeOptions });
+          ({ run, totals } = await runPullIngestInWorker({ uppConfig, period, storeOptions }));
         } catch (workerErr) {
           if (workerErr.workerInfra) {
             console.error(`[upp-pull] worker infra failure → inline fallback: ${workerErr.message}`);
@@ -131,7 +131,7 @@ function startPullScheduler({ config, store, storeOptions, intervalMs, onResult,
       } else {
         run = await ingestInline(period);
       }
-      onResult?.(run);
+      onResult?.(run, totals);
     } catch (error) {
       onError?.(error);
     }

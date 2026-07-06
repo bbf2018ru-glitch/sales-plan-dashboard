@@ -2248,18 +2248,25 @@ function startPullSchedulerWithInterval(intervalMin) {
     // storeOptions → worker создаёт свой store (postgres) и ингестит вне главного event-loop
     storeOptions: { databaseUrl: DATABASE_URL, dbPath: DB_PATH, sampleDbPath: SAMPLE_DB_PATH },
     intervalMs: intervalMin * 60 * 1000,
-    onResult: (run) => {
+    onResult: (run, totals) => {
       console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
       if (run.status === 'success') {
         // Ingest прошёл в worker-инстансе store → сбрасываем кэш снимка ЗДЕСЬ (главный
-        // инстанс), иначе getDb ниже и запросы дашборда отдавали бы устаревшие данные до TTL.
+        // инстанс), иначе запросы дашборда отдавали бы устаревшие данные до TTL.
         store.invalidateDb?.();
-        (async () => {
-          const db = await store.getDb();
-          const summary = aggregateDashboard(db, run.period);
-          sendEvent('plans_updated', { period: run.period, totals: summary.totals });
-          sendEvent('sales_updated', { period: run.period, totals: summary.totals });
-        })().catch(() => {});
+        if (totals) {
+          // Воркер уже посчитал сводку — main НЕ грузит getDb/aggregateDashboard (не блокит луп).
+          sendEvent('plans_updated', { period: run.period, totals });
+          sendEvent('sales_updated', { period: run.period, totals });
+        } else {
+          // Фолбэк (inline-ingest или воркер не дал totals): считаем на main.
+          (async () => {
+            const db = await store.getDb();
+            const summary = aggregateDashboard(db, run.period);
+            sendEvent('plans_updated', { period: run.period, totals: summary.totals });
+            sendEvent('sales_updated', { period: run.period, totals: summary.totals });
+          })().catch(() => {});
+        }
       }
     },
     onError: (error) => {

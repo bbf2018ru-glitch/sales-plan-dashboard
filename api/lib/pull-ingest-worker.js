@@ -1,9 +1,9 @@
-// Worker-thread: тянет пакет из 1С УПП и ингестит его ВНЕ главного event-loop.
-// Тяжёлый синхронный путь (JSON.parse мегабайтного ответа → normalizeUppPayload
-// ~78k строк → JSON.stringify(raw)) морозил единственный event-loop сервера на
-// несколько секунд на КАЖДЫЙ пул (~1/мин) — дашборд подвисал у всех. Здесь эта
-// цепочка выполняется в отдельном потоке со своим pg-пулом; главный процесс
-// остаётся отзывчивым. Результат (run) возвращается в главный поток сообщением.
+// Worker-thread: тянет пакет из 1С УПП, ингестит и считает сводку дашборда ВНЕ
+// главного event-loop. Тяжёлый синхронный путь (JSON.parse мегабайтного ответа →
+// normalizeUppPayload ~78k строк → JSON.stringify(raw)) + агрегация снимка морозили
+// единственный event-loop сервера на КАЖДЫЙ пул (~1/мин) — дашборд подвисал у всех.
+// Здесь всё это в отдельном потоке со своим pg-пулом; главный процесс отзывчив.
+// Возвращаем run + посчитанные totals (для SSE) — чтобы main не грузил getDb/aggregate.
 const { parentPort, workerData } = require('node:worker_threads');
 const { fetchUppPackage } = require('./upp-pull');
 const { createStore } = require('../storage');
@@ -13,7 +13,18 @@ const { createStore } = require('../storage');
   try {
     const payload = await fetchUppPackage({ ...workerData.uppConfig, period: workerData.period });
     const run = await store.ingestUppPayload(payload);
-    parentPort.postMessage({ ok: true, run });
+    // Сводка считается ЗДЕСЬ (воркер уже прочитал БД под ingest, кэш свежий) — main
+    // получит готовые totals и не будет блокировать луп на getDb+aggregateDashboard.
+    // Если не вышло — не критично: main посчитает сам как фолбэк (totals undefined).
+    let totals;
+    try {
+      if (run && run.status === 'success') {
+        const { aggregateDashboard } = require('./analytics');
+        const db = await store.getDb();
+        totals = aggregateDashboard(db, workerData.period).totals;
+      }
+    } catch (_) { totals = undefined; }
+    parentPort.postMessage({ ok: true, run, totals });
   } catch (error) {
     parentPort.postMessage({ ok: false, error: String((error && error.message) || error) });
   } finally {
