@@ -7,10 +7,11 @@ const { normalizeUppPayload, validateNormalizedUppPayload } = require('../lib/up
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'sql', 'init.sql');
 const SAMPLE_PATH = path.join(__dirname, '..', '..', 'data', 'sample-db.json');
 
-// Кэш снимка БД (getDb читает ВСЮ базу — stores/plans/sales/... + normalizeDb,
-// 4-8с на запрос). Кэшируем на 30с: дашборд-данные меняются только при ингесте
-// (~раз в 15 мин), а нагрузка из множества запросов больше не валит БД.
-const DB_CACHE_TTL_MS = Number(process.env.DB_CACHE_TTL_MS) || 30000;
+// Кэш снимка БД (getDb читает ВСЮ базу — stores/plans/sales/... ~2.3с холодный).
+// TTL 90с: worker-пул (~1/мин) праймит кэш свежим снимком после каждого ингеста
+// (primeDbCache), поэтому 90с покрывает 60с-интервал и кэш не остывает между пулами
+// → запросы дашборда не платят холодную перезагрузку. Ручные правки инвалидируют явно.
+const DB_CACHE_TTL_MS = Number(process.env.DB_CACHE_TTL_MS) || 90000;
 
 // Пакетная вставка одним multi-row INSERT (вместо построчных запросов).
 // Ускоряет ingest в десятки раз: ~3400 sales за один-два round-trip к БД
@@ -277,6 +278,15 @@ class PostgresStore {
   // (worker-поток пула) — тогда этот, главный, инстанс должен сбросить свой кэш,
   // иначе дашборд отдаёт устаревшие данные до истечения TTL.
   invalidateDb() { this._invalidateDb(); }
+
+  // Пре-варминг кэша готовым снимком (worker уже прочитал БД под totals). Ставит его
+  // ГОРЯЧИМ, минуя ~2.3с холодную перезагрузку _loadDb — запросы дашборда сразу быстрые.
+  primeDbCache(db) {
+    if (db && typeof db === 'object' && Array.isArray(db.sales)) {
+      this._dbCache = db;
+      this._dbCacheAt = Date.now();
+    }
+  }
 
   // Версия снимка (меняется при перезагрузке/инвалидации) — для result-кэшей выше.
   getDbStamp() { return this._dbCacheAt || 0; }

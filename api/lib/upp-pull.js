@@ -87,7 +87,7 @@ function runPullIngestInWorker({ uppConfig, period, storeOptions }) {
     }
     worker.once('message', (msg) => {
       worker.terminate();
-      if (msg && msg.ok) done(resolve, { run: msg.run, totals: msg.totals });
+      if (msg && msg.ok) done(resolve, { run: msg.run, totals: msg.totals, snapshotJson: msg.snapshotJson });
       else done(reject, new Error((msg && msg.error) || 'worker ingest failed'));
     });
     worker.once('error', (err) => { err.workerInfra = true; done(reject, err); });
@@ -115,11 +115,11 @@ function startPullScheduler({ config, store, storeOptions, intervalMs, onResult,
   const trigger = async () => {
     try {
       const period = config.currentPeriod ? config.currentPeriod() : undefined;
-      let run, totals;  // totals — сводка, посчитанная воркером (иначе main посчитает сам)
+      let run, totals, snapshotJson;  // totals+снимок — от воркера (иначе фолбэк на main)
       if (useWorker) {
         try {
           const uppConfig = { url: config.url, username: config.username, password: config.password, timeoutMs: config.timeoutMs };
-          ({ run, totals } = await runPullIngestInWorker({ uppConfig, period, storeOptions }));
+          ({ run, totals, snapshotJson } = await runPullIngestInWorker({ uppConfig, period, storeOptions }));
         } catch (workerErr) {
           if (workerErr.workerInfra) {
             console.error(`[upp-pull] worker infra failure → inline fallback: ${workerErr.message}`);
@@ -130,6 +130,16 @@ function startPullScheduler({ config, store, storeOptions, intervalMs, onResult,
         }
       } else {
         run = await ingestInline(period);
+      }
+      // Обновляем кэш снимка на ГЛАВНОМ инстансе store (ingest шёл в воркере/inline):
+      // праймим готовым снимком воркера (парсинг ~0.25с) — иначе первый запрос заплатил бы
+      // ~2.3с холодной перезагрузки. Нет снимка (фолбэк) → просто инвалидация.
+      if (run && run.status === 'success') {
+        let primed = false;
+        if (snapshotJson && typeof store.primeDbCache === 'function') {
+          try { store.primeDbCache(JSON.parse(snapshotJson)); primed = true; } catch (_) { primed = false; }
+        }
+        if (!primed) store.invalidateDb?.();
       }
       onResult?.(run, totals);
     } catch (error) {

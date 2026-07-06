@@ -2250,10 +2250,8 @@ function startPullSchedulerWithInterval(intervalMin) {
     intervalMs: intervalMin * 60 * 1000,
     onResult: (run, totals) => {
       console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);
+      // Кэш снимка обновляет планировщик (prime/invalidate). Здесь — только SSE.
       if (run.status === 'success') {
-        // Ingest прошёл в worker-инстансе store → сбрасываем кэш снимка ЗДЕСЬ (главный
-        // инстанс), иначе запросы дашборда отдавали бы устаревшие данные до TTL.
-        store.invalidateDb?.();
         if (totals) {
           // Воркер уже посчитал сводку — main НЕ грузит getDb/aggregateDashboard (не блокит луп).
           sendEvent('plans_updated', { period: run.period, totals });

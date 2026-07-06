@@ -13,18 +13,20 @@ const { createStore } = require('../storage');
   try {
     const payload = await fetchUppPackage({ ...workerData.uppConfig, period: workerData.period });
     const run = await store.ingestUppPayload(payload);
-    // Сводка считается ЗДЕСЬ (воркер уже прочитал БД под ingest, кэш свежий) — main
-    // получит готовые totals и не будет блокировать луп на getDb+aggregateDashboard.
-    // Если не вышло — не критично: main посчитает сам как фолбэк (totals undefined).
-    let totals;
+    // Сводка И снимок БД считаются/сериализуются ЗДЕСЬ (воркер уже прочитал БД под
+    // ingest). main получит готовые totals (для SSE) и снимок строкой для прайминга
+    // кэша — и не будет блокировать луп ни на getDb (~2.3с), ни на aggregate (~2.2с).
+    // Если не вышло — не критично: main посчитает/перезагрузит сам как фолбэк.
+    let totals, snapshotJson;
     try {
       if (run && run.status === 'success') {
         const { aggregateDashboard } = require('./analytics');
         const db = await store.getDb();
         totals = aggregateDashboard(db, workerData.period).totals;
+        snapshotJson = JSON.stringify(db); // ~15МБ; парсинг на main ~0.25с вместо 2.3с холодного getDb
       }
-    } catch (_) { totals = undefined; }
-    parentPort.postMessage({ ok: true, run, totals });
+    } catch (_) { totals = undefined; snapshotJson = undefined; }
+    parentPort.postMessage({ ok: true, run, totals, snapshotJson });
   } catch (error) {
     parentPort.postMessage({ ok: false, error: String((error && error.message) || error) });
   } finally {
