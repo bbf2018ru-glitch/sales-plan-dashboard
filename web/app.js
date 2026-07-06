@@ -6471,40 +6471,48 @@ function initChartCrosshair(){
     if(!svg || svg.__xh || typeof isZoomableChart!=='function' || !isZoomableChart(svg)) return;
     attach(svg);
   });
-  function points(svg){
-    // элементы-данные = носители <title>; группируем по экранному X (бар/точка одного месяца).
-    var groups={};
-    svg.querySelectorAll('title').forEach(function(t){
-      var el=t.parentElement; if(!el) return; var tag=(el.tagName||'').toLowerCase();
-      if(tag!=='rect' && tag!=='circle' && tag!=='path' && tag!=='g') return;
-      var txt=(t.textContent||'').trim(); if(!txt) return;
-      var b; try{ b=el.getBoundingClientRect(); }catch(_){ return; } if(!b.width && !b.height) return;
-      var cx=b.left+b.width/2, key=Math.round(cx/8);
-      if(!groups[key]) groups[key]={x:cx, texts:[]};
-      if(groups[key].texts.indexOf(txt)<0) groups[key].texts.push(txt);
-    });
-    return Object.keys(groups).map(function(k){return groups[k];}).sort(function(a,b){return a.x-b.x;});
-  }
   function attach(svg){
     svg.__xh=true;
-    var line=null, tip=null;
+    // Геометрия точек кэшируется (относительно svg → переживает скролл), пересчёт лениво
+    // и на resize. Раньше points() дёргался на КАЖДЫЙ mousemove с getBoundingClientRect
+    // по каждому <title> → форс-reflow на каждый бар × кадр (layout-thrash).
+    var line=null, tip=null, pts=null, raf=0, lastEv=null;
+    function measure(){
+      var root=svg.getBoundingClientRect();
+      var groups={};
+      svg.querySelectorAll('title').forEach(function(t){
+        var el=t.parentElement; if(!el) return; var tag=(el.tagName||'').toLowerCase();
+        if(tag!=='rect' && tag!=='circle' && tag!=='path' && tag!=='g') return;
+        var txt=(t.textContent||'').trim(); if(!txt) return;
+        var b; try{ b=el.getBoundingClientRect(); }catch(_){ return; } if(!b.width && !b.height) return;
+        var cx=b.left+b.width/2, relX=cx-root.left, key=Math.round(cx/8);
+        if(!groups[key]) groups[key]={relX:relX, texts:[]};
+        if(groups[key].texts.indexOf(txt)<0) groups[key].texts.push(txt);
+      });
+      pts=Object.keys(groups).map(function(k){return groups[k];}).sort(function(a,b){return a.relX-b.relX;});
+    }
     function ensure(){
-      if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent,var(--accent));opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
+      if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent);opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
       if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,var(--bg));color:var(--ink,#221A16);border:1px solid var(--line,#E9E1DA);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
     }
-    function onMove(ev){
-      var pts=points(svg); if(!pts.length){ hide(); return; }
-      var mx=ev.clientX, best=pts[0];
-      for(var i=1;i<pts.length;i++) if(Math.abs(pts[i].x-mx)<Math.abs(best.x-mx)) best=pts[i];
-      var r=svg.getBoundingClientRect(); ensure();
-      line.style.top=r.top+'px'; line.style.height=r.height+'px'; line.style.left=best.x+'px';
+    function render(ev){
+      if(!pts) measure();
+      if(!pts.length){ hide(); return; }
+      var r=svg.getBoundingClientRect(); // единственный reflow-read на кадр
+      var mx=ev.clientX-r.left, best=pts[0];
+      for(var i=1;i<pts.length;i++) if(Math.abs(pts[i].relX-mx)<Math.abs(best.relX-mx)) best=pts[i];
+      var bx=r.left+best.relX; ensure();
+      line.style.top=r.top+'px'; line.style.height=r.height+'px'; line.style.left=bx+'px';
       tip.innerHTML=best.texts.map(function(s){return s.replace(/[&<>]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c];});}).join('<br>');
       var tw=tip.offsetWidth||160;
-      tip.style.left=Math.max(6, Math.min(best.x+12, (window.innerWidth||1200)-tw-6))+'px';
+      tip.style.left=Math.max(6, Math.min(bx+12, (window.innerWidth||1200)-tw-6))+'px';
       tip.style.top=(r.top+8)+'px';
     }
-    function hide(){ if(line){line.remove();line=null;} if(tip){tip.remove();tip=null;} }
+    function onMove(ev){ lastEv=ev; if(raf) return; raf=requestAnimationFrame(function(){ raf=0; if(lastEv) render(lastEv); }); }
+    function invalidate(){ pts=null; }
+    function hide(){ if(raf){ cancelAnimationFrame(raf); raf=0; } if(line){line.remove();line=null;} if(tip){tip.remove();tip=null;} }
     svg.addEventListener('mousemove', onMove);
     svg.addEventListener('mouseleave', hide);
+    window.addEventListener('resize', invalidate);
   }
 }
