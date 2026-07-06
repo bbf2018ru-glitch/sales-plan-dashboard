@@ -2245,6 +2245,8 @@ function startPullSchedulerWithInterval(intervalMin) {
   pullSchedulerStop = startPullScheduler({
     config: uppPullConfig,
     store,
+    // storeOptions → worker создаёт свой store (postgres) и ингестит вне главного event-loop
+    storeOptions: { databaseUrl: DATABASE_URL, dbPath: DB_PATH, sampleDbPath: SAMPLE_DB_PATH },
     intervalMs: intervalMin * 60 * 1000,
     onResult: (run) => {
       console.log(`[upp-pull] ${run.status}: package=${run.packageId} period=${run.period}`);

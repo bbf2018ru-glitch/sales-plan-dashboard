@@ -1,5 +1,6 @@
 const http = require('node:http');
 const https = require('node:https');
+const path = require('node:path');
 const { URL } = require('node:url');
 
 // 1С на тяжёлых выгрузках (/sales-detail за полный месяц, /pull) отвечает
@@ -67,17 +68,69 @@ function fetchUppPackageOnce({ url, username, password, period, timeoutMs }) {
   });
 }
 
+// Прогоняет fetch+ingest в worker-потоке (вне главного event-loop). Резолвит
+// объект run либо реджектит ошибкой (реальной пула/ingest или инфраструктурной).
+function runPullIngestInWorker({ uppConfig, period, storeOptions }) {
+  const { Worker } = require('node:worker_threads');
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn, arg) => { if (!settled) { settled = true; fn(arg); } };
+    let worker;
+    try {
+      worker = new Worker(path.join(__dirname, 'pull-ingest-worker.js'), {
+        workerData: { uppConfig, period, storeOptions }
+      });
+    } catch (spawnErr) {
+      // Синхронный сбой старта воркера — помечаем как инфраструктурный (фолбэк выше).
+      spawnErr.workerInfra = true;
+      return reject(spawnErr);
+    }
+    worker.once('message', (msg) => {
+      worker.terminate();
+      if (msg && msg.ok) done(resolve, msg.run);
+      else done(reject, new Error((msg && msg.error) || 'worker ingest failed'));
+    });
+    worker.once('error', (err) => { err.workerInfra = true; done(reject, err); });
+    worker.once('exit', (code) => {
+      if (code !== 0 && !settled) { const e = new Error(`pull worker exited (${code}) без результата`); e.workerInfra = true; done(reject, e); }
+    });
+  });
+}
+
 /**
  * Запускает периодический опрос HTTP-сервиса 1С УПП.
+ * При storeOptions.databaseUrl (прод, postgres) тяжёлый fetch+ingest уходит в
+ * worker-поток, чтобы не морозить главный event-loop. При инфраструктурном сбое
+ * воркера — безопасный фолбэк на inline-ingest (данные всё равно обновятся;
+ * ingestUppPayload идемпотентен по packageId/payloadHash).
  * Возвращает функцию остановки.
  */
-function startPullScheduler({ config, store, intervalMs, onResult, onError }) {
+function startPullScheduler({ config, store, storeOptions, intervalMs, onResult, onError }) {
   if (!config.url) return () => {};
+  const useWorker = !!(storeOptions && storeOptions.databaseUrl);
+  const ingestInline = async (period) => {
+    const payload = await fetchUppPackage({ ...config, period });
+    return store.ingestUppPayload(payload);
+  };
   const trigger = async () => {
     try {
       const period = config.currentPeriod ? config.currentPeriod() : undefined;
-      const payload = await fetchUppPackage({ ...config, period });
-      const run = await store.ingestUppPayload(payload);
+      let run;
+      if (useWorker) {
+        try {
+          const uppConfig = { url: config.url, username: config.username, password: config.password, timeoutMs: config.timeoutMs };
+          run = await runPullIngestInWorker({ uppConfig, period, storeOptions });
+        } catch (workerErr) {
+          if (workerErr.workerInfra) {
+            console.error(`[upp-pull] worker infra failure → inline fallback: ${workerErr.message}`);
+            run = await ingestInline(period);
+          } else {
+            throw workerErr; // реальная ошибка пула/ingest — в onError
+          }
+        }
+      } else {
+        run = await ingestInline(period);
+      }
       onResult?.(run);
     } catch (error) {
       onError?.(error);
@@ -88,4 +141,4 @@ function startPullScheduler({ config, store, intervalMs, onResult, onError }) {
   return () => clearInterval(handle);
 }
 
-module.exports = { fetchUppPackage, startPullScheduler };
+module.exports = { fetchUppPackage, startPullScheduler, runPullIngestInWorker };
