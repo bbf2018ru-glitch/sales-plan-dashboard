@@ -65,9 +65,9 @@
       }
       // Палитра + эмодзи по имени сегмента
       const meta = {
-        'VIP':           { emoji: '🏆', color: '#22c55e', desc: 'Часто, много, недавно' },
-        'Постоянные':    { emoji: '💚', color: '#3b82f6', desc: 'Регулярные покупки' },
-        'Уходящие VIP':  { emoji: '⚠️', color: '#f59e0b', desc: 'Были VIP, последний раз давно' },
+        'VIP':           { emoji: '🏆', color: 'var(--good)', desc: 'Часто, много, недавно' },
+        'Постоянные':    { emoji: '💚', color: 'var(--muted)', desc: 'Регулярные покупки' },
+        'Уходящие VIP':  { emoji: '⚠️', color: 'var(--warn)', desc: 'Были VIP, последний раз давно' },
         'Спящие':        { emoji: '😴', color: '#a855f7', desc: 'Не покупали последние месяцы' },
         'Прочие':        { emoji: '🟦', color: '#94a3b8', desc: 'Разовые / нерегулярные' },
       };
@@ -93,7 +93,7 @@
         `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Всего клиентов: ${total.toLocaleString('ru-RU')} · Период: ${from} … ${to} (6 мес). Наведи на цифру — точное значение в подсказке.</div>` +
         (data.topVIP && data.topVIP.length ? renderTopVip(data.topVIP) : '');
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить RFM: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить RFM: ${esc(e.message)}</div>`;
     }
   }
 
@@ -160,14 +160,14 @@
           const bg = `hsl(${Math.round(120 * ratio)}deg 60% ${88 - ratio * 28}%)`;
           return `<td style="background:${bg};text-align:center;font-weight:600" title="${r.count?.toLocaleString('ru-RU') ?? 0} карт">${r.pct.toFixed(1)}%</td>`;
         }).join('');
-        const label = firstMonth + (isCurrent ? ' <span style="font-size:10px;color:var(--amber,#f59e0b)">(не завершён)</span>' : '');
+        const label = firstMonth + (isCurrent ? ' <span style="font-size:10px;color:var(--warn)">(не завершён)</span>' : '');
         return `<tr><td>${label}</td><td style="text-align:right">${(c.total || c.size || 0).toLocaleString('ru-RU')}</td>${tds}</tr>`;
       }).join('');
-      const note = (data.pendingNote ? `<div style="font-size:11px;color:var(--amber,#f59e0b);margin-top:6px">⚠ ${esc(data.pendingNote)}</div>` : '') +
+      const note = (data.pendingNote ? `<div style="font-size:11px;color:var(--warn);margin-top:6px">⚠ ${esc(data.pendingNote)}</div>` : '') +
         `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:4px">«Новых карт» = карты, не покупавшие ни разу за предыдущие 12 месяцев — та же методика, что у графика «Новые карты лояльности» (цифры совпадают).</div>`;
       el.innerHTML = `<div class="table-wrap"><table style="width:100%;font-size:13px"><thead>${head}</thead><tbody>${rows}</tbody></table></div>` + note;
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить когорты: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить когорты: ${esc(e.message)}</div>`;
     }
   }
 
@@ -188,14 +188,14 @@
         <td>${esc(it.name || it.productName)}</td>
         <td style="text-align:right">${fmtMoney(it.curRevenue || it.cur || 0)} ₽</td>
         <td style="text-align:right">${fmtMoney(it.prevRevenue || it.prev || 0)} ₽</td>
-        <td style="text-align:right;color:${(it.share || it.ratio || 0) < 0.05 ? 'var(--red,#ef4444)' : 'var(--amber,#f59e0b)'}">${fmtPct(it.share ?? it.ratio ?? 0)}</td>
+        <td style="text-align:right;color:${(it.share || it.ratio || 0) < 0.05 ? 'var(--bad)' : 'var(--warn)'}">${fmtPct(it.share ?? it.ratio ?? 0)}</td>
       </tr>`).join('');
       el.innerHTML = `<table style="width:100%;font-size:13px">
         <thead><tr><th>#</th><th>Товар</th><th>Сейчас</th><th>Раньше</th><th>Доля</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
   }
 
@@ -236,12 +236,12 @@
       el.innerHTML =
         `<div style="font-size:13px;margin-bottom:8px">Сумма скидок за период: <b>${rub(total)}</b> ` +
         `<span class="muted" style="font-size:11px">(${data.totals.totalRows} записей, ${data.totals.months} мес.)</span>` +
-        (data.truncationWarning ? `<div style="color:#f59e0b;font-size:11px;margin-top:4px">⚠ ${esc(data.truncationWarning)}</div>` : '') +
+        (data.truncationWarning ? `<div style="color:var(--warn);font-size:11px;margin-top:4px">⚠ ${esc(data.truncationWarning)}</div>` : '') +
         `</div>` +
         `<table style="width:100%;font-size:13px"><thead><tr><th>Условие скидки</th><th style="text-align:right">Сумма</th><th style="text-align:right">Доля</th></tr></thead><tbody>${rows}</tbody></table>` +
         (recv ? `<div style="font-size:12px;color:var(--muted,#64748b);margin-top:8px">Топ-5 получателей: ${recv}</div>` : '');
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
   }
 
@@ -257,7 +257,7 @@
         el.innerHTML = '<div style="color:var(--muted,#64748b);font-size:13px;padding:8px">Нет данных для кластеризации.</div>';
         return;
       }
-      const toneColors = { good: '#22c55e', warn: '#f59e0b', bad: '#ef4444', neutral: '#3b82f6' };
+      const toneColors = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)', neutral: 'var(--muted)' };
       el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">' +
         clusters.map((cl, i) => {
           const color = toneColors[cl.tone] || toneColors.neutral;
@@ -274,7 +274,7 @@
           </div>`;
         }).join('') + '</div>';
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
   }
 
@@ -292,7 +292,7 @@
       }
       const yoyPct = next.yoy != null ? next.yoy : (next.lastYearShare != null ? next.lastYearShare : null);
       const trend = yoyPct == null ? '' : (yoyPct >= 0 ? '↑' : '↓');
-      const color = yoyPct == null ? 'var(--muted)' : (yoyPct >= 0 ? 'var(--green,#22c55e)' : 'var(--red,#ef4444)');
+      const color = yoyPct == null ? 'var(--muted)' : (yoyPct >= 0 ? 'var(--good)' : 'var(--bad)');
       el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
         <div style="padding:14px;border:1px solid var(--line,#e2e8f0);border-radius:10px">
           <div style="font-size:12px;color:var(--muted,#64748b)">Ближайший праздник</div>
@@ -309,7 +309,7 @@
         </div>
       </div>`;
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
   }
 
@@ -356,8 +356,8 @@
         const first = rec.history[0].rating;
         const delta = rec.history.length > 1 ? last - first : null;
         const trend = delta == null ? '' :
-          delta > 0.05 ? `<span style="color:var(--green,#22c55e)">↑ +${delta.toFixed(2)}</span>` :
-          delta < -0.05 ? `<span style="color:var(--red,#ef4444)">↓ ${delta.toFixed(2)}</span>` :
+          delta > 0.05 ? `<span style="color:var(--good)">↑ +${delta.toFixed(2)}</span>` :
+          delta < -0.05 ? `<span style="color:var(--bad)">↓ ${delta.toFixed(2)}</span>` :
           '<span style="color:var(--muted,#64748b)">→</span>';
         const addrCell = rec.address
           ? esc(rec.address)
@@ -379,9 +379,9 @@
       const best = byR[0], worst = byR[byR.length - 1];
       const kpiCard = (v, l, c) => `<div style="flex:1;min-width:120px;background:var(--surface-2,rgba(0,0,0,.04));border-radius:8px;padding:8px 10px"><div style="font-size:18px;font-weight:700${c ? ';color:' + c : ''}">${v}</div><div style="font-size:11px;color:var(--muted,#64748b)">${l}</div></div>`;
       const summary = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${
-        kpiCard(avg.toFixed(2), 'Средний рейтинг сети', avg >= 4.5 ? 'var(--green,#22c55e)' : avg >= 4.2 ? 'var(--amber,#b8860b)' : 'var(--red,#ef4444)')
+        kpiCard(avg.toFixed(2), 'Средний рейтинг сети', avg >= 4.5 ? 'var(--good)' : avg >= 4.2 ? 'var(--warn)' : 'var(--bad)')
         }${kpiCard(cur.length, 'Точек с рейтингом')
-        }${kpiCard(low, 'Точек ниже 4.5', low ? 'var(--amber,#b8860b)' : 'var(--green,#22c55e)')
+        }${kpiCard(low, 'Точек ниже 4.5', low ? 'var(--warn)' : 'var(--good)')
         }${kpiCard(totalRev.toLocaleString('ru-RU'), 'Всего оценок')}</div>
         <div style="font-size:12px;color:var(--muted,#64748b);margin-bottom:8px">⭐ Лучшая: <b>${esc((best.addr || '').replace(', Иркутск', '') || '—')}</b> ${best.rating.toFixed(2)} · ⚠️ слабее всех: <b>${esc((worst.addr || '').replace(', Иркутск', '') || '—')}</b> ${worst.rating.toFixed(2)} — приоритет на работу с отзывами. Сравнение с конкурентами (Стефания/Этика/Cake Home/ЯХОНТ) — в разделе «Конкуренты».</div>`;
       el.innerHTML = summary + `<div class="table-wrap"><table style="width:100%;font-size:13px">
@@ -390,7 +390,7 @@
       </table></div>
       <div style="font-size:11px;color:var(--muted,#64748b);margin-top:8px">Точек с рейтингом: ${byId.size} · Снимков в архиве: ${entries.length} (за ${entries[0].date} … ${entries[entries.length - 1].date})</div>`;
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить: ${esc(e.message)}</div>`;
     }
   }
 
@@ -415,11 +415,11 @@
       // Старый формат содержит данные только по maria и stefania → остальные карточки не показываем,
       // чтобы не врать нулями.
       const brands = [
-        { key: 'maria',    name: 'Мария',     color: '#22c55e' },
-        { key: 'stefania', name: 'Стефания',  color: '#3b82f6' },
+        { key: 'maria',    name: 'Мария',     color: 'var(--good)' },
+        { key: 'stefania', name: 'Стефания',  color: 'var(--muted)' },
         { key: 'cakehome', name: 'Cake Home', color: '#a855f7' },
-        { key: 'etika',    name: 'Этика',     color: '#f59e0b' },
-        { key: 'yahont',   name: 'Яхонт',     color: '#ef4444' },
+        { key: 'etika',    name: 'Этика',     color: 'var(--warn)' },
+        { key: 'yahont',   name: 'Яхонт',     color: 'var(--bad)' },
       ];
       function brandStats(brandKey) {
         const v = sum[brandKey];
@@ -442,7 +442,7 @@
           <div style="font-size:12px;color:var(--muted,#64748b)">Топ-3: ${fmtNum(v.top3)}</div>
           <div style="font-size:12px;color:var(--muted,#64748b)">Найден в выдаче: ${fmtNum(v.found)} запросов</div>
           <div style="font-size:12px;color:var(--muted,#64748b)">Сред. позиция: ${v.avg != null ? v.avg.toFixed(1) : '—'}</div>
-          ${v._legacy ? '<div style="font-size:10px;color:var(--amber,#f59e0b);margin-top:4px" title="Старый формат скрейпа без top-3 и количества найденных">формат до 04.06</div>' : ''}
+          ${v._legacy ? '<div style="font-size:10px;color:var(--warn);margin-top:4px" title="Старый формат скрейпа без top-3 и количества найденных">формат до 04.06</div>' : ''}
         </div>`;
       }).join('');
 
@@ -462,7 +462,7 @@
         <td style="text-align:right">${c.total}</td>
         <td style="text-align:right">${c.mariaInTop10}</td>
         <td style="text-align:right">${c.avgRankMaria != null ? c.avgRankMaria.toFixed(1) : '—'}</td>
-        <td style="text-align:right;color:${c.captcha ? 'var(--amber,#f59e0b)' : 'var(--muted,#64748b)'}">${c.captcha || 0}</td>
+        <td style="text-align:right;color:${c.captcha ? 'var(--warn)' : 'var(--muted,#64748b)'}">${c.captcha || 0}</td>
       </tr>`).join('');
 
       // Тренд средней позиции Маши по снимкам — поддерживаем оба формата summary.
@@ -478,7 +478,7 @@
         const first = validTrend[0].avg;
         const last = validTrend[validTrend.length - 1].avg;
         const delta = last - first;
-        const trendColor = delta < -0.2 ? 'var(--green,#22c55e)' : delta > 0.2 ? 'var(--red,#ef4444)' : 'var(--muted,#64748b)';
+        const trendColor = delta < -0.2 ? 'var(--good)' : delta > 0.2 ? 'var(--bad)' : 'var(--muted,#64748b)';
         const arrow = delta < -0.2 ? '↑ позиции выросли' : delta > 0.2 ? '↓ позиции упали' : '→ без изменений';
         trendBlock = `<div style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--paper,#fff)">
           <div style="font-weight:600;font-size:13px;margin-bottom:8px">Динамика средней позиции «Мария»</div>
@@ -501,7 +501,7 @@
         trendBlock +
         `<div style="font-size:11px;color:var(--muted,#64748b);margin-top:10px">Источник: Яндекс SERP, регион Иркутск (lr=63), скрейп еженедельно (пн 4:00). Капчи неизбежны при текущей анти-бот защите Яндекса. <code>scrape-seo.js</code> на VDS.</div>`;
     } catch (e) {
-      el.innerHTML = `<div style="color:var(--red,#ef4444);font-size:13px;padding:8px">Не удалось загрузить SEO: ${esc(e.message)}</div>`;
+      el.innerHTML = `<div style="color:var(--bad);font-size:13px;padding:8px">Не удалось загрузить SEO: ${esc(e.message)}</div>`;
     }
   }
 

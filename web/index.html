@@ -18,14 +18,14 @@
     <!-- Шрифты (@font-face, font-display:swap) грузим НЕблокирующе: render-blocking
          <link> на эти CSS гейтил выполнение app.js — при заморозке event-loop сервера
          они зависали, app.js не исполнялся и дашборд вечно «висел Загрузка». Текст
-         показывается фолбэком сразу, Inter Tight/Onest подменяются по готовности. -->
-    <link rel="stylesheet" href="/fonts.css?v=2" media="print" onload="this.media='all';this.onload=null" />
-    <noscript><link rel="stylesheet" href="/fonts.css?v=2" /></noscript>
-    <link rel="stylesheet" href="/styles.css?v=79" />
+         показывается фолбэком сразу, Onest/Prata/JetBrains Mono подменяются по готовности. -->
+    <link rel="stylesheet" href="/fonts.css?v=3" media="print" onload="this.media='all';this.onload=null" />
+    <noscript><link rel="stylesheet" href="/fonts.css?v=3" /></noscript>
+    <link rel="stylesheet" href="/styles.css?v=80" />
     <!-- maria-design: раскатано на весь дашборд. ОТКАТ — снять эти 2 ссылки. -->
     <link rel="stylesheet" href="/fonts-maria.css?v=2" media="print" onload="this.media='all';this.onload=null" />
     <noscript><link rel="stylesheet" href="/fonts-maria.css?v=2" /></noscript>
-    <link rel="stylesheet" href="/styles-maria.css?v=12" />
+    <link rel="stylesheet" href="/styles-maria.css?v=13" />
     <!-- «Стекло» (бенто + стекло + aurora) — ДЕФОЛТНАЯ оболочка поверх maria-design.
          Флаг data-design="glass" на <html>. ОТКАТ — снять этот <link> и атрибут data-design. -->
     <link rel="stylesheet" href="/styles-glass.css?v=8" />
@@ -1588,7 +1588,7 @@
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
     <script async src="/app.js?v=168"></script>
-    <script src="/marketing-advanced.js?v=23"></script>
+    <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>
   </body>

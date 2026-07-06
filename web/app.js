@@ -2847,7 +2847,7 @@ async function init() {
         <div style="font-size:40px;margin-bottom:12px">⚠️</div>
         <div style="font-size:18px;font-weight:600;margin-bottom:6px">Не удалось загрузить данные</div>
         <div style="color:var(--bad);margin-bottom:22px">${err.message}</div>
-        <button onclick="location.reload()" style="background:#c14456;color:#fff;border:none;padding:11px 24px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer">Повторить</button>
+        <button onclick="location.reload()" style="background:var(--accent);color:#fff;border:none;padding:11px 24px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer">Повторить</button>
       </main>`;
   }
 }
@@ -4967,7 +4967,7 @@ function renderGrossProfit(d){
   // Текущий/незакрытый месяц: себестоимость в 1С ещё не рассчитана → показываем оценку.
   if(d.costed===false){
     var estM=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? mNum1(state.summary.totals.marginPct)+' %' : '—';
-    el.innerHTML='<div style="font-size:13px;color:var(--muted,#64748b);padding:6px;line-height:1.5">'+
+    el.innerHTML='<div style="font-size:13px;color:var(--muted,#7A6A5C);padding:6px;line-height:1.5">'+
       '📅 Себестоимость за этот месяц ещё не рассчитана в 1С (производство не закрыто) — реальная валовая прибыль появится после <b>закрытия месяца</b>.<br>'+
       'Пока — оценка по наценке: <b>'+estM+'</b> (выручка '+rub(d.revenue)+'). Реальные цифры — по закрытым месяцам ниже и при выборе прошлого месяца.</div>';
     return;
@@ -4981,7 +4981,7 @@ function renderGrossProfit(d){
     kpi(rub(d.grossProfit),'Валовая прибыль')+
     kpi((d.marginPct!=null?mNum1(d.marginPct)+' %':'—'),'Маржа',estLine)+
     '</div>'+
-    '<div style="font-size:11px;color:var(--muted,#64748b);margin-top:8px">Источник: '+(d.source||'1С')+'. Обновлено: '+(d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—')+'.</div>';
+    '<div style="font-size:11px;color:var(--muted,#7A6A5C);margin-top:8px">Источник: '+(d.source||'1С')+'. Обновлено: '+(d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—')+'.</div>';
 }
 // Выпуск продукции в кг — KPI + график 12 мес + топ продукции.
 function renderProductionKg(pk){
@@ -6490,7 +6490,7 @@ function initChartCrosshair(){
     var line=null, tip=null;
     function ensure(){
       if(!line){ line=document.createElement('div'); line.style.cssText='position:fixed;width:1px;background:var(--accent,var(--accent));opacity:.45;pointer-events:none;z-index:9998'; document.body.appendChild(line); }
-      if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,var(--bg));color:var(--ink,#14151a);border:1px solid var(--line,#e4e5ea);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
+      if(!tip){ tip=document.createElement('div'); tip.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:var(--panel-bg,var(--bg));color:var(--ink,#221A16);border:1px solid var(--line,#E9E1DA);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:240px;white-space:nowrap'; document.body.appendChild(tip); }
     }
     function onMove(ev){
       var pts=points(svg); if(!pts.length){ hide(); return; }
