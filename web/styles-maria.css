@@ -238,4 +238,33 @@ textarea:focus-visible, summary:focus-visible, [role="tab"]:focus-visible,
   letter-spacing: 0;
 }
 
+/* ───────── Adapt: тач и мобильные экраны ─────────
+   Детектим ВВОД (pointer:coarse), а не только ширину — таргеты ≥44px на тач-устройствах
+   (десктоп с мышью не раздуваем). Плюс на узких экранах снимаем дорогое стекло/aurora. */
+@media (pointer: coarse) {
+  .tool-btn, .bp-ctrl, .dr-preset, .btn-xs, .atab, .tab-btn,
+  #dashNav a, #mktNav a, .nav-btn, .side-action-btn, .modal-close,
+  .ai-chat-x, .kpi-detail-close, .dr-preset, .b-chip {
+    min-height: 44px;
+  }
+  .tool-btn { min-width: 44px; }
+  /* увеличенная высота не должна ломать вид — центрируем содержимое */
+  .bp-ctrl, .dr-preset, .btn-xs, .atab, .tab-btn, #dashNav a, #mktNav a {
+    display: inline-flex; align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  /* backdrop-blur на десятках панелей — дорого для мобильных GPU при скролле.
+     Фон панелей (--glass) непрозрачный, так что без blur они остаются читаемыми.
+     !important — перебить более специфичные правила стеклянного слоя (styles-glass.css). */
+  .panel, .kpi, select, .btn-secondary, .cmdk-box, .ai-chat-widget, .sticky-metrics {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  /* амбиентная aurora-анимация фона — гасим на мобиле (постоянный композитинг) */
+  body::before { animation: none; }
+  /* FAB чата — над home-indicator (safe-area) */
+  .ai-chat-fab { bottom: max(16px, env(safe-area-inset-bottom)); }
+}
+
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
