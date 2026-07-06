@@ -21,11 +21,11 @@
          показывается фолбэком сразу, Inter Tight/Onest подменяются по готовности. -->
     <link rel="stylesheet" href="/fonts.css?v=2" media="print" onload="this.media='all';this.onload=null" />
     <noscript><link rel="stylesheet" href="/fonts.css?v=2" /></noscript>
-    <link rel="stylesheet" href="/styles.css?v=78" />
+    <link rel="stylesheet" href="/styles.css?v=79" />
     <!-- maria-design: раскатано на весь дашборд. ОТКАТ — снять эти 2 ссылки. -->
     <link rel="stylesheet" href="/fonts-maria.css?v=2" media="print" onload="this.media='all';this.onload=null" />
     <noscript><link rel="stylesheet" href="/fonts-maria.css?v=2" /></noscript>
-    <link rel="stylesheet" href="/styles-maria.css?v=10" />
+    <link rel="stylesheet" href="/styles-maria.css?v=12" />
     <!-- «Стекло» (бенто + стекло + aurora) — ДЕФОЛТНАЯ оболочка поверх maria-design.
          Флаг data-design="glass" на <html>. ОТКАТ — снять этот <link> и атрибут data-design. -->
     <link rel="stylesheet" href="/styles-glass.css?v=8" />
@@ -49,10 +49,10 @@
 
     <!-- ═══ PLAN EDIT MODAL ═══ -->
     <div id="planEditModal" class="modal-overlay hidden">
-      <div class="modal-box">
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="planEditTitle">
         <div class="modal-header">
-          <div class="modal-title">Редактировать план</div>
-          <button id="modalClose" class="modal-close">&times;</button>
+          <div class="modal-title" id="planEditTitle">Редактировать план</div>
+          <button id="modalClose" class="modal-close" aria-label="Закрыть">&times;</button>
         </div>
         <div class="modal-body" style="padding-top:4px">
           <div id="modalStoreName" class="modal-store-name"></div>
@@ -78,10 +78,10 @@
 
     <!-- ═══ 1С GUIDE MODAL ═══ -->
     <div id="uppGuideModal" class="modal-overlay hidden">
-      <div class="modal-box modal-wide">
+      <div class="modal-box modal-wide" role="dialog" aria-modal="true" aria-labelledby="uppGuideTitle">
         <div class="modal-header">
-          <div class="modal-title">Интеграция с 1С УПП</div>
-          <button id="uppGuideClose" class="modal-close">&times;</button>
+          <div class="modal-title" id="uppGuideTitle">Интеграция с 1С УПП</div>
+          <button id="uppGuideClose" class="modal-close" aria-label="Закрыть">&times;</button>
         </div>
         <div class="modal-body">
           <div id="uppGuideContent" class="guide-content"></div>
@@ -109,23 +109,23 @@
           </div>
           <div class="brand-actions">
             <button id="themeToggle" class="tool-btn" title="Тёмная тема" aria-label="Переключить тему оформления"></button>
-            <button id="printBtn" class="tool-btn" title="Печать / PDF">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <button id="printBtn" class="tool-btn" title="Печать / PDF" aria-label="Печать / PDF">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             </button>
-            <button id="exportTabBtn" class="tool-btn" title="Скачать таб (TSV для Excel)">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <button id="exportTabBtn" class="tool-btn" title="Скачать таб (TSV для Excel)" aria-label="Скачать таб (TSV для Excel)">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             </button>
-            <button id="installPwaBtn" class="tool-btn hidden" title="Установить как приложение">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            <button id="installPwaBtn" class="tool-btn hidden" title="Установить как приложение" aria-label="Установить как приложение">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </button>
-            <button id="pinSettingsBtn" class="tool-btn" title="PIN-защита">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <button id="pinSettingsBtn" class="tool-btn" title="PIN-защита" aria-label="PIN-защита">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </button>
-            <button id="logoutBtn" class="tool-btn hidden" title="Выйти">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <button id="logoutBtn" class="tool-btn hidden" title="Выйти" aria-label="Выйти">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </button>
-            <button id="uppGuideBtn" class="tool-btn" title="Интеграция с 1С УПП">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <button id="uppGuideBtn" class="tool-btn" title="Интеграция с 1С УПП" aria-label="Интеграция с 1С УПП">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </button>
           </div>
         </div>
@@ -452,7 +452,7 @@
 
             <!-- Date range filter -->
             <div class="date-range">
-              <div class="date-range-presets">
+              <div class="date-range-presets" role="group" aria-label="Быстрый выбор периода">
                 <button class="dr-preset" data-preset="month">Этот месяц</button>
                 <button class="dr-preset" data-preset="prev-month">Прошлый месяц</button>
                 <button class="dr-preset" data-preset="today">Сегодня</button>
@@ -1587,7 +1587,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=167"></script>
+    <script async src="/app.js?v=168"></script>
     <script src="/marketing-advanced.js?v=23"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

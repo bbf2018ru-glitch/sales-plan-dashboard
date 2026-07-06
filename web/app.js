@@ -235,15 +235,55 @@ function initHeadings() {
   }
 }
 
+// A11y: семантика вкладок (role=tablist/tab + aria-selected + клавиши-стрелки + roving tabindex).
+// Вкладка раскрывает НЕСКОЛЬКО секций (data-atab/data-mgroup), поэтому tabpanel на секции
+// не вешаем — ограничиваемся ролью tab, состоянием выбора и клавиатурной навигацией.
+function setupTabSemantics(containerSel, label) {
+  const box = document.querySelector(containerSel);
+  if (!box) return;
+  if (!box.getAttribute('role')) box.setAttribute('role', 'tablist');
+  if (label && !box.getAttribute('aria-label')) box.setAttribute('aria-label', label);
+  const tabs = Array.from(box.querySelectorAll('.atab'));
+  tabs.forEach((t) => { t.setAttribute('role', 'tab'); if (!t.getAttribute('type')) t.setAttribute('type', 'button'); });
+  if (!box.__a11yKeys) {
+    box.__a11yKeys = true;
+    box.addEventListener('keydown', (e) => {
+      const cur = box.querySelector('.atab:focus') || box.querySelector('.atab.atab-active');
+      const idx = tabs.indexOf(cur);
+      if (idx < 0) return;
+      let next = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = tabs[(idx + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = tabs[(idx - 1 + tabs.length) % tabs.length];
+      else if (e.key === 'Home') next = tabs[0];
+      else if (e.key === 'End') next = tabs[tabs.length - 1];
+      else return;
+      e.preventDefault();
+      next.focus();
+      next.click();
+    });
+  }
+  refreshTabSemantics(containerSel);
+}
+function refreshTabSemantics(containerSel) {
+  const box = document.querySelector(containerSel);
+  if (!box) return;
+  box.querySelectorAll('.atab').forEach((t) => {
+    const on = t.classList.contains('atab-active');
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.setAttribute('tabindex', on ? '0' : '-1');
+  });
+}
+
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('maria_theme', theme);
   const btn = $('themeToggle');
   if (!btn) return;
   btn.title = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
   btn.innerHTML = theme === 'dark'
-    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
-    : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+    ? `<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
+    : `<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 }
 
 // ── SVG: trend line chart ──────────────────────────────────────────────────
@@ -828,7 +868,7 @@ function buildKpiDetail(id, summary) {
   const today = summary.today || {};
   const stores = summary.stores || [];
   const products = (summary.products || []).filter(p => p.productId !== '_total');
-  const closeBtn = `<button class="kpi-detail-close" onclick="closeKpiDetail()">✕</button>`;
+  const closeBtn = `<button class="kpi-detail-close" onclick="closeKpiDetail()" aria-label="Закрыть" title="Закрыть"><span aria-hidden="true">✕</span></button>`;
   const titles = { plan: 'План на месяц', fact: 'Факт', completion: 'Выполнение плана', margin: 'Маржа', projected: 'Прогноз', required: 'Нужно/день' };
   const header = `<div class="kpi-detail-header"><b>${titles[id] || ''}</b> · подробно ${closeBtn}</div>`;
 
@@ -2832,6 +2872,7 @@ function initMarketingTabs() {
   document.querySelectorAll('#mktTabs .atab').forEach(btn => {
     btn.addEventListener('click', () => switchMarketingGroup(btn.dataset.mgroup));
   });
+  setupTabSemantics('#mktTabs', 'Разделы маркетинга');
 }
 function switchMarketingGroup(group) {
   const groups = ['overview', 'channels', 'loyalty', 'products', 'competitors'];
@@ -2840,6 +2881,7 @@ function switchMarketingGroup(group) {
   localStorage.setItem('maria_mgroup', group);
   document.querySelectorAll('#mktTabs .atab').forEach(b =>
     b.classList.toggle('atab-active', b.dataset.mgroup === group));
+  refreshTabSemantics('#mktTabs');
   document.querySelectorAll('#page-marketing section[data-mgroup]').forEach(s =>
     s.classList.toggle('hidden', s.dataset.mgroup !== group));
   // Закладки/пиннинг в видимых секциях (как в аналитике)
@@ -2878,6 +2920,7 @@ function initAnalyticsTabs() {
   document.querySelectorAll('#analyticsTabs .atab').forEach(btn => {
     btn.addEventListener('click', () => switchAnalyticsTab(btn.dataset.tab));
   });
+  setupTabSemantics('#analyticsTabs', 'Разделы аналитики продаж');
   $('customersRefresh')?.addEventListener('click', () => {
     analyticsState.customersData = null;
     loadCustomers();
@@ -2893,6 +2936,7 @@ function switchAnalyticsTab(tab) {
   localStorage.setItem('maria_atab', tab);
   setTimeout(() => urlStateWrite && urlStateWrite(), 0);
   document.querySelectorAll('#analyticsTabs .atab').forEach(b => b.classList.toggle('atab-active', b.dataset.tab === tab));
+  refreshTabSemantics('#analyticsTabs');
   document.querySelectorAll('.atab-section').forEach(s => s.classList.toggle('hidden', s.dataset.atab !== tab));
   // Закладки: добавляем pin-кнопки + применяем порядок в активной секции
   document.querySelectorAll('.atab-section:not(.hidden)').forEach(s => enhancePinningInSection(s));

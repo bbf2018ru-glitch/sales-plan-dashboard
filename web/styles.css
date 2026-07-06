@@ -3317,13 +3317,13 @@ body.plan-incomplete .spark-fill {
   color: #ecedf5;
   outline: none;
 }
-.ai-chat-form input::placeholder { color: rgba(236,237,245,.45); }
+.ai-chat-form input::placeholder { color: var(--muted); }
 [data-theme=light] .ai-chat-form input {
   background: #fff;
   border-color: rgba(0,0,0,.12);
   color: #1a1530;
 }
-[data-theme=light] .ai-chat-form input::placeholder { color: rgba(26,21,48,.40); }
+[data-theme=light] .ai-chat-form input::placeholder { color: var(--muted); }
 .ai-chat-form input:focus {
   border-color: #ff7a96;
   box-shadow: 0 0 0 3px rgba(255,122,150,.18);
@@ -3661,9 +3661,9 @@ body.mobile-compact #page-dashboard .panel-grid {
   outline: none;
   padding: 0;
 }
-.cmdk-header input::placeholder { color: rgba(236,237,245,.45); }
+.cmdk-header input::placeholder { color: var(--muted); }
 [data-theme=light] .cmdk-header input { color: #1a1530; }
-[data-theme=light] .cmdk-header input::placeholder { color: rgba(26,21,48,.40); }
+[data-theme=light] .cmdk-header input::placeholder { color: var(--muted); }
 .cmdk-hint { font-size: 11px; }
 
 .cmdk-results {
@@ -4154,7 +4154,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 }
 .mkt-scope.dyn{ color:var(--accent); background:var(--accent-soft); }
 .mkt-scope.fix{ color:var(--muted); background:rgba(150,150,170,.16); }
-.mkt-scope.now{ color:#b8860b; background:rgba(184,134,11,.14); }
+.mkt-scope.now{ color:var(--gold); background:var(--gold-soft); }
 
 /* ── Маркетинг: широкие таблицы скроллятся, а не сжимаются ─────────── */
 #mktComp .table-wrap, #mktSocial .table-wrap, #mktPrices .table-wrap{
@@ -4439,7 +4439,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 .aud-text code { font-size:12px; flex:1; word-break:break-word; }
 .aud-copy { flex:none; font-size:11px; padding:3px 8px; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--muted); cursor:pointer; }
 .aud-copy:hover { color:var(--accent); border-color:var(--accent); }
-.aud-warn { font-size:11.5px; color:#b8860b; background:rgba(184,134,11,.08); border-radius:6px; padding:5px 8px; }
+.aud-warn { font-size:11.5px; color:var(--gold); background:var(--gold-soft); border-radius:6px; padding:5px 8px; }
 .aud-foot { display:flex; align-items:center; justify-content:space-between; margin-top:auto; }
 .aud-cost { font-size:12.5px; color:var(--muted); }
 .aud-btn { font-size:12px; padding:5px 10px; border-radius:7px; background:var(--accent); color:#fff; text-decoration:none; }

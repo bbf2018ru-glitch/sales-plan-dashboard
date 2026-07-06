@@ -18,7 +18,7 @@
   --paper:#211A16;         /* тёплая какао-поверхность */
   --ink:#F3ECE4;           /* крем */
   --muted:#B3A595;         /* тёплый таупе */
-  --hint:#8A7C6E;
+  --hint:#9C8E7E;          /* было #8A7C6E (4.24:1) — осветлён под AA */
   --line:#382C22;          /* тёплая какао-линия */
   --accent:#C7566A;        /* винный — функциональный акцент (светлый текст читается) */
   --accent-soft:rgba(199,86,106,.16);
@@ -38,15 +38,15 @@
   --paper:#FFFDF9;
   --ink:#2A211C;           /* какао-ink */
   --muted:#7A6A5C;
-  --hint:#9A8B7C;
+  --hint:#6E6152;          /* было #9A8B7C (2.9:1) — затемнён под AA для мелких лейблов */
   --line:#E7DECF;
   --accent:#8A2A3B;        /* винный */
   --accent-soft:rgba(138,42,59,.08);
   --glow-accent:0 0 0 1px rgba(138,42,59,.18), 0 4px 14px -4px rgba(138,42,59,.16);
-  --gold:#A9851C;          /* золото темнее для контраста на светлом */
+  --gold:#8A6B12;          /* было #A9851C (3.4:1) — затемнён под AA как мелкий текст; медаль-сигнатура красится своими градиентами, не токеном */
   --gold-soft:rgba(169,133,28,.14);
-  --good:#5E8A48; --good-soft:rgba(94,138,72,.12);
-  --warn:#B5722A; --warn-soft:rgba(181,114,42,.12);
+  --good:#4C7439; --good-soft:rgba(94,138,72,.12);   /* good затемнён с #5E8A48 (3.97→5.35:1) */
+  --warn:#9C5F1E; --warn-soft:rgba(181,114,42,.12);  /* warn затемнён с #B5722A (3.82→5.08:1) */
   --bad:#A33A3A;  --bad-soft:rgba(163,58,58,.10);
   --glass:#FFFDF9; --glass-strong:#FFFDF9; --glass-edge:#E7DECF;
   --glow-card:0 1px 2px rgba(42,33,28,.05), 0 2px 10px rgba(42,33,28,.07);
@@ -211,5 +211,17 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
 }
 /* плавность подвкладок */
 .atab { transition: color .18s, background .18s, border-color .18s; }
+
+/* ───────── A11y: единый видимый фокус клавиатуры ─────────
+   styles.css гасит фокус у select/input (`:focus{outline:none}`, ~8 мест).
+   Возвращаем видимое кольцо ТОЛЬКО для клавиатуры (:focus-visible, не мышь).
+   !important — чтобы перебить любые class-based outline:none; это индикатор
+   доступности, который не должен подавляться. Box-shadow-кольца остаются аддитивно. */
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible,
+textarea:focus-visible, summary:focus-visible, [role="tab"]:focus-visible,
+[role="button"]:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
 
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
