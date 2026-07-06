@@ -68,11 +68,9 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
 /* KPI крупнее (Executive-altitude) */
 .kpi-value { font-size:clamp(24px, 2.5vw, 34px); font-weight:500; }
 .brand-name, .pin-title { font-family:'Prata',Georgia,serif; font-weight:400; letter-spacing:.3px; }
-/* Экран входа в духе «Ганаш & золото»: заголовок крем→золото, золотой рул на карточке */
-.pin-title {
-  background:linear-gradient(135deg, var(--ink), var(--gold));
-  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
-}
+/* Экран входа: заголовок сплошным ink (Prata + золотой рул карточки дают премиум-момент).
+   Золото по «Правилу Печати» — только знак достижения, не декор бренд-заголовка. */
+.pin-title { color:var(--ink); }
 .pin-box { border-top:2px solid var(--gold); }
 .pin-btn { background:var(--accent); }
 
@@ -224,6 +222,20 @@ textarea:focus-visible, summary:focus-visible, [role="tab"]:focus-visible,
 [role="button"]:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
+}
+
+/* ───────── Polish: снять uppercase-эйсбрау с секционных лейблов ─────────
+   Мелкий all-caps над каждой секцией — «AI-грамматика» (см. DESIGN.md Don'ts).
+   Снимаем caps + тректинг с секционных микро-лейблов и заголовков; читаемее на
+   кириллице, иерархия держится размером/весом/цветом. Оставлены идиоматичные капсы:
+   th таблиц, статус-пилюли (.mkt-scope), теги (.news-tag/.mt-cat), дни недели (.wc-day),
+   единичный бренд-таглайн (.brand-tagline). styles-maria — слой поверх styles.css. */
+.section-label, .field-label, .kpi-label, .fc-kicker, .cmp-period, .spot-label,
+.exec-label, .abc-stat-group, .rec-section-label, .guide-subtitle, .ins-llm-label,
+.ins-col-label, .mk-hero-label, .ai-narrative-label, .hero-list-title, .store-notes-title,
+.cmdk-group, .sm-label, .kpi-detail-title, .mkt-yoy-l {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }

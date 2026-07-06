@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-06T00:00:00Z",
+  "title": "Design System: Дашборд «Мария» — План/Факт",
+  "extensions": {
+    "colorMeta": {
+      "wine-accent": { "role": "primary", "displayName": "Винный акцент", "canonical": "#8A2A3B", "dark": "#C7566A", "tonalRamp": ["#2A0D12", "#43141C", "#5C1B26", "#742331", "#8A2A3B", "#A6455A", "#C7566A", "#E39CAA"] },
+      "gold-signature": { "role": "secondary", "displayName": "Золото-печать", "canonical": "#C9A227", "textSafeLight": "#8A6B12", "tonalRamp": ["#3A2A08", "#5C4410", "#7C5C12", "#957210", "#A9851C", "#C9A227", "#E0C24F", "#F1D779"] },
+      "ganache-ink": { "role": "neutral", "displayName": "Ганаш-ink", "canonical": "#2A211C", "dark": "#F3ECE4", "tonalRamp": ["#161210", "#2A211C", "#463A31", "#6E5F52", "#7A6A5C", "#B3A595", "#D8CCBF", "#F3ECE4"] },
+      "warm-paper": { "role": "neutral", "displayName": "Тёплая бумага", "canonical": "#F6F1E8", "dark": "#161210", "tonalRamp": ["#161210", "#211A16", "#382C22", "#6E6152", "#B3A595", "#E7DECF", "#F6F1E8", "#FFFDF9"] },
+      "success-olive": { "role": "tertiary", "displayName": "Олива-успех", "canonical": "#4C7439", "dark": "#8FA86B" },
+      "warn-amber": { "role": "tertiary", "displayName": "Янтарь-внимание", "canonical": "#9C5F1E", "dark": "#D6A24A" },
+      "danger-oxblood": { "role": "tertiary", "displayName": "Оксбладь-danger", "canonical": "#A33A3A", "dark": "#D06A6A" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (Prata)", "purpose": "Hero, название бренда, PIN-заголовок. Дозированно." },
+      "body": { "displayName": "Body/UI (Onest)", "purpose": "Основной интерфейс, текст, кнопки, лейблы." },
+      "data": { "displayName": "Data (JetBrains Mono)", "purpose": "KPI и числа, tabular-nums." }
+    },
+    "shadows": [
+      { "name": "glow-card-light", "value": "0 1px 2px rgba(42,33,28,.05), 0 2px 10px rgba(42,33,28,.07)", "purpose": "Базовая тень карточки в светлой теме — hairline-подъём." },
+      { "name": "glow-card-dark", "value": "0 2px 10px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.035)", "purpose": "Глубина + верхний внутренний блик стекла в тёмной теме." },
+      { "name": "accent-glow", "value": "0 6px 18px -6px var(--accent)", "purpose": "Мягкое винное свечение под primary-кнопкой." }
+    ],
+    "motion": [
+      { "name": "ease-decelerate", "value": "cubic-bezier(.4,0,.2,1)", "purpose": "Дефолтная кривая переходов панелей." },
+      { "name": "ease-out-quart", "value": "cubic-bezier(.25,1,.5,1)", "purpose": "Вход элементов, skip-link, микро-интеракции." },
+      { "name": "duration-state", "value": "150-300ms", "purpose": "Диапазон длительностей; всё под @media (prefers-reduced-motion: reduce)." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "640px" },
+      { "name": "tablet", "value": "860px" },
+      { "name": "laptop", "value": "1024px" },
+      { "name": "desktop", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Основное действие — вино с белым текстом и мягким винным свечением.",
+      "html": "<button class=\"ds-btn-primary\">Обновить</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; gap:8px; padding:10px 22px; border:none; border-radius:12px; background:var(--accent,#8A2A3B); color:#fff; font-family:'Onest',system-ui,sans-serif; font-size:14px; font-weight:600; letter-spacing:-.005em; cursor:pointer; box-shadow:0 6px 18px -6px var(--accent,#8A2A3B); transition:transform .18s, box-shadow .18s; } .ds-btn-primary:hover { transform:translateY(-1px); box-shadow:0 12px 28px -8px var(--accent,#8A2A3B); } .ds-btn-primary:active { transform:translateY(0) scale(.98); } .ds-btn-primary:focus-visible { outline:2px solid var(--accent,#8A2A3B); outline-offset:2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Вторичное действие — крем-стекло с hairline-границей.",
+      "html": "<button class=\"ds-btn-secondary\">Экспорт CSV</button>",
+      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; gap:8px; padding:10px 22px; border:1px solid var(--line,#E7DECF); border-radius:12px; background:var(--glass,#FFFDF9); color:var(--ink,#2A211C); font-family:'Onest',system-ui,sans-serif; font-size:14px; font-weight:500; cursor:pointer; backdrop-filter:blur(8px); transition:border-color .15s, transform .15s; } .ds-btn-secondary:hover { border-color:var(--accent,#8A2A3B); transform:translateY(-1px); } .ds-btn-secondary:focus-visible { outline:2px solid var(--accent,#8A2A3B); outline-offset:2px; }"
+    },
+    {
+      "name": "Select / Input",
+      "kind": "input",
+      "refersTo": "input-select",
+      "description": "Селект периода — крем-стекло, hairline, винное фокус-кольцо.",
+      "html": "<select class=\"ds-input-select\"><option>май 2026</option></select>",
+      "css": ".ds-input-select { width:100%; padding:9px 12px; border:1px solid var(--line,#E7DECF); border-radius:10px; background:var(--glass,#FFFDF9); color:var(--ink,#2A211C); font-family:'Onest',system-ui,sans-serif; font-size:13px; font-weight:500; cursor:pointer; backdrop-filter:blur(8px); transition:border-color .15s, background .15s; } .ds-input-select:hover { border-color:var(--accent,#8A2A3B); } .ds-input-select:focus-visible { outline:none; border-color:var(--accent,#8A2A3B); box-shadow:0 0 0 3px rgba(138,42,59,.08); }"
+    },
+    {
+      "name": "KPI Card",
+      "kind": "card",
+      "refersTo": "kpi-card",
+      "description": "Карточка KPI — крем-стекло, radius 16px, моно-число.",
+      "html": "<div class=\"ds-kpi\"><div class=\"ds-kpi-val\">6.09 М₽</div><div class=\"ds-kpi-lbl\">Факт</div></div>",
+      "css": ".ds-kpi { background:var(--glass,#FFFDF9); border:1px solid var(--line,#E7DECF); border-radius:16px; padding:20px 18px; box-shadow:0 1px 2px rgba(42,33,28,.05), 0 2px 10px rgba(42,33,28,.07); } .ds-kpi-val { font-family:'JetBrains Mono',Consolas,monospace; font-size:34px; font-weight:500; letter-spacing:-.02em; color:var(--ink,#2A211C); } .ds-kpi-lbl { font-family:'Onest',system-ui,sans-serif; font-size:13px; color:var(--muted,#7A6A5C); margin-top:4px; }"
+    },
+    {
+      "name": "Tab (underline)",
+      "kind": "nav",
+      "refersTo": "tab-underline",
+      "description": "Вкладка-подчёркивание — muted в покое, вино-подчёркивание в активе.",
+      "html": "<div role=\"tablist\"><button role=\"tab\" class=\"ds-tab ds-tab-active\">Сеть</button><button role=\"tab\" class=\"ds-tab\">Товары</button></div>",
+      "css": ".ds-tab { padding:10px 16px; border:0; background:transparent; font-family:'Onest',system-ui,sans-serif; font-size:13px; font-weight:500; color:var(--muted,#7A6A5C); border-bottom:2px solid transparent; cursor:pointer; transition:color .18s, border-color .18s; } .ds-tab:hover { color:var(--ink,#2A211C); } .ds-tab-active { color:var(--accent,#8A2A3B); border-bottom-color:var(--accent,#8A2A3B); font-weight:600; } .ds-tab:focus-visible { outline:2px solid var(--accent,#8A2A3B); outline-offset:2px; }"
+    },
+    {
+      "name": "Gold Seal (signature)",
+      "kind": "custom",
+      "refersTo": "gold-seal",
+      "description": "Золотая сургуч-печать % выполнения плана — смысловой центр дашборда.",
+      "html": "<span class=\"ds-seal\">92%</span>",
+      "css": ".ds-seal { position:relative; z-index:0; isolation:isolate; display:inline-flex; align-items:center; justify-content:center; min-width:3.1em; min-height:3.1em; padding:.28em .5em; font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:-.03em; color:#3A2A08; border-radius:999px; background:radial-gradient(circle at 50% 16%, rgba(255,255,255,.55), transparent 44%), radial-gradient(circle at 34% 30%, #F1D779 0%, #CDA62B 50%, #957210 100%); box-shadow:0 0 0 3px #1B1410, 0 0 22px rgba(201,162,39,.4), 0 10px 26px -7px rgba(201,162,39,.55), inset 0 1.5px 0 rgba(255,255,255,.65), inset 0 -3px 8px rgba(70,48,0,.45); } .ds-seal::before { content:''; position:absolute; inset:-7px; z-index:-1; border-radius:inherit; background:repeating-conic-gradient(from 0deg, #E6C652 0deg 6deg, #876510 6deg 12deg); -webkit-mask:radial-gradient(circle, transparent 61%, #000 63%); mask:radial-gradient(circle, transparent 61%, #000 63%); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Печать качества",
+    "overview": "Дашборд «Марии» — рабочий стол руководителя, где каждый день решается один вопрос: идём мы по плану или отстаём. Смысловой центр — золотая сургуч-печать процента выполнения плана: тяжёлая монета с рифлёным рантом, загорается золотом при успехе и гаснет в винный при отставании. Вокруг — тёплое кондитерское поле: какао-ганаш в тёмной теме, тёплая бумага в светлой, кремовый текст, винный функциональный акцент. Золото тратится точечно — оно означает достижение, не украшение. Система служит задаче: плотная спокойная сетка, цвет несёт смысл, читаемость таблиц важнее эффектов; один смелый ход — стеклянные панели с aurora-свечением — держит экран от вида дефолтного BI-шаблона.",
+    "keyCharacteristics": [
+      "Золотая печать % выполнения — единственный геройский элемент, всё подчинено ей.",
+      "Тёплая материальная палитра «Ганаш & золото», две выверенные по контрасту темы.",
+      "Вино = сигнал (CTA/активное/ключевая цифра), не фон.",
+      "Стекло + aurora — осознанная сигнатура, не дефолтный декор.",
+      "Данные честные: нет цифры → «н/д»/«—», оценка помечена."
+    ],
+    "rules": [
+      { "name": "Правило Печати", "body": "Золото появляется только как знак достижения — печать % выполнения, «план выполнен», топ-по-выручке. Никогда как фон, разделитель или декоративная обводка.", "section": "colors" },
+      { "name": "Правило Сигнала", "body": "Винный акцент занимает ≤10% любого экрана; заливать вином большие площади запрещено — сигнал живёт в тренд/YoY-колонках и на одном CTA.", "section": "colors" },
+      { "name": "Правило Табличных Цифр", "body": "Любое число в колонках/KPI — моно с tabular-nums; дисплейный шрифт в плотных таблицах запрещён.", "section": "typography" },
+      { "name": "Правило Читаемого Стекла", "body": "Стекло допустимо только если поверх него данные читаемы; на плотных таблицах blur приглушается или снимается.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do держать золото только как печать достижения (% выполнения, «план выполнен», топ-по-выручке).",
+      "Do держать вино ≤10% экрана: CTA/активное/ключевая цифра/тренд.",
+      "Do давать числам JetBrains Mono + tabular-nums; текст/UI — Onest, дисплей — Prata.",
+      "Do показывать пустое как «н/д»/«—», оценку помечать словом «оценка».",
+      "Do держать контраст ≥4.5:1 (мелкий)/≥3:1 (крупный) в обеих темах; danger всегда с иконкой/текстом.",
+      "Do приглушать/снимать blur на плотных таблицах."
+    ],
+    "donts": [
+      "Don't заливать большие площади фирменным вином («море красного»).",
+      "Don't использовать Inter/Inter Tight, Roboto sans, Arial, Helvetica, Space Grotesk, Open Sans, Lato.",
+      "Don't ставить эмодзи как визуальный язык — для этого бренда это «дёшево».",
+      "Don't делать hero-метрику с градиент-текстом, одинаковые плитки icon+heading+text, uppercase-эйсбрау над каждой секцией, маркеры 01/02/03.",
+      "Don't использовать border-left/right >1px как цветную полосу или background-clip:text + градиент.",
+      "Don't уходить в холодный сине-серый корпоратив или дефолтный AI-BI-шаблон.",
+      "Don't вкладывать карточки в карточки."
+    ]
+  }
+}
