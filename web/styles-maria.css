@@ -238,6 +238,11 @@ textarea:focus-visible, summary:focus-visible, [role="tab"]:focus-visible,
   letter-spacing: 0;
 }
 
+/* ───────── A11y-контраст: accent-as-text бейджи в тёмной теме ─────────
+   accent (#C7566A) как мелкий текст на accent-soft = 3.4:1 (фейл AA). Осветляем
+   текст этих бейджей в dark до винно-розового #DE8A9A (≈5.6:1 на soft / 6.7 на paper). */
+[data-theme=dark] .mkt-scope.dyn, [data-theme=dark] .status-pill.syncing { color: #DE8A9A; }
+
 /* ───────── Adapt: тач и мобильные экраны ─────────
    Детектим ВВОД (pointer:coarse), а не только ширину — таргеты ≥44px на тач-устройствах
    (десктоп с мышью не раздуваем). Плюс на узких экранах снимаем дорогое стекло/aurora. */
