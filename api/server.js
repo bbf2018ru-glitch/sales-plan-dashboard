@@ -18,6 +18,7 @@ const { getMarketTrends } = require('./lib/market-trends');
 const marketing = require('./lib/marketing-analytics');
 const marketingChannels = require('./lib/marketing-channels');
 const smsAttribution = require('./lib/sms-attribution');
+const appBridge = require('./lib/app-bridge');
 const productionKg = require('./lib/production-kg');
 const grossProfit = require('./lib/gross-profit');
 const sweetDetail = require('./lib/sweet-detail');
@@ -592,6 +593,25 @@ const server = http.createServer(async (req, res) => {
         products: db.products.length,
         lastIngestRun: ingestRuns[0] || null
       });
+      return;
+    }
+
+    // ── Мост для maria-app: бонусы/покупки по верифицированному телефону ──────
+    // Телефон верифицируется ботом (TG :contact), сюда ходит только maria-bot
+    // со своим токеном. Без APP_BRIDGE_TOKEN в env — эндпоинт закрыт (503).
+    if (pathname === '/api/app-bridge/lk' && req.method === 'GET') {
+      const bridgeToken = process.env.APP_BRIDGE_TOKEN || '';
+      if (!bridgeToken) { sendJson(res, 503, { error: 'bridge_not_configured' }); return; }
+      if (!safeEqual(String(req.headers['x-bridge-token'] || ''), bridgeToken)) {
+        sendJson(res, 401, { error: 'unauthorized' }); return;
+      }
+      const phone = parsedUrl.searchParams.get('phone') || '';
+      try {
+        const lk = await appBridge.getLkByPhone(phone);
+        sendJson(res, lk.ok ? 200 : 400, lk);
+      } catch (e) {
+        sendJson(res, 502, { ok: false, error: 'upp_error', detail: String(e.message || e).slice(0, 200) });
+      }
       return;
     }
 
