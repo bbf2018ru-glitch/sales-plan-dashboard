@@ -597,15 +597,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── Мост для maria-app: бонусы/покупки по верифицированному телефону ──────
-    // Телефон верифицируется ботом (TG :contact), сюда ходит только maria-bot
-    // со своим токеном. Без APP_BRIDGE_TOKEN в env — эндпоинт закрыт (503).
+    // Телефон верифицируется ботом (TG :contact), сюда ходит только maria-bot.
+    // АУТЕНТИФИКАЦИЯ: не bearer-токен (он бы ходил в открытую и при перехвате давал
+    // enumerate всей базы по любому номеру), а HMAC-подпись над `phone:ts` с общим
+    // секретом APP_BRIDGE_TOKEN. Секрет по сети НЕ передаётся; подпись валидна 60с и
+    // только для конкретного телефона → перехват не даёт ни секрета, ни enumerate.
+    // Без APP_BRIDGE_TOKEN в env — эндпоинт закрыт (503).
     if (pathname === '/api/app-bridge/lk' && req.method === 'GET') {
-      const bridgeToken = process.env.APP_BRIDGE_TOKEN || '';
-      if (!bridgeToken) { sendJson(res, 503, { error: 'bridge_not_configured' }); return; }
-      if (!safeEqual(String(req.headers['x-bridge-token'] || ''), bridgeToken)) {
+      const secret = process.env.APP_BRIDGE_TOKEN || '';
+      if (!secret) { sendJson(res, 503, { error: 'bridge_not_configured' }); return; }
+      const phone = parsedUrl.searchParams.get('phone') || '';
+      const ts = String(req.headers['x-bridge-ts'] || '');
+      const sig = String(req.headers['x-bridge-sig'] || '');
+      const tsNum = Number(ts);
+      if (!ts || !sig || !Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > 60000) {
         sendJson(res, 401, { error: 'unauthorized' }); return;
       }
-      const phone = parsedUrl.searchParams.get('phone') || '';
+      const expect = crypto.createHmac('sha256', secret).update(phone + ':' + ts).digest('hex');
+      if (!safeEqual(sig, expect)) { sendJson(res, 401, { error: 'unauthorized' }); return; }
       try {
         const lk = await appBridge.getLkByPhone(phone);
         sendJson(res, lk.ok ? 200 : 400, lk);
