@@ -4302,11 +4302,12 @@ function renderAvgCheckAnalysis(d) {
   }
   const sign = (v) => v == null ? '—' : (v > 0 ? '+' : '') + String(v).replace('.', ',') + '%';
   const cls = (v) => v == null ? '' : (v >= 0 ? 'style="color:var(--good)"' : 'style="color:var(--bad)"');
+  // 6 карточек в ряд — дефолтный kpi-value не влезает, ужимаем шрифт
   const card = (label, val, yoyV) => '<div class="kpi-card"><div class="kpi-label">' + label + '</div>'
-    + '<div class="kpi-value">' + val + '</div>'
+    + '<div class="kpi-value" style="font-size:21px;white-space:nowrap">' + val + '</div>'
     + '<div style="font-size:11px" ' + cls(yoyV) + '>' + sign(yoyV) + ' к ' + d.prevYear + '</div></div>';
   kpi.innerHTML =
-    card('Средний чек (нетто)', fmtNum(d.cur.avgNetCheque) + ' ₽', d.yoy.avgNetCheque) +
+    card('Средний чек (нетто)', fmtNum(Math.round(d.cur.avgNetCheque)) + ' ₽', d.yoy.avgNetCheque) +
     card('Чеков', fmtNum(d.cur.cheques), d.yoy.cheques) +
     card('Штук в чеке', String(d.cur.unitsPerCheque).replace('.', ','), d.yoy.unitsPerCheque) +
     card('Цена штуки (брутто)', fmtNum(d.cur.pricePerUnit) + ' ₽', d.yoy.pricePerUnit) +
