@@ -4302,9 +4302,10 @@ function renderAvgCheckAnalysis(d) {
   }
   const sign = (v) => v == null ? '—' : (v > 0 ? '+' : '') + String(v).replace('.', ',') + '%';
   const cls = (v) => v == null ? '' : (v >= 0 ? 'style="color:var(--good)"' : 'style="color:var(--bad)"');
-  // 6 карточек в ряд — дефолтный kpi-value не влезает, ужимаем шрифт
+  // 6 карточек в ряд: класс kpi-value НЕ используем — тема glass задаёт ему
+  // font-size !important (28-42px), 6 значений в ряд не влезают и режутся в «717…»
   const card = (label, val, yoyV) => '<div class="kpi-card"><div class="kpi-label">' + label + '</div>'
-    + '<div class="kpi-value" style="font-size:21px;white-space:nowrap">' + val + '</div>'
+    + '<div style="font-size:21px;font-weight:600;white-space:nowrap;letter-spacing:-.02em">' + val + '</div>'
     + '<div style="font-size:11px" ' + cls(yoyV) + '>' + sign(yoyV) + ' к ' + d.prevYear + '</div></div>';
   kpi.innerHTML =
     card('Средний чек (нетто)', fmtNum(Math.round(d.cur.avgNetCheque)) + ' ₽', d.yoy.avgNetCheque) +
