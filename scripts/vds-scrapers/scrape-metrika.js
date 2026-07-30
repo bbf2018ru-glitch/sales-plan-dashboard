@@ -97,7 +97,7 @@ function buildUrl(per) {
       const t = (document.body && document.body.innerText) || '';
       return /(Переходы из|Прямые заходы|Внутренние переходы|Социальные сети|Переходы по ссылкам)/.test(t) &&
         (t.match(/\d{3,}/g) || []).length >= 3;
-    }, { timeout: 60000 });
+    }, { timeout: 100000 }); // 60с не хватало на нагруженной VM в кроновский час → ложный gridTimeout при полных данных (2026-07-29)
   } catch (_) { out.gridTimeout = true; }
   try { await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); } catch (_) {}
   await p.waitForTimeout(4000);

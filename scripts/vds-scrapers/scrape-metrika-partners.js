@@ -52,14 +52,21 @@ function hostOf(u) {
   } catch (e) { out.partnersReadError = e.message; }
 
   try { await p.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 }); } catch (e) { out.error = 'goto: ' + e.message; }
-  // Ждём грид ЛИБО «нет данных»
-  try {
-    await p.waitForFunction(() => {
-      const t = (document.body && document.body.innerText) || '';
-      if (/Нет данных|Данные не найдены|Недостаточно данных/i.test(t)) return true;
-      return /Итого и средние/i.test(t) && t.length > 500;
-    }, { timeout: 55000 });
-  } catch (_) { out.gridTimeout = true; }
+  // ВАЖНО (2026-07-29): page.waitForFunction на тяжёлом SPA Метрики стабильно
+  // таймаутит (rAF-поллинг голодает на занятом main thread), при этом обычный
+  // evaluate-поллинг видит те же строки за ~13с. Поэтому ждём ВРУЧНУЮ.
+  const pollBody = async (checkFn, timeoutMs, stepMs = 1500) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeoutMs) {
+      const t = await p.evaluate(() => (document.body && document.body.innerText) || '').catch(() => '');
+      if (checkFn(t)) return true;
+      await p.waitForTimeout(stepMs);
+    }
+    return false;
+  };
+  const gridReady = await pollBody(t =>
+    /Нет данных|Данные не найдены|Недостаточно данных/i.test(t) || /Итого и средние/i.test(t), 90000);
+  if (!gridReady) out.gridTimeout = true;
   for (let i = 0; i < 6; i++) { await p.evaluate(() => window.scrollBy(0, 600)).catch(() => {}); await p.waitForTimeout(400); }
   await p.waitForTimeout(2000);
 
@@ -69,28 +76,57 @@ function hostOf(u) {
   const noData = /Нет данных|Данные не найдены|Недостаточно данных/i.test(body);
   out.noData = noData;
 
-  // Парсим: после «Итого и средние» идёт TOTAL, «100,00 %», затем триплеты value, count, «XX,XX %».
-  // Значения — домены (hostname). Берём пары: <домен-подобная строка> + следующее целое.
-  const lines = body.split('\n').map(s => s.trim()).filter(Boolean);
+  // ФИКС 2026-07-29: URL-фильтр по цели SPA молча выбрасывает («Цель: Не выбрана»),
+  // отчёт показывает ВСЕ paramsLevel2 (SMS-коды и пр.), а виртуализация грида прячет
+  // домены с малым числом кликов ниже фолда. Поэтому: каждый партнёрский домен ищем
+  // ТОЧЕЧНО через поле «Найти по названию» — грид фильтруется, строка домена всегда
+  // видима. Значение = визиты с параметром partner=<домен> (шлёт только сниппет клика).
   const byDomain = {};
-  const domainRe = /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i;
-  for (let i = 0; i < lines.length; i++) {
-    const dom = lines[i].toLowerCase().replace(/^www\./, '');
-    // Берём только домены, реально присутствующие среди партнёров — отсекает шапку
-    // (www.maria-irk.ru) и номер счётчика, который иначе ловится как «количество».
-    if (domainRe.test(lines[i]) && partnerDomains.has(dom)) {
-      const n = parseInt((lines[i + 1] || '').replace(/[\s ]/g, ''), 10);
-      if (isFinite(n) && n >= 0 && n < 1e6) byDomain[dom] = Math.max(byDomain[dom] || 0, n);
+  if (!noData) {
+    // «Найти по названию» — КНОПКА (span.button__text); поле ввода появляется после клика.
+    const openBtn = p.locator('span.button__text', { hasText: 'Найти по названию' }).first();
+    if (await openBtn.count().catch(() => 0)) { await openBtn.click({ force: true }).catch(() => {}); await p.waitForTimeout(1200); }
+    const search = p.locator('input.text-input__control:visible, input[type="text"]:visible, input[type="search"]:visible').first();
+    const searchOk = await search.count().catch(() => 0);
+    if (!searchOk) out.searchBoxMissing = true;
+    const readDomainRow = async (dom) => {
+      const ls = ((await p.evaluate(() => document.body.innerText || '')) || '').split('\n').map(s => s.trim());
+      const idx = ls.findIndex(s => s.toLowerCase().replace(/^www\./, '') === dom);
+      if (idx >= 0) {
+        const n = parseInt((ls[idx + 1] || '').replace(/[\s ]/g, ''), 10);
+        if (isFinite(n) && n >= 0 && n < 1e6) return n;
+      }
+      return /Нет данных|Данные не найдены/i.test(ls.join('\n')) ? 0 : null; // null = грид не подтвердил ни строку, ни пустоту
+    };
+    // Два прохода: первый домен списка стабильно гонится с только что открытым гридом
+    // (2 cron-прогона подряд теряли pryanikov38) — на 2-м проходе грид уже тёплый.
+    for (let pass = 0; pass < 2; pass++) {
+      for (const dom of partnerDomains) {
+        if (!searchOk) break;
+        if (byDomain[dom] != null) continue;
+        try {
+          // до 2 попыток внутри прохода: нулю с 1-й попытки не верим — перепроверяем
+          for (let attempt = 0; attempt < 2 && byDomain[dom] == null; attempt++) {
+            await search.fill('', { timeout: 8000 }).catch(() => {});
+            await p.waitForTimeout(600);
+            await search.fill(dom, { timeout: 8000 });
+            await pollBody(t =>
+              t.split('\n').some(s => s.trim().toLowerCase().replace(/^www\./, '') === dom) ||
+              /Нет данных|Данные не найдены/i.test(t), 20000, 1200);
+            await p.waitForTimeout(1500);
+            const n = await readDomainRow(dom);
+            if (n != null && (n > 0 || attempt === 1 || pass === 1)) byDomain[dom] = n;
+          }
+        } catch (e) { out['searchErr_' + dom] = String(e.message || e).slice(0, 80); }
+      }
     }
+    await search.fill('').catch(() => {});
   }
   out.byDomain = byDomain;
   out.partnerDomainsKnown = partnerDomains.size;
-  // Итого по цели
-  let total = 0;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^Итого и средние$/i.test(lines[i])) { const t = parseInt((lines[i + 1] || '').replace(/[\s ]/g, ''), 10); if (isFinite(t)) total = t; break; }
-  }
-  out.totalClicks = noData ? 0 : (total || Object.values(byDomain).reduce((a, c) => a + c, 0));
+  // totalClicks = СУММА по партнёрским доменам. «Итого и средние» таблицы НЕ используем —
+  // это все params визитов (в т.ч. SMS-коды), к партнёрам отношения не имеет.
+  out.totalClicks = Object.values(byDomain).reduce((a, c) => a + c, 0);
 
   // Мердж в partners.json по домену (READ-MODIFY-WRITE; базу Bitrix сохраняем).
   let merged = 0;
@@ -99,7 +135,8 @@ function hostOf(u) {
     for (const pr of partners.partners) {
       const dom = hostOf(pr.targetUrl || (pr.props && Object.values(pr.props).find(v => /^\s*https?:\/\//.test(v))) || '');
       pr.domain = dom;
-      pr.metrikaClicks = dom && byDomain[dom] != null ? byDomain[dom] : 0;
+      // непроверенный домен (byDomain нет ключа) НЕ обнуляем — оставляем прошлое значение
+      pr.metrikaClicks = dom && byDomain[dom] != null ? byDomain[dom] : (pr.metrikaClicks || 0);
       if (pr.metrikaClicks > 0) merged++;
     }
     partners.metrikaClicksUpdatedAt = out.scrapedAt;
@@ -110,6 +147,8 @@ function hostOf(u) {
   } catch (e) { out.mergeError = e.message; }
 
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
-  console.log(JSON.stringify({ ok: !out.gridTimeout || noData, totalClicks: out.totalClicks, byDomain, merged, periodShown: out.periodShown, bodyLen: out.bodyLen, gridTimeout: !!out.gridTimeout }, null, 2));
+  // ok = каждый известный партнёрский домен реально поискан (число или честный 0)
+  const allSearched = noData || (!out.searchBoxMissing && Object.keys(byDomain).length === partnerDomains.size);
+  console.log(JSON.stringify({ ok: allSearched, totalClicks: out.totalClicks, byDomain, merged, periodShown: out.periodShown, bodyLen: out.bodyLen, gridTimeout: !!out.gridTimeout }, null, 2));
   await b.close();
 })().catch(e => { console.log('ERR', e.message); });
