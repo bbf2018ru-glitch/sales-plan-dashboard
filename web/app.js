@@ -6568,7 +6568,7 @@ function openChartZoom(elSrc){
       for(var i=0;i<els.length;i++){
         if(els[i].children.length>0) continue;
         var er=els[i].getBoundingClientRect();
-        if(er.width>0 && er.width<srcW-4) maxRight=Math.max(maxRight, er.right);
+        if(er.width>0 && er.width<srcW*0.9) maxRight=Math.max(maxRight, er.right); // блочные подписи ≈ srcW − отсекаем с запасом
       }
       var effW=Math.max(Math.min(maxRight-wr.left, srcW), 120);
       var bw=body.clientWidth-16, bh=body.clientHeight-16;
