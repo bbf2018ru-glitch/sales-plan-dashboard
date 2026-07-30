@@ -99,46 +99,33 @@ body { font-family:'Onest',system-ui,-apple-system,'Segoe UI',sans-serif; }
   font-size:clamp(17px, 2vw, 23px); font-weight:400; letter-spacing:.2px;
   line-height:1.25; color:var(--ink);
 }
-/* СИГНАТУРА: % выполнения → золотая глянцевая МЕДАЛЬ (печать-знак качества) */
-.summary-hero .hero-headline b {
-  position:relative; z-index:0; isolation:isolate;
-  display:inline-flex; align-items:center; justify-content:center;
-  min-width:3.1em; min-height:3.1em; padding:.28em .5em; margin:0 .55em;
-  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1.02em;
-  letter-spacing:-.03em; color:#3A2A08;
-  background:
-    radial-gradient(circle at 50% 16%, rgba(255,255,255,.55), transparent 44%),
-    radial-gradient(circle at 34% 30%, #F1D779 0%, #CDA62B 50%, #957210 100%);
-  border-radius:999px;
-  box-shadow:
-    0 0 0 3px #1B1410,                      /* зазор между монетой и насечкой */
-    0 0 22px rgba(201,162,39,.4),           /* золотое свечение */
-    0 10px 26px -7px rgba(201,162,39,.55),  /* падающая тень */
-    inset 0 1.5px 0 rgba(255,255,255,.65),  /* верхний блик-глянец */
-    inset 0 -3px 8px rgba(70,48,0,.45);     /* нижний объём */
-  vertical-align:middle;
+/* СИГНАТУРА: кольцо выполнения плана месяца (замена золотой медали, 30.07.2026).
+   Дуга = факт/план месяца; цвет: зелёный при выполненном плане, фирменный
+   красный в процессе, винный при сильном отставании (класс hero-bad). */
+.summary-hero .hero-ring {
+  flex:0 0 auto; align-self:center; text-align:center;
+  padding-left:18px; border-left:1px solid var(--line);
 }
-/* НАСЕЧКА-СУРГУЧ: рифлёный золотой рант по краю медали */
-.summary-hero .hero-headline b::before {
-  content:""; position:absolute; inset:-7px; z-index:-1; border-radius:inherit;
-  background:repeating-conic-gradient(from 0deg, #E6C652 0deg 6deg, #876510 6deg 12deg);
-  -webkit-mask:radial-gradient(circle, transparent 61%, #000 63%);
-          mask:radial-gradient(circle, transparent 61%, #000 63%);
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+.summary-hero .hero-ring svg { display:block; margin:0 auto; }
+.summary-hero .hero-ring-arc {
+  transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1);
 }
-/* отстаём от плана (.hero-bad): монета гаснет в таупе (золото = только успех),
-   но РАНТ-НАСЕЧКА становится ВИННОЙ + мягкое винное свечение → читается как тревога */
-.summary-hero .hero-card.hero-bad .hero-headline b {
-  color:#F1E6E2;
-  background:radial-gradient(circle at 34% 30%, #6E5E54, #45382F 72%);
-  box-shadow:
-    0 0 0 3px #1B1410,
-    0 0 17px rgba(199,86,106,.4),          /* винное свечение тревоги */
-    0 8px 20px -8px rgba(0,0,0,.55),
-    inset 0 1.5px 0 rgba(255,255,255,.2), inset 0 -3px 8px rgba(0,0,0,.32);
+.summary-hero .hero-ring-num {
+  font-family:'JetBrains Mono',monospace; font-weight:700; font-size:21px;
+  letter-spacing:-.04em; fill:var(--ink);
 }
-.summary-hero .hero-card.hero-bad .hero-headline b::before {
-  background:repeating-conic-gradient(from 0deg, #C7566A 0deg 6deg, #74293A 6deg 12deg);
+.summary-hero .hero-ring-cap {
+  font-size:9px; letter-spacing:.08em; text-transform:uppercase; fill:var(--ink-2, var(--hint));
+}
+.summary-hero .hero-ring-pace {
+  margin-top:6px; font-size:11px; color:var(--hint);
+}
+.summary-hero .hero-ring-pace b { font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--ink); }
+@media (max-width: 760px) {
+  .summary-hero .hero-ring { display:none; } /* на узких экранах хватает цифр в KPI */
+}
+@media (prefers-reduced-motion: reduce) {
+  .summary-hero .hero-ring-arc { transition:none; }
 }
 /* топ-по-выручке в герое — золотой акцент (достижение) */
 .summary-hero .hero-store-good b { color:var(--gold); }

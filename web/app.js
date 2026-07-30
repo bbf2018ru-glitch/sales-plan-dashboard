@@ -295,6 +295,21 @@ function fmtPeriodLabel(period, prevPeriod) {
   return label;
 }
 
+// Гладкая кривая (Catmull-Rom → кубические Безье): современный вид вместо ломаной.
+// pts = [[x,y],...]; k=0 даёт прямые отрезки.
+function smoothPathD(pts, k = 0.85) {
+  if (!pts.length) return '';
+  if (pts.length < 3) return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6 * k, c1y = p1[1] + (p2[1] - p0[1]) / 6 * k;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6 * k, c2y = p2[1] - (p3[1] - p1[1]) / 6 * k;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
 function renderTrendChart(summary) {
   const el = $('trendChart');
   const allPts = (summary.trend?.periods || []).filter(p => p.plan > 0 || p.fact > 0);
@@ -305,70 +320,91 @@ function renderTrendChart(summary) {
   if (subtitle) subtitle.textContent = `план и факт за ${pts.length} мес.`;
 
   const dense = pts.length > 8;
-  const W = 560, H = 240, pad = { t: 24, r: 20, b: dense ? 54 : 46, l: 68 };
+  const W = 560, H = 230, pad = { t: 30, r: 20, b: dense ? 46 : 38, l: 56 };
   const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b, n = pts.length;
-  const maxVal = Math.max(...pts.flatMap(p => [p.plan, p.fact, p.factPrevYear || 0]), 1);
+  // Модернизация 30.07.2026: ось Y обрезана к диапазону данных (раньше от нуля —
+  // данные жались в верхние 25% высоты и динамика не читалась).
+  const vals = pts.flatMap(p => [p.plan, p.fact, p.factPrevYear].filter(v => v != null && v > 0));
+  const rawMin = Math.min(...vals), rawMax = Math.max(...vals);
+  const span = Math.max(rawMax - rawMin, rawMax * 0.05);
+  const lo = Math.max(0, rawMin - span * 0.18), hi = rawMax + span * 0.14;
   const xp = i => pad.l + (n > 1 ? (i / (n - 1)) * pw : pw / 2);
-  const yp = v => pad.t + ph - (v / maxVal) * ph;
+  const yp = v => pad.t + ph - ((v - lo) / (hi - lo)) * ph;
 
-  // YoY: линия факта того же месяца год назад. Разрывается там, где данных
-  // за прошлый год нет (factPrevYear === null), чтобы не врать интерполяцией.
-  let pyD = '', pyOpen = false, pyHasAny = false;
-  pts.forEach((p, i) => {
-    if (p.factPrevYear != null) {
-      pyD += `${pyOpen ? 'L' : 'M'}${xp(i).toFixed(1)},${yp(p.factPrevYear).toFixed(1)} `;
-      pyOpen = true; pyHasAny = true;
-    } else {
-      pyOpen = false;
-    }
-  });
-  const pyDots = pyHasAny ? pts.map((p, i) => p.factPrevYear == null ? '' :
-    `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.factPrevYear).toFixed(1)}" r="2.5" fill="var(--gold)"><title>${bpMonthLabel(p.prevYearPeriod)}: ${fmtAxis(p.factPrevYear)}</title></circle>`).join('') : '';
-
-  const grids = Array.from({ length: 5 }, (_, i) => {
-    const v = maxVal / 4 * i, y = yp(v);
-    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
-    <text x="${pad.l - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="11">${fmtAxis(v)}</text>`;
+  // 4 «красивых» горизонтали внутри окна данных
+  const step = (hi - lo) / 4;
+  const grids = Array.from({ length: 4 }, (_, i) => {
+    const v = lo + step * (i + 0.5), y = yp(v);
+    return `<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${pad.l + pw}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="1,4" opacity=".9"/>
+    <text x="${pad.l - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="10">${fmtAxis(v)}</text>`;
   }).join('');
 
-  const planD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(p.plan).toFixed(1)}`).join(' ');
-  const factD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(p.fact).toFixed(1)}`).join(' ');
+  const factPts = pts.map((p, i) => [xp(i), yp(p.fact)]);
+  const planPts = pts.map((p, i) => [xp(i), yp(p.plan)]);
+  const factD = smoothPathD(factPts);
+  const planD = smoothPathD(planPts, 0.6);
   const areaD = `${factD} L${xp(n - 1).toFixed(1)},${(pad.t + ph).toFixed(1)} L${xp(0).toFixed(1)},${(pad.t + ph).toFixed(1)} Z`;
 
-  const dotR = dense ? 3.5 : 5;
+  // YoY: сегменты без интерполяции через дырки (factPrevYear === null)
+  const pySegs = [];
+  let seg = [];
+  pts.forEach((p, i) => {
+    if (p.factPrevYear != null) seg.push([xp(i), yp(p.factPrevYear)]);
+    else { if (seg.length) pySegs.push(seg); seg = []; }
+  });
+  if (seg.length) pySegs.push(seg);
+  const pyHasAny = pySegs.length > 0;
+  const pyD = pySegs.map(s => smoothPathD(s, 0.6)).join(' ');
+
+  // Точки: только факт; мелкие, цвет по выполнению; ТЕКУЩИЙ (последний) месяц —
+  // крупнее, с внешним кольцом и бейджем процента. План/YoY — только hover-зоны.
   const dots = pts.map((p, i) => {
+    const isLast = i === n - 1;
     const clr = p.completion >= 100 ? 'var(--good)' : p.completion >= 80 ? 'var(--warn)' : 'var(--bad)';
-    const pctLabel = dense ? '' : `<text x="${xp(i).toFixed(1)}" y="${(yp(p.fact) - 9).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${p.completion}%</text>`;
-    return `<circle cx="${xp(i).toFixed(1)}" cy="${yp(p.fact).toFixed(1)}" r="${dotR}" fill="${clr}" stroke="var(--paper)" stroke-width="2"><title>${bpMonthLabel(p.period)}: факт ${fmtAxis(p.fact)} · ${p.completion}% плана</title></circle>
-    <circle cx="${xp(i).toFixed(1)}" cy="${yp(p.plan).toFixed(1)}" r="2.5" fill="var(--paper)" stroke="var(--hint)" stroke-width="1.5"><title>${bpMonthLabel(p.period)}: план ${fmtAxis(p.plan)}</title></circle>${pctLabel}`;
+    const x = xp(i).toFixed(1), y = yp(p.fact).toFixed(1);
+    const tip = `<title>${bpMonthLabel(p.period)}: факт ${fmtAxis(p.fact)} · план ${fmtAxis(p.plan)} · ${p.completion}% плана${p.factPrevYear != null ? ` · год назад ${fmtAxis(p.factPrevYear)}` : ''}</title>`;
+    if (!isLast) return `<circle cx="${x}" cy="${y}" r="${dense ? 2.6 : 3.4}" fill="${clr}" stroke="var(--paper)" stroke-width="1.5">${tip}</circle>`;
+    const bx = Math.min(Number(x), pad.l + pw - 30);
+    return `<circle cx="${x}" cy="${y}" r="8" fill="none" stroke="${clr}" stroke-width="1.5" opacity=".45"/>
+      <circle cx="${x}" cy="${y}" r="4.2" fill="${clr}" stroke="var(--paper)" stroke-width="2">${tip}</circle>
+      <g><rect x="${(bx - 21).toFixed(1)}" y="${(Number(y) - 26).toFixed(1)}" rx="8" width="42" height="16" fill="${clr}" opacity=".92"/>
+      <text x="${bx.toFixed(1)}" y="${(Number(y) - 14.5).toFixed(1)}" text-anchor="middle" fill="var(--paper)" font-size="10" font-weight="700">${p.completion}%</text></g>`;
   }).join('');
 
+  // Невидимые вертикальные hover-зоны с полным тултипом по месяцу
+  const hitW = n > 1 ? pw / (n - 1) : pw;
+  const hits = pts.map((p, i) => `<rect x="${(xp(i) - hitW / 2).toFixed(1)}" y="${pad.t}" width="${hitW.toFixed(1)}" height="${ph}" fill="transparent"><title>${bpMonthLabel(p.period)}: факт ${fmtAxis(p.fact)} · план ${fmtAxis(p.plan)} · ${p.completion}%${p.factPrevYear != null ? ` · год назад ${fmtAxis(p.factPrevYear)}` : ''}</title></rect>`).join('');
+
   const xlabels = pts.map((p, i) => {
+    if (dense && i % 2 === 1 && i !== n - 1) return ''; // разрежаем подписи вместо поворота
     const x = xp(i).toFixed(1);
-    const y = (pad.t + ph + 14).toFixed(1);
     const lbl = fmtPeriodLabel(p.period, pts[i - 1]?.period);
-    if (dense) {
-      return `<text x="${x}" y="${y}" text-anchor="end" fill="var(--hint)" font-size="10" transform="rotate(-40,${x},${y})">${lbl}</text>`;
-    }
-    return `<text x="${x}" y="${(pad.t + ph + 18).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="11">${lbl}</text>`;
+    return `<text x="${x}" y="${(pad.t + ph + 16).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="10">${lbl}</text>`;
   }).join('');
+
+  // Легенда-чипы в правом верхнем углу
+  const chip = (x, w, html) => `<g transform="translate(${x},8)"><rect width="${w}" height="16" rx="8" fill="var(--secondary, var(--line))" opacity=".55"/>${html}</g>`;
+  const legend =
+    chip(pad.l + pw - (pyHasAny ? 250 : 160), 66, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">факт</text>`) +
+    chip(pad.l + pw - (pyHasAny ? 178 : 88), 66, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--hint)" stroke-width="2" stroke-dasharray="4,3"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">план</text>`) +
+    (pyHasAny ? chip(pad.l + pw - 106, 84, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--gold)" stroke-width="2" stroke-dasharray="2,3"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">пр. год</text>`) : '');
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
     <defs>
       <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.22"/>
-        <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0"/>
+        <stop offset="0%" style="stop-color:var(--accent);stop-opacity:0.16"/>
+        <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0.01"/>
       </linearGradient>
+      <clipPath id="tclip"><rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}"/></clipPath>
     </defs>
     ${grids}
-    <path class="ch-area" d="${areaD}" fill="url(#tg)"/>
-    <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="2" stroke-dasharray="6,4"/>
-    ${pyHasAny ? `<path d="${pyD.trim()}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-dasharray="2,3" opacity="0.85"/>${pyDots}` : ''}
-    <path class="ch-line" d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    ${dots}${xlabels}
-    <text x="${pad.l}" y="${H - 4}" fill="var(--hint)" font-size="10">─ ─ план</text>
-    <text x="${pad.l + 54}" y="${H - 4}" fill="var(--accent)" font-size="10">─── факт</text>
-    ${pyHasAny ? `<text x="${pad.l + 108}" y="${H - 4}" fill="var(--gold)" font-size="10">··· факт пр. года</text>` : ''}
+    <g clip-path="url(#tclip)">
+      <path class="ch-area" d="${areaD}" fill="url(#tg)"/>
+      <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="1.6" stroke-dasharray="5,4" opacity=".8"/>
+      ${pyHasAny ? `<path d="${pyD}" fill="none" stroke="var(--gold)" stroke-width="1.8" stroke-dasharray="2,3.5" opacity=".8"/>` : ''}
+      <path class="ch-line" d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    ${hits}${dots}${xlabels}${legend}
   </svg>`;
 }
 
@@ -604,12 +640,32 @@ function renderSummaryHero(summary) {
     ? `<b class="hero-gap">отстаём на сегодня: ${fmtMoneyShort(gapToday)}</b>`
     : `<b style="color:var(--good)">опережаем на сегодня: ${fmtMoneyShort(-gapToday)}</b>`;
 
+  // Кольцо прогресса: % выполнения плана МЕСЯЦА (факт/план), не темп «к сегодня».
+  // Темп остаётся мелкой подписью под кольцом. Запрос юзера 30.07.2026.
+  const monthPct = Number.isFinite(t.completion) ? t.completion : (t.plan > 0 ? Math.round((t.fact || 0) / t.plan * 1000) / 10 : null);
+  const ringR = 48, ringC = 2 * Math.PI * ringR;
+  const ringFill = monthPct == null ? 0 : Math.min(monthPct, 100) / 100;
+  const ringColor = monthPct == null ? 'var(--line)' : monthPct >= 100 ? 'var(--good)' : (mood === 'bad' ? 'var(--bad)' : 'var(--accent)');
+  const ringVal = monthPct == null ? '—' : (monthPct >= 100 ? Math.round(monthPct) : monthPct.toFixed(1).replace('.', ',')) + '%';
+  const ringHtml = `
+      <div class="hero-ring" role="img" aria-label="Выполнено ${ringVal} плана месяца">
+        <svg viewBox="0 0 116 116" width="116" height="116">
+          <circle cx="58" cy="58" r="${ringR}" fill="none" stroke="var(--line)" stroke-width="9"/>
+          <circle class="hero-ring-arc" cx="58" cy="58" r="${ringR}" fill="none" stroke="${ringColor}" stroke-width="9"
+            stroke-linecap="round" stroke-dasharray="${ringC.toFixed(1)}"
+            stroke-dashoffset="${(ringC * (1 - ringFill)).toFixed(1)}" transform="rotate(-90 58 58)"/>
+          <text x="58" y="56" text-anchor="middle" class="hero-ring-num">${ringVal}</text>
+          <text x="58" y="74" text-anchor="middle" class="hero-ring-cap">плана месяца</text>
+        </svg>
+        <div class="hero-ring-pace">темп к сегодня: <b>${pct}%</b></div>
+      </div>`;
+
   el.innerHTML = `
     <div class="hero-card hero-${mood}">
       <div class="hero-icon">${moodIcon}</div>
       <div class="hero-body">
         <div class="hero-headline">
-          ${escapeHtml(monthName)} ${escapeHtml(yyyy || '')} · к сегодня — <b>${pct}%</b>
+          ${escapeHtml(monthName)} ${escapeHtml(yyyy || '')}
           <span class="hero-mood">${escapeHtml(moodLabel)}</span>
         </div>
         <div class="hero-sub">
@@ -631,6 +687,7 @@ function renderSummaryHero(summary) {
           </div>
         </div>` : ''}
       </div>
+      ${ringHtml}
     </div>
   `;
   el.classList.remove('hidden');
