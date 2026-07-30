@@ -540,6 +540,16 @@
             </div>
           </section>
 
+          <!-- Разбор среднего чека: почему изменился (штуки × цена, SKU-инфляция vs микс) -->
+          <section class="section atab-section" data-atab="network">
+            <div class="section-label">🔬 Разбор среднего чека: почему изменился <span class="mkt-scope dyn" title="Живой расчёт из ЧекККМ: текущий месяц по вчера включительно против того же окна год назад">live · MTD YoY</span></div>
+            <div class="section-hint">Чек = штук в чеке × цена штуки. Цена штуки раскладывается на честную инфляцию — подорожание ТЕХ ЖЕ товаров, что продавались год назад (перекодировки категорий не мешают) — и сдвиг микса (покупатель берёт другие позиции). Отрицательный сдвиг микса при положительной инфляции = «даунгрейд»: платят дороже за единицу, но берут попроще.</div>
+            <div id="avgCheckKpi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px"></div>
+            <div id="avgCheckVerdict" style="font-size:12px;margin-bottom:12px"></div>
+            <div id="avgCheckMovers" class="table-wrap"></div>
+            <div id="avgCheckHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+          </section>
+
           <!-- A17/A18. Средний чек по форматам магазинов -->
           <section class="section atab-section" data-atab="network">
             <div class="section-label">Средний чек по форматам магазинов</div>

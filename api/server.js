@@ -1216,6 +1216,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Разбор среднего чека: штуки×цена, SKU-инфляция vs сдвиг микса, честный MTD YoY ──
+    if (pathname === '/api/analytics/avg-check' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        const avgCheck = require('./lib/avg-check-analysis');
+        sendJson(res, 200, await avgCheck.getAvgCheckAnalysis(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Кофе-контроль: стаканы (перемещения) vs пробитые напитки — ловля продаж мимо кассы ──
     // Открыт как соседние marketing-эндпоинты. 2 лёгких агрегата в 1С, кэш 6ч.
     if (pathname === '/api/marketing/coffee-control' && req.method === 'GET') {

@@ -40,7 +40,25 @@ async function _compute() {
     + ` И Т.Номенклатура.НоменклатурнаяГруппа.Наименование В (${DRINK_GROUPS})`
     + ' СГРУППИРОВАТЬ ПО Т.Ссылка.Склад.Наименование';
 
-  const [rCups, rDrinks] = [await upp.callQuery(qCups), await upp.callQuery(qDrinks)];
+  // attach: % чеков точки, в которых есть кофе (только кофейные группы, без чая/бутылок) —
+  // показывает, где кофе-аттач не работает (упущенная выручка), в паре с антифродом выше
+  const qAttach = 'ВЫБРАТЬ Т.Ссылка.Склад.Наименование КАК Точка,'
+    + ' КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Т.Ссылка) КАК КофеЧеков, СУММА(Т.Сумма) КАК КофеРуб'
+    + ' ИЗ Документ.ЧекККМ.Товары КАК Т'
+    + ' ГДЕ Т.Ссылка.Проведен И Т.Ссылка.ВидОперации <> ЗНАЧЕНИЕ(Перечисление.ВидыОперацийЧекККМ.Возврат)'
+    + ` И Т.Ссылка.Дата >= ${dt(from)} И Т.Ссылка.Дата < ${dt(to)}`
+    + ' И Т.Номенклатура.НоменклатурнаяГруппа.Наименование В ("Кофе с собой", "Кофе")'
+    + ' СГРУППИРОВАТЬ ПО Т.Ссылка.Склад.Наименование';
+  const qAllCheques = 'ВЫБРАТЬ Чек.Склад.Наименование КАК Точка, КОЛИЧЕСТВО(Чек.Ссылка) КАК Чеков'
+    + ' ИЗ Документ.ЧекККМ КАК Чек'
+    + ' ГДЕ Чек.Проведен И Чек.ВидОперации <> ЗНАЧЕНИЕ(Перечисление.ВидыОперацийЧекККМ.Возврат)'
+    + ` И Чек.Дата >= ${dt(from)} И Чек.Дата < ${dt(to)}`
+    + ' СГРУППИРОВАТЬ ПО Чек.Склад.Наименование';
+
+  const [rCups, rDrinks, rAttach, rAll] = [
+    await upp.callQuery(qCups), await upp.callQuery(qDrinks),
+    await upp.callQuery(qAttach), await upp.callQuery(qAllCheques)
+  ];
   const stores = new Map();
   for (const row of (rCups.rows || [])) {
     const name = String(row['Точка'] || '').trim();
@@ -54,6 +72,32 @@ async function _compute() {
     s.drinks = Math.round(upp.parseRu(row['Кол']));
     s.drinkCheques = Math.round(upp.parseRu(row['Чеков']));
   }
+  const attach = new Map(); // точка → { coffeeCheques, coffeeRub, allCheques }
+  for (const row of (rAttach.rows || [])) {
+    const name = String(row['Точка'] || '').trim();
+    attach.set(name, { coffeeCheques: Math.round(upp.parseRu(row['КофеЧеков'])), coffeeRub: Math.round(upp.parseRu(row['КофеРуб'])), allCheques: 0 });
+  }
+  for (const row of (rAll.rows || [])) {
+    const name = String(row['Точка'] || '').trim();
+    if (!attach.has(name)) attach.set(name, { coffeeCheques: 0, coffeeRub: 0, allCheques: 0 });
+    attach.get(name).allCheques = Math.round(upp.parseRu(row['Чеков']));
+  }
+  const attachRows = [...attach.entries()]
+    .filter(([name, a]) => a.allCheques >= 300 && !/промежуточн|возврат|основной склад|сырье|сайт/i.test(name))
+    .map(([name, a]) => ({ store: name, allCheques: a.allCheques, coffeeCheques: a.coffeeCheques,
+      coffeeRub: a.coffeeRub, attachPct: Math.round(a.coffeeCheques / a.allCheques * 1000) / 10 }))
+    .sort((a, b) => b.attachPct - a.attachPct);
+  // потенциал: подтянуть точки ниже медианы до медианы, по среднему кофе-чеку сети (оценка)
+  const med = attachRows.length ? attachRows[Math.floor(attachRows.length / 2)].attachPct : 0;
+  const netCoffee = attachRows.reduce((s, r) => s + r.coffeeRub, 0);
+  const netCoffeeCheques = attachRows.reduce((s, r) => s + r.coffeeCheques, 0);
+  const avgCoffeeTicket = netCoffeeCheques ? netCoffee / netCoffeeCheques : 0;
+  for (const r of attachRows) {
+    r.potentialRub = r.attachPct < med
+      ? Math.round((med - r.attachPct) / 100 * r.allCheques * avgCoffeeTicket)
+      : 0;
+  }
+
   const list = [...stores.values()].map(s => {
     const ratio = s.drinks > 0 ? s.cups / s.drinks : null;
     let status;
@@ -70,12 +114,18 @@ async function _compute() {
     from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), windowDays: WINDOW_DAYS,
     redCount: list.filter(s => s.status === 'red').length,
     stores: list,
-    method: 'стаканы(перемещения 56д) / пробитые напитки(Кофе с собой+Кофе+Напитки+Напитки производства+Чай); ok≤1.7, warn≤3, red>3'
+    attach: {
+      medianPct: med,
+      avgCoffeeTicket: Math.round(avgCoffeeTicket),
+      totalPotentialRub: attachRows.reduce((s, r) => s + r.potentialRub, 0),
+      rows: attachRows
+    },
+    method: 'стаканы(перемещения 56д) / пробитые напитки(Кофе с собой+Кофе+Напитки+Напитки производства+Чай); ok≤1.7, warn≤3, red>3; attach = % чеков с кофе, потенциал = подтяжка до медианы (оценка)'
   };
 }
 
 async function getCoffeeControl() {
-  return cache.wrap('v1', _compute);
+  return cache.wrap('v2', _compute); // v2: + attach-блок (ключ бампнут, чтобы не отдать старый кэш без него)
 }
 
 module.exports = { getCoffeeControl };

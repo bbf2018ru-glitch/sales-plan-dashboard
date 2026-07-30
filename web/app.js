@@ -3761,6 +3761,7 @@ async function loadAnalytics() {
     renderComparison();
     renderCheques();
     renderDiscounts();
+    loadAvgCheckAnalysis(); // отдельный live-эндпоинт (1С, кэш 6ч) — не зависит от analyticsState
     loadNetworkChequesFromChannels(); // фоллбэк из channels, если 1С не прислала cheque_stats
     renderNewProducts();
     renderCakeSegments();
@@ -4277,6 +4278,59 @@ function updateDateRangeStatus() {
   const r = analyticsState.data?.range;
   if (!r) { el.textContent = `показан весь период ${state.period}`; return; }
   el.textContent = `период: ${r.from || '−∞'} … ${r.to || '+∞'}`;
+}
+
+// ── Разбор среднего чека: почему изменился (live 1С, MTD-честный YoY) ──
+async function loadAvgCheckAnalysis() {
+  const kpi = $('avgCheckKpi');
+  if (!kpi) return;
+  kpi.innerHTML = '<div class="kpi-card" style="grid-column:1/-1"><div class="kpi-label">Считаю разбор чека из 1С (~15 сек при холодном кэше)…</div></div>';
+  try {
+    const d = await fetchJson('/api/analytics/avg-check?period=' + state.period);
+    renderAvgCheckAnalysis(d);
+  } catch (e) {
+    kpi.innerHTML = '<div class="kpi-card" style="grid-column:1/-1"><div class="kpi-label">Разбор недоступен: ' + escapeHtml(e.message) + '</div></div>';
+  }
+}
+function renderAvgCheckAnalysis(d) {
+  const kpi = $('avgCheckKpi'), verdict = $('avgCheckVerdict'), movers = $('avgCheckMovers'), hint = $('avgCheckHint');
+  if (!kpi) return;
+  if (!d || d.error || !d.cur || !d.prev || !d.yoy) {
+    kpi.innerHTML = '<div class="kpi-card" style="grid-column:1/-1"><div class="kpi-label">Нет данных для сравнения (' + escapeHtml((d && d.error) || 'нет прошлогоднего окна') + ')</div></div>';
+    if (verdict) verdict.innerHTML = ''; if (movers) movers.innerHTML = ''; if (hint) hint.innerHTML = '';
+    return;
+  }
+  const sign = (v) => v == null ? '—' : (v > 0 ? '+' : '') + String(v).replace('.', ',') + '%';
+  const cls = (v) => v == null ? '' : (v >= 0 ? 'style="color:var(--good)"' : 'style="color:var(--bad)"');
+  const card = (label, val, yoyV) => '<div class="kpi-card"><div class="kpi-label">' + label + '</div>'
+    + '<div class="kpi-value">' + val + '</div>'
+    + '<div style="font-size:11px" ' + cls(yoyV) + '>' + sign(yoyV) + ' к ' + d.prevYear + '</div></div>';
+  kpi.innerHTML =
+    card('Средний чек (нетто)', fmtNum(d.cur.avgNetCheque) + ' ₽', d.yoy.avgNetCheque) +
+    card('Чеков', fmtNum(d.cur.cheques), d.yoy.cheques) +
+    card('Штук в чеке', String(d.cur.unitsPerCheque).replace('.', ','), d.yoy.unitsPerCheque) +
+    card('Цена штуки (брутто)', fmtNum(d.cur.pricePerUnit) + ' ₽', d.yoy.pricePerUnit) +
+    card('Те же товары подорожали', sign(d.skuInflationPct), null) +
+    card('Сдвиг микса (оценка)', sign(d.mixShiftPct), null);
+  if (verdict) {
+    const parts = [];
+    if (d.skuInflationPct != null) parts.push('инфляция тех же SKU <b>' + sign(d.skuInflationPct) + '</b> (покрывают ' + d.commonSkuSharePct + '% выручки)');
+    if (d.mixShiftPct != null && d.mixShiftPct < -1) parts.push('<b style="color:var(--gold)">даунгрейд микса ' + sign(d.mixShiftPct) + '</b> — платят дороже за единицу, но берут позиции попроще');
+    else if (d.mixShiftPct != null && d.mixShiftPct > 1) parts.push('микс сдвинулся к дорогим позициям ' + sign(d.mixShiftPct));
+    if (d.newItemsRevenue > 0) parts.push('новинки дали ' + fmtMoneyShort(d.newItemsRevenue) + ' ₽');
+    verdict.innerHTML = parts.length ? 'Итого: ' + parts.join(' · ') + '.' : '';
+  }
+  if (movers) {
+    const rows = (d.topMovers || []).map(function (m) {
+      return '<tr><td><b>' + escapeHtml(m.name) + '</b></td><td class="num">' + fmtNum(m.pricePrev) + '</td><td class="num">' + fmtNum(m.priceCur) + '</td>'
+        + '<td class="num" ' + cls(m.changePct) + '>' + sign(m.changePct) + '</td><td class="num">' + fmtMoneyShort(m.revenueCur) + '</td></tr>';
+    }).join('');
+    const newRows = (d.newItems || []).map(function (n) {
+      return '<tr><td>🆕 ' + escapeHtml(n.name) + '</td><td class="num">—</td><td class="num">' + fmtNum(n.price) + '</td><td class="num" style="color:var(--muted)">новинка</td><td class="num">' + fmtMoneyShort(n.revenue) + '</td></tr>';
+    }).join('');
+    movers.innerHTML = '<table style="font-size:12px"><thead><tr><th>Товар (топ-влияние на цену)</th><th class="num">₽/шт ' + d.prevYear + '</th><th class="num">₽/шт сейчас</th><th class="num">Δ цены</th><th class="num">Выручка</th></tr></thead><tbody>' + rows + newRows + '</tbody></table>';
+  }
+  if (hint) hint.innerHTML = (d.asOfDay ? 'Оба года обрезаны по ' + d.asOfDay + '-е число включительно (MTD-честно). ' : 'Полный месяц против полного. ') + escapeHtml(d.method || '');
 }
 
 // ── Чеки и средний чек ─────────────────────────────────────────────────
@@ -4882,7 +4936,22 @@ function renderCoffeeControl(cc){
     var bad=s.status==='red'?' style="background:var(--bad-soft)"':'';
     return '<tr'+bad+'><td><b>'+s.store+'</b></td><td class="num">'+mNum(s.cups)+'</td><td class="num">'+mNum(s.drinks)+'</td><td class="num">'+ratio+'</td><td>'+(stLabel[s.status]||s.status)+'</td></tr>';
   }).join('');
-  el.innerHTML='<table style="font-size:12px"><thead><tr><th>Точка</th><th class="num">Стаканов отгружено</th><th class="num">Напитков пробито</th><th class="num">Стаканов на напиток</th><th>Статус</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  var html='<table style="font-size:12px"><thead><tr><th>Точка</th><th class="num">Стаканов отгружено</th><th class="num">Напитков пробито</th><th class="num">Стаканов на напиток</th><th>Статус</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  // Кофе-attach: % чеков с кофе по точкам + потенциал подтяжки до медианы
+  if(cc.attach && cc.attach.rows && cc.attach.rows.length){
+    var at=cc.attach;
+    var aRows=at.rows.map(function(r){
+      var barW=Math.min(100, r.attachPct/Math.max(at.rows[0].attachPct,1)*100);
+      var pot=r.potentialRub>0?('+'+mNum(r.potentialRub)+' ₽/мес'):'—';
+      var low=r.attachPct<at.medianPct/2?' style="color:var(--bad)"':'';
+      return '<tr><td><b>'+r.store+'</b></td><td class="num">'+mNum(r.allCheques)+'</td><td class="num">'+mNum(r.coffeeCheques)+'</td>'
+        +'<td><div style="display:flex;align-items:center;gap:6px"><div style="flex:0 0 80px;height:8px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:'+barW+'%;height:100%;background:var(--accent)"></div></div><span class="num"'+low+'>'+String(r.attachPct).replace('.',',')+'%</span></div></td>'
+        +'<td class="num" style="color:'+(r.potentialRub>0?'var(--gold)':'var(--muted)')+'">'+pot+'</td></tr>';
+    }).join('');
+    html+='<div style="margin-top:14px;font-size:12px"><b>Кофе-attach по точкам</b> — % чеков, в которых есть кофе. Потенциал = подтяжка отстающих до медианы сети ('+String(at.medianPct).replace('.',',')+'%) по среднему кофе-чеку '+mNum(at.avgCoffeeTicket)+' ₽ <span style="color:var(--muted)">(оценка)</span>. Суммарно: <b style="color:var(--gold)">+'+mNum(at.totalPotentialRub)+' ₽/мес</b>.</div>'
+      +'<table style="font-size:12px;margin-top:6px"><thead><tr><th>Точка</th><th class="num">Чеков всего</th><th class="num">С кофе</th><th>Attach</th><th class="num">Потенциал</th></tr></thead><tbody>'+aRows+'</tbody></table>';
+  }
+  el.innerHTML=html;
   if(hint){
     var reds=cc.stores.filter(function(s){return s.status==='red';}).map(function(s){return s.store;});
     hint.innerHTML='Окно '+cc.windowDays+' дней ('+cc.from+' … '+cc.to+'). «Напитков пробито» считается с запасом в пользу точки (все напитки, включая чай и бутылки).'+
