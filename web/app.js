@@ -6533,12 +6533,16 @@ function openChartZoom(svg){
   if(!t){ var sec=svg.closest('section,.card,.kpi-detail,div'); if(sec) t=sec.querySelector('.mkt-chart-t,.chart-title,.section-label,h2,h3'); }
   if(t) title=t.textContent.trim();
   var clone=svg.cloneNode(true);
-  clone.removeAttribute('style'); clone.setAttribute('width','100%'); clone.removeAttribute('height');
-  clone.style.width='100%'; clone.style.height='auto'; clone.style.maxHeight='82vh';
+  // Полноэкранный режим: SVG растягивается на всё доступное место с сохранением
+  // пропорций (contain) — и по ширине, и по высоте.
+  clone.removeAttribute('style'); clone.removeAttribute('width'); clone.removeAttribute('height');
+  clone.setAttribute('preserveAspectRatio','xMidYMid meet');
+  clone.style.width='100%'; clone.style.height='100%';
   var bar=document.createElement('div'); bar.className='chart-zoom-bar';
   bar.innerHTML='<span>'+(title?escapeHtml(title):'График')+'</span>';
   var x=document.createElement('button'); x.className='chart-zoom-x'; x.setAttribute('aria-label','Закрыть'); x.textContent='✕';
-  bar.appendChild(x); box.appendChild(bar); box.appendChild(clone); ov.appendChild(box);
+  var body=document.createElement('div'); body.className='chart-zoom-body'; body.appendChild(clone);
+  bar.appendChild(x); box.appendChild(bar); box.appendChild(body); ov.appendChild(box);
   function done(){ ov.remove(); document.removeEventListener('keydown', onKey); }
   function onKey(e){ if(e.key==='Escape') done(); }
   ov.addEventListener('click', function(e){ if(e.target===ov) done(); });
