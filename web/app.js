@@ -6529,8 +6529,10 @@ function openChartZoom(svg){
   var ov=document.createElement('div'); ov.className='chart-zoom-ov';
   var box=document.createElement('div'); box.className='chart-zoom-box';
   // Заголовок графика — ближайшая подпись рядом со svg.
-  var title='', t=svg.parentElement && svg.parentElement.querySelector('.mkt-chart-t,.chart-title,.section-label,h2,h3');
-  if(!t){ var sec=svg.closest('section,.card,.kpi-detail,div'); if(sec) t=sec.querySelector('.mkt-chart-t,.chart-title,.section-label,h2,h3'); }
+  var TITLE_SEL='.mkt-chart-t,.chart-title,.panel-title,.section-title,.section-label,h2,h3';
+  var title='', t=svg.parentElement && svg.parentElement.querySelector(TITLE_SEL);
+  if(!t){ var sec=svg.closest('section,.panel,.card,.kpi-detail,div'); if(sec) t=sec.querySelector(TITLE_SEL); }
+  if(!t){ var sec2=svg.closest('section'); if(sec2) t=sec2.querySelector(TITLE_SEL); }
   if(t) title=t.textContent.trim();
   var clone=svg.cloneNode(true);
   // Полноэкранный режим: SVG растягивается на всё доступное место с сохранением
