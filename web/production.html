@@ -94,7 +94,17 @@ function fetchPlan(){
   var date=document.getElementById('date').value||tomorrowISO();
   document.getElementById('sub').textContent='загрузка плана на '+date+'…';
   var url='/api/production/plan?date='+date+(YOY?'&yoy=1':'');
-  fetch(url).then(function(r){return r.json();}).then(render).catch(function(e){
+  // С 30.07.2026 API закрыт авторизацией (PIN-сессия — cookie на весь домен).
+  // Если сессии нет — не сыпем сырой ошибкой, а ведём на вход в дашборд.
+  fetch(url).then(function(r){
+    if(r.status===401){
+      document.getElementById('err').innerHTML='Нужен вход: откройте <a href="/" style="color:inherit;text-decoration:underline">дашборд</a>, введите PIN — и вернитесь на эту страницу.';
+      document.getElementById('sub').textContent='доступ закрыт';
+      throw new Error('unauthorized');
+    }
+    return r.json();
+  }).then(render).catch(function(e){
+    if(e && e.message==='unauthorized') return;
     document.getElementById('err').textContent='Ошибка: '+e.message;
   });
 }

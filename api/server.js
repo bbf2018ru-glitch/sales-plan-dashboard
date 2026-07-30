@@ -388,10 +388,25 @@ const CORS_HEADERS = CORS_ORIGIN ? {
   'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Session-Token, X-User-Token'
 } : {};
 
+// Заголовки безопасности (30.07.2026). Внешних origin у дашборда нет (шрифты
+// локальные, CDN не используются) → CSP по 'self'; inline разрешён, потому что
+// index.html/app.js содержат inline-скрипты и стили. eval в проекте нет.
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
+};
+const CSP_HTML = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+  + "img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
+  + "font-src 'self' data:; connect-src 'self'; form-action 'self'";
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    ...SECURITY_HEADERS,
     ...CORS_HEADERS
   });
   res.end(JSON.stringify(payload));
@@ -455,6 +470,25 @@ function requireSession(req, res) {
   return true;
 }
 
+// Публичные (до авторизации) пути /api/*. Всё остальное закрывает глобальный гейт.
+// Держать МИНИМАЛЬНЫМ: сюда только то, что физически нужно неавторизованному
+// клиенту или машинным интеграциям со своим секретом.
+const INGEST_PATH_RE = /^\/api\/ingest\//;               // 1С пушит данные под X-API-Key
+const PUBLIC_API_EXACT = new Set([
+  '/api/auth',          // ввод PIN (свой rate-limit)
+  '/api/auth/logout',
+  '/api/health'         // мониторинг/смоук/дайджест — только {ok, версия}
+]);
+function isPublicApiPath(pathname, method) {
+  if (PUBLIC_API_EXACT.has(pathname)) return true;
+  // ingest-роуты проверяют X-API-Key внутри себя (requireApiKey) — гейт их пропускает,
+  // но только при наличии ключа (см. вызов в обработчике).
+  if (INGEST_PATH_RE.test(pathname)) return true;
+  // app-bridge для maria-app: свой HMAC-протокол (подпись phone:ts), сессии нет
+  if (pathname.startsWith('/api/app-bridge/')) return true;
+  return false;
+}
+
 function serveStatic(res, pathname) {
   const safePath = pathname === '/' ? '/index.html' : pathname;
   const filePath = path.normalize(path.join(WEB_DIR, safePath));
@@ -492,9 +526,10 @@ function serveStatic(res, pathname) {
     // правках — она может кэшироваться браузером свободно.
     // sw.js — без cache: при обновлении SW нужен fresh fetch, иначе
     // зависнет старая версия.
-    const headers = { 'Content-Type': contentType };
+    const headers = { 'Content-Type': contentType, ...SECURITY_HEADERS };
     if (ext === '.html' || pathname === '/') {
       headers['Cache-Control'] = 'no-cache, must-revalidate';
+      headers['Content-Security-Policy'] = CSP_HTML;
     } else if (pathname === '/sw.js') {
       headers['Cache-Control'] = 'no-cache, must-revalidate';
       headers['Service-Worker-Allowed'] = '/';
@@ -530,6 +565,24 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+
+    // ══ ГЛОБАЛЬНЫЙ ГЕЙТ /api/* (30.07.2026) ═════════════════════════════════
+    // ДО этого PIN-гейт был ФАКТИЧЕСКИ ТОЛЬКО КЛИЕНТСКИМ: requireSession стоял
+    // на 3 роутах из 85, и вся коммерческая аналитика (план/факт по точкам, маржа,
+    // выручка, каналы, себестоимость) отдавалась анониму простым curl.
+    // Теперь закрыто в одном месте — новый роут по умолчанию защищён.
+    // Пускаем: PIN-сессию (браузер), валидный X-User-Token (дайджест/интеграции),
+    // X-API-Key на ingest-роутах (1С пушит данные — ключ проверяет сам роут).
+    if (pathname.startsWith('/api/') && !isPublicApiPath(pathname, req.method)) {
+      let allowed = hasActiveSession(req);
+      if (!allowed && (req.headers['x-user-token'] || parseCookies(req)[USER_TOKEN_COOKIE] || parsedUrl.searchParams.get('userToken'))) {
+        allowed = !!(await resolveUser(req));
+      }
+      if (!allowed) {
+        sendJson(res, 401, { error: 'Требуется авторизация: введите PIN в дашборде или передайте X-User-Token.' });
+        return;
+      }
+    }
 
     // ── Auth ──────────────────────────────────────────────────────────────────
     if (pathname === '/api/auth' && req.method === 'POST') {
