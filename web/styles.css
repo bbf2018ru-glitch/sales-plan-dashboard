@@ -4405,7 +4405,7 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
    Раньше была коробка 1100px по центру — на больших мониторах читалась «маленьким
    попапом». Теперь оверлей занимает весь экран, график растягивается на максимум
    с сохранением пропорций (preserveAspectRatio contain). === */
-svg[width="100%"], svg[style*="width:100%"] { cursor: zoom-in; }
+svg[width="100%"], svg[style*="width:100%"], .zoomable-html-chart { cursor: zoom-in; }
 .chart-zoom-ov {
   position: fixed; inset: 0; z-index: 9999;
   background: rgba(8,10,16,.78); backdrop-filter: blur(3px);

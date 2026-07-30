@@ -3979,6 +3979,7 @@ function renderWeekly() {
 function renderCategoryChart() {
   const el = $('analyticsCategoryChart');
   if (!el) return;
+  el.classList.add('zoomable-html-chart'); // клик → полноэкранный зум (HTML-график)
   const rows = (analyticsState.data?.byCategory || []).slice(0, 15);
   if (!rows.length) { el.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
   const max = Math.max(...rows.map(r => r.fact));
@@ -4149,6 +4150,7 @@ function renderHourChart() {
 function renderHeatmap() {
   const el = $('analyticsHeatmap');
   if (!el) return;
+  el.classList.add('zoomable-html-chart'); // клик → полноэкранный зум (HTML-график)
   const cells = analyticsState.data?.heatmap || [];
   if (!cells.length) { el.innerHTML = '<div class="empty-state" style="padding:16px">Нет данных</div>'; return; }
   const max = Math.max(...cells.map(c => c.fact));
@@ -6525,25 +6527,43 @@ function isZoomableChart(svg){
   try{ if(svg.getBoundingClientRect().width>=220) return true; }catch(e){}
   return false;                                         // мелкие инлайн-иконки не зумим
 }
-function openChartZoom(svg){
+function openChartZoom(elSrc){
+  var isSvg = elSrc.namespaceURI==='http://www.w3.org/2000/svg';
   var ov=document.createElement('div'); ov.className='chart-zoom-ov';
   var box=document.createElement('div'); box.className='chart-zoom-box';
-  // Заголовок графика — ближайшая подпись рядом со svg.
+  // Заголовок графика — ближайшая подпись рядом с элементом.
   var TITLE_SEL='.mkt-chart-t,.chart-title,.panel-title,.section-title,.section-label,h2,h3';
-  var title='', t=svg.parentElement && svg.parentElement.querySelector(TITLE_SEL);
-  if(!t){ var sec=svg.closest('section,.panel,.card,.kpi-detail,div'); if(sec) t=sec.querySelector(TITLE_SEL); }
-  if(!t){ var sec2=svg.closest('section'); if(sec2) t=sec2.querySelector(TITLE_SEL); }
+  var title='', t=elSrc.parentElement && elSrc.parentElement.querySelector(TITLE_SEL);
+  if(!t){ var sec=elSrc.closest('section,.panel,.card,.kpi-detail,div'); if(sec) t=sec.querySelector(TITLE_SEL); }
+  if(!t){ var sec2=elSrc.closest('section'); if(sec2) t=sec2.querySelector(TITLE_SEL); }
   if(t) title=t.textContent.trim();
-  var clone=svg.cloneNode(true);
-  // Полноэкранный режим: SVG растягивается на всё доступное место с сохранением
-  // пропорций (contain) — и по ширине, и по высоте.
-  clone.removeAttribute('style'); clone.removeAttribute('width'); clone.removeAttribute('height');
-  clone.setAttribute('preserveAspectRatio','xMidYMid meet');
-  clone.style.width='100%'; clone.style.height='100%';
+  var clone=elSrc.cloneNode(true), body=document.createElement('div'); body.className='chart-zoom-body';
+  if(isSvg){
+    // SVG растягивается на всё доступное место с сохранением пропорций (contain).
+    clone.removeAttribute('style'); clone.removeAttribute('width'); clone.removeAttribute('height');
+    clone.setAttribute('preserveAspectRatio','xMidYMid meet');
+    clone.style.width='100%'; clone.style.height='100%';
+    body.appendChild(clone);
+  } else {
+    // HTML-график (div-бары, теплокарта): масштабируем transform-ом до окна —
+    // текст и бары растут векторно, раскладка не ломается.
+    var r=elSrc.getBoundingClientRect(), natW=Math.max(r.width,1), natH=Math.max(r.height,1);
+    var wrap=document.createElement('div');
+    wrap.style.cssText='width:'+natW+'px;flex:none;transform-origin:top left;';
+    clone.classList.remove('zoomable-html-chart');
+    wrap.appendChild(clone); body.appendChild(wrap);
+    body.style.overflow='hidden';
+    requestAnimationFrame(function(){
+      var bw=body.clientWidth-16, bh=body.clientHeight-16;
+      var k=Math.max(Math.min(bw/natW, bh/natH), 1); // только увеличиваем
+      wrap.style.transform='scale('+k+')';
+      wrap.style.width=natW+'px'; wrap.style.height=natH+'px';
+      wrap.style.marginLeft=Math.max((bw-natW*k)/2,0)+'px';
+    });
+  }
   var bar=document.createElement('div'); bar.className='chart-zoom-bar';
   bar.innerHTML='<span>'+(title?escapeHtml(title):'График')+'</span>';
   var x=document.createElement('button'); x.className='chart-zoom-x'; x.setAttribute('aria-label','Закрыть'); x.textContent='✕';
-  var body=document.createElement('div'); body.className='chart-zoom-body'; body.appendChild(clone);
   bar.appendChild(x); box.appendChild(bar); box.appendChild(body); ov.appendChild(box);
   function done(){ ov.remove(); document.removeEventListener('keydown', onKey); }
   function onKey(e){ if(e.key==='Escape') done(); }
@@ -6556,8 +6576,12 @@ function initChartZoom(){
   if(window.__chartZoomInit) return; window.__chartZoomInit=true;
   document.addEventListener('click', function(e){
     if(!e.target || !e.target.closest) return;
+    if(e.target.closest('.chart-zoom-ov')) return;
     var svg=e.target.closest('svg');
-    if(svg && isZoomableChart(svg)) openChartZoom(svg);
+    if(svg && isZoomableChart(svg)) { openChartZoom(svg); return; }
+    // HTML-графики, помеченные классом при рендере (теплокарта, div-бары)
+    var hc=e.target.closest('.zoomable-html-chart');
+    if(hc) openChartZoom(hc);
   });
 }
 
