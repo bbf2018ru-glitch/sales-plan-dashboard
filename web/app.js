@@ -6546,19 +6546,29 @@ function openChartZoom(elSrc){
     body.appendChild(clone);
   } else {
     // HTML-график (div-бары, теплокарта): масштабируем transform-ом до окна —
-    // текст и бары растут векторно, раскладка не ломается.
-    var r=elSrc.getBoundingClientRect(), natW=Math.max(r.width,1), natH=Math.max(r.height,1);
+    // текст и бары растут векторно, раскладка не ломается. Ширину меряем у
+    // КОНТЕНТА (inline-block shrink-wrap), а не у контейнера — контейнер обычно
+    // растянут на всю панель и занижал масштаб.
     var wrap=document.createElement('div');
-    wrap.style.cssText='width:'+natW+'px;flex:none;transform-origin:top left;';
+    wrap.style.cssText='flex:none;transform-origin:top left;';
     clone.classList.remove('zoomable-html-chart');
+    // Раскладку сохраняем по ширине ИСХОДНОГО контейнера (процентные бары зависят
+    // от неё), а масштаб считаем по фактической правой кромке контента — иначе
+    // фикс-ширинные графики (теплокарта) в широком контейнере недомасштабируются.
+    var srcW=Math.max(elSrc.getBoundingClientRect().width,1);
+    clone.style.width=srcW+'px';
     wrap.appendChild(clone); body.appendChild(wrap);
     body.style.overflow='hidden';
     requestAnimationFrame(function(){
+      var wr=wrap.getBoundingClientRect(), natH=Math.max(wr.height,1);
+      var maxRight=0, els=wrap.querySelectorAll('*');
+      for(var i=0;i<els.length;i++){ var er=els[i].getBoundingClientRect(); if(er.width>0) maxRight=Math.max(maxRight, er.right); }
+      var effW=Math.max(Math.min(maxRight-wr.left, srcW), 120);
       var bw=body.clientWidth-16, bh=body.clientHeight-16;
-      var k=Math.max(Math.min(bw/natW, bh/natH), 1); // только увеличиваем
+      var k=Math.max(Math.min(bw/effW, bh/natH), 1); // только увеличиваем
       wrap.style.transform='scale('+k+')';
-      wrap.style.width=natW+'px'; wrap.style.height=natH+'px';
-      wrap.style.marginLeft=Math.max((bw-natW*k)/2,0)+'px';
+      wrap.style.width=effW+'px'; wrap.style.height=natH+'px';
+      wrap.style.marginLeft=Math.max((bw-effW*k)/2,0)+'px';
     });
   }
   var bar=document.createElement('div'); bar.className='chart-zoom-bar';
