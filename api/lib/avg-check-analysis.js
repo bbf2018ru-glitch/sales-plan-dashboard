@@ -79,7 +79,9 @@ async function _compute(period) {
     if (!sku.has(name)) sku.set(name, {});
     sku.get(name)[yy] = { rev: upp.parseRu(row['Брутто']), qty: upp.parseRu(row['Штук']) };
   }
-  // общие SKU: взвешенный индекс цен (вес = выручка текущего года)
+  // общие SKU: взвешенный индекс цен. Вес = СРЕДНЕЕ выручки двух лет (Маршалл-Эджворт):
+  // вес только текущего года переоценивает подорожавшие позиции (их выручка уже содержит
+  // рост цены) — на июле-2026 давал 21% при честных ~15%.
   let wSum = 0, wIdx = 0, commonRevCur = 0;
   const movers = [];
   for (const [name, a] of sku) {
@@ -87,10 +89,11 @@ async function _compute(period) {
     if (!cur || !prev || !(cur.qty > 0) || !(prev.qty > 0)) continue;
     const pCur = cur.rev / cur.qty, pPrev = prev.rev / prev.qty;
     if (!(pPrev > 0)) continue;
-    wSum += cur.rev; wIdx += cur.rev * (pCur / pPrev); commonRevCur += cur.rev;
+    const w = (cur.rev + prev.rev) / 2;
+    wSum += w; wIdx += w * (pCur / pPrev); commonRevCur += cur.rev;
     movers.push({ name, pricePrev: Math.round(pPrev), priceCur: Math.round(pCur),
       changePct: Math.round((pCur / pPrev - 1) * 1000) / 10, revenueCur: Math.round(cur.rev),
-      impact: cur.rev * (pCur / pPrev - 1) });
+      impact: w * (pCur / pPrev - 1) });
   }
   const skuInflationPct = wSum > 0 ? Math.round((wIdx / wSum - 1) * 1000) / 10 : null;
   movers.sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact));
@@ -130,12 +133,12 @@ async function _compute(period) {
     topMovers: movers.slice(0, TOP_MOVERS).map(({ impact, ...rest }) => rest),
     newItems: newItems.slice(0, TOP_NEW),
     newItemsRevenue: Math.round(newItems.reduce((s, n) => s + n.revenue, 0)),
-    method: `чек = штуки/чек × цена/шт (брутто, Товары.Сумма); нетто-чек = СуммаДокумента−возвраты; SKU-индекс: общие товары >${SKU_MIN_REVENUE / 1000}к, вес = выручка тек. года; сдвиг микса = рост цены/шт − SKU-инфляция (оценка)`
+    method: `чек = штуки/чек × цена/шт (брутто, Товары.Сумма); нетто-чек = СуммаДокумента−возвраты; SKU-индекс: общие товары >${SKU_MIN_REVENUE / 1000}к, вес = средняя выручка двух лет; сдвиг микса = рост цены/шт − SKU-инфляция (оценка)`
   };
 }
 
 async function getAvgCheckAnalysis(period) {
-  return cache.wrap(period, () => _compute(period));
+  return cache.wrap(period + ':v2', () => _compute(period)); // v2: веса Маршалла-Эджворта
 }
 
 module.exports = { getAvgCheckAnalysis };
