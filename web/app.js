@@ -6561,16 +6561,19 @@ function openChartZoom(elSrc){
     body.style.overflow='hidden';
     requestAnimationFrame(function(){
       var wr=wrap.getBoundingClientRect(), natH=Math.max(wr.height,1);
-      // Кромка контента: только листовые элементы И не растянутые на всю ширину
-      // контейнера (блочные текстовые подписи типа «Часы Иркутск…» тянутся на 100%
-      // и прятали реальную кромку — теплокарта получала k~1.27 вместо ~2.3).
-      var maxRight=0, els=wrap.querySelectorAll('*');
+      // Контент-бокс по ЛИСТОВЫМ элементам (обе кромки): контейнеры/блочные подписи
+      // растянуты на 100% и врут; внутренние отступы/центрирование компенсируем
+      // сдвигом клона к левой кромке контента.
+      var minLeft=Infinity, maxRight=0, els=wrap.querySelectorAll('*');
       for(var i=0;i<els.length;i++){
         if(els[i].children.length>0) continue;
         var er=els[i].getBoundingClientRect();
-        if(er.width>0 && er.width<srcW*0.9) maxRight=Math.max(maxRight, er.right); // блочные подписи ≈ srcW − отсекаем с запасом
+        if(er.width<=0 || er.width>=srcW*0.9) continue;
+        minLeft=Math.min(minLeft, er.left); maxRight=Math.max(maxRight, er.right);
       }
-      var effW=Math.max(Math.min(maxRight-wr.left, srcW), 120);
+      if(!isFinite(minLeft) || maxRight<=minLeft){ minLeft=wr.left; maxRight=wr.right; }
+      var effW=Math.max(Math.min(maxRight-minLeft, srcW), 120);
+      clone.style.marginLeft=(-(minLeft-wr.left))+'px'; // контент к началу wrap
       var bw=body.clientWidth-16, bh=body.clientHeight-16;
       var k=Math.max(Math.min(bw/effW, bh/natH), 1); // только увеличиваем
       wrap.style.transform='scale('+k+')';
