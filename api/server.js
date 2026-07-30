@@ -2379,7 +2379,12 @@ function startPullSchedulerWithInterval(intervalMin) {
   return true;
 }
 
-server.listen(PORT, async () => {
+// Слушаем ТОЛЬКО localhost (30.07.2026): nginx проксирует на 127.0.0.1:3000,
+// а до фикса node висел на 0.0.0.0 — порт 3000 торчал в интернет и позволял
+// ходить в API напрямую, минуя nginx (его правила/логи/будущий HTTPS).
+// HOST=0.0.0.0 в env — осознанный опт-аут (docker/иной прокси).
+const HOST = process.env.HOST || '127.0.0.1';
+server.listen(PORT, HOST, async () => {
   await store.init();
   console.log(`Sales Plan Dashboard running at http://localhost:${PORT}`);
   console.log(`Storage: ${DATABASE_URL ? 'PostgreSQL' : 'JSON file'}`);

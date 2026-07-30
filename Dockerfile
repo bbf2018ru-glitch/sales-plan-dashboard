@@ -14,4 +14,8 @@ COPY README.md ./README.md
 
 EXPOSE 3000
 
+# В контейнере слушаем все интерфейсы (иначе порт недоступен снаружи).
+# На хосте (systemd за nginx) по умолчанию 127.0.0.1 — см. HOST в api/server.js.
+ENV HOST=0.0.0.0
+
 CMD ["npm", "start"]
