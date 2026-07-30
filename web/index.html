@@ -28,7 +28,7 @@
     <link rel="stylesheet" href="/styles-maria.css?v=17" />
     <!-- «Стекло» (бенто + стекло + aurora) — ДЕФОЛТНАЯ оболочка поверх maria-design.
          Флаг data-design="glass" на <html>. ОТКАТ — снять этот <link> и атрибут data-design. -->
-    <link rel="stylesheet" href="/styles-glass.css?v=8" />
+    <link rel="stylesheet" href="/styles-glass.css?v=9" />
   </head>
   <body>
     <a href="#mainContent" class="skip-link">Перейти к содержимому</a>
@@ -1405,7 +1405,7 @@
 
           <section class="section" id="mkt-s-stores" data-mgroup="products">
             <div class="section-label">По точкам — маркетинг <span class="mkt-scope dyn" title="Живые данные из 1С, YoY к тому же месяцу год назад">live · за месяц</span></div>
-            <div class="section-hint">Выручка / средний чек / % карты лояльности в разрезе каждой точки + Δ к маю прошлого года. Помогает увидеть, где маркетинг работает, где карта лояльности проседает, где рост или падение год-к-году.</div>
+            <div class="section-hint">Выручка / средний чек / % карты лояльности в разрезе каждой точки + Δ к тому же месяцу прошлого года. Помогает увидеть, где маркетинг работает, где карта лояльности проседает, где рост или падение год-к-году.</div>
             <div id="mktByStore" class="table-wrap"></div>
           </section>
 
@@ -1604,7 +1604,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=179"></script>
+    <script async src="/app.js?v=180"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

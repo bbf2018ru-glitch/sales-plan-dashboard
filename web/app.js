@@ -6068,12 +6068,25 @@ function mktLoadYoY(){
         '<div class="mkt-kpi"><div class="mkt-v" style="'+rateC+'">'+(rate==null?'—':mNum1(rate)+' %')+'</div><div class="mkt-l">Доля чеков с промо</div></div>'+
         '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.uniqueCodes)+'</div><div class="mkt-l">Уникальных кодов</div></div>'+
         '</div>'+
-        '<div class="mkt-chart-t">Последние '+(uds.recentApplications||[]).length+' применений (свежее наверху)</div>'+
-        '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Промокод</th><th>Чек №</th><th class="num">Сумма ₽</th><th>Точка</th></tr></thead><tbody>'+
-        (uds.recentApplications||[]).slice(0,40).map(function(r){
-          return '<tr><td style="font-size:11px">'+(r.date||'')+'</td><td><b>'+r.code+'</b></td><td style="font-size:11px;color:var(--muted)">'+(r.docNumber||'—')+'</td><td class="num">'+mNum(r.sum)+'</td><td style="font-size:11px;color:var(--muted)">'+((r.store||'—')+'').slice(0,30)+'</td></tr>';
-        }).join('')+'</tbody></table></div>'+
+        '<div class="mkt-chart-t">Свежие применения (новее наверху)</div>'+
+        '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Промокод</th><th>Чек №</th><th class="num">Сумма ₽</th><th>Точка</th></tr></thead><tbody id="udsFreshBody"></tbody></table></div>'+
+        '<div id="udsFreshMoreWrap"></div>'+
         '<div style="font-size:11px;color:var(--muted);margin-top:6px">За '+(uds.periodYM||period)+' · выручка чеков с промокодом '+fmtNum(uds.revenue)+' ₽ · бонусов списано '+fmtNum(uds.bonusUsed)+' ₽ (ДРР '+(uds.drr==null?'—':mNum1(uds.drr)+' %')+').'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
+      // Список свернут до 12 строк (раньше простыня из 40 при заголовке «100» —
+      // заголовок врал, лента хоронила матрицу кодов ниже). «Показать все» — по клику.
+      var freshRows=(uds.recentApplications||[]);
+      var freshRow=function(r){ return '<tr><td style="font-size:11px">'+(r.date||'')+'</td><td><b>'+r.code+'</b></td><td style="font-size:11px;color:var(--muted)">'+(r.docNumber||'—')+'</td><td class="num">'+mNum(r.sum)+'</td><td style="font-size:11px;color:var(--muted)">'+((r.store||'—')+'').slice(0,30)+'</td></tr>'; };
+      var freshBody=document.getElementById('udsFreshBody'), freshMore=document.getElementById('udsFreshMoreWrap');
+      if(freshBody){
+        freshBody.innerHTML=freshRows.slice(0,12).map(freshRow).join('');
+        if(freshMore && freshRows.length>12){
+          freshMore.innerHTML='<button class="btn-mini" type="button" style="margin-top:6px">Показать все '+freshRows.length+'</button>';
+          freshMore.querySelector('button').addEventListener('click', function(){
+            freshBody.innerHTML=freshRows.map(freshRow).join('');
+            freshMore.innerHTML='';
+          });
+        }
+      }
     }).catch(function(){});
 
     // Промокоды UDS — помесячная матрица.

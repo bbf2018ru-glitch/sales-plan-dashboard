@@ -148,14 +148,15 @@
 }
 
 /* ───────── ФАЗА 2: модерн-бары (скругл + градиент) ───────── */
-[data-design="glass"] .mkt-topbar,
+/* ФИКС 30.07.2026: .mkt-topbar убран из градиента — это ЛИПКАЯ ШАПКА маркетинга
+   (период + под-табы), а не столбик графика; бордовая заливка делала весь тёмный
+   текст на ней нечитаемым (контраст) и лила красный большой площадью. */
 [data-design="glass"] .mkt-dbar,
 [data-design="glass"] .mkt-fbar,
 [data-design="glass"] .bar {
   border-radius: 7px 7px 3px 3px !important;
   background: linear-gradient(180deg, var(--accent), rgba(199,86,106,.22)) !important;
 }
-[data-theme=light][data-design="glass"] .mkt-topbar,
 [data-theme=light][data-design="glass"] .mkt-dbar,
 [data-theme=light][data-design="glass"] .mkt-fbar {
   background: linear-gradient(180deg, var(--accent), rgba(138,42,59,.18)) !important;
