@@ -6561,12 +6561,14 @@ function openChartZoom(elSrc){
     body.style.overflow='hidden';
     requestAnimationFrame(function(){
       var wr=wrap.getBoundingClientRect(), natH=Math.max(wr.height,1);
-      // только ЛИСТОВЫЕ элементы: контейнеры строк растянуты на всю ширину и
-      // прятали реальную кромку контента (теплокарта опять получала k~1.3)
+      // Кромка контента: только листовые элементы И не растянутые на всю ширину
+      // контейнера (блочные текстовые подписи типа «Часы Иркутск…» тянутся на 100%
+      // и прятали реальную кромку — теплокарта получала k~1.27 вместо ~2.3).
       var maxRight=0, els=wrap.querySelectorAll('*');
       for(var i=0;i<els.length;i++){
         if(els[i].children.length>0) continue;
-        var er=els[i].getBoundingClientRect(); if(er.width>0) maxRight=Math.max(maxRight, er.right);
+        var er=els[i].getBoundingClientRect();
+        if(er.width>0 && er.width<srcW-4) maxRight=Math.max(maxRight, er.right);
       }
       var effW=Math.max(Math.min(maxRight-wr.left, srcW), 120);
       var bw=body.clientWidth-16, bh=body.clientHeight-16;
