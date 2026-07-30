@@ -6561,8 +6561,13 @@ function openChartZoom(elSrc){
     body.style.overflow='hidden';
     requestAnimationFrame(function(){
       var wr=wrap.getBoundingClientRect(), natH=Math.max(wr.height,1);
+      // только ЛИСТОВЫЕ элементы: контейнеры строк растянуты на всю ширину и
+      // прятали реальную кромку контента (теплокарта опять получала k~1.3)
       var maxRight=0, els=wrap.querySelectorAll('*');
-      for(var i=0;i<els.length;i++){ var er=els[i].getBoundingClientRect(); if(er.width>0) maxRight=Math.max(maxRight, er.right); }
+      for(var i=0;i<els.length;i++){
+        if(els[i].children.length>0) continue;
+        var er=els[i].getBoundingClientRect(); if(er.width>0) maxRight=Math.max(maxRight, er.right);
+      }
       var effW=Math.max(Math.min(maxRight-wr.left, srcW), 120);
       var bw=body.clientWidth-16, bh=body.clientHeight-16;
       var k=Math.max(Math.min(bw/effW, bh/natH), 1); // только увеличиваем
