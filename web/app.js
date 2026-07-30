@@ -6574,11 +6574,15 @@ function openChartZoom(elSrc){
       if(!isFinite(minLeft) || maxRight<=minLeft){ minLeft=wr.left; maxRight=wr.right; }
       var effW=Math.max(Math.min(maxRight-minLeft, srcW), 120);
       clone.style.marginLeft=(-(minLeft-wr.left))+'px'; // контент к началу wrap
+      // Флекс-центрирование body считает по НЕмасштабированной ширине wrap —
+      // scale уносил график вправо/вниз за экран. Центруем вручную.
+      body.style.alignItems='flex-start'; body.style.justifyContent='flex-start';
       var bw=body.clientWidth-16, bh=body.clientHeight-16;
       var k=Math.max(Math.min(bw/effW, bh/natH), 1); // только увеличиваем
       wrap.style.transform='scale('+k+')';
       wrap.style.width=effW+'px'; wrap.style.height=natH+'px';
-      wrap.style.marginLeft=Math.max((bw-effW*k)/2,0)+'px';
+      wrap.style.marginLeft=Math.max((bw-effW*k)/2,8)+'px';
+      wrap.style.marginTop=Math.max((bh-natH*k)/2,8)+'px';
     });
   }
   var bar=document.createElement('div'); bar.className='chart-zoom-bar';
