@@ -4870,6 +4870,25 @@ function renderPaidCosts(pc){
   if(pc.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+pc.note+'</div>';
   el.innerHTML=html;
 }
+// Кофе-контроль: стаканы, уехавшие на точку (1С перемещения), против пробитых напитков.
+// Разрыв = продажи мимо кассы. Светофор: ok ≤1.7 стакана/напиток, warn ≤3, red >3.
+function renderCoffeeControl(cc){
+  var el=document.getElementById('mktCoffee'), hint=document.getElementById('mktCoffeeHint');
+  if(!el) return;
+  if(!cc || cc.error || !cc.stores){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных: '+((cc&&cc.error)||'пустой ответ 1С')+'</div>'; return; }
+  var stLabel={ok:'<span style="color:var(--good)">✓ норма</span>',warn:'<span style="color:var(--gold)">⚠ разрыв</span>',red:'<span style="color:var(--bad)"><b>✗ мимо кассы?</b></span>',few:'<span style="color:var(--muted)">мало данных</span>'};
+  var rows=cc.stores.map(function(s){
+    var ratio=s.ratio!=null?String(s.ratio).replace('.',','):'—';
+    var bad=s.status==='red'?' style="background:var(--bad-soft)"':'';
+    return '<tr'+bad+'><td><b>'+s.store+'</b></td><td class="num">'+mNum(s.cups)+'</td><td class="num">'+mNum(s.drinks)+'</td><td class="num">'+ratio+'</td><td>'+(stLabel[s.status]||s.status)+'</td></tr>';
+  }).join('');
+  el.innerHTML='<table style="font-size:12px"><thead><tr><th>Точка</th><th class="num">Стаканов отгружено</th><th class="num">Напитков пробито</th><th class="num">Стаканов на напиток</th><th>Статус</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  if(hint){
+    var reds=cc.stores.filter(function(s){return s.status==='red';}).map(function(s){return s.store;});
+    hint.innerHTML='Окно '+cc.windowDays+' дней ('+cc.from+' … '+cc.to+'). «Напитков пробито» считается с запасом в пользу точки (все напитки, включая чай и бутылки).'+
+      (reds.length?' <b style="color:var(--bad)">Красные точки: '+reds.join(', ')+'</b> — стаканы расходуются, продажи не пробиваются: контрольная закупка + сверка счётчика кофемашины.':' Красных точек нет.');
+  }
+}
 // SMS-атрибуция: по каждой маркетинговой рассылке, привязка к офферу (продукт+срок).
 function renderSmsAttribution(sa){
   var el=document.getElementById('mktSmsAttr'); if(!el) return;
@@ -5668,6 +5687,13 @@ function mktLoadYoY(){
       paidEl.innerHTML='<div class="mkt-yoy-load">Считаю бюджет платных каналов…</div>';
       fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ _mktPaid=pc; renderPaidCosts(pc); })
         .catch(function(e){ paidEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Бюджет недоступен: '+e.message+'</div>'; });
+    }
+    // Кофе-контроль (стаканы→чеки) — отдельный эндпоинт, окно 56 дней, кэш 6ч.
+    var coffEl=document.getElementById('mktCoffee');
+    if(coffEl){
+      coffEl.innerHTML='<div class="mkt-yoy-load">Сверяю стаканы с чеками из 1С…</div>';
+      fetchJson('/api/marketing/coffee-control').then(function(cc){ renderCoffeeControl(cc); })
+        .catch(function(e){ coffEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Кофе-контроль недоступен: '+e.message+'</div>'; });
     }
     // SMS-атрибуция за выбранный месяц — отдельный (тяжёлый ~9с, кэш 6ч) эндпоинт.
     var smsAttrEl=document.getElementById('mktSmsAttr');

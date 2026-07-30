@@ -1216,6 +1216,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Кофе-контроль: стаканы (перемещения) vs пробитые напитки — ловля продаж мимо кассы ──
+    // Открыт как соседние marketing-эндпоинты. 2 лёгких агрегата в 1С, кэш 6ч.
+    if (pathname === '/api/marketing/coffee-control' && req.method === 'GET') {
+      try {
+        const coffeeControl = require('./lib/coffee-control');
+        sendJson(res, 200, await coffeeControl.getCoffeeControl());
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── SMS-атрибуция: рассылки → покупки по карте (живой /query 1С) ──
     // Открыт без авторизации (как summary/channels). Тяжёлый запрос (~9с) кэшируется на 6ч.
     if (pathname === '/api/marketing/sms-attribution' && req.method === 'GET') {
