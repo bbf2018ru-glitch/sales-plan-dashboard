@@ -89,12 +89,12 @@
 [data-design="chalk"] .summary-hero .hero-ring-num { fill:var(--ink); }
 [data-design="chalk"] .summary-hero .hero-headline { color:var(--ink); }
 
-/* Числа набираются моно — на доске цифры должны стоять ровными столбцами */
-[data-design="chalk"] .kpi-value,
+/* Числа в ТАБЛИЦАХ — табличные цифры, чтобы столбцы стояли ровно.
+   В крупных KPI намеренно НЕ включаем: tabular-нули шире пропорциональных,
+   и «26.1 М ₽» переставало влезать в плитку (ловилось на проде). */
 [data-design="chalk"] td.num,
-[data-design="chalk"] .num {
+[data-design="chalk"] th.num {
   font-variant-numeric:tabular-nums;
-  letter-spacing:-.01em;
 }
 
 /* Сайдбар — та же доска, отделён штрихом */
