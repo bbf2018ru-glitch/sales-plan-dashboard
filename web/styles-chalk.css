@@ -68,6 +68,10 @@
   font-weight:600;
 }
 
+/* Столбики графиков: на доске мел кладётся плоско. Глянцевый блик поверх
+   баров (наследие «стеклянной» темы) читался как пластик — гасим. */
+[data-design="chalk"] rect[fill="url(#chSheen)"] { display:none; }
+
 /* Разделители — штрих мела, а не типографская линейка */
 [data-design="chalk"] table tbody tr { border-bottom:1px dashed rgba(42,39,36,.14); }
 [data-design="chalk"] table thead tr { border-bottom:1px solid rgba(42,39,36,.3); }
