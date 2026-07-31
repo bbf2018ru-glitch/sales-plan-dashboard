@@ -68,6 +68,45 @@
   font-weight:600;
 }
 
+/* ── Цвета мимо палитры ─────────────────────────────────────────────────────
+   Аудит контраста на живой странице (замер по всем текстовым узлам) вскрыл
+   наследие прежней вёрстки: захардкоженные «тейлвиндовские» зелёный/красный/
+   голубой мимо токенов. На бумаге они давали 2,1–3,9:1 при норме 4,5 (самый
+   тяжёлый — голубой «Розница», 18 элементов) и выпадали из брендовой палитры.
+   Переводим на токены темы: они уже затемнены под AA. */
+[data-design="chalk"] .sm-value.sm-good,
+[data-design="chalk"] [data-theme=light] .sm-value.sm-good,
+[data-design="chalk"] .trend-cell.good,
+[data-design="chalk"] .mk-hero-good .mk-hero-value,
+[data-design="chalk"] .mk-rfm-col-title.good,
+[data-design="chalk"] .kpi-delta-up,
+[data-design="chalk"] .mkt-yoy-up { color:var(--good) !important; }
+
+[data-design="chalk"] .sm-value.sm-bad,
+[data-design="chalk"] .trend-cell.bad,
+[data-design="chalk"] .hero-store-bad b,
+[data-design="chalk"] .kpi-delta-down,
+[data-design="chalk"] .mkt-yoy-down { color:var(--bad) !important; }
+
+/* Подложки бейджей — тёплые тинты вместо холодных */
+[data-design="chalk"] .kpi-delta-up,
+[data-design="chalk"] .mkt-yoy-up,
+[data-design="chalk"] .mt-rising,
+[data-design="chalk"] .mk-badge-good { background:var(--good-soft) !important; }
+[data-design="chalk"] .kpi-delta-down,
+[data-design="chalk"] .mkt-yoy-down { background:var(--bad-soft) !important; }
+[data-design="chalk"] .trend-cell.good { background:var(--good-soft) !important; }
+[data-design="chalk"] .trend-cell.bad  { background:var(--bad-soft) !important; }
+
+/* Метки каналов продаж: голубой «Розница» (#38bdf8, 2,09:1) — единственный
+   холодный цвет во всём интерфейсе. Переводим на тёплую нейтраль. */
+[data-design="chalk"] .store-source-retail { color:var(--muted) !important; }
+[data-design="chalk"] .store-source { color:var(--muted); }
+
+/* Обводки лучшего/худшего дня недели — в цветах темы */
+[data-design="chalk"] .weekday-cell.is-best  { box-shadow:0 0 0 2px rgba(76,116,57,.45); }
+[data-design="chalk"] .weekday-cell.is-worst { box-shadow:0 0 0 2px rgba(163,58,58,.35); }
+
 /* Столбики графиков: на доске мел кладётся плоско. Глянцевый блик поверх
    баров (наследие «стеклянной» темы) читался как пластик — гасим. */
 [data-design="chalk"] rect[fill="url(#chSheen)"] { display:none; }
