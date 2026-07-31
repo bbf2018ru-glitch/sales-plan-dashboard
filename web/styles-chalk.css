@@ -93,8 +93,9 @@
    но в крупных KPI они шире пропорциональных, и «26.1 М ₽» не влезало в плитку.
    Glass лечит это сжатием трекинга; на доске делаем так же плюс чуть мельче кегль. */
 [data-design="chalk"] .kpi-value {
-  font-size:clamp(22px, 2.25vw, 31px);
+  font-size:clamp(18px, 1.85vw, 26px);
   letter-spacing:-.035em;
+  white-space:nowrap;
 }
 
 /* Сайдбар — та же доска, отделён штрихом */
