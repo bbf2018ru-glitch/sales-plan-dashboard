@@ -415,7 +415,7 @@ function renderTrendChart(summary) {
   const legend =
     chip(pad.l + pw - (pyHasAny ? 250 : 160), 66, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">факт</text>`) +
     chip(pad.l + pw - (pyHasAny ? 178 : 88), 66, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--hint)" stroke-width="2" stroke-dasharray="4,3"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">план</text>`) +
-    (pyHasAny ? chip(pad.l + pw - 106, 84, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--gold)" stroke-width="2" stroke-dasharray="2,3"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">пр. год</text>`) : '');
+    (pyHasAny ? chip(pad.l + pw - 106, 84, `<line x1="8" y1="8" x2="22" y2="8" stroke="var(--series-prev, var(--gold))" stroke-width="2" stroke-dasharray="2,3"/><text x="27" y="11.5" font-size="9.5" fill="var(--ink, #333)">пр. год</text>`) : '');
 
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
     <defs>
@@ -429,7 +429,7 @@ function renderTrendChart(summary) {
     <g clip-path="url(#tclip)">
       <path class="ch-area" d="${areaD}" fill="url(#tg)"/>
       <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="1.6" stroke-dasharray="5,4" opacity=".8"/>
-      ${pyHasAny ? `<path d="${pyD}" fill="none" stroke="var(--gold)" stroke-width="1.8" stroke-dasharray="2,3.5" opacity=".8"/>` : ''}
+      ${pyHasAny ? `<path d="${pyD}" fill="none" stroke="var(--series-prev, var(--gold))" stroke-width="1.8" stroke-dasharray="2,3.5" opacity=".8"/>` : ''}
       <path class="ch-line" d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     ${hits}${dots}${xlabels}${legend}
@@ -5955,10 +5955,10 @@ function mktLoadYoY(){
       var leg=document.getElementById('mktChartRevLeg');
       if(leg){ leg.innerHTML='<span class="mkt-lg"><i style="background:var(--accent)"></i>факт месяца</span><span class="mkt-lg"><i style="background:var(--gold)"></i>год назад (YoY)</span>'; }
       // Прошлый год: null там, где данных нет → разрыв (нулевой столбик), а не выдуманный 0.
-      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m?m.revenue:null;}), 'var(--accent)', 'var(--gold)', ' ₽');
-      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m?m.cheques:null;}), 'var(--accent)', 'var(--gold)', ' шт');
-      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m?m.avgCheck:null;}), 'var(--accent)', 'var(--gold)', ' ₽');
-      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m?m.cardPct:null;}), 'var(--accent)', 'var(--gold)', ' %');
+      mGroup('mktChartRev', lbls, cs.map(function(m){return m.revenue;}), ps.map(function(m){return m?m.revenue:null;}), 'var(--accent)', 'var(--series-prev, var(--gold))', ' ₽');
+      mGroup('mktChartCheq', lbls, cs.map(function(m){return m.cheques;}), ps.map(function(m){return m?m.cheques:null;}), 'var(--accent)', 'var(--series-prev, var(--gold))', ' шт');
+      mGroup('mktChartAvg', lbls, cs.map(function(m){return m.avgCheck;}), ps.map(function(m){return m?m.avgCheck:null;}), 'var(--accent)', 'var(--series-prev, var(--gold))', ' ₽');
+      mGroup('mktChartCard', lbls, cs.map(function(m){return m.cardPct;}), ps.map(function(m){return m?m.cardPct:null;}), 'var(--accent)', 'var(--series-prev, var(--gold))', ' %');
     }
     // Партнёры (Bitrix iblock 88) — список с UTM-метками
     if (d.external && d.external.partners) {
