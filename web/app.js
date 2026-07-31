@@ -6234,9 +6234,17 @@ function mktLoadYoY(){
       bs.innerHTML='<table><thead><tr><th>Точка</th><th class="num">Выручка ₽</th><th class="num">YoY</th><th class="num">Чеки</th><th class="num">Ср. чек</th><th class="num">Карта лоял.</th><th class="num">Δ карты</th></tr></thead><tbody>'+
         d.byStore.map(function(r){
           var dr=r.revenue.deltaPct, dcl=r.cardPct.deltaPp;
-          var drs=(dr==null?'нов.':(dr>0?'+':'')+mNum1(dr)+'%'); var drc=(dr==null?'color:var(--muted)':(dr>0?'color:var(--good)':(dr<0?'color:var(--bad)':'')));
+          // Точки, стартовавшие год назад с копеечной базы, дают «+27 018 250 %»:
+          // колонка разъезжается, а число ничего не сообщает. Показываем кратность,
+          // точный процент уходит в подсказку.
+          var drTitle='';
+          var drs;
+          if(dr==null) drs='нов.';
+          else if(Math.abs(dr)>999){ drs='×'+mNum(Math.round(dr/100+1)); drTitle=' title="Рост с очень низкой базы: '+mNum1(dr)+' % к тому же месяцу год назад"'; }
+          else drs=(dr>0?'+':'')+mNum1(dr)+'%';
+          var drc=(dr==null?'color:var(--muted)':(dr>0?'color:var(--good)':(dr<0?'color:var(--bad)':'')));
           var dcls=(dcl==null?'—':(dcl>0?'+':'')+mNum1(dcl)+' п.п.'); var dclc=(dcl>=0?'color:var(--good)':'color:var(--bad)');
-          return '<tr><td><b>'+r.name+'</b></td><td class="num">'+mNum(r.revenue.cur)+'</td><td class="num" style="'+drc+'">'+drs+'</td><td class="num">'+mNum(r.cheques.cur)+'</td><td class="num">'+mNum(r.avgCheck.cur)+' ₽</td><td class="num">'+mNum1(r.cardPct.cur)+'%</td><td class="num" style="'+dclc+'">'+dcls+'</td></tr>';
+          return '<tr><td><b>'+r.name+'</b></td><td class="num">'+mNum(r.revenue.cur)+'</td><td class="num" style="'+drc+'"'+drTitle+'>'+drs+'</td><td class="num">'+mNum(r.cheques.cur)+'</td><td class="num">'+mNum(r.avgCheck.cur)+' ₽</td><td class="num">'+mNum1(r.cardPct.cur)+'%</td><td class="num" style="'+dclc+'">'+dcls+'</td></tr>';
         }).join('')+'</tbody></table>';
     }
     // 2ГИС Сторис — Маша платит за продвижение
