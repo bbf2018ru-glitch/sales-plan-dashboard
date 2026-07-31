@@ -210,18 +210,21 @@ async function handlePinSubmit() {
 }
 
 // ── Dark theme ─────────────────────────────────────────────────────────────
+// Тема одна — «Мел на бумаге» (светлая). Переключателей в интерфейсе нет:
+// кнопки луны и оформления убраны 31.07.2026 по решению владельца.
+// Старые значения в localStorage игнорируем, чтобы у тех, кто успел
+// переключиться на тёмную, не открылась несуществующая тема.
 function initDarkTheme() {
-  const savedDesign = localStorage.getItem('maria_design') || 'glass';
-  const saved = localStorage.getItem('maria_theme') || 'light';
-  setTheme(saved);
-  if (savedDesign === 'chalk') setDesign('chalk'); else setDesign('glass');
-  $('themeToggle').addEventListener('click', () => {
+  setTheme('light');
+  setDesign('chalk');
+  const tBtn = $('themeToggle');
+  if (tBtn) tBtn.addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     setTheme(current === 'dark' ? 'light' : 'dark');
   });
   const dBtn = $('designToggle');
   if (dBtn) dBtn.addEventListener('click', () => {
-    const now = document.documentElement.getAttribute('data-design') || 'glass';
+    const now = document.documentElement.getAttribute('data-design') || 'chalk';
     setDesign(now === 'chalk' ? 'glass' : 'chalk');
   });
 }
@@ -288,13 +291,8 @@ function setDesign(design) {
   const html = document.documentElement;
   html.setAttribute('data-design', design);
   localStorage.setItem('maria_design', design);
-  if (design === 'chalk') {
-    const prev = html.getAttribute('data-theme') || 'light';
-    if (prev !== 'dark') localStorage.setItem('maria_theme_before_chalk', prev);
-    setTheme('dark');
-  } else {
-    setTheme(localStorage.getItem('maria_theme_before_chalk') || 'light');
-  }
+  // «Мел на бумаге» — светлая тема (в отличие от первой, грифельной версии).
+  if (design === 'chalk') setTheme('light');
   const btn = $('designToggle');
   if (btn) {
     const on = design === 'chalk';

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-theme="light" data-design="glass">
+<html lang="ru" data-theme="light" data-design="chalk">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -31,7 +31,7 @@
     <link rel="stylesheet" href="/styles-glass.css?v=9" />
     <!-- «Чистый грифель» — альтернативное оформление (кнопка «доска» в сайдбаре).
          Активируется флагом data-design="chalk"; при glass не влияет ни на что. -->
-    <link rel="stylesheet" href="/styles-chalk.css?v=4" />
+    <link rel="stylesheet" href="/styles-chalk.css?v=5" />
   </head>
   <body>
     <a href="#mainContent" class="skip-link">Перейти к содержимому</a>
@@ -111,10 +111,9 @@
             </div>
           </div>
           <div class="brand-actions">
-            <button id="themeToggle" class="tool-btn" title="Тёмная тема" aria-label="Переключить тему оформления"></button>
-            <button id="designToggle" class="tool-btn" title="Оформление: доска" aria-label="Переключить оформление: грифельная доска" aria-pressed="false">
-              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="1.5"/><line x1="2" y1="20" x2="22" y2="20"/><line x1="7" y1="9" x2="13" y2="9" stroke-dasharray="2 2"/><line x1="7" y1="13" x2="16" y2="13" stroke-dasharray="2 2"/></svg>
-            </button>
+            <!-- Переключатели темы и оформления убраны 31.07.2026: тема одна —
+                 «Мел на бумаге» (data-design="chalk" + data-theme="light" ниже). -->
+
             <button id="printBtn" class="tool-btn" title="Печать / PDF" aria-label="Печать / PDF">
               <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             </button>
@@ -1610,7 +1609,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=181"></script>
+    <script async src="/app.js?v=182"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

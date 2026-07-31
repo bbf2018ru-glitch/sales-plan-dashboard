@@ -1,122 +1,117 @@
 /* ============================================================
-   ТЕМА «ЧИСТЫЙ ГРИФЕЛЬ» (chalk) — выбрана владельцем 31.07.2026
-   из десяти направлений (макет: maria-design-lab/chalk.html, вариант A).
+   ТЕМА «МЕЛ НА БУМАГЕ» (chalk) — ЕДИНСТВЕННОЕ оформление дашборда.
+   Выбрана владельцем 31.07.2026: направление «меловая доска», степень
+   доводки A, но в СВЕТЛОМ исполнении (решение владельца).
 
-   Концепция: экран — грифельная доска кофейни. Поверхность с едва заметной
-   неровностью тона, текст «мелом», разделители — пунктир (штрих мела, а не
-   типографская линейка). Цвет тратится скупо: ОХРА — сигнатура достижения
-   (кольцо плана, линия факта), зелёный и терракотовый мелки — только статусы.
-   Никакой имитации дерева и бликов: доска чувствуется, но не спорит с цифрами.
+   Концепция: не грифель, а светлая доска кофейни — тёплая бумажная
+   поверхность с едва заметной неровностью тона, надписи угольно-графитовые,
+   разделители — штрих мела, а не типографская линейка. Цвет тратится скупо:
+   ОХРА — единственная сигнатура (кольцо плана, линия факта, активные
+   элементы); зелёный и терракотовый — только статусы.
 
-   Включается флагом data-design="chalk" на <html> (кнопка «Доска» в сайдбаре).
-   ОТКАТ: снять флаг — вернётся «Ганаш & золото» (data-design="glass").
+   Переключателей тем в интерфейсе нет: тема одна. Флаг data-design="chalk"
+   и data-theme="light" зафиксированы в index.html.
+   ОТКАТ к «Ганаш & золото»: снять флаг data-design (вернётся glass).
    ============================================================ */
 
 [data-design="chalk"] {
-  /* поверхность */
-  --bg:#23211F;              /* грифель */
-  --paper:#2A2724;           /* планка/панель — на тон светлее доски */
-  --glass:#2A2724; --glass-strong:#302C29; --glass-edge:rgba(244,237,226,.14);
-  /* мел */
-  --ink:#F4EDE2;             /* основной мел */
-  --muted:#B7ADA0;           /* приглушённый мел */
-  --hint:#A2988C;            /* подписи (AA на грифеле) */
-  --line:rgba(244,237,226,.15);
-  /* сигнатура: охра = достижение, отмеряется скупо */
-  --accent:#DFAF6A;
-  --accent-soft:rgba(223,175,106,.14);
-  --glow-accent:0 0 0 1px rgba(223,175,106,.34);
-  --gold:#E3C071; --gold-soft:rgba(227,192,113,.15);
+  /* поверхность: тёплая бумага, НЕ белая */
+  --bg:#F2EDE4;
+  --paper:#FFFCF6;           /* планка/панель — светлее фона */
+  --glass:#FFFCF6; --glass-strong:#FFFFFF; --glass-edge:rgba(42,39,36,.14);
+  /* уголь */
+  --ink:#2A2724;             /* графит — основной текст */
+  --muted:#6E655C;
+  --hint:#6A6158;            /* подписи, AA на бумаге */
+  --line:rgba(42,39,36,.16);
+  /* сигнатура: охра, затемнённая под светлый фон (AA на бумаге) */
+  --accent:#9A6B18;
+  --accent-soft:rgba(154,107,24,.12);
+  --glow-accent:0 0 0 1px rgba(154,107,24,.26), 0 4px 14px -6px rgba(154,107,24,.22);
+  --gold:#8A6B12; --gold-soft:rgba(138,107,18,.14);
   /* статусные мелки */
-  --good:#9CC08A; --good-soft:rgba(156,192,138,.16);
-  --warn:#E3C071; --warn-soft:rgba(227,192,113,.15);
-  --bad:#DE8A80;  --bad-soft:rgba(222,138,128,.16);
-  --info:#B7ADA0; --info-soft:rgba(183,173,160,.14);
-  --glow-card:0 2px 12px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.03);
+  --good:#4C7439; --good-soft:rgba(76,116,57,.12);
+  --warn:#9C5F1E; --warn-soft:rgba(156,95,30,.12);
+  --bad:#A33A3A;  --bad-soft:rgba(163,58,58,.10);
+  --info:#6E655C; --info-soft:rgba(110,101,92,.12);
+  --glow-card:0 1px 2px rgba(42,39,36,.05), 0 6px 18px -12px rgba(42,39,36,.35);
 }
 
 /* Поверхность доски: неровность тона + следы стёртого мела.
-   fixed — чтобы «доска» не ехала вместе со скроллом длинных таблиц. */
+   fixed — чтобы фактура не ехала вместе со скроллом длинных таблиц. */
 [data-design="chalk"] body {
   background-color:var(--bg);
   background-image:
-    radial-gradient(120% 70% at 16% 4%, rgba(255,255,255,.05), transparent 62%),
-    radial-gradient(90% 55% at 88% 96%, rgba(255,255,255,.028), transparent 58%),
-    repeating-linear-gradient(102deg, rgba(255,255,255,.011) 0 2px, transparent 2px 7px);
+    radial-gradient(120% 70% at 16% 4%, rgba(255,255,255,.7), transparent 62%),
+    radial-gradient(90% 55% at 88% 96%, rgba(255,255,255,.5), transparent 58%),
+    repeating-linear-gradient(102deg, rgba(42,39,36,.012) 0 2px, transparent 2px 7px);
   background-attachment:fixed;
+  color:var(--ink);
 }
 
-/* На охре лежал белый текст (винный акцент «Ганаша») — на меловой охре нужен
-   тёмный грифельный, иначе контраст рушится. */
+/* На охре лежал белый текст (винный акцент «Ганаша») — на охряной заливке
+   он читается, оставляем белый; но следим, чтобы охра не была слишком светлой. */
 [data-design="chalk"] .nav-btn.nav-active,
 [data-design="chalk"] .atab-active,
 [data-design="chalk"] .btn-primary,
 [data-design="chalk"] .mkt-export,
-[data-design="chalk"] .aud-btn,
-[data-design="chalk"] .chart-zoom-x:hover,
-[data-design="chalk"] .b-good,
-[data-design="chalk"] .badge-accent {
-  color:#241F1A !important;
+[data-design="chalk"] .aud-btn {
+  color:#FFFCF6 !important;
   font-weight:600;
 }
 
 /* Разделители — штрих мела, а не типографская линейка */
-[data-design="chalk"] table tbody tr { border-bottom:1px dashed rgba(244,237,226,.13); }
-[data-design="chalk"] table thead tr { border-bottom:1px solid rgba(244,237,226,.28); }
-[data-design="chalk"] .section + .section,
-[data-design="chalk"] .panel + .panel { border-top-style:dashed; }
+[data-design="chalk"] table tbody tr { border-bottom:1px dashed rgba(42,39,36,.14); }
+[data-design="chalk"] table thead tr { border-bottom:1px solid rgba(42,39,36,.3); }
 
-/* Панели и KPI: мягкая планка на доске, без стеклянных бликов */
+/* Панели и KPI: бумажная планка на доске, без стеклянных бликов */
 [data-design="chalk"] .panel,
 [data-design="chalk"] .kpi,
 [data-design="chalk"] .kpi-card,
 [data-design="chalk"] .mkt-kpi,
 [data-design="chalk"] .section {
   background:var(--paper);
-  border:1px solid rgba(244,237,226,.13);
+  border:1px solid rgba(42,39,36,.11);
   box-shadow:var(--glow-card);
 }
-[data-design="chalk"] .kpi.good { background:var(--paper); border-color:rgba(156,192,138,.34); }
-[data-design="chalk"] .kpi.warn { background:var(--paper); border-color:rgba(227,192,113,.34); }
-[data-design="chalk"] .kpi.bad  { background:var(--paper); border-color:rgba(222,138,128,.34); }
+[data-design="chalk"] .kpi.good { background:var(--paper); border-color:rgba(76,116,57,.34); }
+[data-design="chalk"] .kpi.warn { background:var(--paper); border-color:rgba(156,95,30,.34); }
+[data-design="chalk"] .kpi.bad  { background:var(--paper); border-color:rgba(163,58,58,.32); }
 
-/* Герой: кольцо плана — охра, подпись мелом */
+/* Герой: кольцо плана — охра, отделено штрихом */
 [data-design="chalk"] .summary-hero .hero-card {
-  background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 60%), var(--paper);
-  border:1px solid rgba(244,237,226,.14);
+  background:linear-gradient(180deg, #FFFDF9, #FBF6EC);
+  border:1px solid rgba(42,39,36,.12);
 }
-[data-design="chalk"] .summary-hero .hero-ring { border-left:1px dashed rgba(244,237,226,.2); }
-[data-design="chalk"] .summary-hero .hero-ring-num { fill:var(--ink); }
+[data-design="chalk"] .summary-hero .hero-ring { border-left:1px dashed rgba(42,39,36,.22); }
 [data-design="chalk"] .summary-hero .hero-headline { color:var(--ink); }
 
 /* Табличные цифры включены глобально в styles.css (столбцы стоят ровно) —
-   но в крупных KPI они шире пропорциональных, и «26.1 М ₽» не влезало в плитку.
-   Glass лечит это сжатием трекинга; на доске делаем так же плюс чуть мельче кегль. */
+   но в крупных KPI они шире пропорциональных, и «26.1 М ₽» обрезалось
+   многоточием в шести-колоночном ряду: сжимаем трекинг и кегль. */
 [data-design="chalk"] .kpi-value {
   font-size:clamp(18px, 1.85vw, 26px);
   letter-spacing:-.035em;
   white-space:nowrap;
 }
 
-/* Сайдбар — та же доска, отделён штрихом */
+/* Сайдбар — та же бумага, отделён штрихом */
 [data-design="chalk"] .sidebar,
 [data-design="chalk"] aside {
-  background:rgba(255,255,255,.02);
-  border-right:1px dashed rgba(244,237,226,.16);
+  background:rgba(255,255,255,.5);
+  border-right:1px dashed rgba(42,39,36,.18);
 }
 
-/* Полноэкранный зум графика — на доске, не на светлой подложке */
+/* Полноэкранный зум графика — на той же бумаге */
 [data-design="chalk"] .chart-zoom-box { background:var(--bg); }
+[data-design="chalk"] .chart-zoom-ov { background:rgba(42,39,36,.55); }
 
-/* Ввод PIN и модалки */
+/* Поля ввода и PIN */
 [data-design="chalk"] input,
 [data-design="chalk"] select,
 [data-design="chalk"] textarea {
-  background:rgba(255,255,255,.05);
+  background:#FFFDF9;
   color:var(--ink);
-  border:1px solid rgba(244,237,226,.2);
+  border:1px solid rgba(42,39,36,.2);
 }
 [data-design="chalk"] ::placeholder { color:var(--hint); }
-
-/* Кнопка выбора оформления в сайдбаре */
-.design-toggle-on { box-shadow:0 0 0 1px var(--accent) inset; }
