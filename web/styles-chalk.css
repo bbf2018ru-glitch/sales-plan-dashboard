@@ -1,0 +1,121 @@
+/* ============================================================
+   ТЕМА «ЧИСТЫЙ ГРИФЕЛЬ» (chalk) — выбрана владельцем 31.07.2026
+   из десяти направлений (макет: maria-design-lab/chalk.html, вариант A).
+
+   Концепция: экран — грифельная доска кофейни. Поверхность с едва заметной
+   неровностью тона, текст «мелом», разделители — пунктир (штрих мела, а не
+   типографская линейка). Цвет тратится скупо: ОХРА — сигнатура достижения
+   (кольцо плана, линия факта), зелёный и терракотовый мелки — только статусы.
+   Никакой имитации дерева и бликов: доска чувствуется, но не спорит с цифрами.
+
+   Включается флагом data-design="chalk" на <html> (кнопка «Доска» в сайдбаре).
+   ОТКАТ: снять флаг — вернётся «Ганаш & золото» (data-design="glass").
+   ============================================================ */
+
+[data-design="chalk"] {
+  /* поверхность */
+  --bg:#23211F;              /* грифель */
+  --paper:#2A2724;           /* планка/панель — на тон светлее доски */
+  --glass:#2A2724; --glass-strong:#302C29; --glass-edge:rgba(244,237,226,.14);
+  /* мел */
+  --ink:#F4EDE2;             /* основной мел */
+  --muted:#B7ADA0;           /* приглушённый мел */
+  --hint:#A2988C;            /* подписи (AA на грифеле) */
+  --line:rgba(244,237,226,.15);
+  /* сигнатура: охра = достижение, отмеряется скупо */
+  --accent:#DFAF6A;
+  --accent-soft:rgba(223,175,106,.14);
+  --glow-accent:0 0 0 1px rgba(223,175,106,.34);
+  --gold:#E3C071; --gold-soft:rgba(227,192,113,.15);
+  /* статусные мелки */
+  --good:#9CC08A; --good-soft:rgba(156,192,138,.16);
+  --warn:#E3C071; --warn-soft:rgba(227,192,113,.15);
+  --bad:#DE8A80;  --bad-soft:rgba(222,138,128,.16);
+  --info:#B7ADA0; --info-soft:rgba(183,173,160,.14);
+  --glow-card:0 2px 12px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+/* Поверхность доски: неровность тона + следы стёртого мела.
+   fixed — чтобы «доска» не ехала вместе со скроллом длинных таблиц. */
+[data-design="chalk"] body {
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(120% 70% at 16% 4%, rgba(255,255,255,.05), transparent 62%),
+    radial-gradient(90% 55% at 88% 96%, rgba(255,255,255,.028), transparent 58%),
+    repeating-linear-gradient(102deg, rgba(255,255,255,.011) 0 2px, transparent 2px 7px);
+  background-attachment:fixed;
+}
+
+/* На охре лежал белый текст (винный акцент «Ганаша») — на меловой охре нужен
+   тёмный грифельный, иначе контраст рушится. */
+[data-design="chalk"] .nav-btn.nav-active,
+[data-design="chalk"] .atab-active,
+[data-design="chalk"] .btn-primary,
+[data-design="chalk"] .mkt-export,
+[data-design="chalk"] .aud-btn,
+[data-design="chalk"] .chart-zoom-x:hover,
+[data-design="chalk"] .b-good,
+[data-design="chalk"] .badge-accent {
+  color:#241F1A !important;
+  font-weight:600;
+}
+
+/* Разделители — штрих мела, а не типографская линейка */
+[data-design="chalk"] table tbody tr { border-bottom:1px dashed rgba(244,237,226,.13); }
+[data-design="chalk"] table thead tr { border-bottom:1px solid rgba(244,237,226,.28); }
+[data-design="chalk"] .section + .section,
+[data-design="chalk"] .panel + .panel { border-top-style:dashed; }
+
+/* Панели и KPI: мягкая планка на доске, без стеклянных бликов */
+[data-design="chalk"] .panel,
+[data-design="chalk"] .kpi,
+[data-design="chalk"] .kpi-card,
+[data-design="chalk"] .mkt-kpi,
+[data-design="chalk"] .section {
+  background:var(--paper);
+  border:1px solid rgba(244,237,226,.13);
+  box-shadow:var(--glow-card);
+}
+[data-design="chalk"] .kpi.good { background:var(--paper); border-color:rgba(156,192,138,.34); }
+[data-design="chalk"] .kpi.warn { background:var(--paper); border-color:rgba(227,192,113,.34); }
+[data-design="chalk"] .kpi.bad  { background:var(--paper); border-color:rgba(222,138,128,.34); }
+
+/* Герой: кольцо плана — охра, подпись мелом */
+[data-design="chalk"] .summary-hero .hero-card {
+  background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 60%), var(--paper);
+  border:1px solid rgba(244,237,226,.14);
+}
+[data-design="chalk"] .summary-hero .hero-ring { border-left:1px dashed rgba(244,237,226,.2); }
+[data-design="chalk"] .summary-hero .hero-ring-num { fill:var(--ink); }
+[data-design="chalk"] .summary-hero .hero-headline { color:var(--ink); }
+
+/* Числа набираются моно — на доске цифры должны стоять ровными столбцами */
+[data-design="chalk"] .kpi-value,
+[data-design="chalk"] td.num,
+[data-design="chalk"] .num {
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;
+}
+
+/* Сайдбар — та же доска, отделён штрихом */
+[data-design="chalk"] .sidebar,
+[data-design="chalk"] aside {
+  background:rgba(255,255,255,.02);
+  border-right:1px dashed rgba(244,237,226,.16);
+}
+
+/* Полноэкранный зум графика — на доске, не на светлой подложке */
+[data-design="chalk"] .chart-zoom-box { background:var(--bg); }
+
+/* Ввод PIN и модалки */
+[data-design="chalk"] input,
+[data-design="chalk"] select,
+[data-design="chalk"] textarea {
+  background:rgba(255,255,255,.05);
+  color:var(--ink);
+  border:1px solid rgba(244,237,226,.2);
+}
+[data-design="chalk"] ::placeholder { color:var(--hint); }
+
+/* Кнопка выбора оформления в сайдбаре */
+.design-toggle-on { box-shadow:0 0 0 1px var(--accent) inset; }

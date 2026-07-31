@@ -211,11 +211,18 @@ async function handlePinSubmit() {
 
 // ── Dark theme ─────────────────────────────────────────────────────────────
 function initDarkTheme() {
+  const savedDesign = localStorage.getItem('maria_design') || 'glass';
   const saved = localStorage.getItem('maria_theme') || 'light';
   setTheme(saved);
+  if (savedDesign === 'chalk') setDesign('chalk'); else setDesign('glass');
   $('themeToggle').addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
     setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+  const dBtn = $('designToggle');
+  if (dBtn) dBtn.addEventListener('click', () => {
+    const now = document.documentElement.getAttribute('data-design') || 'glass';
+    setDesign(now === 'chalk' ? 'glass' : 'chalk');
   });
 }
 
@@ -272,6 +279,29 @@ function refreshTabSemantics(containerSel) {
     t.setAttribute('aria-selected', on ? 'true' : 'false');
     t.setAttribute('tabindex', on ? '0' : '-1');
   });
+}
+
+// ── Оформление: «Ганаш & золото» (glass) ⇄ «Чистый грифель» (chalk) ─────────
+// Доска по определению тёмная, поэтому вместе с ней включается тёмная тема,
+// а при возврате восстанавливается та, что была до неё.
+function setDesign(design) {
+  const html = document.documentElement;
+  html.setAttribute('data-design', design);
+  localStorage.setItem('maria_design', design);
+  if (design === 'chalk') {
+    const prev = html.getAttribute('data-theme') || 'light';
+    if (prev !== 'dark') localStorage.setItem('maria_theme_before_chalk', prev);
+    setTheme('dark');
+  } else {
+    setTheme(localStorage.getItem('maria_theme_before_chalk') || 'light');
+  }
+  const btn = $('designToggle');
+  if (btn) {
+    const on = design === 'chalk';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? 'Оформление: вернуть «Ганаш»' : 'Оформление: доска';
+    btn.classList.toggle('design-toggle-on', on);
+  }
 }
 
 function setTheme(theme) {
