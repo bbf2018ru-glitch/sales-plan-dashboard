@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-theme="dark">
+<html lang="ru" data-theme="light">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,9 +8,11 @@
 <!-- maria-design: фирменные шрифты (Onest/Prata). ОТКАТ страницы — снять эту ссылку и вернуть токены/шрифт ниже. -->
 <link rel="stylesheet" href="/fonts-maria.css?v=1" />
 <style>
-  /* maria-design «Ганаш & золото»: база какао + крем + винный акцент + золото-сигнатура */
-  :root{ --bg:#161210; --paper:#211A16; --paper2:#2A211C; --line:#382C22; --ink:#F3ECE4; --muted:#B3A595;
-    --good:#5BB58A; --bad:#D06A6A; --warn:#D69A52; --accent:#C7566A; --gold:#C9A227; }
+  
+  /* Палитра «Мел на бумаге» — та же, что на дашборде (31.07.2026).
+     Раньше страница была тёмной и выпадала из общего вида. */
+  :root{ --bg:#F2EDE4; --paper:#FFFCF6; --paper2:#F7F2E9; --line:rgba(42,39,36,.16); --ink:#2A2724; --muted:#6A6158;
+    --good:#4C7439; --bad:#A33A3A; --warn:#9C5F1E; --accent:#855C10; --gold:#7A6636; }
   *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);
     font-family:'Onest',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
   .wrap{max-width:1500px;margin:0 auto;padding:18px}
@@ -30,8 +32,8 @@
   th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   th{position:sticky;top:0;background:var(--paper2);z-index:2;color:var(--muted);font-weight:600;font-size:11px}
   td:first-child,th:first-child{text-align:left}
-  tr.ceh td{background:#2A2327;font-weight:700;color:#E8DFD9;border-top:2px solid var(--accent)}
-  tr.def td{background:rgba(224,70,106,.08)}
+  tr.ceh td{background:#EFE7D8;font-weight:700;color:var(--ink);border-top:2px solid var(--accent)}
+  tr.def td{background:rgba(163,58,58,.09)}
   .task{color:var(--good);font-weight:700}
   .neg{color:var(--bad)} .pos{color:var(--good)} .mut{color:var(--muted)}
   .auto{font-size:11px;color:var(--muted)}
@@ -39,21 +41,21 @@
   @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
   .yoycol{color:var(--warn)}
   #err{color:var(--bad);padding:10px}
-  .warnbox{background:rgba(217,165,40,.12);border:1px solid #6b5518;color:#e8c35a;
+  .warnbox{background:rgba(156,95,30,.10);border:1px solid rgba(156,95,30,.35);color:var(--warn);
     border-radius:9px;padding:8px 12px;margin:6px 0;font-size:12.5px;line-height:1.45}
   .fc{font-size:9px;color:var(--warn);font-weight:600;letter-spacing:.3px}
   .note{color:var(--muted);font-size:11px;margin-top:10px;line-height:1.5}
-  .convbox{border:1px solid var(--line,#2a2f3a);border-radius:10px;padding:12px 14px;margin:10px 0;background:rgba(120,160,255,.05)}
+  .convbox{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:rgba(133,92,16,.05)}
   .convhead{font-weight:600;font-size:14px;margin-bottom:8px}
   .convhead button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px}
   .convkpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
   .convsub{font-size:12px;color:var(--muted);margin:12px 0 4px}
   .convtbl{width:100%;border-collapse:collapse;font-size:12px}
-  .convtbl th{text-align:left;color:var(--muted);font-weight:500;padding:3px 8px;border-bottom:1px solid var(--line,#2a2f3a)}
-  .convtbl td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.12)}
-  .pos{color:#4caf50}.neg{color:#e5736b}
-  .approx{display:inline-block;font-size:10px;font-weight:600;color:#b8860b;background:rgba(184,134,11,.13);border:1px solid rgba(184,134,11,.4);border-radius:8px;padding:1px 7px;margin-left:8px;letter-spacing:.2px;vertical-align:middle}
-  tr.ceh-approx td{background:rgba(184,134,11,.05)}
+  .convtbl th{text-align:left;color:var(--muted);font-weight:500;padding:3px 8px;border-bottom:1px solid var(--line)}
+  .convtbl td{padding:3px 8px;border-bottom:1px solid var(--line)}
+  .pos{color:var(--good)}.neg{color:var(--bad)}
+  .approx{display:inline-block;font-size:10px;font-weight:600;color:var(--warn);background:rgba(156,95,30,.12);border:1px solid rgba(156,95,30,.35);border-radius:8px;padding:1px 7px;margin-left:8px;letter-spacing:.2px;vertical-align:middle}
+  tr.ceh-approx td{background:rgba(156,95,30,.05)}
 </style>
 </head>
 <body>
@@ -136,7 +138,7 @@ function render(d){
     c.items.forEach(function(it){
       var yoy = YOY? '<td class="yoycol">'+(it.lyShip!=null?n1(it.lyShip):'—')+'</td><td class="yoycol '+(it.deltaPct>0?'pos':(it.deltaPct<0?'neg':''))+'">'+(it.deltaPct!=null?(it.deltaPct>0?'+':'')+it.deltaPct+'%':'—')+'</td>':'';
       var shipCell = it.bom
-        ? '<td title="разузловка: спрос из заданий родителей" style="color:#c39bff">🧩 '+(it.ship?n1(it.ship):'<span class="mut">·</span>')+'</td>'
+        ? '<td title="разузловка: спрос из заданий родителей" style="color:var(--accent)">🧩 '+(it.ship?n1(it.ship):'<span class="mut">·</span>')+'</td>'
         : td(it.ship);
       h+='<tr class="'+(it.task>0?'def':'')+'"><td>'+it.name+'</td>'+
         td(it.gp)+td(it.zap)+td(it.kont)+td(it.siteL,'mut')+shipCell+td(it.shipNext)+td(it.siteP,'mut')+
