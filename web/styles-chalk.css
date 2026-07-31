@@ -89,12 +89,12 @@
 [data-design="chalk"] .summary-hero .hero-ring-num { fill:var(--ink); }
 [data-design="chalk"] .summary-hero .hero-headline { color:var(--ink); }
 
-/* Числа в ТАБЛИЦАХ — табличные цифры, чтобы столбцы стояли ровно.
-   В крупных KPI намеренно НЕ включаем: tabular-нули шире пропорциональных,
-   и «26.1 М ₽» переставало влезать в плитку (ловилось на проде). */
-[data-design="chalk"] td.num,
-[data-design="chalk"] th.num {
-  font-variant-numeric:tabular-nums;
+/* Табличные цифры включены глобально в styles.css (столбцы стоят ровно) —
+   но в крупных KPI они шире пропорциональных, и «26.1 М ₽» не влезало в плитку.
+   Glass лечит это сжатием трекинга; на доске делаем так же плюс чуть мельче кегль. */
+[data-design="chalk"] .kpi-value {
+  font-size:clamp(22px, 2.25vw, 31px);
+  letter-spacing:-.035em;
 }
 
 /* Сайдбар — та же доска, отделён штрихом */
