@@ -51,14 +51,13 @@
   color:var(--ink);
 }
 
-/* На охре лежал белый текст (винный акцент «Ганаша») — на охряной заливке
-   он читается, оставляем белый; но следим, чтобы охра не была слишком светлой. */
-[data-design="chalk"] .nav-btn.nav-active,
-[data-design="chalk"] .atab-active,
+/* Белый текст — ТОЛЬКО на сплошной охряной заливке. Активный пункт меню и
+   активный таб залиты accent-soft (светлым) и красят текст самим акцентом —
+   белый там делал их нечитаемыми. */
 [data-design="chalk"] .btn-primary,
 [data-design="chalk"] .mkt-export,
 [data-design="chalk"] .aud-btn {
-  color:#FFFCF6 !important;
+  color:#FFFCF6;
   font-weight:600;
 }
 
@@ -66,12 +65,13 @@
 [data-design="chalk"] table tbody tr { border-bottom:1px dashed rgba(42,39,36,.14); }
 [data-design="chalk"] table thead tr { border-bottom:1px solid rgba(42,39,36,.3); }
 
-/* Панели и KPI: бумажная планка на доске, без стеклянных бликов */
+/* Панели и KPI: бумажная планка на доске, без стеклянных бликов.
+   .section НЕ красим: это контейнер-отступ вокруг панелей, от заливки
+   появлялась вторая подложка «блок в блоке». */
 [data-design="chalk"] .panel,
 [data-design="chalk"] .kpi,
 [data-design="chalk"] .kpi-card,
-[data-design="chalk"] .mkt-kpi,
-[data-design="chalk"] .section {
+[data-design="chalk"] .mkt-kpi {
   background:var(--paper);
   border:1px solid rgba(42,39,36,.11);
   box-shadow:var(--glow-card);
