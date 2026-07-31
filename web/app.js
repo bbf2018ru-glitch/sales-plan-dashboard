@@ -516,7 +516,10 @@ function renderWeekdayHeatmap(summary) {
     const cls = `weekday-cell ${isWeekend ? 'weekend' : ''} ${isBest ? 'is-best' : ''} ${isWorst ? 'is-worst' : ''}`;
     const subline = v > 0 ? `${fmtMoneyShort(v)}/день` : '—';
     const days = countsByDow[i];
-    return `<div class="${cls}" style="background: rgba(128, 120, 130, ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, медианная выручка ${formatMoney(v)} ₽">
+    // Цвет тинта берём из темы (--dow-tint): на грифеле был нейтральный серый,
+    // на бумажной доске он выглядит грязно — там тёплая охра. Градацию по
+    // интенсивности сохраняем: alpha по-прежнему считается от выручки дня.
+    return `<div class="${cls}" style="background: rgba(var(--dow-tint, 128, 120, 130), ${alpha.toFixed(2)})" title="${labels[i]}: ${days} ${days === 1 ? 'день' : 'дн.'}, медианная выручка ${formatMoney(v)} ₽">
       <div class="wc-day">${labels[i]}</div>
       <div class="wc-val">${subline}</div>
     </div>`;
