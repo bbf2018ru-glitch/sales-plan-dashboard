@@ -326,6 +326,31 @@ function buildYoyForecast(period, totalFact, elapsedDays, totalDays, allSales) {
 // Для таких точек считаем averagePerDay за половину прошедших дней —
 // грубое приближение что они активны "вторую половину месяца".
 // Для старых точек — averagePerDay за все elapsedDays.
+// Темп продаж нельзя считать «факт / elapsedDays»: сегодняшний день ещё идёт.
+// На 4-е число утром это делило выручку трёх полных дней на четыре и занижало
+// прогноз на треть — дашборд писал «текущего темпа недостаточно» на ровном месте.
+// Считаем средний день по ЗАВЕРШЁННЫМ суткам; сегодняшний факт учитывается как
+// есть, а до среднего он «добирается» отдельным слагаемым.
+// Возвращает { rateDays, todayFact } — знаменатель темпа и выручку текущего дня.
+function splitElapsed(period, elapsedDays, sales) {
+  const parsed = parsePeriod(period);
+  const now = nowIrk();
+  const isCurrent = parsed && parsed.year === now.getUTCFullYear() && parsed.month === now.getUTCMonth() + 1;
+  if (!isCurrent || elapsedDays < 2) return { rateDays: Math.max(elapsedDays, 1), todayFact: 0, partial: false };
+  const today = now.getUTCDate();
+  let todayFact = 0;
+  for (const s of (sales || [])) {
+    const d = s.soldAt || s.sold_at || s.date;
+    if (!d) continue;
+    const dt = toIrk(new Date(d));
+    if (Number.isNaN(dt.getTime())) continue;
+    if (dt.getUTCFullYear() === parsed.year && dt.getUTCMonth() + 1 === parsed.month && dt.getUTCDate() === today) {
+      todayFact += Number(s.amount || 0);
+    }
+  }
+  return { rateDays: elapsedDays - 1, todayFact, partial: true };
+}
+
 function buildPerStoreForecast(period, totalDays, elapsedDays, allSales, allPlans) {
   if (!allSales || allSales.length === 0 || elapsedDays <= 0) return null;
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
@@ -351,13 +376,30 @@ function buildPerStoreForecast(period, totalDays, elapsedDays, allSales, allPlan
   }
 
   // Группируем факт текущего периода по всем реальным магазинам.
+  // Отдельно копим выручку сегодняшнего (неполного) дня — она нужна, чтобы
+  // не занижать темп и правильно достроить остаток дня.
+  const nowIrkDay = nowIrk();
+  const curParsed = parsePeriod(period);
+  const isCurrentPeriod = curParsed && curParsed.year === nowIrkDay.getUTCFullYear()
+    && curParsed.month === nowIrkDay.getUTCMonth() + 1;
   const byStore = new Map();
   for (const s of allSales) {
     if (s.period !== period) continue;
     const sid = s.storeId || s.store_id;
     if (!isRealId(sid)) continue;
-    if (!byStore.has(sid)) byStore.set(sid, { storeId: sid, fact: 0 });
-    byStore.get(sid).fact += Number(s.amount || 0);
+    if (!byStore.has(sid)) byStore.set(sid, { storeId: sid, fact: 0, factToday: 0 });
+    const amount = Number(s.amount || 0);
+    byStore.get(sid).fact += amount;
+    if (isCurrentPeriod) {
+      const raw = s.soldAt || s.sold_at || s.date;
+      if (raw) {
+        const dt = toIrk(new Date(raw));
+        if (!Number.isNaN(dt.getTime()) && dt.getUTCDate() === nowIrkDay.getUTCDate()
+          && dt.getUTCMonth() === nowIrkDay.getUTCMonth() && dt.getUTCFullYear() === nowIrkDay.getUTCFullYear()) {
+          byStore.get(sid).factToday += amount;
+        }
+      }
+    }
   }
   if (byStore.size < 3) return null;
 
@@ -365,15 +407,21 @@ function buildPerStoreForecast(period, totalDays, elapsedDays, allSales, allPlan
   // per-store linear даст результат равный общему linear → пользы нет.
   if (storesInPrev.size === 0) return null;
 
+  // Темп — по завершённым суткам (см. splitElapsed): сегодняшний день ещё идёт
+  // и делить на него нельзя. Его недобор до среднего добавляем отдельно.
+  const { rateDays, partial } = splitElapsed(period, elapsedDays, allSales);
   let projectedFact = 0;
   let newStoresCount = 0;
   for (const x of byStore.values()) {
     const isNew = !storesInPrev.has(x.storeId);
     // Для новых точек грубо считаем что они работали половину периода.
-    const actualElapsed = isNew ? Math.max(elapsedDays / 2, 1) : elapsedDays;
-    const averagePerDay = x.fact / actualElapsed;
+    const actualElapsed = isNew ? Math.max(rateDays / 2, 1) : rateDays;
+    // Из числителя тоже убираем сегодняшний неполный день — иначе темп поплывёт.
+    const averagePerDay = Math.max(x.fact - (x.factToday || 0), 0) / actualElapsed;
     const remainingProjection = averagePerDay * remainingDays;
-    projectedFact += x.fact + remainingProjection;
+    // «Хвост» текущего дня: сколько точка ещё доберёт сегодня до своего среднего.
+    const todayTail = partial ? Math.max(averagePerDay - (x.factToday || 0), 0) : 0;
+    projectedFact += x.fact + remainingProjection + todayTail;
     if (isNew) newStoresCount += 1;
   }
   return {
@@ -389,7 +437,11 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales, pla
   const totalDays = daysInPeriod(period);
   const elapsedDays = effectiveElapsedDays(period, lastSaleAt);
   const remainingDays = Math.max(totalDays - elapsedDays, 0);
-  const averagePerDay = elapsedDays > 0 ? totalFact / elapsedDays : 0;
+  // Темп — по завершённым суткам: сегодняшний день ещё идёт (см. splitElapsed).
+  const { rateDays, todayFact, partial } = splitElapsed(period, elapsedDays, sales);
+  const averagePerDay = rateDays > 0 ? (totalFact - todayFact) / rateDays : 0;
+  // Сколько сеть ещё доберёт сегодня до обычного дня.
+  const todayTail = partial ? Math.max(averagePerDay - todayFact, 0) : 0;
 
   let projectedFact;
   let projectionMethod = 'linear';
@@ -441,8 +493,9 @@ function buildSalesForecast(period, totalPlan, totalFact, lastSaleAt, sales, pla
   }
 
   // Приоритет 4: линейный (последний fallback).
+  // Факт (включая начатый день) + средний день на каждый оставшийся + добор сегодняшнего.
   if (projectedFact === undefined) {
-    projectedFact = roundMetric(averagePerDay * totalDays);
+    projectedFact = roundMetric(totalFact + averagePerDay * remainingDays + todayTail);
     projectionMethod = 'linear';
   }
 
