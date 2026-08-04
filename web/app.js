@@ -367,9 +367,15 @@ function renderTrendChart(summary) {
     <text x="${pad.l - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" fill="var(--hint)" font-size="10">${fmtAxis(v)}</text>`;
   }).join('');
 
+  // Текущий месяц ещё идёт: его столбик факта заведомо ниже полных месяцев.
+  // Рисуем последний отрезок пунктиром и подписываем «идёт», иначе график
+  // читается как обвал (4 августа: 2,5 млн рядом с июльскими 27 млн).
+  const nowYM = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const lastIsCurrent = pts.length > 1 && pts[pts.length - 1].period === nowYM;
   const factPts = pts.map((p, i) => [xp(i), yp(p.fact)]);
   const planPts = pts.map((p, i) => [xp(i), yp(p.plan)]);
-  const factD = smoothPathD(factPts);
+  const factD = smoothPathD(lastIsCurrent ? factPts.slice(0, -1) : factPts);
+  const factTailD = lastIsCurrent ? smoothPathD(factPts.slice(-2)) : '';
   const planD = smoothPathD(planPts, 0.6);
   const areaD = `${factD} L${xp(n - 1).toFixed(1)},${(pad.t + ph).toFixed(1)} L${xp(0).toFixed(1)},${(pad.t + ph).toFixed(1)} Z`;
 
@@ -393,6 +399,13 @@ function renderTrendChart(summary) {
     const tip = `<title>${bpMonthLabel(p.period)}: факт ${fmtAxis(p.fact)} · план ${fmtAxis(p.plan)} · ${p.completion}% плана${p.factPrevYear != null ? ` · год назад ${fmtAxis(p.factPrevYear)}` : ''}</title>`;
     if (!isLast) return `<circle cx="${x}" cy="${y}" r="${dense ? 2.6 : 3.4}" fill="${clr}" stroke="var(--paper)" stroke-width="1.5">${tip}</circle>`;
     const bx = Math.min(Number(x), pad.l + pw - 30);
+    // У незакрытого месяца процент выполнения ещё ничего не значит — вместо
+    // бейджа «8.9%» подписываем, что месяц идёт.
+    if (lastIsCurrent) {
+      return `<circle cx="${x}" cy="${y}" r="8" fill="none" stroke="${clr}" stroke-width="1.5" opacity=".35" stroke-dasharray="3,3"/>
+      <circle cx="${x}" cy="${y}" r="4.2" fill="var(--paper)" stroke="${clr}" stroke-width="2">${tip}</circle>
+      <text x="${bx.toFixed(1)}" y="${(Number(y) - 14).toFixed(1)}" text-anchor="middle" fill="var(--hint)" font-size="9.5">месяц идёт</text>`;
+    }
     return `<circle cx="${x}" cy="${y}" r="8" fill="none" stroke="${clr}" stroke-width="1.5" opacity=".45"/>
       <circle cx="${x}" cy="${y}" r="4.2" fill="${clr}" stroke="var(--paper)" stroke-width="2">${tip}</circle>
       <g><rect x="${(bx - 21).toFixed(1)}" y="${(Number(y) - 26).toFixed(1)}" rx="8" width="42" height="16" fill="${clr}" opacity=".92"/>
@@ -431,6 +444,7 @@ function renderTrendChart(summary) {
       <path d="${planD}" fill="none" stroke="var(--hint)" stroke-width="1.6" stroke-dasharray="5,4" opacity=".8"/>
       ${pyHasAny ? `<path d="${pyD}" fill="none" stroke="var(--series-prev, var(--gold))" stroke-width="1.8" stroke-dasharray="2,3.5" opacity=".8"/>` : ''}
       <path class="ch-line" d="${factD}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      ${factTailD ? `<path d="${factTailD}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="4,4" opacity=".65"/>` : ''}
     </g>
     ${hits}${dots}${xlabels}${legend}
   </svg>`;
@@ -705,7 +719,9 @@ function renderSummaryHero(summary) {
         </div>
         <div class="hero-sub" style="font-size:12px;opacity:.7">
           План месяца ${fmtMoneyShort(t.plan || 0)} · до конца месяца нужно ${gapEom > 0 ? fmtMoneyShort(gapEom) : '— план выполнен'}
-          ${f.runwayGap ? `· прогноз разрыва: ${fmtMoneyShort(f.runwayGap)}` : ''}
+          ${f.runwayGap ? (f.runwayGap < 0
+            ? `· по прогнозу не хватит ${fmtMoneyShort(-f.runwayGap)}`
+            : `· по прогнозу перевыполним на ${fmtMoneyShort(f.runwayGap)}`) : ''}
         </div>
         ${lagging.length ? `<div class="hero-lists">
           <div class="hero-list">
