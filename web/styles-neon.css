@@ -1,0 +1,157 @@
+/* ============================================================
+   ТЕМА «ТЁМНОЕ СТЕКЛО С НЕОНОМ» (neon) — выбор владельца 04.08.2026
+   из десяти современных направлений.
+
+   Концепция: почти чёрная база, панели из матового стекла (реальное
+   размытие фона), неон работает СИГНАТУРОЙ, а не заливкой: светится
+   только то, ради чего открывают экран — цифра выполнения плана и линия
+   факта. Остальное — спокойный светлый текст на стекле.
+
+   Палитра проверена валидатором dataviz на тёмной поверхности:
+   мятный ↔ розовый ΔE 16,0 (дейтеранопия) — статусы различимы при
+   дальтонизме; все три статусных цвета дают ≥3:1 к фону.
+
+   Включается data-design="neon" + data-theme="dark" в index.html.
+   ОТКАТ: вернуть data-design="chalk" (светлая «бумага» осталась в репо).
+   ============================================================ */
+
+[data-design="neon"] {
+  --bg:#08090C;
+  --paper:rgba(255,255,255,.055);      /* стекло: полупрозрачное, не сплошное */
+  --glass:rgba(255,255,255,.055); --glass-strong:rgba(255,255,255,.085);
+  --glass-edge:rgba(255,255,255,.12);
+  --ink:#E7EBF2;
+  --muted:#9AA5B5;
+  --hint:#98A3B3;
+  --line:rgba(255,255,255,.11);
+  /* сигнатура — неон-мята: кольцо плана, линия факта, активные элементы */
+  --accent:#38F5C0;
+  --accent-soft:rgba(56,245,192,.14);
+  --glow-accent:0 0 0 1px rgba(56,245,192,.35), 0 0 22px rgba(56,245,192,.22);
+  --gold:#FFC46B; --gold-soft:rgba(255,196,107,.14);
+  /* серия «год назад» — холодный серо-синий, ΔE 24 к мяте */
+  --series-prev:#7A8DA6;
+  /* статусы (проверены на CVD) */
+  --good:#38F5C0; --good-soft:rgba(56,245,192,.13);
+  --warn:#FFC46B; --warn-soft:rgba(255,196,107,.13);
+  --bad:#FF5C7A;  --bad-soft:rgba(255,92,122,.13);
+  --info:#9AA5B5; --info-soft:rgba(154,165,181,.12);
+  --glow-card:0 8px 32px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  --dow-tint:56, 245, 192;             /* тинт плиток «дни недели» */
+}
+
+/* Фон: два неоновых пятна, размытых до сияния. Держим их приглушёнными и
+   fixed — иначе при скролле длинных таблиц цвет «плывёт» под цифрами. */
+[data-design="neon"] body {
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(38% 42% at 82% 8%, rgba(56,245,192,.13), transparent 68%),
+    radial-gradient(34% 38% at 10% 88%, rgba(255,92,122,.10), transparent 68%),
+    radial-gradient(50% 50% at 50% 50%, rgba(255,255,255,.02), transparent 70%);
+  background-attachment:fixed;
+  color:var(--ink);
+}
+
+/* Матовое стекло: панели, KPI, секции-карточки */
+[data-design="neon"] .panel,
+[data-design="neon"] .kpi,
+[data-design="neon"] .kpi-card,
+[data-design="neon"] .mkt-kpi,
+[data-design="neon"] .summary-hero .hero-card {
+  background:rgba(255,255,255,.055);
+  backdrop-filter:blur(16px) saturate(1.25);
+  -webkit-backdrop-filter:blur(16px) saturate(1.25);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:var(--glow-card);
+}
+[data-design="neon"] .kpi.good { border-color:rgba(56,245,192,.34); }
+[data-design="neon"] .kpi.warn { border-color:rgba(255,196,107,.34); }
+[data-design="neon"] .kpi.bad  { border-color:rgba(255,92,122,.34); }
+
+/* Свечение — ТОЛЬКО на главной цифре и кольце плана. Дозировано намеренно:
+   неон на каждом элементе утомляет при ежедневной работе. */
+[data-design="neon"] .summary-hero .hero-ring-num { fill:var(--accent); }
+[data-design="neon"] .summary-hero .hero-ring-arc { filter:drop-shadow(0 0 8px rgba(56,245,192,.55)); }
+[data-design="neon"] .summary-hero .hero-ring { border-left:1px solid rgba(255,255,255,.12); }
+[data-design="neon"] .summary-hero .hero-headline { color:var(--ink); }
+[data-design="neon"] #kpis .kpi[data-kpi-id="completion"] .kpi-value {
+  color:var(--accent);
+  text-shadow:0 0 18px rgba(56,245,192,.35);
+}
+
+/* Текст на неоновой заливке — тёмный: мята светлая, белый на ней нечитаем */
+[data-design="neon"] .btn-primary,
+[data-design="neon"] .mkt-export,
+[data-design="neon"] .aud-btn,
+[data-design="neon"] .nav-btn.nav-active {
+  color:#07120E !important;
+  font-weight:600;
+}
+[data-design="neon"] .nav-btn.nav-active { background:var(--accent); border-color:var(--accent); }
+[data-design="neon"] .atab-active { color:var(--accent); border-bottom-color:var(--accent); background:transparent; }
+
+/* Цвета мимо палитры (наследие прежней вёрстки) — на токены темы */
+[data-design="neon"] .sm-value.sm-good,
+[data-design="neon"] .trend-cell.good,
+[data-design="neon"] .kpi-delta-up,
+[data-design="neon"] .mkt-yoy-up,
+[data-design="neon"] .hero-great .hero-mood { color:var(--good) !important; background-color:transparent; }
+[data-design="neon"] .sm-value.sm-bad,
+[data-design="neon"] .trend-cell.bad,
+[data-design="neon"] .hero-store-bad b,
+[data-design="neon"] .kpi-delta-down,
+[data-design="neon"] .mkt-yoy-down,
+[data-design="neon"] .hero-bad .hero-mood { color:var(--bad) !important; }
+[data-design="neon"] .kpi-delta-up, [data-design="neon"] .mkt-yoy-up,
+[data-design="neon"] .trend-cell.good { background:var(--good-soft) !important; }
+[data-design="neon"] .kpi-delta-down, [data-design="neon"] .mkt-yoy-down,
+[data-design="neon"] .trend-cell.bad { background:var(--bad-soft) !important; }
+[data-design="neon"] .store-source-retail,
+[data-design="neon"] .store-source { color:var(--muted) !important; }
+
+/* Таблицы: тонкие светлые разделители по тёмному стеклу */
+[data-design="neon"] table tbody tr { border-bottom:1px solid rgba(255,255,255,.07); }
+[data-design="neon"] table thead tr { border-bottom:1px solid rgba(255,255,255,.2); }
+[data-design="neon"] table tbody tr:hover { background:rgba(255,255,255,.04); }
+
+/* KPI-числа: тот же приём, что в светлой теме — табличные цифры шире,
+   поэтому кегль и трекинг ужимаем, иначе «26.1 М ₽» не влезает */
+[data-design="neon"] .kpi-value {
+  font-size:clamp(18px, 1.85vw, 26px);
+  letter-spacing:-.035em;
+  white-space:nowrap;
+}
+
+/* Сайдбар — стекло потемнее, чтобы отделялся от полотна */
+[data-design="neon"] .sidebar,
+[data-design="neon"] aside {
+  background:rgba(255,255,255,.03);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-right:1px solid rgba(255,255,255,.09);
+}
+
+/* Полноэкранный зум графика */
+[data-design="neon"] .chart-zoom-box { background:#0A0C10; }
+[data-design="neon"] .chart-zoom-ov { background:rgba(0,0,0,.72); }
+
+/* Поля ввода и PIN */
+[data-design="neon"] input,
+[data-design="neon"] select,
+[data-design="neon"] textarea {
+  background:rgba(255,255,255,.06);
+  color:var(--ink);
+  border:1px solid rgba(255,255,255,.16);
+}
+[data-design="neon"] ::placeholder { color:var(--hint); }
+
+/* Плоские столбики: стеклянный блик прежней темы тут не нужен */
+[data-design="neon"] rect[fill="url(#chSheen)"] { display:none; }
+
+/* Печать: неон на бумаге не печатается — уводим в чёрно-белое */
+@media print {
+  [data-design="neon"] body { background:#fff !important; color:#111 !important; }
+  [data-design="neon"] .panel, [data-design="neon"] .kpi {
+    background:#fff !important; border-color:#bbb !important; box-shadow:none !important; backdrop-filter:none !important;
+  }
+}

@@ -215,8 +215,8 @@ async function handlePinSubmit() {
 // Старые значения в localStorage игнорируем, чтобы у тех, кто успел
 // переключиться на тёмную, не открылась несуществующая тема.
 function initDarkTheme() {
-  setTheme('light');
-  setDesign('chalk');
+  setTheme('dark');
+  setDesign('neon');
   const tBtn = $('themeToggle');
   if (tBtn) tBtn.addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
@@ -291,8 +291,9 @@ function setDesign(design) {
   const html = document.documentElement;
   html.setAttribute('data-design', design);
   localStorage.setItem('maria_design', design);
-  // «Мел на бумаге» — светлая тема (в отличие от первой, грифельной версии).
-  if (design === 'chalk') setTheme('light');
+  // «Тёмное стекло с неоном» — тёмная; «Мел на бумаге» — светлая.
+  if (design === 'neon') setTheme('dark');
+  else if (design === 'chalk') setTheme('light');
   const btn = $('designToggle');
   if (btn) {
     const on = design === 'chalk';
