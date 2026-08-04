@@ -38,7 +38,7 @@
   --series-prev:#C9B48D;
   /* статусные мелки */
   --good:#4C7439; --good-soft:rgba(76,116,57,.12);
-  --warn:#9C5F1E; --warn-soft:rgba(156,95,30,.12);
+  --warn:#8A5416; --warn-soft:rgba(138,84,22,.12);
   --bad:#A33A3A;  --bad-soft:rgba(163,58,58,.10);
   --info:#6E655C; --info-soft:rgba(110,101,92,.12);
   --glow-card:0 1px 2px rgba(42,39,36,.05), 0 6px 18px -12px rgba(42,39,36,.35);
@@ -97,6 +97,10 @@
 [data-design="chalk"] .mkt-yoy-down { background:var(--bad-soft) !important; }
 [data-design="chalk"] .trend-cell.good { background:var(--good-soft) !important; }
 [data-design="chalk"] .trend-cell.bad  { background:var(--bad-soft) !important; }
+
+/* Плашка настроения в герое — те же захардкоженные красный/зелёный (3,2:1) */
+[data-design="chalk"] .hero-bad .hero-mood   { background:var(--bad-soft) !important;  color:var(--bad) !important; }
+[data-design="chalk"] .hero-great .hero-mood { background:var(--good-soft) !important; color:var(--good) !important; }
 
 /* Метки каналов продаж: голубой «Розница» (#38bdf8, 2,09:1) — единственный
    холодный цвет во всём интерфейсе. Переводим на тёплую нейтраль. */
