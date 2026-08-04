@@ -3405,7 +3405,7 @@ async function loadMkHolidayYoy() {
   if (!el) return;
   el.innerHTML = '<div class="empty-state" style="padding:14px">Считаю YoY по календарю…</div>';
   try {
-    const data = await fetchJson('/api/marketing/holiday-yoy?window=60');
+    const data = await fetchJson('/api/marketing/holiday-yoy?window=120');
     if (!data.events?.length) { el.innerHTML = '<div class="empty-state" style="padding:14px">Нет ближайших праздников</div>'; return; }
     const baseline = data.baseline.avgRevenuePerDay;
     const rows = data.events.map(e => {
