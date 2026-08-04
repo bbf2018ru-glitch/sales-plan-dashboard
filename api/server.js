@@ -486,6 +486,11 @@ function isPublicApiPath(pathname, method) {
   if (INGEST_PATH_RE.test(pathname)) return true;
   // app-bridge для maria-app: свой HMAC-протокол (подпись phone:ts), сессии нет
   if (pathname.startsWith('/api/app-bridge/')) return true;
+  // M2M-прокси к 1С для maria-crew (каталог, бонусы за покупки, филиалы и рейтинги
+  // 2ГИС). Все четыре роута сами требуют X-API-Key — проверено перед добавлением.
+  // ВАЖНО: правка 31.07 жила только на сервере и была затёрта авто-деплоем —
+  // кроны crew молча падали 401. Держим её здесь, в репозитории.
+  if (pathname.startsWith('/api/upp/proxy/')) return true;
   return false;
 }
 
