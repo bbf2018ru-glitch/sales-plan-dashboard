@@ -5033,6 +5033,30 @@ function renderPaidCosts(pc){
   if(pc.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+pc.note+'</div>';
   el.innerHTML=html;
 }
+// Свежесть источников: возраст файлов внешних данных + флаги сбоя скрейперов.
+function renderSourcesHealth(sh){
+  var el=document.getElementById('mktSources'), hint=document.getElementById('mktSourcesHint');
+  if(!el) return;
+  if(!sh || sh.error || !sh.sources){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных: '+((sh&&sh.error)||'пустой ответ')+'</div>'; return; }
+  var dot={dead:'var(--bad)',stale:'var(--warn)',warn:'var(--info)',ok:'var(--good)'};
+  var word={dead:'мёртв',stale:'просрочен',warn:'неполный',ok:'свежий'};
+  var rows=sh.sources.map(function(s){
+    var bad=s.status==='dead';
+    return '<tr'+(bad?' style="background:var(--bad-soft)"':'')+'>'+
+      '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+dot[s.status]+';margin-right:8px"></span><b>'+s.name+'</b></td>'+
+      '<td class="num">'+s.ageText+'</td>'+
+      '<td class="num" style="color:var(--muted)">'+(s.expectedHours?('раз в '+(s.expectedHours<=26?'сутки':Math.round(s.expectedHours/24)+' дн')):'—')+'</td>'+
+      '<td style="color:'+dot[s.status]+'">'+word[s.status]+(s.flags.length?' · '+s.flags.join(', '):'')+'</td></tr>';
+  }).join('');
+  el.innerHTML='<table style="font-size:12px"><thead><tr><th>Источник</th><th class="num">Обновлён</th><th class="num">Ожидаем</th><th>Состояние</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  if(hint){
+    var c=sh.counts||{};
+    var dead=sh.sources.filter(function(s){return s.status==='dead';}).map(function(s){return s.name;});
+    hint.innerHTML='Свежих '+(c.ok||0)+' · неполных '+(c.warn||0)+' · просроченных '+(c.stale||0)+' · мёртвых '+(c.dead||0)+'.'+
+      (dead.length?' <b style="color:var(--bad)">Не обновляются: '+dead.join(', ')+'</b> — проверить скрейпер или авторизацию.':' Все источники приходят по расписанию.');
+  }
+}
+
 // Кофе-контроль: стаканы, уехавшие на точку (1С перемещения), против пробитых напитков.
 // Разрыв = продажи мимо кассы. Светофор: ok ≤1.7 стакана/напиток, warn ≤3, red >3.
 function renderCoffeeControl(cc){
@@ -5865,6 +5889,13 @@ function mktLoadYoY(){
       paidEl.innerHTML='<div class="mkt-yoy-load">Считаю бюджет платных каналов…</div>';
       fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ _mktPaid=pc; renderPaidCosts(pc); })
         .catch(function(e){ paidEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Бюджет недоступен: '+e.message+'</div>'; });
+    }
+    // Свежесть внешних источников — служебный блок: ловит «тихую смерть» скрейпов.
+    var srcEl=document.getElementById('mktSources');
+    if(srcEl){
+      srcEl.innerHTML='<div class="mkt-yoy-load">Проверяю свежесть источников…</div>';
+      fetchJson('/api/marketing/sources-health').then(function(sh){ renderSourcesHealth(sh); })
+        .catch(function(e){ srcEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Проверка недоступна: '+e.message+'</div>'; });
     }
     // Кофе-контроль (стаканы→чеки) — отдельный эндпоинт, окно 56 дней, кэш 6ч.
     var coffEl=document.getElementById('mktCoffee');

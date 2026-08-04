@@ -1284,6 +1284,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Свежесть внешних источников: возраст файлов + флаги сбоя скрейперов ──
+    if (pathname === '/api/marketing/sources-health' && req.method === 'GET') {
+      try {
+        const sh = require('./lib/sources-health');
+        sendJson(res, 200, sh.getSourcesHealth());
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
     // ── Кофе-контроль: стаканы (перемещения) vs пробитые напитки — ловля продаж мимо кассы ──
     // Открыт как соседние marketing-эндпоинты. 2 лёгких агрегата в 1С, кэш 6ч.
     if (pathname === '/api/marketing/coffee-control' && req.method === 'GET') {

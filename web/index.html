@@ -1453,6 +1453,13 @@
             <div id="mktSeoExtra"></div>
           </section>
 
+          <section class="section" id="mkt-s-sources" data-mgroup="overview">
+            <div class="section-label">Свежесть источников <span class="mkt-scope dyn" title="Возраст файлов внешних данных и флаги сбоя скрейперов">служебное</span></div>
+            <div class="section-hint">Внешние данные приходят скрейпами по расписанию, и раньше источник мог умереть незаметно — так ВКонтакте и две выгрузки 2ГИС пролежали мёртвыми с июня. Здесь видно возраст каждого источника: красный — просрочен вдвое или слетела авторизация, жёлтый — не обновился в срок, синий — пришёл неполным.</div>
+            <div id="mktSources" class="table-wrap"></div>
+            <div id="mktSourcesHint" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+          </section>
+
           <section class="section" id="mkt-s-coffee" data-mgroup="channels">
             <div class="section-label">☕ Кофе-контроль: стаканы → чеки <span class="mkt-scope dyn" title="Перемещения стаканов из 1С против пробитых напитков в ЧекККМ, окно 56 дней">из 1С</span></div>
             <div class="section-hint">Антифрод: стакан нужен каждому напитку навынос — если стаканов на точку уходит сильно больше, чем напитков пробито, кофе продаётся мимо кассы. Считаем консервативно (в «пробитое» идут все напитки, включая чай и бутылки), поэтому красное — это уже серьёзный разрыв, а не шум.</div>
@@ -1612,7 +1619,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=188"></script>
+    <script async src="/app.js?v=189"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>
