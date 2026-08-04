@@ -83,6 +83,8 @@
 [data-design="neon"] .btn-primary,
 [data-design="neon"] .mkt-export,
 [data-design="neon"] .aud-btn,
+[data-design="neon"] .btn-xs-active,
+[data-design="neon"] .btn-xs.btn-xs-active,
 [data-design="neon"] .nav-btn.nav-active {
   color:#07120E !important;
   font-weight:600;
