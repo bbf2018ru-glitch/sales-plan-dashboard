@@ -2055,12 +2055,15 @@ function closeDrillDown() { $('drillDownOverlay')?.classList.add('hidden'); }
 // ─── URL state (deeplink) ─────────────────────────────────────────────────
 // При смене period/store/tab пишем в URL. При загрузке/back-forward читаем.
 let __urlUpdating = false;
+// До завершения первой загрузки табы инициализируются программно. В этот момент
+// нельзя переписывать URL: иначе сохранённая страница стирается значением dashboard.
+let __urlReady = false;
 
 function urlStateApply(silent = false) {
   const params = new URLSearchParams(window.location.search);
   const period = params.get('period');
   const storeId = params.get('store');
-  const page = params.get('page');
+  const page = params.get('page') || localStorage.getItem('maria_page');
   const tab = params.get('tab');
   const group = params.get('group');
 
@@ -2092,7 +2095,7 @@ function urlStateApply(silent = false) {
 }
 
 function urlStateWrite() {
-  if (__urlUpdating) return;
+  if (__urlUpdating || !__urlReady) return;
   const params = new URLSearchParams();
   if (state.period) params.set('period', state.period);
   if (state.selectedStoreId) params.set('store', state.selectedStoreId);
@@ -2942,6 +2945,8 @@ async function init() {
     await loadSummary();
     // После summary применяем остальной URL-state (store/tab/page)
     urlStateApply(false);
+    __urlReady = true;
+    urlStateWrite();
     loadInsights();
     loadMarketTrends();
     connectEvents();
@@ -3844,6 +3849,7 @@ function renderCustomersFuture(d) {
 
 function switchPage(page) {
   analyticsState.currentPage = page;
+  localStorage.setItem('maria_page', page);
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('nav-active', b.dataset.page === page));
   $('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
   $('page-analytics').classList.toggle('hidden', page !== 'analytics');
