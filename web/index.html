@@ -1293,14 +1293,14 @@
           </div>
 
           <section class="section mkt-executive" id="mkt-s-executive" data-mgroup="overview">
-            <div class="section-label">Главное за период <span class="mkt-scope dyn">факт · выбранный месяц</span></div>
+            <div class="section-label">Главное за период <span class="mkt-scope dyn">факт · <b id="mktExecutivePeriod">выбранный месяц</b></span></div>
             <div class="section-hint">Короткая сводка для решения. Подробные таблицы и источники — ниже во вкладках «Каналы», «Лояльность» и «Товары».</div>
             <div id="mktExecutive" class="mkt-yoy"></div>
             <details class="mkt-details"><summary>Как читать показатели</summary><div class="section-hint">Выручка, чеки и валовая прибыль — из 1С. Покупки из 2ГИС — только онлайн-заказы с UTM-меткой. Офлайн-продажи по источникам появятся после подключения QR/промокодов.</div></details>
             <details class="mkt-details"><summary>Состояние источников данных</summary><div id="mktExecutiveHealth" class="section-hint">Проверяю свежесть источников…</div></details>
           </section>
 
-          <section class="section" id="mkt-s-kpi" data-mgroup="overview">
+          <section class="section" id="mkt-s-kpi" data-mgroup="overview" style="display:none">
             <div class="section-label">Маркетинг по каналам · сравнение с прошлым годом (YoY) <span class="mkt-scope dyn" title="Живые данные из 1С за выбранный слева период, обновляются на сервере автоматически">live · за месяц</span></div>
             <div class="section-hint" id="mktYoYHint">Данные тянутся напрямую из 1С и обновляются на сервере сами (без ПК).</div>
             <div id="mktYoY" class="mkt-yoy"></div>
@@ -1627,7 +1627,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=196"></script>
+    <script async src="/app.js?v=197"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

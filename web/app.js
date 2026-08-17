@@ -5866,6 +5866,9 @@ var _mktLoadedPeriod=null;
 // Последние live-данные для CSV-экспорта (channels / sms-attribution / paid-costs).
 var _mktLive=null, _mktSms=null, _mktPaid=null;
 function mktInit(){
+  // В обзоре сначала показываем решения и алерты, затем расчётные детали.
+  var overview=document.getElementById('page-marketing'), alerts=document.getElementById('mkt-s-alerts'), gp=document.getElementById('mkt-s-grossprofit');
+  if(overview&&alerts&&gp) overview.insertBefore(alerts,gp);
   var fromEl=document.getElementById('mktFrom'), toEl=document.getElementById('mktTo');
   if(!fromEl||!toEl) return;
   if(!_mktInited){
@@ -5916,6 +5919,7 @@ function mktYoYCard(label, curStr, prevStr, delta, unit){
 }
 function renderMktExecutive(d){
   var el=document.getElementById('mktExecutive'); if(!el||!d) return;
+  var pe=document.getElementById('mktExecutivePeriod'); if(pe) pe.textContent=(d.monthName||d.period||'выбранный период');
   var rub=function(v){return v==null?'н/д':mNum(v)+' ₽';};
   var gp=d.grossProfit||{};
   var e=d.external&&d.external.directEcommerce, u=e&&e.utm2gis;
