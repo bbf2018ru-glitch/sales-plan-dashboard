@@ -4841,6 +4841,13 @@ function mDirectRevenue(row){
   if(v==null) v=row.revenue;
   return v==null ? null : Number(v);
 }
+function mDirectEcommerce(data, ym){
+  var ext=data&&data.external; if(!ext) return null;
+  var live=ext.directEcommerce;
+  if(live&&live.period&&live.period.ym===ym) return live;
+  var history=ext.directEcommerceHistory;
+  return (Array.isArray(history)?history:(history&&history.months)||[]).find(function(x){return x&&x.ym===ym;})||null;
+}
 function mDirectValue(v, suffix){
   return v==null || !isFinite(v) ? '<span style="color:var(--muted)">н/д</span>' : mNum(v)+(suffix||'');
 }
@@ -4938,7 +4945,7 @@ function renderDirectMonthly(d){
   var sp=0,im=0,cl=0,cv=0,rev=0,revKnown=0;
   var selYM=mktSelectedPeriod();
   var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
-  var rows=ms.map(function(m){ var purchases=mDirectPurchases(m)||0, purchaseRevenue=mDirectRevenue(m); sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=purchases;
+  var rows=ms.map(function(m){ var ec=mDirectEcommerce(d,m.ym), purchases=mDirectPurchases(m)||mDirectPurchases(ec)||0, purchaseRevenue=mDirectRevenue(ec); sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=purchases;
     if(purchaseRevenue!=null && isFinite(purchaseRevenue)){ rev+=purchaseRevenue; revKnown+=1; }
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.daysCovered&&m.daysCovered<28?' (1–'+m.daysCovered+')':'');
     var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:var(--good)':(m.cpa<=800?'color:var(--gold)':'color:var(--bad)'));
@@ -6417,7 +6424,7 @@ function mktLoadYoY(){
         var _ml=(function(){var p=_selYM.split('-');return _MMd[Number(p[1])]+' '+p[0];})();
         if(_hm){
           var _st2=_dh.scrapedAt?new Date(_dh.scrapedAt).toLocaleString('ru-RU'):'—';
-          var _hp=mDirectPurchases(_hm), _hr=mDirectRevenue(_hm);
+          var _ec=mDirectEcommerce(d,_selYM), _hp=mDirectPurchases(_hm)||mDirectPurchases(_ec), _hr=mDirectRevenue(_ec);
           dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка за '+_ml+' <span class="mkt-scope fix" title="Историческая сводка из кабинета за выбранный месяц. Live-воронка с разбивкой по кампаниям и остатком счёта — только для текущего месяца.">из истории</span></div>'+
             '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
             '<li><b>Воронка:</b> показы <b>'+mNum(_hm.impressions)+'</b> → клики <b>'+mNum(_hm.clicks)+'</b> (CTR '+mNum1(_hm.ctrPct||0)+'%) → покупки <b>'+mDirectValue(_hp)+'</b> (CR '+mNum1(_hm.crPct||0)+'%).</li>'+
@@ -6429,7 +6436,7 @@ function mktLoadYoY(){
         } else {
           dl.innerHTML='<div style="font-size:12px;color:var(--muted)">За '+_ml+' данных Я.Директа в помесячной истории нет (см. таблицу выше). Live-воронка показывается только для текущего месяца.</div>';
         }
-      } else if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—'; var _tp=mDirectPurchases(t), _tr=mDirectRevenue(t);
+      } else if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—'; var _ecNow=mDirectEcommerce(d,_selYM), _tp=mDirectPurchases(t)||mDirectPurchases(_ecNow), _tr=mDirectRevenue(_ecNow);
         dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка текущего месяца <span class="mkt-scope dyn">live</span></div>'+
           '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
           '<li><b>Воронка:</b> показы <b>'+mNum(t.impressions)+'</b> → клики <b>'+mNum(t.clicks)+'</b> (CTR '+mNum1(t.ctrPct||0)+'%) → покупки <b>'+mDirectValue(_tp)+'</b> (CR '+mNum1(t.crPct||0)+'%).</li>'+

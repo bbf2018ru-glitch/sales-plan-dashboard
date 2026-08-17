@@ -564,6 +564,8 @@ function externalBlock() {
     gisCompetitors: readExternal('competitors-2gis.json'),
     direct: readExternal('direct.json'),
     directHistory: readExternal('direct-history.json'),
+    directEcommerce: readExternal('direct-ecommerce.json'),
+    directEcommerceHistory: readExternal('direct-ecommerce-history.json'),
     metrika: readExternal('metrika.json'),
     metrikaHistory: readExternal('metrika-history.json'),
     smsClicks: readExternal('sms-clicks.json'),
