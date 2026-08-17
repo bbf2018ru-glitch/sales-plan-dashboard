@@ -80,7 +80,7 @@ function rowAfter(lines, pattern) {
     out.utm2gis = gis || (total || paid ? { purchases: 0, purchaseRevenue: 0 } : null);
     if (gis && gis.purchases > 0 && gis.purchaseRevenue != null && gis.purchaseRevenue < gis.purchases * 100) {
       out.utm2gisWarning = 'Подозрительно низкая выручка в строке UTM; значение не публикуем';
-      out.utm2gis = null;
+      out.utm2gis = period.ym === new Date().toISOString().slice(0, 7) ? null : { purchases: 0, purchaseRevenue: 0 };
     }
     out.total = total;
     out.hasEcommerceRows = !!(paid || total);
