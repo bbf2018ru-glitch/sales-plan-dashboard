@@ -5923,8 +5923,7 @@ function renderMktExecutive(d){
     mktYoYCard('Выручка',rub(d.revenue&&d.revenue.cur),rub(d.revenue&&d.revenue.prev),d.revenue&&d.revenue.deltaPct)+
     mktYoYCard('Чеки',mNum(d.cheques&&d.cheques.cur),mNum(d.cheques&&d.cheques.prev),d.cheques&&d.cheques.deltaPct)+
     mktYoYCard('Средний чек',rub(d.avgCheck&&d.avgCheck.cur),rub(d.avgCheck&&d.avgCheck.prev),d.avgCheck&&d.avgCheck.deltaPct)+
-    mktYoYCard('Валовая прибыль',rub(gp.cur&&gp.cur.grossProfit||gp.cur),rub(gp.prev&&gp.prev.grossProfit||gp.prev),null)+
-    mktYoYCard('Покупки из 2ГИС',u?mNum(u.purchases):'н/д','UTM-сайт',null)+
+    mktYoYCard('Валовая прибыль','см. подробности','из 1С',null)+
   '</div>';
 }
 function mktLoadYoY(){
