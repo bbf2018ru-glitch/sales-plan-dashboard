@@ -2899,6 +2899,16 @@ async function init() {
 
   // Навигация сайдбара и список pending-отчётов работают независимо
   // от загрузки данных — биндим сразу, чтобы клики уже срабатывали.
+  // Восстанавливаем страницу ДО навешивания обработчиков и тяжёлой загрузки:
+  // иначе первый рендер по умолчанию успевает вернуть пользователя на dashboard.
+  const initialPage = new URLSearchParams(window.location.search).get('page') || localStorage.getItem('maria_page');
+  if (initialPage === 'analytics' || initialPage === 'marketing') {
+    analyticsState.currentPage = initialPage;
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('nav-active', b.dataset.page === initialPage));
+    $('page-dashboard')?.classList.add('hidden');
+    $('page-analytics')?.classList.toggle('hidden', initialPage !== 'analytics');
+    $('page-marketing')?.classList.toggle('hidden', initialPage !== 'marketing');
+  }
   initPageNav();
   initHeadings();
   renderPendingReports();
