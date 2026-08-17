@@ -2062,6 +2062,7 @@ function urlStateApply(silent = false) {
   const storeId = params.get('store');
   const page = params.get('page');
   const tab = params.get('tab');
+  const group = params.get('group');
 
   if (period && period !== state.period && (window.__metaPeriods__ || []).includes(period)) {
     state.period = period;
@@ -2082,8 +2083,11 @@ function urlStateApply(silent = false) {
     // switchPage только показывает контейнер, но не дёргает loadAnalytics.
     if (page === 'analytics' && !analyticsState.data && typeof loadAnalytics === 'function') loadAnalytics();
   }
-  if (tab && page !== 'dashboard') {
+  if (tab && page === 'analytics') {
     if (typeof switchAnalyticsTab === 'function') switchAnalyticsTab(tab);
+  }
+  if (group && page === 'marketing') {
+    if (typeof switchMarketingGroup === 'function') switchMarketingGroup(group);
   }
 }
 
@@ -2092,9 +2096,14 @@ function urlStateWrite() {
   const params = new URLSearchParams();
   if (state.period) params.set('period', state.period);
   if (state.selectedStoreId) params.set('store', state.selectedStoreId);
+  if (analyticsState?.currentPage && analyticsState.currentPage !== 'dashboard') {
+    params.set('page', analyticsState.currentPage);
+  }
   if (analyticsState?.currentPage === 'analytics') {
-    params.set('page', 'analytics');
     if (analyticsState.currentTab) params.set('tab', analyticsState.currentTab);
+  }
+  if (analyticsState?.currentPage === 'marketing' && analyticsState.marketingGroup) {
+    params.set('group', analyticsState.marketingGroup);
   }
   const newQs = params.toString();
   const newUrl = window.location.pathname + (newQs ? '?' + newQs : '') + window.location.hash;
@@ -2993,6 +3002,7 @@ function switchMarketingGroup(group) {
   document.querySelectorAll('#page-marketing section[data-mgroup]:not(.hidden)').forEach(s => {
     if (typeof enhancePinningInSection === 'function') enhancePinningInSection(s);
   });
+  setTimeout(() => urlStateWrite && urlStateWrite(), 0);
 }
 
 function initPageNav() {
