@@ -45,7 +45,8 @@ function parseItogo(body){
   const lineNum=/^\s*-?\d[\d ]*(?:[.,]\d+)?\s*(?:₽|%)?\s*$/;
   const nums=tail.split('\n').map(s=>s.trim()).filter(s=>lineNum.test(s)).slice(0,6);
   if(!nums.length || !/₽/.test(nums[0])) return null; // первый столбец Итого — расход с ₽
-  return {spend:one(nums[0]),impressions:one(nums[1]),clicks:one(nums[2]),conversions:one(nums[3]),crPct:one(nums[4]),cpa:one(nums[5]),raw:nums};
+  const purchases=one(nums[3]);
+  return {spend:one(nums[0]),impressions:one(nums[1]),clicks:one(nums[2]),conversions:purchases,purchases,crPct:one(nums[4]),cpa:one(nums[5]),raw:nums};
 }
 const clickSel=(p,sel)=>p.locator(sel).first().click({force:true,noWaitAfter:true,timeout:5000}).then(()=>true).catch(()=>false);
 const NEXT='[data-testid="DateRangeSelect.RangeCalendarWithButton.RangeCalendar.next"]';

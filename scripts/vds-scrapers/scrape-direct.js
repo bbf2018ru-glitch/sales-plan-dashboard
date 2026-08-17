@@ -126,6 +126,8 @@ async function setMonthRange(p, m, lastDay) {
       out.totals.impressions = parseOne(rawNums[1]);
       out.totals.clicks = parseOne(rawNums[2]);
       out.totals.conversions = parseOne(rawNums[3]);
+      // В отчёте выбрана ecommerce-цель, поэтому это именно число покупок.
+      out.totals.purchases = out.totals.conversions;
       out.totals.crPct = parseOne(rawNums[4]);
       out.totals.cpa = parseOne(rawNums[5]);
       if (out.totals.spend && out.totals.clicks) out.totals.cpc = Math.round(out.totals.spend / out.totals.clicks * 100) / 100;
@@ -195,6 +197,7 @@ async function setMonthRange(p, m, lastDay) {
     }
     out.campaigns = [...camp.values()].map(c => ({
       ...c,
+      purchases: c.conversions,
       spend: Math.round(c.spend * 100) / 100,
       cpa: c.conversions ? Math.round(c.spend / c.conversions) : null,
       cpc: c.clicks ? Math.round(c.spend / c.clicks * 100) / 100 : null,

@@ -4826,6 +4826,24 @@ var MKT = {
 };
 function mNum(n){ return Math.round(n).toLocaleString('ru-RU'); }
 function mNum1(n){ return (Math.round(n*10)/10).toLocaleString('ru-RU'); }
+// В отчёте Директа исторически поле называлось conversions, хотя выбранная цель —
+// ecommerce-покупка. Новые снимки могут отдавать явные purchases/purchaseRevenue.
+function mDirectPurchases(row){
+  if(!row) return null;
+  if(row.purchases!=null) return Number(row.purchases);
+  if(row.ecommercePurchases!=null) return Number(row.ecommercePurchases);
+  return row.conversions!=null ? Number(row.conversions) : null;
+}
+function mDirectRevenue(row){
+  if(!row) return null;
+  var v=row.purchaseRevenue;
+  if(v==null) v=row.ecommerceRevenue;
+  if(v==null) v=row.revenue;
+  return v==null ? null : Number(v);
+}
+function mDirectValue(v, suffix){
+  return v==null || !isFinite(v) ? '<span style="color:var(--muted)">н/д</span>' : mNum(v)+(suffix||'');
+}
 function mKpi(v,l){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>'; }
 function mTbl(cols, rows, total){
   var th = cols.map(function(c,i){ return '<th'+(i?' class="num"':'')+'>'+c+'</th>'; }).join('');
@@ -4917,21 +4935,22 @@ function renderDirectMonthly(d){
   var ms=(dh&&dh.months||[]).filter(function(m){return m && m.spend;});
   if(!ms.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Помесячная история Директа собирается скрейпером кабинета.</div>'; return; }
   var MM=['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var sp=0,im=0,cl=0,cv=0;
+  var sp=0,im=0,cl=0,cv=0,rev=0,revKnown=0;
   var selYM=mktSelectedPeriod();
   var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
-  var rows=ms.map(function(m){ sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=m.conversions||0;
+  var rows=ms.map(function(m){ var purchases=mDirectPurchases(m)||0, purchaseRevenue=mDirectRevenue(m); sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=purchases;
+    if(purchaseRevenue!=null && isFinite(purchaseRevenue)){ rev+=purchaseRevenue; revKnown+=1; }
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.daysCovered&&m.daysCovered<28?' (1–'+m.daysCovered+')':'');
     var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:var(--good)':(m.cpa<=800?'color:var(--gold)':'color:var(--bad)'));
-    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.spend)+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+mNum(m.clicks)+'</td><td class="num">'+mNum1(m.ctrPct||0)+' %</td><td class="num">'+mNum(m.conversions)+'</td><td class="num">'+mNum1(m.crPct||0)+' %</td><td class="num">'+mNum1(m.cpc||0)+'</td><td class="num" style="'+cpaC+'">'+(m.cpa==null?'—':mNum(m.cpa))+'</td></tr>';
+    return '<tr'+hlRow(m.ym)+'><td>'+lbl+'</td><td class="num">'+mNum(m.spend)+'</td><td class="num">'+mNum(m.impressions)+'</td><td class="num">'+mNum(m.clicks)+'</td><td class="num">'+mNum1(m.ctrPct||0)+' %</td><td class="num"><b>'+mDirectValue(purchases)+'</b></td><td class="num"><b>'+mDirectValue(purchaseRevenue,' ₽')+'</b></td><td class="num">'+mNum1(m.crPct||0)+' %</td><td class="num">'+mNum1(m.cpc||0)+'</td><td class="num" style="'+cpaC+'">'+(m.cpa==null?'—':mNum(m.cpa))+'</td></tr>';
   }).reverse().join('');
   var tcpc=cl?Math.round(sp/cl*100)/100:0, tctr=im?Math.round(cl/im*1000)/10:0, tcpa=cv?Math.round(sp/cv):0, tcr=cl?Math.round(cv/cl*1000)/10:0;
   var st=dh.scrapedAt?new Date(dh.scrapedAt).toLocaleString('ru-RU'):'—';
   el.innerHTML='<div class="mkt-chart-t">Я.Директ помесячно <span class="mkt-scope dyn">live · кабинет</span></div>'+
-    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Расход ₽</th><th class="num">Показы</th><th class="num">Клики</th><th class="num">CTR</th><th class="num">Конв.</th><th class="num">CR</th><th class="num">CPC ₽</th><th class="num">CPA ₽</th></tr></thead><tbody>'+rows+
-    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(sp)+'</td><td class="num">'+mNum(im)+'</td><td class="num">'+mNum(cl)+'</td><td class="num">'+mNum1(tctr)+' %</td><td class="num">'+mNum(cv)+'</td><td class="num">'+mNum1(tcr)+' %</td><td class="num">'+mNum1(tcpc)+'</td><td class="num">'+mNum(tcpa)+'</td></tr>'+
+    '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Месяц</th><th class="num">Расход ₽</th><th class="num">Показы</th><th class="num">Клики</th><th class="num">CTR</th><th class="num">Покупки</th><th class="num">Сумма покупок ₽</th><th class="num">CR</th><th class="num">CPC ₽</th><th class="num">CPA ₽</th></tr></thead><tbody>'+rows+
+    '<tr class="mkt-total"><td>Итого</td><td class="num">'+mNum(sp)+'</td><td class="num">'+mNum(im)+'</td><td class="num">'+mNum(cl)+'</td><td class="num">'+mNum1(tctr)+' %</td><td class="num">'+mNum(cv)+'</td><td class="num">'+mDirectValue(revKnown===ms.length?rev:null,' ₽')+'</td><td class="num">'+mNum1(tcr)+' %</td><td class="num">'+mNum1(tcpc)+'</td><td class="num">'+mNum(tcpa)+'</td></tr>'+
     '</tbody></table></div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Источник — отчёт «Перформанс-кампании» в кабинете Директа, помесячно. Конверсии — цели Я.Метрики в кабинете. Обновлено: '+st+(dh.sessionExpired?' · ⚠️ сессия протухла':'')+'.</div>';
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Источник — отчёт «Перформанс-кампании» в кабинете Директа, помесячно. Покупки — достижения цели ecommerce-покупки; сумма — переданный Метрикой доход этих покупок. «н/д» означает, что денежная метрика отсутствует в снимке. Обновлено: '+st+(dh.sessionExpired?' · ⚠️ сессия протухла':'')+'.</div>';
 }
 // 2ГИС «Присутствие в выдаче» помесячно — live из кабинета (scrape-2gis-monthly.js).
 function renderGisMonthly(d){
@@ -6398,9 +6417,11 @@ function mktLoadYoY(){
         var _ml=(function(){var p=_selYM.split('-');return _MMd[Number(p[1])]+' '+p[0];})();
         if(_hm){
           var _st2=_dh.scrapedAt?new Date(_dh.scrapedAt).toLocaleString('ru-RU'):'—';
+          var _hp=mDirectPurchases(_hm), _hr=mDirectRevenue(_hm);
           dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка за '+_ml+' <span class="mkt-scope fix" title="Историческая сводка из кабинета за выбранный месяц. Live-воронка с разбивкой по кампаниям и остатком счёта — только для текущего месяца.">из истории</span></div>'+
             '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
-            '<li><b>Воронка:</b> показы <b>'+mNum(_hm.impressions)+'</b> → клики <b>'+mNum(_hm.clicks)+'</b> (CTR '+mNum1(_hm.ctrPct||0)+'%) → конверсии <b>'+mNum(_hm.conversions)+'</b> (CR '+mNum1(_hm.crPct||0)+'%).</li>'+
+            '<li><b>Воронка:</b> показы <b>'+mNum(_hm.impressions)+'</b> → клики <b>'+mNum(_hm.clicks)+'</b> (CTR '+mNum1(_hm.ctrPct||0)+'%) → покупки <b>'+mDirectValue(_hp)+'</b> (CR '+mNum1(_hm.crPct||0)+'%).</li>'+
+            '<li><b>Покупки из контекста:</b> '+mDirectValue(_hp)+' на сумму <b>'+mDirectValue(_hr,' ₽')+'</b>.</li>'+
             '<li><b>Расход:</b> '+mNum(_hm.spend)+' ₽ · <b>CPC</b> '+mNum1(_hm.cpc||0)+' ₽ · <b>CPA</b> '+mNum(_hm.cpa||0)+' ₽.</li>'+
             (_hm.daysCovered&&_hm.daysCovered<28?'<li style="color:var(--muted)">Данные за '+_hm.daysCovered+' дн. месяца (неполный охват скрейпа).</li>':'')+
             '</ul>'+
@@ -6408,10 +6429,11 @@ function mktLoadYoY(){
         } else {
           dl.innerHTML='<div style="font-size:12px;color:var(--muted)">За '+_ml+' данных Я.Директа в помесячной истории нет (см. таблицу выше). Live-воронка показывается только для текущего месяца.</div>';
         }
-      } else if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—';
+      } else if(dd && dd.totals && dd.totals.spend){ var t=dd.totals; var st=dd.scrapedAt?new Date(dd.scrapedAt).toLocaleString('ru-RU'):'—'; var _tp=mDirectPurchases(t), _tr=mDirectRevenue(t);
         dl.innerHTML='<div class="mkt-chart-t">Я.Директ — воронка текущего месяца <span class="mkt-scope dyn">live</span></div>'+
           '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;line-height:1.6">'+
-          '<li><b>Воронка:</b> показы <b>'+mNum(t.impressions)+'</b> → клики <b>'+mNum(t.clicks)+'</b> (CTR '+mNum1(t.ctrPct||0)+'%) → конверсии <b>'+mNum(t.conversions)+'</b> (CR '+mNum1(t.crPct||0)+'%).</li>'+
+          '<li><b>Воронка:</b> показы <b>'+mNum(t.impressions)+'</b> → клики <b>'+mNum(t.clicks)+'</b> (CTR '+mNum1(t.ctrPct||0)+'%) → покупки <b>'+mDirectValue(_tp)+'</b> (CR '+mNum1(t.crPct||0)+'%).</li>'+
+          '<li><b>Покупки из контекста:</b> '+mDirectValue(_tp)+' на сумму <b>'+mDirectValue(_tr,' ₽')+'</b>.</li>'+
           '<li><b>Расход:</b> '+mNum(t.spend)+' ₽ · <b>CPC</b> '+mNum1(t.cpc||0)+' ₽ · <b>CPA</b> '+mNum(t.cpa||0)+' ₽.</li>'+
           (dd.balance?'<li><b>Остаток на счёте кабинета:</b> '+mNum(dd.balance)+' ₽.</li>':'')+
           '<li><b>Структура:</b> РСЯ с гео-привязкой к районам точек («[ЕПК] РСЯ на Ядринцева» и т.п.). Цель — ecommerce-покупка.</li>'+
@@ -6419,7 +6441,7 @@ function mktLoadYoY(){
           // Таблица по кампаниям с CPA-светофором (если есть)
           ((dd.campaigns && dd.campaigns.length) ? (
             '<div class="mkt-chart-t" style="margin-top:14px">По кампаниям за месяц</div>'+
-            '<div class="table-wrap"><table><thead><tr><th>Кампания</th><th>Статус</th><th class="num">Расход ₽</th><th class="num">Клики</th><th class="num">Конв.</th><th class="num">CPA ₽</th><th class="num">CTR</th><th class="num">CR</th></tr></thead><tbody>'+
+            '<div class="table-wrap"><table><thead><tr><th>Кампания</th><th>Статус</th><th class="num">Расход ₽</th><th class="num">Клики</th><th class="num">Покупки</th><th class="num">CPA ₽</th><th class="num">CTR</th><th class="num">CR</th></tr></thead><tbody>'+
             dd.campaigns.map(function(c){
               var cpaC = c.cpa==null?'color:var(--muted)':(c.cpa<=300?'color:var(--good)':(c.cpa<=800?'color:var(--gold)':'color:var(--bad)'));
               return '<tr><td><b>'+c.name+'</b></td><td><span style="font-size:11px;color:var(--muted)">'+c.status+'</span></td><td class="num">'+mNum(c.spend)+'</td><td class="num">'+mNum(c.clicks)+'</td><td class="num">'+mNum(c.conversions)+'</td><td class="num" style="'+cpaC+'"><b>'+(c.cpa==null?'—':mNum(c.cpa))+'</b></td><td class="num">'+(c.ctrPct==null?'—':mNum1(c.ctrPct)+'%')+'</td><td class="num">'+(c.crPct==null?'—':mNum1(c.crPct)+'%')+'</td></tr>';
