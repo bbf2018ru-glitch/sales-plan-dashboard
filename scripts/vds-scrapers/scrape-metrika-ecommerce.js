@@ -90,7 +90,9 @@ function rowAfter(lines, pattern) {
   }
   await browser.close();
   fs.mkdirSync('/opt/marketing-data', { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+  // Latest-файл всегда относится к текущему месяцу; исторический запуск
+  // (TARGET_YM=прошлый месяц) обновляет только history и не затирает live.
+  if (period.ym === new Date().toISOString().slice(0, 7)) fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
   let history = [];
   try { history = JSON.parse(fs.readFileSync(HISTORY, 'utf8')); } catch (_) {}
   const previous = history.find(x => x.ym === period.ym);
