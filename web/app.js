@@ -4872,7 +4872,8 @@ function mDirectEcommerce(data, ym){
   var live=ext.directEcommerce;
   if(live&&live.period&&live.period.ym===ym) return live;
   var history=ext.directEcommerceHistory;
-  return (Array.isArray(history)?history:(history&&history.months)||[]).find(function(x){return x&&x.ym===ym;})||null;
+  var row=(Array.isArray(history)?history:(history&&history.months)||[]).find(function(x){return x&&x.ym===ym;})||null;
+  return row&&row.direct?row.direct:row;
 }
 function mDirectValue(v, suffix){
   return v==null || !isFinite(v) ? '<span style="color:var(--muted)">н/д</span>' : mNum(v)+(suffix||'');

@@ -75,6 +75,9 @@ function rowAfter(lines, pattern) {
     const gis = rowAfter(lines, /^2gis$/i);
     const total = rowAfter(lines, /^Итого и средние$/i) || rowAfter(lines, /^Всего$/i);
     Object.assign(out, paid || { purchases: null, purchaseRevenue: null });
+    // Строка «Переходы по рекламе» — покупки и доход именно рекламного
+    // трафика (Директ), если в Метрике настроена ecommerce-цель.
+    out.direct = paid || null;
     // Если строка источника отсутствует в полностью загруженном отчёте,
     // это означает ноль покупок, а не неизвестное значение.
     out.utm2gis = gis || (total || paid ? { purchases: 0, purchaseRevenue: 0 } : null);
@@ -92,7 +95,7 @@ function rowAfter(lines, pattern) {
   try { history = JSON.parse(fs.readFileSync(HISTORY, 'utf8')); } catch (_) {}
   const previous = history.find(x => x.ym === period.ym);
   const stableUtm2gis = out.utm2gis || (previous && previous.utm2gis) || null;
-  const entry = { ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, utm2gis: stableUtm2gis, scrapedAt: out.scrapedAt };
+  const entry = { ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, direct: out.direct || (previous && previous.direct) || null, utm2gis: stableUtm2gis, scrapedAt: out.scrapedAt };
   const index = history.findIndex(x => x.ym === entry.ym);
   if (index >= 0) history[index] = entry; else history.push(entry);
   history.sort((a, b) => a.ym.localeCompare(b.ym));
