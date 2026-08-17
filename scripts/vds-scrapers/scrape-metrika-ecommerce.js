@@ -98,7 +98,7 @@ function rowAfter(lines, pattern) {
     // В совместном отчёте SPA иногда рисует только покупки. Повторяем запрос
     // только с метрикой «Доход», чтобы получить сумму по UTM-источникам.
     try {
-      const revenueUrl = URL.replace('%5B%5B%22ym%3As%3AecommercePurchases%22%5D%2C%5B%22ym%3As%3AecommerceRevenue%22%5D%5D', '%5B%5B%22ym%3As%3AecommerceRevenue%22%5D%5D');
+      const revenueUrl = reportUrl(period).replace('%5B%5B%22ym%3As%3AecommercePurchases%22%5D%2C%5B%22ym%3As%3AecommerceRevenue%22%5D%5D', '%5B%5B%22ym%3As%3AecommerceRevenue%22%5D%5D');
       await p.goto(revenueUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await p.waitForTimeout(12000);
       const rb = await p.evaluate(() => document.body ? document.body.innerText : '');
