@@ -71,13 +71,20 @@ function rowAfter(lines, pattern) {
     for (let i = 0; i < 6; i++) { await page.evaluate(() => window.scrollBy(0, 600)).catch(() => {}); await page.waitForTimeout(600); }
     const body = await page.evaluate(() => document.body ? document.body.innerText : '');
     const lines = body.split('\n').map(s => s.trim()).filter(Boolean);
-    const paid = rowAfter(lines, /^Переходы по рекламе$/i);
+    // В отчёте с UTM-разрезом Метрика называет рекламный источник по-разному:
+    // «Переходы по рекламе», «Директ», direct или yandex.
+    const paid = rowAfter(lines, /^(Переходы по рекламе|Директ|direct|yandex)$/i);
     const gis = rowAfter(lines, /^2gis$/i);
     const total = rowAfter(lines, /^Итого и средние$/i) || rowAfter(lines, /^Всего$/i);
     Object.assign(out, paid || { purchases: null, purchaseRevenue: null });
     // Строка «Переходы по рекламе» — покупки и доход именно рекламного
     // трафика (Директ), если в Метрике настроена ecommerce-цель.
     out.direct = paid || null;
+    if (out.direct && out.direct.purchases > 0 && out.direct.purchaseRevenue != null && out.direct.purchaseRevenue < out.direct.purchases * 100) {
+      out.directWarning = 'Строка Директа загрузилась неполностью; доход не публикуем';
+      out.direct = { purchases: out.direct.purchases, purchaseRevenue: null };
+      out.purchaseRevenue = null;
+    }
     // Если строка источника отсутствует в полностью загруженном отчёте,
     // это означает ноль покупок, а не неизвестное значение.
     out.utm2gis = gis || (total || paid ? { purchases: 0, purchaseRevenue: 0 } : null);
