@@ -690,7 +690,7 @@ async function buildUdsPromoCodes(fromYM, toYM) {
   const range = `Ч.Проведен И Ч.Дата >= ДАТАВРЕМЯ(${y},${m},1) И Ч.Дата < ДАТАВРЕМЯ(${ny},${nm},1)`;
 
   // 1) Все проведённые чеки месяца (для доли) + итоги по чекам с промокодом
-  const { results: [totalRes, promoRes, topRes, recentRes], failed, allFailed } = await settleQueries([
+  const { results: [totalRes, promoRes, topRes, recentRes, buyersRes], failed, allFailed } = await settleQueries([
     callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(*) КАК Всего ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range}`, { timeoutMs: 120000 }),
     callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.uds_КодСкидки) КАК Кодов, КОЛИЧЕСТВО(*) КАК Применений,`
       + ` СУММА(ЕСТЬNULL(Ч.СуммаДокумента,0)) КАК Выручка, СУММА(ЕСТЬNULL(Ч.СуммаОплатыБонусами,0)) КАК Бонусы`
@@ -702,8 +702,9 @@ async function buildUdsPromoCodes(fromYM, toYM) {
       + ` СГРУППИРОВАТЬ ПО Ч.uds_КодСкидки УПОРЯДОЧИТЬ ПО Выручка УБЫВ`, { timeoutMs: 120000 }),
     callQuery(`ВЫБРАТЬ ПЕРВЫЕ 100 Ч.Дата КАК Дата, Ч.uds_КодСкидки КАК Код, Ч.Номер КАК Номер,`
       + ` Ч.Склад.Наименование КАК Точка, ЕСТЬNULL(Ч.СуммаДокумента,0) КАК Сумма`
-      + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> "" УПОРЯДОЧИТЬ ПО Ч.Дата УБЫВ`, { timeoutMs: 120000 })
-  ], ['всего чеков', 'итоги промо', 'топ кодов', 'свежие применения']);
+      + ` ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> "" УПОРЯДОЧИТЬ ПО Ч.Дата УБЫВ`, { timeoutMs: 120000 }),
+    callQuery(`ВЫБРАТЬ КОЛИЧЕСТВО(РАЗЛИЧНЫЕ Ч.ДисконтнаяКарта) КАК Клиенты ИЗ Документ.ЧекККМ КАК Ч ГДЕ ${range} И Ч.uds_КодСкидки <> ""`, { timeoutMs: 120000 })
+  ], ['всего чеков', 'итоги промо', 'топ кодов', 'свежие применения', 'уникальные клиенты']);
   if (allFailed) return { period: { from: ym, to: ym }, periodYM: ym, available: false, note: 'Источник 1С недоступен (UDS-промокоды)' };
 
   // Упавший запрос → метрика null (фронт «—»), а не 0 (выглядело бы как реальный ноль).
@@ -713,12 +714,15 @@ async function buildUdsPromoCodes(fromYM, toYM) {
   const checksWithPromocode = promoRes ? (parseRu(pr['Применений']) || 0) : null;
   const bonusUsed = promoRes ? Math.round(parseRu(pr['Бонусы']) || 0) : null;
   const revenue = promoRes ? Math.round(parseRu(pr['Выручка']) || 0) : null;
+  const uniqueCustomers = buyersRes ? (parseRu((buyersRes.rows || [])[0]?.['Клиенты']) || 0) : null;
 
   return {
     period: { from: ym, to: ym },
     periodYM: ym,
     totalChecksScanned: totalChecks,
     checksWithPromocode,
+    uniqueCustomers,
+    avgCheck: (checksWithPromocode && revenue != null) ? Math.round(revenue / checksWithPromocode) : null,
     promocodeRate: (totalChecks && checksWithPromocode != null) ? Number(((checksWithPromocode / totalChecks) * 100).toFixed(2)) : null,
     uniqueCodes,
     revenue,

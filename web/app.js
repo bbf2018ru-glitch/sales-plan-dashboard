@@ -6221,12 +6221,13 @@ function mktLoadYoY(){
         '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.totalChecksScanned)+'</div><div class="mkt-l">Чеков просмотрено</div></div>'+
         '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.checksWithPromocode)+'</div><div class="mkt-l">С промокодом</div></div>'+
         '<div class="mkt-kpi"><div class="mkt-v" style="'+rateC+'">'+(rate==null?'—':mNum1(rate)+' %')+'</div><div class="mkt-l">Доля чеков с промо</div></div>'+
-        '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.uniqueCodes)+'</div><div class="mkt-l">Уникальных кодов</div></div>'+
+        '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.uniqueCodes)+'</div><div class="mkt-l">Уникальных кодов</div></div>'+ 
+        '<div class="mkt-kpi"><div class="mkt-v">'+fmtNum(uds.uniqueCustomers)+'</div><div class="mkt-l">Уникальных клиентов</div></div>'+ 
         '</div>'+
         '<div class="mkt-chart-t">Свежие применения (новее наверху)</div>'+
         '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Дата</th><th>Промокод</th><th>Чек №</th><th class="num">Сумма ₽</th><th>Точка</th></tr></thead><tbody id="udsFreshBody"></tbody></table></div>'+
         '<div id="udsFreshMoreWrap"></div>'+
-        '<div style="font-size:11px;color:var(--muted);margin-top:6px">За '+(uds.periodYM||period)+' · выручка чеков с промокодом '+fmtNum(uds.revenue)+' ₽ · бонусов списано '+fmtNum(uds.bonusUsed)+' ₽ (ДРР '+(uds.drr==null?'—':mNum1(uds.drr)+' %')+').'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px">За '+(uds.periodYM||period)+' · выручка чеков с промокодом '+fmtNum(uds.revenue)+' ₽ · средний чек '+fmtNum(uds.avgCheck)+' ₽ · бонусов списано '+fmtNum(uds.bonusUsed)+' ₽ (ДРР '+(uds.drr==null?'—':mNum1(uds.drr)+' %')+').'+(uds.truncatedNote?' '+uds.truncatedNote:'')+'</div>';
       // Список свернут до 12 строк (раньше простыня из 40 при заголовке «100» —
       // заголовок врал, лента хоронила матрицу кодов ниже). «Показать все» — по клику.
       var freshRows=(uds.recentApplications||[]);
