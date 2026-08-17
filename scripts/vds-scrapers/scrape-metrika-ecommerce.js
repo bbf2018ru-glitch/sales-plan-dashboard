@@ -75,7 +75,9 @@ function rowAfter(lines, pattern) {
     const gis = rowAfter(lines, /^2gis$/i);
     const total = rowAfter(lines, /^Итого и средние$/i) || rowAfter(lines, /^Всего$/i);
     Object.assign(out, paid || { purchases: null, purchaseRevenue: null });
-    out.utm2gis = gis;
+    // Если строка источника отсутствует в полностью загруженном отчёте,
+    // это означает ноль покупок, а не неизвестное значение.
+    out.utm2gis = gis || (total ? { purchases: 0, purchaseRevenue: 0 } : null);
     if (gis && gis.purchases > 0 && gis.purchaseRevenue != null && gis.purchaseRevenue < gis.purchases * 100) {
       out.utm2gisWarning = 'Подозрительно низкая выручка в строке UTM; значение не публикуем';
       out.utm2gis = null;
