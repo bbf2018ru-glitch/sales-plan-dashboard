@@ -59,6 +59,9 @@ function rowAfter(lines, pattern) {
   if (!out.sessionExpired) {
     await page.goto(reportUrl(period), { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(e => { out.error = e.message; });
     await page.waitForFunction(() => /Количество покупок/.test(document.body.innerText || ''), { timeout: 90000 }).catch(() => { out.gridTimeout = true; });
+    // При разрезе по UTM Метрика иногда отдаёт сначала неполную строку
+    // (например, выручку «2» вместо «29 564»). Даём таблице догрузиться.
+    await page.waitForTimeout(12000);
     for (let i = 0; i < 6; i++) { await page.evaluate(() => window.scrollBy(0, 600)).catch(() => {}); await page.waitForTimeout(600); }
     const body = await page.evaluate(() => document.body ? document.body.innerText : '');
     const lines = body.split('\n').map(s => s.trim()).filter(Boolean);
@@ -67,6 +70,10 @@ function rowAfter(lines, pattern) {
     const total = rowAfter(lines, /^Итого и средние$/i) || rowAfter(lines, /^Всего$/i);
     Object.assign(out, paid || { purchases: null, purchaseRevenue: null });
     out.utm2gis = gis;
+    if (gis && gis.purchases > 0 && gis.purchaseRevenue != null && gis.purchaseRevenue < gis.purchases * 100) {
+      out.utm2gisWarning = 'Подозрительно низкая выручка в строке UTM; значение не публикуем';
+      out.utm2gis = null;
+    }
     out.total = total;
     out.hasEcommerceRows = !!(paid || total);
   }
@@ -75,7 +82,9 @@ function rowAfter(lines, pattern) {
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
   let history = [];
   try { history = JSON.parse(fs.readFileSync(HISTORY, 'utf8')); } catch (_) {}
-  const entry = { ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, utm2gis: out.utm2gis || null, scrapedAt: out.scrapedAt };
+  const previous = history.find(x => x.ym === period.ym);
+  const stableUtm2gis = out.utm2gis || (previous && previous.utm2gis) || null;
+  const entry = { ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, utm2gis: stableUtm2gis, scrapedAt: out.scrapedAt };
   const index = history.findIndex(x => x.ym === entry.ym);
   if (index >= 0) history[index] = entry; else history.push(entry);
   history.sort((a, b) => a.ym.localeCompare(b.ym));
