@@ -4972,7 +4972,7 @@ function renderDirectMonthly(d){
   var sp=0,im=0,cl=0,cv=0,rev=0,revKnown=0;
   var selYM=mktSelectedPeriod();
   var hlRow=function(ym){ return ym===selYM?' style="background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)"':''; };
-  var rows=ms.map(function(m){ var ec=mDirectEcommerce(d,m.ym), purchases=mDirectPurchases(m)||mDirectPurchases(ec)||0, purchaseRevenue=mDirectRevenue(ec); sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=purchases;
+  var rows=ms.map(function(m){ var ec=mDirectEcommerce(d,m.ym), purchases=mDirectPurchases(ec)||mDirectPurchases(m)||0, purchaseRevenue=mDirectRevenue(ec); sp+=m.spend||0; im+=m.impressions||0; cl+=m.clicks||0; cv+=purchases;
     if(purchaseRevenue!=null && isFinite(purchaseRevenue)){ rev+=purchaseRevenue; revKnown+=1; }
     var p=m.ym.split('-'); var lbl=p[0].slice(2)+'-'+MM[Number(p[1])]+(m.daysCovered&&m.daysCovered<28?' (1–'+m.daysCovered+')':'');
     var cpaC=m.cpa==null?'color:var(--muted)':(m.cpa<=300?'color:var(--good)':(m.cpa<=800?'color:var(--gold)':'color:var(--bad)'));

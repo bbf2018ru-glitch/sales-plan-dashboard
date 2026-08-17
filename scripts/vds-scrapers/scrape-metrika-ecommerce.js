@@ -59,6 +59,20 @@ function rowAfter(lines, pattern) {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=ru-RU'] });
   const context = await browser.newContext({ storageState: STATE, locale: 'ru-RU', viewport: { width: 1600, height: 2000 } });
   const page = await context.newPage();
+  let networkAttribution = null;
+  page.on('response', async response => {
+    const url = response.url();
+    if (!/metrika\.yandex\.(?:ru|com)\/api\/metrika/i.test(url)) return;
+    const type = response.request().resourceType();
+    if (type !== 'xhr' && type !== 'fetch') return;
+    try {
+      const json = await response.json();
+      const data = json && json.data && json.data.stat2Data && json.data.stat2Data.data;
+      if (data && Array.isArray(data.items) && data.items.some(item => Array.isArray(item.metrics) && item.metrics.length >= 2)) {
+        networkAttribution = data;
+      }
+    } catch (_) {}
+  });
   await page.goto('https://metrika.yandex.ru/list', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(e => { out.prewarmError = e.message; });
   await page.waitForTimeout(3500);
   if (/passport\.yandex|\/auth\//.test(page.url())) out.sessionExpired = true;
@@ -94,6 +108,30 @@ function rowAfter(lines, pattern) {
     }
     out.total = total;
     out.hasEcommerceRows = !!(paid || total);
+
+    // Надёжный источник — JSON, которым сама таблица Метрики заполняет строки.
+    // metrics: [Количество покупок, Доход]. Объединяем алиасы Директа,
+    // а 2gis оставляем отдельным каналом.
+    if (networkAttribution && Array.isArray(networkAttribution.items)) {
+      const bySource = {};
+      for (const item of networkAttribution.items) {
+        const key = String(item.statDataId || item.dimensions?.[0]?.name || '').toLowerCase();
+        if (!key || !Array.isArray(item.metrics)) continue;
+        bySource[key] = { purchases: Number(item.metrics[0]) || 0, purchaseRevenue: Number(item.metrics[1]) || 0 };
+      }
+      const directKeys = ['yandex', 'geoadv_direct', 'ya'];
+      const direct = directKeys.reduce((a, key) => ({ purchases: a.purchases + (bySource[key]?.purchases || 0), purchaseRevenue: a.purchaseRevenue + (bySource[key]?.purchaseRevenue || 0) }), { purchases: 0, purchaseRevenue: 0 });
+      if (direct.purchases || direct.purchaseRevenue) {
+        out.purchases = direct.purchases;
+        out.purchaseRevenue = direct.purchaseRevenue;
+        out.direct = direct;
+        delete out.directWarning;
+      }
+      if (bySource['2gis']) out.utm2gis = bySource['2gis'];
+      if (networkAttribution.metricsTotals && Array.isArray(networkAttribution.metricsTotals.metrics)) {
+        out.total = { purchases: Number(networkAttribution.metricsTotals.metrics[0]) || 0, purchaseRevenue: Number(networkAttribution.metricsTotals.metrics[1]) || 0 };
+      }
+    }
 
     // В совместном отчёте SPA иногда рисует только покупки. Повторяем запрос
     // только с метрикой «Доход», чтобы получить сумму по UTM-источникам.
