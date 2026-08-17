@@ -5914,6 +5914,19 @@ function mktYoYCard(label, curStr, prevStr, delta, unit){
     '<div class="mkt-yoy-p">год назад: '+prevStr+'</div>'+
     mktDeltaBadge(delta, unit)+'</div>';
 }
+function renderMktExecutive(d){
+  var el=document.getElementById('mktExecutive'); if(!el||!d) return;
+  var rub=function(v){return v==null?'н/д':mNum(v)+' ₽';};
+  var gp=d.grossProfit||{};
+  var e=d.external&&d.external.directEcommerce, u=e&&e.utm2gis;
+  el.innerHTML='<div class="mkt-yoy-grid">'+
+    mktYoYCard('Выручка',rub(d.revenue&&d.revenue.cur),rub(d.revenue&&d.revenue.prev),d.revenue&&d.revenue.deltaPct)+
+    mktYoYCard('Чеки',mNum(d.cheques&&d.cheques.cur),mNum(d.cheques&&d.cheques.prev),d.cheques&&d.cheques.deltaPct)+
+    mktYoYCard('Средний чек',rub(d.avgCheck&&d.avgCheck.cur),rub(d.avgCheck&&d.avgCheck.prev),d.avgCheck&&d.avgCheck.deltaPct)+
+    mktYoYCard('Валовая прибыль',rub(gp.cur&&gp.cur.grossProfit||gp.cur),rub(gp.prev&&gp.prev.grossProfit||gp.prev),null)+
+    mktYoYCard('Покупки из 2ГИС',u?mNum(u.purchases):'н/д','UTM-сайт',null)+
+  '</div>';
+}
 function mktLoadYoY(){
   var el=document.getElementById('mktYoY'); if(!el) return;
   var period=mktSelectedPeriod();
@@ -5935,6 +5948,7 @@ function mktLoadYoY(){
       mktYoYCard('Оплачено бонусами', rub(d.bonus.cur), rub(d.bonus.prev), d.bonus.deltaPct)
     ].join('');
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
+    try { renderMktExecutive(d); } catch(_){}
     // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
     try { renderAlerts(d, period); } catch(_){}
     _mktLive=d; // для CSV-экспорта (live)
