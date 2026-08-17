@@ -5932,8 +5932,7 @@ function mktLoadYoY(){
       mktYoYCard('Чеков', mNum(d.cheques.cur), mNum(d.cheques.prev), d.cheques.deltaPct),
       mktYoYCard('Средний чек', rub(d.avgCheck.cur), rub(d.avgCheck.prev), d.avgCheck.deltaPct),
       mktYoYCard('Карта лояльности', mNum1(d.cardPct.cur)+' %', mNum1(d.cardPct.prev)+' %', d.cardPct.deltaPp, ' п.п.'),
-      mktYoYCard('Оплачено бонусами', rub(d.bonus.cur), rub(d.bonus.prev), d.bonus.deltaPct),
-      mktYoYCard('Сладкий чек', d.sweet.cur.cards+' карт · '+d.sweet.cur.points+' б.', (d.sweet.isNew?'программы не было':d.sweet.prev.cards+' карт'), d.sweet.isNew?null:0)
+      mktYoYCard('Оплачено бонусами', rub(d.bonus.cur), rub(d.bonus.prev), d.bonus.deltaPct)
     ].join('');
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
     // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
@@ -5948,6 +5947,8 @@ function mktLoadYoY(){
     // 2ГИС воронка действий + динамика-графики (показы/переходы по месяцам).
     try { renderGisFunnel(d); } catch(_){}
     try { renderGisCharts(d); } catch(_){}
+    fetchJson('/api/marketing/2gis-ratings-history').then(function(x){ var el=document.getElementById('mktGisHistory'); if(!el)return; var rows=(x&&x.entries)||[]; el.innerHTML=rows.length?'<div class="mkt-chart-t">Рейтинг 2ГИС по точкам · история</div><div class="table-wrap"><table><thead><tr><th>Дата</th><th class="num">Рейтинг</th><th class="num">Точек</th></tr></thead><tbody>'+rows.slice(-90).reverse().map(function(r){var s=r.summary||r.overall||{};return '<tr><td>'+String(r.date||r.scrapedAt||'').slice(0,10)+'</td><td class="num">'+(s.rating||s.avgRating||'—')+'</td><td class="num">'+(s.branches||((r.branches||[]).length)||'—')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="section-hint">История рейтинга ещё не накоплена.</div>'; }).catch(function(){});
+    fetchJson('/api/marketing/seo-history').then(function(x){ var el=document.getElementById('mktSeoExtra'); if(!el)return; var rows=(x&&x.entries)||[]; el.innerHTML=rows.length?'<div class="mkt-chart-t">SEO-тренд · средняя позиция</div><div class="table-wrap"><table><thead><tr><th>Дата</th><th class="num">Мария</th><th class="num">Стефания</th></tr></thead><tbody>'+rows.slice(-90).reverse().map(function(r){var s=r.summary||{};return '<tr><td>'+String(r.date||r.scrapedAt||'').slice(0,10)+'</td><td class="num">'+(s.avgRankMaria==null?'—':s.avgRankMaria)+'</td><td class="num">'+(s.avgRankStefania==null?'—':s.avgRankStefania)+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="section-hint">SEO-история ещё не накоплена.</div>'; }).catch(function(){});
     // Спрос (поисковые запросы 2ГИС) — live из секции demand (заменили снимок апреля).
     try { renderDemand(d); } catch(_){}
     // Воронка лояльности — реальная mini-воронка из Метрики+1С (заменили выдуманную).
