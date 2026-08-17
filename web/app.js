@@ -5949,6 +5949,12 @@ function mktLoadYoY(){
     ].join('');
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
     try { renderMktExecutive(d); } catch(_){}
+    fetchJson('/api/marketing/sources-health').then(function(h){
+      var he=document.getElementById('mktExecutiveHealth'); if(!he)return;
+      var c=h&&h.counts||{}; var list=(h&&h.sources||[]).filter(function(s){return s.status!=='ok';}).slice(0,6);
+      var badge=function(s){var color=s.status==='dead'?'var(--bad)':(s.status==='stale'?'var(--gold)':'var(--accent)');return '<span style="color:'+color+';font-weight:700">'+(s.status==='dead'?'ошибка':s.status==='stale'?'устарел':'неполный')+'</span>';};
+      he.innerHTML='<b>В порядке:</b> '+(c.ok||0)+' · <b style="color:var(--gold)">устарели:</b> '+(c.stale||0)+' · <b style="color:var(--bad)">ошибки:</b> '+(c.dead||0)+' · неполные: '+(c.warn||0)+(list.length?'<br>'+list.map(function(s){return escapeHtml(s.name)+' — '+badge(s)+' ('+escapeHtml(s.ageText)+')';}).join('<br>'):'<br>Все основные источники обновлены по расписанию.');
+    }).catch(function(){});
     // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
     try { renderAlerts(d, period); } catch(_){}
     _mktLive=d; // для CSV-экспорта (live)
