@@ -5037,7 +5037,27 @@ function renderGisFunnel(d){
     '</div>';
   }).join('');
   el.innerHTML='<div class="mkt-chart-t">Воронка действий 2ГИС · '+mlbl+(m.partial?' (идёт)':'')+'</div>'+rows+
-    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Из показов в выдаче в целевые действия (переход на сайт, построение маршрута, звонок) — '+(pct(target,imp)!=null?mNum1(pct(target,imp))+'%':'н/д')+'. Разбивка целевых: на сайт '+mNum(site)+' · маршруты '+mNum(rt)+' · звонки '+mNum(calls)+'. «Маршруты» — самый близкий к визиту сигнал.</div>';
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px">Из показов в выдаче в целевые действия (переход на сайт, построение маршрута, звонок) — '+(pct(target,imp)!=null?mNum1(pct(target,imp))+'%':'н/д')+'. Разбивка целевых: на сайт '+mNum(site)+' · маршруты '+mNum(rt)+' · звонки '+mNum(calls)+'. «Маршруты» — самый близкий к визиту сигнал.</div>'+
+    renderGisSalesSummary(d, m);
+}
+
+// Единая сводка: действия 2ГИС рядом с ecommerce Метрики. Метрика считает
+// только сайт; офлайн-чек нельзя приписать 2ГИС без UTM/QR/промокода.
+function renderGisSalesSummary(d, m){
+  var e=d&&d.external&&d.external.directEcommerce;
+  var total=e&&e.total||{};
+  var purchases=total.purchases, revenue=total.purchaseRevenue;
+  var known=purchases!=null||revenue!=null;
+  var period=e&&e.period&&e.period.ym?e.period.ym:'текущий период';
+  return '<div style="margin-top:12px;padding:10px;border:1px solid var(--border,rgba(0,0,0,.12));border-radius:8px">'+
+    '<div class="mkt-chart-t" style="margin-bottom:6px">Продажи в общей сводке · '+period+'</div>'+
+    '<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:12px">'+
+      '<span><span style="color:var(--muted)">Покупки на сайте (Метрика)</span><br><b>'+ (purchases==null?'н/д':mNum(purchases)) +'</b></span>'+
+      '<span><span style="color:var(--muted)">Выручка сайта</span><br><b>'+ (revenue==null?'н/д':mNum(revenue)+' ₽') +'</b></span>'+
+      '<span><span style="color:var(--muted)">Офлайн-продажи из 2ГИС</span><br><b>не определяются</b></span>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:7px">'+(known?'Сумма взята из ecommerce Метрики и относится ко всем источникам сайта, не только к 2ГИС. ':'')+'Чтобы выделить именно продажи 2ГИС, нужны UTM-метки на ссылке карточки и событие покупки; кассовые продажи связываются отдельным QR/промокодом.</div>'+
+  '</div>';
 }
 // 2ГИС динамика по месяцам — графики показов и переходов (gisHistory.series).
 function renderGisCharts(d){
