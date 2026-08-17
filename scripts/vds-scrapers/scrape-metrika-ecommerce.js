@@ -94,6 +94,26 @@ function rowAfter(lines, pattern) {
     }
     out.total = total;
     out.hasEcommerceRows = !!(paid || total);
+
+    // В совместном отчёте SPA иногда рисует только покупки. Повторяем запрос
+    // только с метрикой «Доход», чтобы получить сумму по UTM-источникам.
+    try {
+      const revenueUrl = URL.replace('%5B%5B%22ym%3As%3AecommercePurchases%22%5D%2C%5B%22ym%3As%3AecommerceRevenue%22%5D%5D', '%5B%5B%22ym%3As%3AecommerceRevenue%22%5D%5D');
+      await p.goto(revenueUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await p.waitForTimeout(12000);
+      const rb = await p.evaluate(() => document.body ? document.body.innerText : '');
+      const rl = rb.split('\n').map(s => s.trim()).filter(Boolean);
+      const revRows = [
+        rowAfter(rl, /^yandex$/i),
+        rowAfter(rl, /^geoadv_direct$/i),
+        rowAfter(rl, /^ya$/i)
+      ].filter(Boolean);
+      const directRevenue = revRows.reduce((sum, x) => sum + (x.purchaseRevenue || 0), 0);
+      if (directRevenue > 0) {
+        out.purchaseRevenue = directRevenue;
+        out.direct = Object.assign({}, out.direct || {}, { purchaseRevenue: directRevenue });
+      }
+    } catch (_) { /* основной отчёт остаётся доступным даже при сбое второго */ }
   }
   await browser.close();
   fs.mkdirSync('/opt/marketing-data', { recursive: true });
