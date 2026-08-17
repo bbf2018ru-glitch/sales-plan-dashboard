@@ -21,7 +21,13 @@ function metric(value) {
 
 function monthToDate() {
   const now = new Date();
-  const ym = now.toISOString().slice(0, 7);
+  const requested = process.env.TARGET_YM;
+  const ym = requested && /^\d{4}-\d{2}$/.test(requested) ? requested : now.toISOString().slice(0, 7);
+  if (ym !== now.toISOString().slice(0, 7)) {
+    const [y, m] = ym.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    return { ym, from: ym + '-01', to: last };
+  }
   return { ym, from: ym + '-01', to: now.toISOString().slice(0, 10) };
 }
 
