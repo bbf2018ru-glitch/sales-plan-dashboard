@@ -29,7 +29,7 @@ function reportUrl(period) {
   const range = encodeURIComponent(period.from + ':' + period.to);
   return 'https://metrika.yandex.ru/stat/new?id=' + COUNTER +
     '&period=' + range + '&group=day' +
-    '&selectedDimensionKeys=%5B%5B%22ym%3As%3A%3Cattribution%3ETrafficSource%22%5D%5D' +
+    '&selectedDimensionKeys=%5B%5B%22ym%3As%3AlastUTMSource%22%5D%5D' +
     '&tableMetrics=%5B%5B%22ym%3As%3AecommercePurchases%22%5D%2C%5B%22ym%3As%3AecommerceRevenue%22%5D%5D' +
     '&view=Linear&chartView=Line&table=visits' +
     '&attr=%7B%22attributionId%22%3A%22LastSign%22%2C%22isCrossDevice%22%3Atrue%7D' +
@@ -63,8 +63,10 @@ function rowAfter(lines, pattern) {
     const body = await page.evaluate(() => document.body ? document.body.innerText : '');
     const lines = body.split('\n').map(s => s.trim()).filter(Boolean);
     const paid = rowAfter(lines, /^Переходы по рекламе$/i);
+    const gis = rowAfter(lines, /^2gis$/i);
     const total = rowAfter(lines, /^Итого и средние$/i) || rowAfter(lines, /^Всего$/i);
     Object.assign(out, paid || { purchases: null, purchaseRevenue: null });
+    out.utm2gis = gis;
     out.total = total;
     out.hasEcommerceRows = !!(paid || total);
   }
@@ -73,10 +75,10 @@ function rowAfter(lines, pattern) {
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
   let history = [];
   try { history = JSON.parse(fs.readFileSync(HISTORY, 'utf8')); } catch (_) {}
-  const entry = { ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, scrapedAt: out.scrapedAt };
+  const entry = { ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, utm2gis: out.utm2gis || null, scrapedAt: out.scrapedAt };
   const index = history.findIndex(x => x.ym === entry.ym);
   if (index >= 0) history[index] = entry; else history.push(entry);
   history.sort((a, b) => a.ym.localeCompare(b.ym));
   fs.writeFileSync(HISTORY, JSON.stringify(history, null, 2));
-  console.log(JSON.stringify({ ok: true, ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, hasRows: out.hasEcommerceRows, sessionExpired: !!out.sessionExpired }));
+  console.log(JSON.stringify({ ok: true, ym: period.ym, purchases: out.purchases, purchaseRevenue: out.purchaseRevenue, utm2gis: out.utm2gis || null, hasRows: out.hasEcommerceRows, sessionExpired: !!out.sessionExpired }));
 })().catch(e => { console.error('FATAL', e.message); process.exit(1); });

@@ -5046,17 +5046,18 @@ function renderGisFunnel(d){
 function renderGisSalesSummary(d, m){
   var e=d&&d.external&&d.external.directEcommerce;
   var total=e&&e.total||{};
-  var purchases=total.purchases, revenue=total.purchaseRevenue;
+  var utm=e&&e.utm2gis||null;
+  var purchases=utm&&utm.purchases, revenue=utm&&utm.purchaseRevenue;
   var known=purchases!=null||revenue!=null;
   var period=e&&e.period&&e.period.ym?e.period.ym:'текущий период';
   return '<div style="margin-top:12px;padding:10px;border:1px solid var(--border,rgba(0,0,0,.12));border-radius:8px">'+
     '<div class="mkt-chart-t" style="margin-bottom:6px">Продажи в общей сводке · '+period+'</div>'+
     '<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:12px">'+
-      '<span><span style="color:var(--muted)">Покупки на сайте (Метрика)</span><br><b>'+ (purchases==null?'н/д':mNum(purchases)) +'</b></span>'+
-      '<span><span style="color:var(--muted)">Выручка сайта</span><br><b>'+ (revenue==null?'н/д':mNum(revenue)+' ₽') +'</b></span>'+
+      '<span><span style="color:var(--muted)">Покупки из 2ГИС (Метрика)</span><br><b>'+ (purchases==null?'н/д':mNum(purchases)) +'</b></span>'+ 
+      '<span><span style="color:var(--muted)">Выручка из 2ГИС</span><br><b>'+ (revenue==null?'н/д':mNum(revenue)+' ₽') +'</b></span>'+ 
       '<span><span style="color:var(--muted)">Офлайн-продажи из 2ГИС</span><br><b>не определяются</b></span>'+
     '</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:7px">'+(known?'Сумма взята из ecommerce Метрики и относится ко всем источникам сайта, не только к 2ГИС. ':'')+'Чтобы выделить именно продажи 2ГИС, нужны UTM-метки на ссылке карточки и событие покупки; кассовые продажи связываются отдельным QR/промокодом.</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:7px">'+(known?'Источник: UTM-метка <b>utm_source=2gis</b> и ecommerce Метрики. ':'Метрика пока не вернула строку 2ГИС за этот период. ')+'Это онлайн-заказы с сайта; офлайн-касса требует отдельного QR/промокода.</div>'+ 
   '</div>';
 }
 // 2ГИС динамика по месяцам — графики показов и переходов (gisHistory.series).
