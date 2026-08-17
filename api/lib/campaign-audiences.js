@@ -201,6 +201,18 @@ async function getAudiences({ force = false } = {}) {
   return cache.wrap('audiences', buildAudiences);
 }
 
+// Тяжёлая сводка прогревается в фоне, чтобы первый пользователь не ждал
+// несколько последовательных запросов к 1С. Кэш также дедуплицирует вызовы.
+function warm() {
+  return getAudiences().then(data => {
+    console.log('[campaign-audiences] warm', data && data.fromCache ? 'cache' : 'ok', new Date().toISOString());
+    return data;
+  }).catch(err => {
+    console.log('[campaign-audiences] warm error', err.message);
+    return null;
+  });
+}
+
 // ── CSV-выгрузка сегмента ────────────────────────────────────────────────────
 async function pageAll(makeQuery) {
   let last = '', all = []; const seen = new Set();
@@ -328,4 +340,4 @@ async function getAudienceCsv(key) {
   throw new Error('Сегмент без CSV-обработчика: ' + key);
 }
 
-module.exports = { getAudiences, getAudienceCsv };
+module.exports = { getAudiences, warm, getAudienceCsv };

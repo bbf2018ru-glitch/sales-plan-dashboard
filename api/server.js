@@ -146,6 +146,14 @@ function warmSms() {
 setTimeout(warmSms, 45000);
 setInterval(warmSms, 6 * 60 * 60 * 1000);
 
+// Аудитории кампаний — тяжёлая агрегация по 1С. Прогреваем после запуска,
+// чтобы открытие вкладки маркетинга не зависело от холодного расчёта.
+function warmCampaignAudiences() {
+  require('./lib/campaign-audiences').warm();
+}
+setTimeout(warmCampaignAudiences, 75000);
+setInterval(warmCampaignAudiences, 6 * 60 * 60 * 1000);
+
 // UDS-промокоды помесячно — 17 запросов callDocument('ЧекККМ').
 function warmPromoCodes() {
   warmPromoCodesMonthly()
