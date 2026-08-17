@@ -490,6 +490,12 @@
             </div>
           </section>
 
+          <section class="section" id="mkt-s-economy" data-mgroup="overview">
+            <div class="section-label">Экономика маркетинга <span class="mkt-scope dyn">затраты · выручка · ROI</span></div>
+            <div class="section-hint">Показываем только подтверждённые суммы. ROI по отдельному каналу появляется после его атрибуции; общая доля затрат считается от выручки выбранного периода.</div>
+            <div id="mktEconomy" class="mkt-yoy"></div>
+          </section>
+
           <!-- Сравнительный круговой отчёт (C3) -->
           <section class="section atab-section" data-atab="comparison">
             <div class="section-label">Сравнение магазинов (радар)</div>
@@ -1627,7 +1633,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=197"></script>
+    <script async src="/app.js?v=198"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

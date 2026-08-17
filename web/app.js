@@ -5108,6 +5108,14 @@ function renderPaidCosts(pc){
   if(pc.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+pc.note+'</div>';
   el.innerHTML=html;
 }
+function renderMarketingEconomy(d, pc){
+  var el=document.getElementById('mktEconomy'); if(!el||!d) return;
+  var revenue=d.revenue&&d.revenue.cur, spend=pc&&pc.totalMonthly;
+  var share=(revenue>0&&spend!=null)?(spend/revenue*100):null;
+  var roi=(revenue>0&&spend>0)?((revenue-spend)/spend*100):null;
+  var card=function(v,l){return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div></div>';};
+  el.innerHTML='<div class="mkt-yoy-grid">'+card(spend==null?'н/д':mNum(spend)+' ₽','Маркетинг / мес')+card(revenue==null?'н/д':mNum(revenue)+' ₽','Выручка периода')+card(share==null?'н/д':mNum1(share)+' %','Доля затрат в выручке')+card(roi==null?'н/д':(roi>=0?'+':'')+mNum1(roi)+' %','Окупаемость по общей выручке')+'</div><div class="section-hint" style="margin-top:8px">Окупаемость выше — ориентир по всей выручке, не доказанная атрибуция каналов. Для точного ROI канала нужны покупки с его UTM или промокодом.</div>';
+}
 // Свежесть источников: возраст файлов внешних данных + флаги сбоя скрейперов.
 function renderSourcesHealth(sh){
   var el=document.getElementById('mktSources'), hint=document.getElementById('mktSourcesHint');
@@ -5952,6 +5960,7 @@ function mktLoadYoY(){
     ].join('');
     el.innerHTML='<div class="mkt-yoy-grid">'+cards+'</div>';
     try { renderMktExecutive(d); } catch(_){}
+    fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ renderMarketingEconomy(d,pc); }).catch(function(){ renderMarketingEconomy(d,null); });
     fetchJson('/api/marketing/sources-health').then(function(h){
       var he=document.getElementById('mktExecutiveHealth'); if(!he)return;
       var c=h&&h.counts||{}; var list=(h&&h.sources||[]).filter(function(s){return s.status!=='ok';}).slice(0,6);
