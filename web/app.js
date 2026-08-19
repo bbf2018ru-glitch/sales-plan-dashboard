@@ -2200,7 +2200,7 @@ function initPwa() {
     // app.js грузится async (не ждёт render-blocking CSS), поэтому может исполниться
     // уже ПОСЛЕ события window.load — тогда слушатель не сработал бы. Регистрируем
     // сразу, если документ уже загружен; иначе по load.
-    const regSw = () => navigator.serviceWorker.register('/sw.js').catch(() => {});
+    const regSw = () => navigator.serviceWorker.register('/sw.js?v=118').catch(() => {});
     if (document.readyState === 'complete') regSw();
     else window.addEventListener('load', regSw);
   }

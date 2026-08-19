@@ -1,10 +1,11 @@
-// Service worker — лёгкий cache-first для статики, network-first для API/dynamic.
+// Service worker — network-first для HTML, cache-first с фоновым обновлением
+// для версионированной статики, без кэша для API.
 //
 // Кэшируем: index.html, app.js, styles.css, icon.svg, manifest.
 // НЕ кэшируем: /api/*, SSE (/api/events), HTML с динамическим контентом.
 // При network failure для shell — отдаём из кэша (offline-режим).
 
-const CACHE_NAME = 'maria-dashboard-v117';
+const CACHE_NAME = 'maria-dashboard-v118';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -49,6 +50,21 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   // API / SSE — не трогаем (всегда network)
   if (url.pathname.startsWith('/api/')) return;
+
+  // HTML всегда сначала берём с сервера. Иначе старый shell мог ещё один запуск
+  // показывать уже исправленную, но закэшированную страницу без формы входа.
+  if (req.mode === 'navigate') {
+    e.respondWith(
+      fetch(req, { cache: 'no-cache' }).then((r) => {
+        if (r.ok) {
+          const copy = r.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return r;
+      }).catch(() => caches.match(req).then((cached) => cached || caches.match('/index.html')))
+    );
+    return;
+  }
 
   // Cache-first для shell-ассетов, fallback на network, и обновляем кэш свежей версией
   e.respondWith(
