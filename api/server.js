@@ -598,6 +598,19 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ── Auth ──────────────────────────────────────────────────────────────────
+    if (pathname === '/api/auth' && req.method === 'GET') {
+      let authenticated = checkSession(req);
+      if (!authenticated && (req.headers['x-user-token'] || parseCookies(req)[USER_TOKEN_COOKIE] || parsedUrl.searchParams.get('userToken'))) {
+        authenticated = !!(await resolveUser(req));
+      }
+      sendJson(res, 200, {
+        ok: true,
+        pinRequired: !!DASHBOARD_PIN,
+        authenticated
+      });
+      return;
+    }
+
     if (pathname === '/api/auth' && req.method === 'POST') {
       const ip = getClientIp(req);
       const limit = checkPinRateLimit(ip);

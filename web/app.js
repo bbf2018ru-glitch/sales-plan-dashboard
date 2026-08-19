@@ -124,6 +124,8 @@ async function fetchJson(path, opts = {}) {
 
 // ── PIN Auth ───────────────────────────────────────────────────────────────
 const PIN_STORED_KEY = 'maria_pin_hash';
+let pinAuthResolve = null;
+let pinHandlersBound = false;
 
 function pinHash(pin) {
   let h = 5381;
@@ -131,13 +133,17 @@ function pinHash(pin) {
   return (h >>> 0).toString(36);
 }
 
-function initPin(pinRequired) {
+function initPin(pinRequired, authenticated = false) {
   state.pinRequired = pinRequired;
 
-  if (pinRequired && !state.sessionToken) showPinOverlay();
+  if (pinRequired && !authenticated) showPinOverlay();
 
   const storedHash = localStorage.getItem(PIN_STORED_KEY);
-  if (storedHash && !sessionStorage.getItem('maria_local_ok')) showPinOverlay(true);
+  // Серверный PIN всегда имеет приоритет над старой локальной защитой.
+  if ((!pinRequired || authenticated) && storedHash && !sessionStorage.getItem('maria_local_ok')) showPinOverlay(true);
+
+  if (pinHandlersBound) return;
+  pinHandlersBound = true;
 
   $('pinSubmit').addEventListener('click', handlePinSubmit);
   $('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinSubmit').click(); });
@@ -199,6 +205,11 @@ async function handlePinSubmit() {
         sessionStorage.setItem('maria_session', data.token);
       }
       hidePinOverlay();
+      if (pinAuthResolve) {
+        const resolve = pinAuthResolve;
+        pinAuthResolve = null;
+        resolve();
+      }
     } else {
       $('pinError').textContent = data.error || 'Неверный PIN';
       $('pinInput').value = '';
@@ -207,6 +218,17 @@ async function handlePinSubmit() {
   } catch {
     $('pinError').textContent = 'Ошибка соединения';
   }
+}
+
+async function ensureAuthenticated() {
+  // Этот публичный статус нужен до /api/metadata: после истечения 8-часовой
+  // cookie metadata уже отвечает 401, поэтому прежний код не успевал показать
+  // форму PIN и заменял страницу общей ошибкой загрузки.
+  const auth = await fetchJson('/api/auth');
+  const needsServerPin = !!auth.pinRequired && !auth.authenticated;
+  initPin(!!auth.pinRequired, !!auth.authenticated);
+  if (!needsServerPin) return;
+  await new Promise(resolve => { pinAuthResolve = resolve; });
 }
 
 // ── Dark theme ─────────────────────────────────────────────────────────────
@@ -2914,8 +2936,8 @@ async function init() {
   renderPendingReports();
 
   try {
+    await ensureAuthenticated();
     const meta = await loadMetadata();
-    initPin(meta.pinRequired);
 
     // ВАЖНО: обработчик смены месяца вешаем СРАЗУ после заполнения дропдауна
     // (в loadMetadata), ДО тяжёлого await loadSummary(). Иначе при медленном
