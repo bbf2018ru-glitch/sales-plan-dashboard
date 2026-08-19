@@ -1312,6 +1312,12 @@
             <div id="mktYoY" class="mkt-yoy"></div>
           </section>
 
+          <section class="section" id="mkt-s-budget" data-mgroup="overview">
+            <div class="section-label">📊 Бюджет маркетинга — план / факт <span class="mkt-scope dyn" title="План из помесячного листа Google Sheets; факт из последнего решения финансового планирования 1С">Google Sheets + 1С</span></div>
+            <div class="section-hint">План — сумма строк выбранного месяца в таблице бюджета. Факт — только утверждённые на ФП суммы из 1С; заявки, которые ещё ждут рассмотрения, показаны отдельно.</div>
+            <div id="mktBudgetLive"><div class="mkt-yoy-load">Загружаю план и решения ФП…</div></div>
+          </section>
+
           <section class="section" id="mkt-s-grossprofit" data-mgroup="overview">
             <div class="section-label">💰 Валовая прибыль (из 1С) <span class="mkt-scope dyn" title="Реальная себестоимость из 1С (материалы, списанные в производство) — совпадает с отчётом «Валовая прибыль»">live · за месяц</span></div>
             <div class="section-hint">Реальная себестоимость из 1С (материалы в производство), не оценка по наценке. Совпадает с отчётом Маши «Валовая прибыль».</div>
@@ -1634,7 +1640,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=204"></script>
+    <script async src="/app.js?v=205"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

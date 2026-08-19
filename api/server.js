@@ -25,6 +25,7 @@ const sweetDetail = require('./lib/sweet-detail');
 const productionPlan = require('./lib/production-plan');
 const productionXlsx = require('./lib/production-xlsx');
 const paidCosts = require('./lib/paid-costs');
+const marketingBudget = require('./lib/marketing-budget');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { returnsLive } = require('./lib/returns-live');
 const { wholesaleLive } = require('./lib/wholesale-live');
@@ -1291,6 +1292,15 @@ const server = http.createServer(async (req, res) => {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await paidCosts.getPaidCosts(period));
+      } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // ── Бюджет маркетинга: план из Google Sheets + решения ФП из 1С ──
+    if (pathname === '/api/marketing/budget-plan-fact' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        sendJson(res, 200, await marketingBudget.getMarketingBudget(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
       return;
     }
