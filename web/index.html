@@ -1441,13 +1441,14 @@
           </section>
 
           <section class="section" id="mkt-s-prodkg" data-mgroup="products">
-            <div class="section-label">Выпуск продукции, кг (производство) <span class="mkt-scope dyn" title="Документ.ОтчетПроизводстваЗаСмену из 1С через /query, за выбранный месяц + динамика 12 мес">live · за месяц</span></div>
-            <div class="section-hint">Сколько произведено в килограммах (Σ Количество × вес штуки). Источник — отчёты производства за смену в 1С. Помогает планировать загрузку цеха и сверять с продажами.</div>
+            <div class="section-label">Выпуск готовой продукции, кг (производство) <span class="mkt-scope dyn" title="Только номенклатурные группы с признаком «ЭтоПродукция = Да» из отчётов производства за смену в 1С, за выбранный месяц + динамика 12 мес">live · за месяц</span></div>
+            <div class="section-hint">Сколько произведено готовой продукции в килограммах (Σ Количество × вес штуки). Сырьё, полуфабрикаты и компоненты не учитываются.</div>
             <div id="mktProdKgKpi"></div>
             <div class="mkt-2col" style="margin-top:12px">
               <div><div class="mkt-chart-t">Динамика выпуска по месяцам, кг</div><div id="mktProdKgChart"></div></div>
               <div><div class="mkt-chart-t">Топ продукции по кг (за месяц)</div><div id="mktProdKgTop" class="table-wrap"></div></div>
             </div>
+            <div id="mktProdKgNote" class="section-hint" style="margin-top:8px"></div>
           </section>
 
           <section class="section" id="mkt-s-seo" data-mgroup="channels">
@@ -1633,7 +1634,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=203"></script>
+    <script async src="/app.js?v=204"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

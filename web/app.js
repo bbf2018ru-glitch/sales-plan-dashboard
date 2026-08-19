@@ -5318,7 +5318,7 @@ function renderProductionKg(pk){
   var c=pk.current||{kg:0,units:0,momPct:null};
   var momStr = c.momPct==null ? '—' : '<span style="color:'+(c.momPct>=0?'var(--good)':'var(--bad)')+'">'+(c.momPct>0?'+':'')+mNum1(c.momPct)+' %</span>';
   el.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+
-    kpi(mNum(c.kg)+' кг','Выпуск за месяц')+
+    kpi(mNum(c.kg)+' кг','Готовая продукция за месяц')+
     kpi(mNum(c.units)+' шт','Штук произведено')+
     kpi(momStr,'К прошлому месяцу')+
     '</div>';
@@ -5336,6 +5336,8 @@ function renderProductionKg(pk){
         top.slice(0,20).map(function(r,i){ return '<tr><td>'+(i+1)+'. '+r.name+'</td><td class="num">'+mNum(r.kg)+'</td><td class="num">'+mNum(r.units)+'</td></tr>'; }).join('')+'</tbody></table>';
     } else { tEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Нет данных за месяц.</div>'; }
   }
+  var noteEl=document.getElementById('mktProdKgNote');
+  if(noteEl && pk.note) noteEl.textContent=pk.note;
 }
 function mktCsvN(n, dec){ return dec ? (Math.round(n*100)/100).toFixed(2).replace('.',',') : String(Math.round(n)); }
 function mktExport(){
