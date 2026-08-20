@@ -1319,11 +1319,11 @@
           </section>
 
           <section class="section" id="mkt-s-grossprofit" data-mgroup="overview">
-            <div class="section-label">💰 Валовая прибыль (из 1С) <span class="mkt-scope dyn" title="Реальная себестоимость из 1С (материалы, списанные в производство) — совпадает с отчётом «Валовая прибыль»">live · за месяц</span></div>
-            <div class="section-hint">Реальная себестоимость из 1С (материалы в производство), не оценка по наценке. Совпадает с отчётом Маши «Валовая прибыль».</div>
+            <div class="section-label">💰 Валовая и операционная прибыль (из 1С) <span class="mkt-scope dyn" title="Материалы + весь начисленный ФОТ + прочие оплаченные операционные затраты">live · за месяц</span></div>
+            <div class="section-hint">Валовая прибыль = выручка − материалы. Ниже дополнительно вычитаются <b>весь начисленный ФОТ</b> по всем подразделениям и остальные оплаченные операционные затраты. Налоги и капитальные покупки показаны отдельно.</div>
             <div id="mktGrossProfit" class="mkt-yoy"></div>
             <div style="margin-top:12px">
-              <div class="section-hint" style="margin-bottom:4px">Маржа по месяцам (реальная, из 1С · закрытые месяцы)</div>
+              <div class="section-hint" style="margin-bottom:4px">Валовая маржа по месяцам (реальная, из 1С · закрытые месяцы)</div>
               <div id="mktGrossProfitChart" class="chart-wrap"></div>
             </div>
           </section>
@@ -1640,7 +1640,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=205"></script>
+    <script async src="/app.js?v=206"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

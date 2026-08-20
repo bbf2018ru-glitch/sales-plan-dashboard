@@ -5336,7 +5336,7 @@ function renderSmsMonthly(sm){
     '</tbody></table>'+
     (sm.monthsPending?'<div style="font-size:11px;color:var(--muted);margin-top:4px">'+sm.monthsPending+' мес. ещё прогреваются (тяжёлый расчёт атрибуции). Обнови позже.</div>':'');
 }
-// Валовая прибыль из 1С — реальная себестоимость (материалы в производство).
+// Валовая и операционная прибыль: материалы + полный ФОТ + прочие затраты.
 function renderGpTrend(trend){
   var c=document.getElementById('mktGrossProfitChart'); if(!c) return;
   var pts=(trend||[]).filter(function(x){ return x.costed && x.marginPct!=null; });
@@ -5349,7 +5349,20 @@ function renderGrossProfit(d){
   var el=document.getElementById('mktGrossProfit'); if(!el) return;
   if(d && d.unavailable){ el.innerHTML='<div class="mkt-yoy-load">'+(d.reason||'1С временно недоступна')+' — попробуйте позже.</div>'; return; }
   if(!d || d.error){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">Недоступно: '+((d&&d.error)||'ошибка')+'</div>'; return; }
-  var rub=function(n){ return mNum(n)+' ₽'; };
+  var rub=function(n){ return n==null?'—':mNum(n)+' ₽'; };
+  var kpi=function(v,l,sub){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:2px">'+sub+'</div>':'')+'</div>'; };
+  var details=function(){
+    var html='';
+    var units=d.payrollUnits||[];
+    if(units.length){
+      html+='<details class="mkt-details" style="margin-top:12px"><summary>Весь ФОТ по подразделениям ('+mNum(units.length)+')</summary><div class="table-wrap" style="margin-top:8px"><table style="font-size:11px"><thead><tr><th>Подразделение / точка</th><th class="num">Начислено, ₽</th></tr></thead><tbody>'+units.map(function(x){return '<tr><td>'+escapeHtml(x.name)+'</td><td class="num">'+mNum(x.amount)+'</td></tr>';}).join('')+'<tr class="mkt-total"><td><b>Начисления</b></td><td class="num"><b>'+mNum(d.payrollWages||0)+'</b></td></tr>'+(d.payrollContributions?'<tr><td>Взносы работодателя, отражённые в 1С</td><td class="num">'+mNum(d.payrollContributions)+'</td></tr>':'')+'</tbody></table></div></details>';
+    }
+    var items=d.otherExpenseItems||[];
+    if(items.length){
+      html+='<details class="mkt-details"><summary>Остальные операционные затраты ('+mNum(items.length)+' статей)</summary><div class="table-wrap" style="margin-top:8px"><table style="font-size:11px"><thead><tr><th>Статья движения денег</th><th class="num">Оплачено, ₽</th></tr></thead><tbody>'+items.map(function(x){return '<tr><td>'+escapeHtml(x.name)+'</td><td class="num">'+mNum(x.amount)+'</td></tr>';}).join('')+'<tr class="mkt-total"><td><b>Итого прочих операционных</b></td><td class="num"><b>'+mNum(d.otherExpenses||0)+'</b></td></tr></tbody></table></div></details>';
+    }
+    return html;
+  };
   // Тренд маржи по месяцам (закрытые) — рисуем всегда, даже если текущий месяц не рассчитан.
   try{ renderGpTrend(d.trend); }catch(_){}
   // Текущий/незакрытый месяц: себестоимость в 1С ещё не рассчитана → показываем оценку.
@@ -5357,19 +5370,32 @@ function renderGrossProfit(d){
     var estM=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? mNum1(state.summary.totals.marginPct)+' %' : '—';
     el.innerHTML='<div style="font-size:13px;color:var(--muted,#7A6A5C);padding:6px;line-height:1.5">'+
       '📅 Себестоимость за этот месяц ещё не рассчитана в 1С (производство не закрыто) — реальная валовая прибыль появится после <b>закрытия месяца</b>.<br>'+
-      'Пока — оценка по наценке: <b>'+estM+'</b> (выручка '+rub(d.revenue)+'). Реальные цифры — по закрытым месяцам ниже и при выборе прошлого месяца.</div>';
+      'Пока — оценка по наценке: <b>'+estM+'</b> (выручка '+rub(d.revenue)+'). ФОТ и прочие оплаты ниже — фактические на текущую дату, но месяц ещё неполный.</div>'+
+      '<div class="mkt-yoy-grid" style="margin-top:10px">'+
+        kpi(rub(d.payroll),'ФОТ начислен на сейчас',d.payrollComplete?'расчёт выглядит полным':'месяц ещё не закрыт')+
+        kpi(rub(d.otherExpenses),'Прочие затраты оплачено','операционные статьи')+
+        kpi(rub(d.taxPayments),'Налоги оплачено','отдельно: ЕНС не расшифрован')+
+        kpi(rub(d.capex),'Капитальные покупки','не уменьшают прибыль целиком')+
+      '</div>'+details()+
+      '<div class="section-hint" style="margin-top:8px">'+escapeHtml(d.basisNote||'')+'</div>';
     return;
   }
-  var kpi=function(v,l,sub){ return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:2px">'+sub+'</div>':'')+'</div>'; };
   var est=(state.summary && state.summary.totals && isNum(state.summary.totals.marginPct)) ? state.summary.totals.marginPct : null;
   var estLine=est!=null ? 'оценка по наценке: '+mNum1(est)+' %' : '';
-  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">'+
+  var opColor=d.operatingProfit==null?'var(--muted)':(d.operatingProfit>=0?'var(--good)':'var(--bad)');
+  el.innerHTML='<div class="mkt-yoy-grid">'+
     kpi(rub(d.revenue),'Выручка')+
     kpi(rub(d.cogs),'Себестоимость','материалы в произв.')+
     kpi(rub(d.grossProfit),'Валовая прибыль')+
     kpi((d.marginPct!=null?mNum1(d.marginPct)+' %':'—'),'Маржа',estLine)+
     '</div>'+
-    '<div style="font-size:11px;color:var(--muted,#7A6A5C);margin-top:8px">Источник: '+(d.source||'1С')+'. Обновлено: '+(d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—')+'.</div>';
+    '<div class="mkt-yoy-grid" style="margin-top:12px">'+
+      kpi(rub(d.payroll),'Весь ФОТ','начисления '+rub(d.payrollWages)+' · взносы '+rub(d.payrollContributions))+
+      kpi(rub(d.otherExpenses),'Остальные затраты','оплаченные операционные')+
+      kpi('<span style="color:'+opColor+'">'+rub(d.operatingProfit)+'</span>','Прибыль после затрат',d.operatingReady?'до налогов и CAPEX':'ФОТ месяца ещё не закрыт')+
+      kpi(d.operatingMarginPct==null?'—':mNum1(d.operatingMarginPct)+' %','Рентабельность после затрат')+
+    '</div>'+details()+
+    '<div style="font-size:11px;color:var(--muted,#7A6A5C);margin-top:8px"><b>Отдельно, не вычтено повторно:</b> налоги/ЕНС оплачено '+rub(d.taxPayments)+' · капитальные покупки '+rub(d.capex)+'. '+escapeHtml(d.basisNote||'')+'<br>Источник: '+escapeHtml(d.source||'1С')+'. Обновлено: '+(d.refreshedAt?new Date(d.refreshedAt).toLocaleString('ru-RU'):'—')+'.</div>';
 }
 // Выпуск продукции в кг — KPI + график 12 мес + топ продукции.
 function renderProductionKg(pk){
@@ -5750,7 +5776,7 @@ function renderCampaignAudiences(d){
     });
   });
 }
-function renderAlerts(d, period){
+function renderAlerts(d, period, sms){
   var el=document.getElementById('mktAlerts'); if(!el) return;
   if(!d){ el.innerHTML='<div class="mkt-yoy-load">Загрузка сигналов…</div>'; return; }
   var a=[], mn=d.monthName||'';
@@ -5818,8 +5844,27 @@ function renderAlerts(d, period){
     var seoSrc=mk.sources.find(function(s){return /поиск|seo/i.test(s.name);});
     if(seoSrc && seoSrc.sharePct>=50) a.push(['green','SEO — главный канал сайта','Органика '+mNum1(seoSrc.sharePct)+' % трафика сайта ('+mNum(seoSrc.visits)+' визитов). Расход 46к/мес оправдан.']);
   }
-  // SMS без атрибуции (постоянный приоритет, пока нет BSL-патча получателей)
-  a.push(['amber','SMS без атрибуции','Отдача SMS-рассылок в покупках пока не измеряется (ждём BSL-патч получателей в 1С). Приоритет — атрибуция «карта-получатель ↔ чек».']);
+  // SMS: живой результат отдельного расчёта атрибуции. Старая постоянная заглушка
+  // «SMS без атрибуции» была неверной — JOIN получателей с чеками уже работает.
+  if(sms && sms.error){
+    a.push(['red','SMS-атрибуция недоступна','Расчёт SMS вернул ошибку: '+escapeHtml(sms.error)+'.']);
+  } else if(sms && sms.totals){
+    var st=sms.totals, camps=sms.campaignsCount||0;
+    if(!camps){
+      a.push(['amber','SMS-рассылок не было','За '+mn+' маркетинговых SMS-кампаний в 1С не найдено.']);
+    } else if(st.recipientsApprox){
+      a.push(['amber','SMS посчитаны приблизительно','Найдено '+mNum(camps)+' рассылок, но уникальные получатели одной или нескольких кампаний не пришли из 1С. Охват и стоимость — верхняя граница.']);
+    } else if((st.incremental||0)>0){
+      var smsRoas=st.cost>0?(st.incRevenue||0)/st.cost:null;
+      a.push(['green','SMS дают подтверждённый прирост','За '+mn+': '+mNum(st.recipients)+' получателей, '+mNum(st.buyers)+' покупок/переходов; прирост к обычному уровню +'+mNum(st.incremental)+' покупок и +'+mNum(st.incRevenue||0)+' ₽ выручки'+(smsRoas!=null?' при затратах '+mNum(st.cost)+' ₽ (ROAS прироста ×'+mNum1(smsRoas)+').':'.')]);
+    } else if((st.buyers||0)>0){
+      a.push(['amber','SMS: прирост не подтверждён','Реакции есть ('+mNum(st.buyers)+' из '+mNum(st.recipients)+' получателей), но выше обычного уровня этих клиентов прироста пока нет. Не масштабировать без проверки сегмента и оффера.']);
+    } else {
+      a.push(['red','SMS не дали результата','По '+mNum(camps)+' рассылкам и '+mNum(st.recipients)+' получателям покупок/переходов не найдено. Проверить ссылку, оффер и срок атрибуции.']);
+    }
+  } else {
+    a.push(['amber','SMS-данные загружаются','Атрибуция считается отдельно по получателям и чекам 1С; алерт обновится после загрузки.']);
+  }
   // «Сладкий чек» — пассивный штамп
   if(d.sweet&&d.sweet.cur&&d.sweet.cur.tasks){
     var tk=d.sweet.cur.tasks;
@@ -6039,6 +6084,7 @@ function mktLoadYoY(){
   var el=document.getElementById('mktYoY'); if(!el) return;
   var period=mktSelectedPeriod();
   _mktLoadedPeriod=period;
+  _mktSms=null;
   var echo=document.getElementById('mktPeriodEcho'); if(echo) echo.textContent=period;
   el.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
   fetchJson('/api/marketing/channels?period='+period).then(function(d){
@@ -6065,7 +6111,7 @@ function mktLoadYoY(){
       he.innerHTML='<b>В порядке:</b> '+(c.ok||0)+' · <b style="color:var(--gold)">устарели:</b> '+(c.stale||0)+' · <b style="color:var(--bad)">ошибки:</b> '+(c.dead||0)+' · неполные: '+(c.warn||0)+(list.length?'<br>'+list.map(function(s){return escapeHtml(s.name)+' — '+badge(s)+' ('+escapeHtml(s.ageText)+')';}).join('<br>'):'<br>Все основные источники обновлены по расписанию.');
     }).catch(function(){});
     // Алерты «на что обратить внимание» — живые из этих же данных за выбранный период.
-    try { renderAlerts(d, period); } catch(_){}
+    try { renderAlerts(d, period, null); } catch(_){}
     _mktLive=d; // для CSV-экспорта (live)
     // Продажи и лояльность помесячно — live (заменили статику янв–май).
     try { renderSalesMonthly(d); } catch(_){}
@@ -6120,8 +6166,13 @@ function mktLoadYoY(){
     var smsAttrEl=document.getElementById('mktSmsAttr');
     if(smsAttrEl){
       smsAttrEl.innerHTML='<div class="mkt-yoy-load">Считаю атрибуцию рассылок из 1С (~10 сек)…</div>';
-      fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){ _mktSms=sa; renderSmsAttribution(sa); })
-        .catch(function(e){ smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>'; });
+      fetchJson('/api/marketing/sms-attribution?period='+period).then(function(sa){
+        if(period!==_mktLoadedPeriod) return;
+        _mktSms=sa; renderSmsAttribution(sa); try{ renderAlerts(_mktLive||d,period,sa); }catch(_){}
+      }).catch(function(e){
+        smsAttrEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Атрибуция недоступна: '+e.message+'</div>';
+        try{ renderAlerts(_mktLive||d,period,{error:e.message}); }catch(_){}
+      });
     }
     // SMS помесячно — обзор по месяцам (лёгкий: итоги из кэша sms-attribution + фон-прогрев).
     var smsMEl=document.getElementById('mktSmsMonthly');

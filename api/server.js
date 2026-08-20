@@ -985,14 +985,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/marketing/gross-profit' && req.method === 'GET') {
-      // Реальная валовая прибыль из 1С: выручка (db.sales, как summary) − себестоимость
-      // (РегистрНакопления.УчётЗатрат «Списание партий в производство», ./lib/gross-profit).
-      // Совпадает с отчётом Маши «Валовая прибыль» (~74.6%). COGS кэшируется 6ч (тяжёлый 1С-запрос).
+      // Валовая + операционная прибыль: материалы, полный начисленный ФОТ и прочие
+      // оплаченные операционные затраты из 1С. Расчёт кэшируется на 6 часов.
       try {
         const { db } = await getScopedDb(req);
         const period = monthKey(parsedUrl.searchParams.get('period'));
         const gp = await grossProfit.getGrossProfitCogs(period);
         const cogsByMonth = gp.cogsByMonth || {};
+        const payrollByMonth = gp.payrollByMonth || {};
+        const cashByMonth = gp.cashByMonth || {};
         // Выручка по месяцам из db.sales (как summary).
         const revByMonth = {};
         for (const x of db.sales || []) {
@@ -1004,16 +1005,37 @@ const server = http.createServer(async (req, res) => {
         const monthRow = (ym) => {
           const revenue = Math.round(revByMonth[ym] || 0);
           const cogs = cogsByMonth[ym];
-          if (!(revenue > 0) || !(cogs > 0)) return { ym, revenue, costed: false, marginPct: null };
-          const grossProfitVal = revenue - cogs;
-          const marginPct = Number((grossProfitVal / revenue * 100).toFixed(1));
-          const costed = marginPct >= 50 && marginPct <= 90;
+          const payroll = payrollByMonth[ym] || { wages: 0, contributions: 0, total: 0, complete: false, units: [] };
+          const cash = cashByMonth[ym] || { operating: 0, taxes: 0, capex: 0, excluded: 0, materialsPaid: 0, payrollPaid: 0, items: [] };
+          const rawGrossProfit = revenue > 0 && cogs > 0 ? revenue - cogs : null;
+          const rawMarginPct = rawGrossProfit != null ? Number((rawGrossProfit / revenue * 100).toFixed(1)) : null;
+          const costed = rawMarginPct != null && rawMarginPct >= 50 && rawMarginPct <= 90;
+          const grossProfitVal = costed ? rawGrossProfit : null;
+          const marginPct = costed ? rawMarginPct : null;
+          const operatingReady = costed && payroll.complete && payroll.total > 0;
+          const operatingCosts = operatingReady ? Math.round(payroll.total + cash.operating) : null;
+          const operatingProfit = operatingReady ? Math.round(grossProfitVal - operatingCosts) : null;
+          const operatingMarginPct = operatingReady ? Number((operatingProfit / revenue * 100).toFixed(1)) : null;
           return {
             ym, revenue,
             cogs: costed ? cogs : null,
-            grossProfit: costed ? Math.round(grossProfitVal) : null,
-            marginPct: costed ? marginPct : null,
-            costed
+            grossProfit: grossProfitVal != null ? Math.round(grossProfitVal) : null,
+            marginPct,
+            costed,
+            payroll: Math.round(payroll.total),
+            payrollWages: Math.round(payroll.wages),
+            payrollContributions: Math.round(payroll.contributions),
+            payrollComplete: !!payroll.complete,
+            otherExpenses: Math.round(cash.operating),
+            operatingCosts,
+            operatingProfit,
+            operatingMarginPct,
+            operatingReady,
+            taxPayments: Math.round(cash.taxes),
+            capex: Math.round(cash.capex),
+            excludedCash: Math.round(cash.excluded),
+            materialsPaid: Math.round(cash.materialsPaid),
+            payrollPaid: Math.round(cash.payrollPaid)
           };
         };
         // Тренд: помесячно за период действия cogsByMonth, только месяцы с выручкой в БД.
@@ -1021,15 +1043,16 @@ const server = http.createServer(async (req, res) => {
           .map(monthRow)
           .filter((x) => x.revenue > 0);
         const cur = monthRow(period);
+        const curPayroll = payrollByMonth[period] || { units: [] };
+        const curCash = cashByMonth[period] || { items: [] };
         sendJson(res, 200, {
           period,
-          revenue: cur.revenue,
-          cogs: cur.cogs ?? null,
-          grossProfit: cur.grossProfit ?? null,
-          marginPct: cur.marginPct ?? null,
-          costed: cur.costed,
+          ...cur,
+          payrollUnits: (curPayroll.units || []).slice(0, 50),
+          otherExpenseItems: (curCash.items || []).slice(0, 60),
           trend,
           source: gp.source,
+          basisNote: gp.basisNote,
           refreshedAt: gp.refreshedAt
         });
       } catch (e) {
