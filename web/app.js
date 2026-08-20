@@ -136,11 +136,18 @@ function pinHash(pin) {
 function initPin(pinRequired, authenticated = false) {
   state.pinRequired = pinRequired;
 
-  if (pinRequired && !authenticated) showPinOverlay();
-
   const storedHash = localStorage.getItem(PIN_STORED_KEY);
-  // Серверный PIN всегда имеет приоритет над старой локальной защитой.
-  if ((!pinRequired || authenticated) && storedHash && !sessionStorage.getItem('maria_local_ok')) showPinOverlay(true);
+  // Серверная защита полностью заменяет старый PIN, который сохранялся только
+  // в браузере. Иначе после успешного входа появлялся второй PIN-экран и
+  // отклонял правильный серверный PIN как «неверный».
+  if (pinRequired) {
+    if (storedHash) localStorage.removeItem(PIN_STORED_KEY);
+    sessionStorage.removeItem('maria_local_ok');
+    if (!authenticated) showPinOverlay(false);
+    else hidePinOverlay();
+  } else if (storedHash && !sessionStorage.getItem('maria_local_ok')) {
+    showPinOverlay(true);
+  }
 
   if (pinHandlersBound) return;
   pinHandlersBound = true;
@@ -149,6 +156,10 @@ function initPin(pinRequired, authenticated = false) {
   $('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinSubmit').click(); });
 
   $('pinSettingsBtn').addEventListener('click', () => {
+    if (state.pinRequired) {
+      alert('PIN задаётся на сервере и уже защищает весь дашборд. Дополнительный PIN браузера не требуется.');
+      return;
+    }
     const newPin = prompt('Введите новый PIN (4-8 цифр) для клиентской защиты.\nОставьте пустым — отключить:');
     if (newPin === null) return;
     if (newPin.trim() === '') {
