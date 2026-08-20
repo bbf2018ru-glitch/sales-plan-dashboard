@@ -4133,6 +4133,12 @@ tr.mkt-total td{font-weight:700;background:rgba(184,134,11,.14)}
 
 /* ── Маркетинг: живой YoY-блок ───────────────────────────────────── */
 .mkt-yoy-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:10px; }
+.mkt-budget-cat-row{cursor:pointer;transition:background .15s ease}
+.mkt-budget-cat-row:hover,.mkt-budget-cat-row:focus{background:var(--accent-soft);outline:none}
+.mkt-budget-arrow{display:inline-block;width:18px;color:var(--accent);font-weight:700}
+.mkt-budget-cat-detail>td{padding:14px;background:color-mix(in srgb,var(--panel) 92%,var(--accent) 8%)}
+.mkt-budget-detail-grid{display:grid;gap:14px}
+.mkt-budget-detail-title{font-size:12px;font-weight:700;margin:0 0 6px;color:var(--ink)}
 .mkt-yoy-card{ background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
 .mkt-yoy-l{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
 .mkt-yoy-v{ font-size:22px; font-weight:700; color:var(--ink); margin:4px 0 2px; letter-spacing:-.02em; }

@@ -1,10 +1,12 @@
-// План-факт маркетингового бюджета.
+// План / утверждение / оплата маркетингового бюджета.
 //
 // План: публичная Google Sheets Маши с помесячными листами.
 // Факт: Документ.ИА_ЗаказНаПриобретение (только маркетинговые фонды отделения
 // продаж и продвижения). Сумма «одобрено» берётся из ПОСЛЕДНЕГО решения табличной
 // части Документ.ИА_ФинансовоеПланирование.ЗаказыНаПриобретение. Заявки, которые
 // ещё ждут ФП, показываются отдельно и не подменяют факт.
+// Оплачено: движения денег за месяц по всем явно маркетинговым статьям 1С,
+// с детализацией до платежа, контрагента и назначения.
 
 const http = require('http');
 const https = require('https');
@@ -31,7 +33,7 @@ const CATEGORIES = [
   { key: 'other', name: 'Прочее продвижение' }
 ];
 
-const MARKETING_FUND_RE = /интернет\s*реклам|смс\s*рассыл|фонд\s*накопления\s*продвиж|офлайн\s*реклам|печатн.*реклам|размещен.*вывес|\buds\b|юдс/i;
+const MARKETING_FUND_RE = /интернет\s*реклам|смс\s*рассыл|фонд\s*накопления\s*продвиж|офлайн\s*реклам|печатн.*реклам|размещен.*вывес|оформлен.*тт|\buds\b|юдс/i;
 
 function normalize(value) {
   return String(value || '')
@@ -67,8 +69,9 @@ function classifyText(value, fund) {
   const s = normalize(`${fund || ''} ${value || ''}`);
   if (/смс|sms/.test(s)) return 'sms';
   if (/\buds\b|юдс|лояльност/.test(s)) return 'loyalty';
-  if (/блогер|амбассадор|копирайт|актер|песн|контент|смм|smm|соц сет/.test(s)) return 'content';
-  if (/печат|листов|вывес|баннер|банер|оклей|расклей|стойк|стикер/.test(s)) return 'print';
+  if (/блогер|амбассадор|копирайт|актер|видео|песн|контент|смм|smm|соц сет/.test(s)) return 'content';
+  if (/печат|листов|вывес|баннер|банер|оклей|расклей|стойк|стикер|оформлен.*тт/.test(s)) return 'print';
+  if (/таплинк/.test(s)) return 'internet';
   if (/лифт|кино|экран|телевид|\bтв\b|транспорт|трамва|автобус|наружн|музык|фасад/.test(s)) return 'offline';
   if (/интернет|сео|seo|контекст|яндекс|2гис|ретарг|калибр|авито|рейтинг|сайт/.test(s)) return 'internet';
   if (/фонд накопления продвиж|офлайн реклам/.test(s)) return 'offline';
@@ -310,7 +313,58 @@ async function getOrdersFact(period) {
   };
 }
 
-function buildCategories(plan, fact) {
+async function getPaidFact(period) {
+  const b = bounds(period);
+  const cashQ = 'ВЫБРАТЬ Д.Период КАК Дата,'
+    + ' Д.СтатьяДвиженияДенежныхСредств.Наименование КАК Статья,'
+    + ' Д.Контрагент.Наименование КАК Контрагент, Д.ДокументДвижения КАК Документ,'
+    + ' П.НазначениеПлатежа КАК Назначение, Д.СуммаУпр КАК Сумма'
+    + ' ИЗ РегистрНакопления.ДвиженияДенежныхСредств КАК Д'
+    + ' ЛЕВОЕ СОЕДИНЕНИЕ Документ.ПлатежноеПоручениеИсходящее КАК П'
+    + ' ПО Д.ДокументДвижения = П.Ссылка'
+    + ` ГДЕ Д.Период >= ДАТАВРЕМЯ(${b.y},${b.m},1)`
+    + ` И Д.Период < ДАТАВРЕМЯ(${b.ny},${b.nm},1)`
+    + ' И Д.ПриходРасход = ЗНАЧЕНИЕ(Перечисление.ВидыДвиженийПриходРасход.Расход)'
+    + ' УПОРЯДОЧИТЬ ПО Дата';
+  const cashRes = await upp.callQuery(cashQ, { timeoutMs: 60000 });
+  const byArticle = new Map();
+  for (const row of (cashRes.rows || [])) {
+    const article = String(row.Статья || '').trim();
+    if (!MARKETING_FUND_RE.test(normalize(article))) continue;
+    const amount = Math.round(upp.parseRu(row.Сумма) * 100) / 100;
+    if (!amount) continue;
+    if (!byArticle.has(article)) {
+      byArticle.set(article, {
+        name: article,
+        category: classifyText(article, article),
+        amount: 0,
+        transactions: []
+      });
+    }
+    const item = byArticle.get(article);
+    item.amount += amount;
+    item.transactions.push({
+      date: row.Дата || '',
+      counterparty: String(row.Контрагент || '').trim(),
+      document: String(row.Документ || '').trim(),
+      purpose: String(row.Назначение || '').replace(/\s+/g, ' ').trim(),
+      amount
+    });
+  }
+  const articles = Array.from(byArticle.values()).map((article) => {
+    article.amount = Math.round(article.amount * 100) / 100;
+    article.transactions.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return article;
+  }).sort((a, b) => b.amount - a.amount);
+  return {
+    available: true,
+    total: Math.round(articles.reduce((sum, article) => sum + article.amount, 0) * 100) / 100,
+    articles,
+    transactions: articles.reduce((sum, article) => sum + article.transactions.length, 0)
+  };
+}
+
+function buildCategories(plan, fact, paid) {
   const map = new Map(CATEGORIES.map((category) => [category.key, {
     key: category.key,
     name: category.name,
@@ -318,8 +372,10 @@ function buildCategories(plan, fact) {
     approved: 0,
     pending: 0,
     requested: 0,
+    paid: 0,
     planItems: 0,
-    orders: 0
+    orders: 0,
+    payments: 0
   }]));
   for (const item of (plan.items || [])) {
     const row = map.get(item.category) || map.get('other');
@@ -333,19 +389,27 @@ function buildCategories(plan, fact) {
     row.requested += order.requested;
     row.orders += 1;
   }
+  for (const article of (paid.articles || [])) {
+    const row = map.get(article.category) || map.get('other');
+    row.paid += article.amount;
+    row.payments += (article.transactions || []).length;
+  }
   return Array.from(map.values()).map((row) => {
-    for (const field of ['plan', 'approved', 'pending', 'requested']) row[field] = Math.round(row[field] * 100) / 100;
+    for (const field of ['plan', 'approved', 'pending', 'requested', 'paid']) row[field] = Math.round(row[field] * 100) / 100;
     row.committed = Math.round((row.approved + row.pending) * 100) / 100;
     row.remaining = Math.round((row.plan - row.committed) * 100) / 100;
     row.executionPct = row.plan > 0 ? Math.round(row.approved / row.plan * 1000) / 10 : null;
+    row.remainingPaid = Math.round((row.plan - row.paid) * 100) / 100;
+    row.paidPct = row.plan > 0 ? Math.round(row.paid / row.plan * 1000) / 10 : null;
     return row;
-  }).filter((row) => row.plan || row.orders);
+  }).filter((row) => row.plan || row.orders || row.payments);
 }
 
 async function compute(period) {
-  const [planResult, factResult] = await Promise.allSettled([
+  const [planResult, factResult, paidResult] = await Promise.allSettled([
     getSheetPlan(period),
-    getOrdersFact(period)
+    getOrdersFact(period),
+    getPaidFact(period)
   ]);
   const plan = planResult.status === 'fulfilled'
     ? planResult.value
@@ -354,6 +418,9 @@ async function compute(period) {
     ? factResult.value
     : { available: false, approved: 0, pending: 0, requested: 0, rejected: 0, orders: [], counts: { total: 0, approved: 0, pending: 0, rejected: 0 }, error: factResult.reason.message };
   if (fact.available === undefined) fact.available = true;
+  const paid = paidResult.status === 'fulfilled'
+    ? paidResult.value
+    : { available: false, total: 0, articles: [], transactions: 0, error: paidResult.reason.message };
 
   const committed = Math.round((fact.approved + fact.pending) * 100) / 100;
   const remainingApproved = Math.round((plan.total - fact.approved) * 100) / 100;
@@ -362,25 +429,29 @@ async function compute(period) {
     period,
     plan,
     fact,
-    categories: buildCategories(plan, fact),
+    paid,
+    categories: buildCategories(plan, fact, paid),
     totals: {
       plan: plan.total,
       approved: fact.approved,
       pending: fact.pending,
+      paid: paid.total,
       committed,
       remainingApproved,
       remainingCommitted,
+      remainingPaid: Math.round((plan.total - paid.total) * 100) / 100,
       executionPct: plan.total > 0 ? Math.round(fact.approved / plan.total * 1000) / 10 : null,
-      committedPct: plan.total > 0 ? Math.round(committed / plan.total * 1000) / 10 : null
+      committedPct: plan.total > 0 ? Math.round(committed / plan.total * 1000) / 10 : null,
+      paidPct: plan.total > 0 ? Math.round(paid.total / plan.total * 1000) / 10 : null
     },
-    note: 'План — сумма строк выбранного листа Google Sheets. Факт — утверждённая сумма последнего решения финансового планирования 1С по маркетинговым заказам. Заявки «Рассмотреть на ФП» показаны отдельно и в факт не входят.',
+    note: 'План — сумма строк выбранного листа Google Sheets. «Утверждено» — последнее решение ФП по маркетинговым заказам. «Оплачено» — фактические расходы по всем маркетинговым статьям движения денег в 1С за выбранный месяц.',
     refreshedAt: new Date().toISOString()
   };
 }
 
 function getMarketingBudget(period) {
   const p = period || upp.nowYM();
-  return resultCache.wrap(`marketing-budget-v1:${p}`, () => compute(p));
+  return resultCache.wrap(`marketing-budget-v2:${p}`, () => compute(p));
 }
 
 module.exports = {

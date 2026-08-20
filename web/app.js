@@ -5150,58 +5150,75 @@ function renderMarketingBudget(b){
     el.innerHTML='<div style="font-size:12px;color:var(--muted)">Бюджет недоступен: '+escapeHtml((b&&b.error)||'ошибка')+'</div>';
     return;
   }
-  var t=b.totals||{}, plan=b.plan||{}, fact=b.fact||{};
+  var t=b.totals||{}, plan=b.plan||{}, fact=b.fact||{}, paid=b.paid||{};
   var rub=function(v){return v==null?'н/д':mNum(v)+' ₽';};
   var pct=function(v){return v==null?'н/д':mNum1(v)+' %';};
   var kpi=function(v,l,sub){return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:3px">'+sub+'</div>':'')+'</div>';};
-  var remaining=t.remainingCommitted;
+  var remaining=t.remainingPaid;
   var remainingColor=remaining<0?'var(--bad)':(remaining<t.plan*.15?'var(--gold)':'var(--good)');
   var html='<div class="mkt-yoy-grid">'+
     kpi(plan.available?rub(t.plan):'н/д','План на месяц',plan.available?(plan.items||[]).length+' строк из Google Sheets':'план не найден')+
     kpi(fact.available?rub(t.approved):'н/д','Утверждено на ФП',fact.available?pct(t.executionPct)+' плана':'1С недоступна')+
+    kpi(paid.available?rub(t.paid):'н/д','Фактически оплачено',paid.available?pct(t.paidPct)+' плана · '+(paid.transactions||0)+' платежей':'движения денег недоступны')+
     kpi(fact.available?rub(t.pending):'н/д','Ждёт рассмотрения',fact.available?((fact.counts&&fact.counts.pending)||0)+' заявок':'1С недоступна')+
-    kpi(plan.available&&fact.available?'<span style="color:'+remainingColor+'">'+rub(remaining)+'</span>':'н/д',remaining<0?'Перерасход после заявок':'Остаток после заявок','утверждено + ожидает: '+rub(t.committed))+
+    kpi(plan.available&&paid.available?'<span style="color:'+remainingColor+'">'+rub(remaining)+'</span>':'н/д',remaining<0?'Перерасход по оплатам':'Остаток после оплат','утверждено + ожидает: '+rub(t.committed))+
   '</div>';
 
   var warnings=(plan.warnings||[]).slice();
   if(fact.error) warnings.push('Данные 1С недоступны: '+fact.error);
+  if(paid.error) warnings.push('Оплаты из 1С недоступны: '+paid.error);
   if(warnings.length){
     html+='<div style="margin-top:10px;padding:9px 11px;border:1px solid var(--gold);background:var(--warn-soft);border-radius:7px;font-size:12px;color:var(--gold)">⚠ '+warnings.map(escapeHtml).join('<br>⚠ ')+'</div>';
   }
 
   var cats=b.categories||[];
   if(cats.length){
-    html+='<div class="table-wrap" style="margin-top:12px"><table style="font-size:12px"><thead><tr><th>Категория</th><th class="num">План</th><th class="num">Утверждено</th><th class="num">Ожидает ФП</th><th class="num">Остаток</th><th class="num">Исполнение</th></tr></thead><tbody>'+
-      cats.map(function(c){
-        var remColor=c.remaining<0?'var(--bad)':'';
-        return '<tr><td><b>'+escapeHtml(c.name)+'</b></td><td class="num">'+mNum(c.plan)+'</td><td class="num">'+mNum(c.approved)+'</td><td class="num">'+mNum(c.pending)+'</td><td class="num" style="'+remColor+'">'+mNum(c.remaining)+'</td><td class="num">'+pct(c.executionPct)+'</td></tr>';
-      }).join('')+
-      '<tr class="mkt-total"><td><b>Итого</b></td><td class="num"><b>'+mNum(t.plan)+'</b></td><td class="num"><b>'+mNum(t.approved)+'</b></td><td class="num"><b>'+mNum(t.pending)+'</b></td><td class="num" style="color:'+remainingColor+'"><b>'+mNum(t.remainingCommitted)+'</b></td><td class="num"><b>'+pct(t.executionPct)+'</b></td></tr>'+
-      '</tbody></table></div>';
-  }
-
-  var orders=fact.orders||[];
-  if(orders.length){
+    var planItems=plan.items||[], orders=fact.orders||[], paidArticles=paid.articles||[];
     var statusLabel={approved:'утверждено',pending:'ожидает ФП',rejected:'отклонено'};
     var statusColor={approved:'var(--good)',pending:'var(--gold)',rejected:'var(--bad)'};
-    html+='<details class="mkt-details" style="margin-top:12px"><summary>Заявки из 1С ('+mNum(orders.length)+')</summary><div class="table-wrap" style="margin-top:8px"><table style="font-size:11px"><thead><tr><th>Дата / №</th><th>Фонд и предмет</th><th>Последнее решение ФП</th><th class="num">Запрошено</th><th class="num">Утверждено</th></tr></thead><tbody>'+
-      orders.map(function(o){
-        var kind=o.statusKind||'pending';
-        return '<tr><td style="white-space:nowrap">'+escapeHtml(String(o.date||'').slice(0,10))+'<br><span style="color:var(--muted)">'+escapeHtml(o.number)+'</span></td>'+
-          '<td><b>'+escapeHtml(o.fund)+'</b><br><span style="color:var(--muted)">'+escapeHtml(o.subject||'—')+'</span></td>'+
-          '<td><span style="color:'+(statusColor[kind]||'var(--muted)')+'"><b>'+(statusLabel[kind]||escapeHtml(o.status||'—'))+'</b></span>'+(o.fpNumber?'<br><span style="color:var(--muted)">№ '+escapeHtml(o.fpNumber)+' · '+escapeHtml(String(o.fpDate||'').slice(0,10))+'</span>':'')+'</td>'+
-          '<td class="num">'+mNum(o.requested)+'</td><td class="num">'+mNum(o.approved)+'</td></tr>';
-      }).join('')+'</tbody></table></div></details>';
-  }
-
-  var items=plan.items||[];
-  if(items.length){
-    html+='<details class="mkt-details"><summary>Строки плана из Google Sheets ('+mNum(items.length)+')</summary><div class="table-wrap" style="margin-top:8px"><table style="font-size:11px"><thead><tr><th>Раздел</th><th>Статья</th><th class="num">План, ₽</th><th>Комментарий</th></tr></thead><tbody>'+
-      items.map(function(i){return '<tr><td>'+escapeHtml(i.section||'—')+'</td><td><b>'+escapeHtml(i.name)+'</b></td><td class="num">'+mNum(i.amount)+'</td><td style="color:var(--muted)">'+escapeHtml(i.comment||'')+'</td></tr>';}).join('')+
-      '</tbody></table></div></details>';
+    var detailsFor=function(c){
+      var pRows=planItems.filter(function(x){return x.category===c.key;});
+      var oRows=orders.filter(function(x){return x.category===c.key;});
+      var aRows=paidArticles.filter(function(x){return x.category===c.key;});
+      var out='<div class="mkt-budget-detail-grid">';
+      if(pRows.length){
+        out+='<div><div class="mkt-budget-detail-title">Плановые статьи · '+mNum(pRows.length)+'</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Статья</th><th>Комментарий</th><th class="num">План, ₽</th></tr></thead><tbody>'+pRows.map(function(i){return '<tr><td><b>'+escapeHtml(i.name)+'</b><div style="color:var(--muted)">'+escapeHtml(i.section||'')+'</div></td><td>'+escapeHtml(i.comment||'—')+'</td><td class="num">'+mNum(i.amount)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+      }
+      if(oRows.length){
+        out+='<div><div class="mkt-budget-detail-title">Заявки финансового планирования · '+mNum(oRows.length)+'</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Дата / №</th><th>Фонд и предмет</th><th>Статус</th><th class="num">Запрошено</th><th class="num">Утверждено</th></tr></thead><tbody>'+oRows.map(function(o){var kind=o.statusKind||'pending';return '<tr><td style="white-space:nowrap">'+escapeHtml(String(o.date||'').slice(0,10))+'<div style="color:var(--muted)">'+escapeHtml(o.number||'')+'</div></td><td><b>'+escapeHtml(o.fund||'—')+'</b><div style="color:var(--muted)">'+escapeHtml(o.subject||'—')+'</div></td><td style="color:'+(statusColor[kind]||'var(--muted)')+'"><b>'+(statusLabel[kind]||escapeHtml(o.status||'—'))+'</b></td><td class="num">'+mNum(o.requested||0)+'</td><td class="num">'+mNum(o.approved||0)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+      }
+      if(aRows.length){
+        var tx=[];
+        aRows.forEach(function(a){(a.transactions||[]).forEach(function(x){tx.push({article:a.name,date:x.date,counterparty:x.counterparty,document:x.document,purpose:x.purpose,amount:x.amount});});});
+        out+='<div><div class="mkt-budget-detail-title">Оплаченные статьи · '+mNum(aRows.length)+'</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Статья движения денег</th><th class="num">Оплачено, ₽</th><th class="num">Платежей</th></tr></thead><tbody>'+aRows.map(function(a){return '<tr><td><b>'+escapeHtml(a.name)+'</b></td><td class="num"><b>'+mNum(a.amount)+'</b></td><td class="num">'+mNum((a.transactions||[]).length)+'</td></tr>';}).join('')+'</tbody></table></div>'+
+          '<div class="mkt-budget-detail-title" style="margin-top:10px">Детализация платежей</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Дата</th><th>Статья</th><th>Контрагент</th><th>Назначение / документ</th><th class="num">Сумма, ₽</th></tr></thead><tbody>'+tx.map(function(x){return '<tr><td style="white-space:nowrap">'+escapeHtml(String(x.date||'').slice(0,10))+'</td><td><b>'+escapeHtml(x.article)+'</b></td><td>'+escapeHtml(x.counterparty||'—')+'</td><td style="color:var(--muted)">'+escapeHtml(x.purpose||x.document||'—')+'</td><td class="num">'+mNum(x.amount)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+      }
+      if(!pRows.length&&!oRows.length&&!aRows.length) out+='<div style="color:var(--muted)">Нет детализации.</div>';
+      return out+'</div>';
+    };
+    html+='<div class="section-hint" style="margin-top:12px">Нажмите на категорию, чтобы раскрыть все плановые статьи, заявки ФП и фактические платежи.</div>'+
+      '<div class="table-wrap" style="margin-top:6px"><table class="mkt-budget-table" style="font-size:12px"><thead><tr><th>Категория</th><th class="num">План</th><th class="num">Утверждено</th><th class="num">Оплачено</th><th class="num">Ожидает ФП</th><th class="num">Остаток после оплат</th><th class="num">Оплачено, %</th></tr></thead><tbody>'+
+      cats.map(function(c){
+        var remColor=c.remainingPaid<0?'var(--bad)':'';
+        var id='mkt-budget-detail-'+c.key;
+        return '<tr class="mkt-budget-cat-row" data-target="'+id+'" tabindex="0" role="button" aria-expanded="false" aria-controls="'+id+'"><td><span class="mkt-budget-arrow">▸</span><b>'+escapeHtml(c.name)+'</b></td><td class="num">'+mNum(c.plan)+'</td><td class="num">'+mNum(c.approved)+'</td><td class="num"><b>'+mNum(c.paid)+'</b></td><td class="num">'+mNum(c.pending)+'</td><td class="num" style="'+remColor+'">'+mNum(c.remainingPaid)+'</td><td class="num">'+pct(c.paidPct)+'</td></tr><tr id="'+id+'" class="mkt-budget-cat-detail" hidden><td colspan="7">'+detailsFor(c)+'</td></tr>';
+      }).join('')+
+      '<tr class="mkt-total"><td><b>Итого</b></td><td class="num"><b>'+mNum(t.plan)+'</b></td><td class="num"><b>'+mNum(t.approved)+'</b></td><td class="num"><b>'+mNum(t.paid)+'</b></td><td class="num"><b>'+mNum(t.pending)+'</b></td><td class="num" style="color:'+remainingColor+'"><b>'+mNum(t.remainingPaid)+'</b></td><td class="num"><b>'+pct(t.paidPct)+'</b></td></tr>'+
+      '</tbody></table></div>';
   }
   if(b.note) html+='<div class="section-hint" style="margin-top:9px">'+escapeHtml(b.note)+'</div>';
   el.innerHTML=html;
+  el.querySelectorAll('.mkt-budget-cat-row').forEach(function(row){
+    var toggle=function(){
+      var detail=document.getElementById(row.dataset.target); if(!detail) return;
+      var open=detail.hidden;
+      detail.hidden=!open;
+      row.setAttribute('aria-expanded',open?'true':'false');
+      var arrow=row.querySelector('.mkt-budget-arrow'); if(arrow) arrow.textContent=open?'▾':'▸';
+    };
+    row.addEventListener('click',toggle);
+    row.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+  });
 }
 function renderMarketingEconomy(d, pc){
   var el=document.getElementById('mktEconomy'); if(!el||!d) return;
@@ -5457,14 +5474,14 @@ function mktExport(){
     push(['Итого/мес', mktCsvN(_mktPaid.totalMonthly), '']); L.push('');
   }
 
-  // Утверждённый маркетинговый бюджет: план Google Sheets + ФП 1С.
+  // Маркетинговый бюджет: план Google Sheets + ФП + фактические оплаты 1С.
   if(_mktBudget && _mktBudget.totals){
     var bt=_mktBudget.totals;
     push(['Бюджет маркетинга — план / факт']);
-    push(['План руб','Утверждено на ФП руб','Ожидает ФП руб','Утверждено + ожидает руб','Остаток руб','Исполнение %']);
-    push([mktCsvN(bt.plan),mktCsvN(bt.approved),mktCsvN(bt.pending),mktCsvN(bt.committed),mktCsvN(bt.remainingCommitted),bt.executionPct==null?'':mktCsvN(bt.executionPct,1)]);
-    push(['Категория','План руб','Утверждено руб','Ожидает ФП руб','Остаток руб','Исполнение %']);
-    (_mktBudget.categories||[]).forEach(function(c){push([c.name,mktCsvN(c.plan),mktCsvN(c.approved),mktCsvN(c.pending),mktCsvN(c.remaining),c.executionPct==null?'':mktCsvN(c.executionPct,1)]);});
+    push(['План руб','Утверждено на ФП руб','Фактически оплачено руб','Ожидает ФП руб','Остаток после оплат руб','Оплачено %']);
+    push([mktCsvN(bt.plan),mktCsvN(bt.approved),mktCsvN(bt.paid),mktCsvN(bt.pending),mktCsvN(bt.remainingPaid),bt.paidPct==null?'':mktCsvN(bt.paidPct,1)]);
+    push(['Категория','План руб','Утверждено руб','Оплачено руб','Ожидает ФП руб','Остаток после оплат руб','Оплачено %']);
+    (_mktBudget.categories||[]).forEach(function(c){push([c.name,mktCsvN(c.plan),mktCsvN(c.approved),mktCsvN(c.paid),mktCsvN(c.pending),mktCsvN(c.remainingPaid),c.paidPct==null?'':mktCsvN(c.paidPct,1)]);});
     L.push('');
   }
 
@@ -6152,10 +6169,10 @@ function mktLoadYoY(){
       fetchJson('/api/marketing/paid-costs?period='+period).then(function(pc){ _mktPaid=pc; renderPaidCosts(pc); })
         .catch(function(e){ paidEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Бюджет недоступен: '+e.message+'</div>'; });
     }
-    // Настоящий план-факт бюджета: Google Sheets + последнее решение ФП в 1С.
+    // Бюджет: план Google Sheets + последнее решение ФП + фактические оплаты 1С.
     var budgetEl=document.getElementById('mktBudgetLive');
     if(budgetEl){
-      budgetEl.innerHTML='<div class="mkt-yoy-load">Сверяю план с решениями ФП из 1С…</div>';
+      budgetEl.innerHTML='<div class="mkt-yoy-load">Сверяю план, решения ФП и оплаты из 1С…</div>';
       fetchJson('/api/marketing/budget-plan-fact?period='+period).then(function(b){ _mktBudget=b; renderMarketingBudget(b); })
         .catch(function(e){ budgetEl.innerHTML='<div style="font-size:12px;color:var(--muted)">План-факт недоступен: '+escapeHtml(e.message)+'</div>'; });
     }

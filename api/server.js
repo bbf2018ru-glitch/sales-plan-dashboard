@@ -1319,7 +1319,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // ── Бюджет маркетинга: план из Google Sheets + решения ФП из 1С ──
+    // ── Бюджет маркетинга: план Google Sheets + ФП + оплаты из 1С ──
     if (pathname === '/api/marketing/budget-plan-fact' && req.method === 'GET') {
       try {
         const period = monthKey(parsedUrl.searchParams.get('period'));
