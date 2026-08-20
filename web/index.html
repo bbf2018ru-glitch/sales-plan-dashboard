@@ -21,7 +21,7 @@
          показывается фолбэком сразу, Onest/Prata/JetBrains Mono подменяются по готовности. -->
     <link rel="stylesheet" href="/fonts.css?v=3" media="print" onload="this.media='all';this.onload=null" />
     <noscript><link rel="stylesheet" href="/fonts.css?v=3" /></noscript>
-    <link rel="stylesheet" href="/styles.css?v=84" />
+    <link rel="stylesheet" href="/styles.css?v=85" />
     <!-- maria-design: раскатано на весь дашборд. ОТКАТ — снять эти 2 ссылки. -->
     <link rel="stylesheet" href="/fonts-maria.css?v=2" media="print" onload="this.media='all';this.onload=null" />
     <noscript><link rel="stylesheet" href="/fonts-maria.css?v=2" /></noscript>
@@ -1318,6 +1318,12 @@
             <div id="mktBudgetLive"><div class="mkt-yoy-load">Загружаю план, решения ФП и оплаты…</div></div>
           </section>
 
+          <section class="section" id="mkt-s-campaign-pnl" data-mgroup="overview">
+            <div class="section-label">🎯 Эффективность кампаний — CAC и ROMI <span class="mkt-scope dyn" title="Затраты выбранного месяца, ecommerce/UTM и покупки по карте лояльности">Campaign P&amp;L</span></div>
+            <div class="section-hint">Связывает затраты выбранного месяца с заказами, выручкой и оценочной валовой прибылью. Пустой CAC/ROMI означает, что атрибуции пока нет, а не нулевой результат.</div>
+            <div id="mktCampaignPnl"><div class="mkt-yoy-load">Собираю кампании и проверяю атрибуцию…</div></div>
+          </section>
+
           <section class="section" id="mkt-s-grossprofit" data-mgroup="overview">
             <div class="section-label">💰 Валовая и операционная прибыль (из 1С) <span class="mkt-scope dyn" title="Материалы + весь начисленный ФОТ + прочие оплаченные операционные затраты">live · за месяц</span></div>
             <div class="section-hint">Валовая прибыль = выручка − материалы. Ниже дополнительно вычитаются <b>весь начисленный ФОТ</b> по всем подразделениям и остальные оплаченные операционные затраты. Налоги и капитальные покупки показаны отдельно.</div>
@@ -1343,8 +1349,8 @@
               <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartCardT">Карта лояльности, %</div><div id="mktChartCard"></div></div>
               <div class="mkt-chart"><div class="mkt-chart-t" id="mktChartNewCustT">Новые карты лояльности, шт/мес</div><div id="mktChartNewCust"></div><div id="mktChartNewCustHint" style="font-size:11px;color:var(--muted);margin-top:4px"></div></div>
             </div>
-            <div class="section-label" style="margin-top:24px">Платные каналы — затраты и отдача <span class="mkt-scope dyn" title="Месячный бюджет маркетинга: фикс-платы + live-расход Директа + SMS по факту отправок">бюджет / мес</span></div>
-            <div class="section-hint">Сколько платим за каждый платный канал в месяц и что он даёт. Фикс-платы (2ГИС-приоритет, SEO, Я.Бизнес, ВК-таргет) — месячные; расход Директа — live из кабинета; SMS — фактич. отправки «Реклама» × цена. Детализация Директа и 2ГИС — в разделе «Каналы».</div>
+            <div class="section-label" style="margin-top:24px">Платные каналы — затраты и отдача <span class="mkt-scope dyn" title="Данные строго за выбранный месяц: история Директа/2ГИС/ecommerce + нормативы договоров">за выбранный месяц</span></div>
+            <div class="section-hint">Сколько относится к выбранному месяцу и какой результат измерен. Исторический месяц не подменяется текущим live-снимком. Директ — расход кабинета за месяц + норматив агентства; SMS — уникальные получатели × цена; договорные каналы явно помечены как норматив.</div>
             <div id="mktPaidLive"></div>
           </section>
 
@@ -1640,7 +1646,7 @@
     <!-- async: app.js НЕ ждёт render-blocking CSS. Иначе при заморозке event-loop
          сервера зависший <link> стиля гейтил выполнение скрипта → init() не стартовал
          → дашборд вечно «висел Загрузка». init() самодостаточен и DOM-ready (конец body). -->
-    <script async src="/app.js?v=208"></script>
+    <script async src="/app.js?v=209"></script>
     <script src="/marketing-advanced.js?v=24"></script>
     <!-- maria-design: анимация вкладки Маркетинг (additive). ОТКАТ — снять эту строку. -->
     <script src="/maria-fx.js?v=1"></script>

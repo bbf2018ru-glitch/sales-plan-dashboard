@@ -26,6 +26,7 @@ const productionPlan = require('./lib/production-plan');
 const productionXlsx = require('./lib/production-xlsx');
 const paidCosts = require('./lib/paid-costs');
 const marketingBudget = require('./lib/marketing-budget');
+const campaignPerformance = require('./lib/campaign-performance');
 const { buildSalesAnalytics } = require('./lib/sales-analytics');
 const { returnsLive } = require('./lib/returns-live');
 const { wholesaleLive } = require('./lib/wholesale-live');
@@ -1325,6 +1326,24 @@ const server = http.createServer(async (req, res) => {
         const period = monthKey(parsedUrl.searchParams.get('period'));
         sendJson(res, 200, await marketingBudget.getMarketingBudget(period));
       } catch (e) { sendJson(res, 500, { error: e.message }); }
+      return;
+    }
+
+    // ── Campaign P&L: стоимость месяца → заказ → выручка → валовая прибыль ──
+    if (pathname === '/api/marketing/campaign-performance' && req.method === 'GET') {
+      try {
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        const { db } = await getScopedDb(req);
+        let revenue = 0;
+        for (const row of (db.sales || [])) {
+          if (row.period !== period || row.storeId === 'undefined' || row.productId === 'undefined') continue;
+          revenue += Number(row.amount || 0);
+        }
+        sendJson(res, 200, await campaignPerformance.getCampaignPerformance(period, Math.round(revenue)));
+      } catch (e) {
+        if (isUpstreamDown(e)) sendJson(res, 200, { unavailable: true, reason: '1С временно недоступна' });
+        else sendJson(res, 500, { error: e.message });
+      }
       return;
     }
 

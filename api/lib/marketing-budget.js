@@ -313,6 +313,63 @@ async function getOrdersFact(period) {
   };
 }
 
+function cashDay(value) {
+  const s = String(value || '');
+  const ru = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(s);
+  if (ru) return `${ru[3]}-${ru[2]}-${ru[1]}`;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : s.slice(0, 10);
+}
+
+// В регистре ДДС один и тот же расход иногда остаётся одновременно как выдача
+// наличных (РКО) и как авансовый отчёт. Это не обычные сторно/перераспределения:
+// схлопываем только точную положительную пару «день + статья + контрагент + сумма».
+// Все отрицательные движения и неточные пары сохраняются без изменений.
+function deduplicateCashTransactions(transactions) {
+  const groups = new Map();
+  transactions.forEach((tx, index) => {
+    if (!(tx.amount > 0)) return;
+    const key = [
+      cashDay(tx.date),
+      normalize(tx.article),
+      normalize(tx.counterparty),
+      Number(tx.amount).toFixed(2)
+    ].join('|');
+    if (!groups.has(key)) groups.set(key, { rko: [], advance: [] });
+    const doc = normalize(tx.document);
+    if (/расходн.*кассов.*ордер/.test(doc)) groups.get(key).rko.push(index);
+    else if (/авансов.*отчет/.test(doc)) groups.get(key).advance.push(index);
+  });
+
+  const excluded = new Set();
+  const adjustments = [];
+  for (const group of groups.values()) {
+    const pairs = Math.min(group.rko.length, group.advance.length);
+    for (let i = 0; i < pairs; i += 1) {
+      const rkoIndex = group.rko[i];
+      const advanceIndex = group.advance[i];
+      excluded.add(rkoIndex);
+      const rko = transactions[rkoIndex];
+      const advance = transactions[advanceIndex];
+      adjustments.push({
+        kind: 'rko-advance-duplicate',
+        date: cashDay(rko.date),
+        article: rko.article,
+        counterparty: rko.counterparty,
+        amount: rko.amount,
+        excludedDocument: rko.document,
+        keptDocument: advance.document,
+        note: 'Точная пара РКО и авансового отчёта учтена один раз.'
+      });
+    }
+  }
+  return {
+    transactions: transactions.filter((_, index) => !excluded.has(index)),
+    adjustments,
+    deduplicatedAmount: Math.round(adjustments.reduce((sum, row) => sum + row.amount, 0) * 100) / 100
+  };
+}
+
 async function getPaidFact(period) {
   const b = bounds(period);
   const cashQ = 'ВЫБРАТЬ Д.Период КАК Дата,'
@@ -327,28 +384,42 @@ async function getPaidFact(period) {
     + ' И Д.ПриходРасход = ЗНАЧЕНИЕ(Перечисление.ВидыДвиженийПриходРасход.Расход)'
     + ' УПОРЯДОЧИТЬ ПО Дата';
   const cashRes = await upp.callQuery(cashQ, { timeoutMs: 60000 });
-  const byArticle = new Map();
+  const rawTransactions = [];
   for (const row of (cashRes.rows || [])) {
     const article = String(row.Статья || '').trim();
     if (!MARKETING_FUND_RE.test(normalize(article))) continue;
     const amount = Math.round(upp.parseRu(row.Сумма) * 100) / 100;
     if (!amount) continue;
-    if (!byArticle.has(article)) {
-      byArticle.set(article, {
-        name: article,
-        category: classifyText(article, article),
-        amount: 0,
-        transactions: []
-      });
-    }
-    const item = byArticle.get(article);
-    item.amount += amount;
-    item.transactions.push({
+    rawTransactions.push({
+      article,
+      category: classifyText(article, article),
       date: row.Дата || '',
       counterparty: String(row.Контрагент || '').trim(),
       document: String(row.Документ || '').trim(),
       purpose: String(row.Назначение || '').replace(/\s+/g, ' ').trim(),
       amount
+    });
+  }
+  const deduped = deduplicateCashTransactions(rawTransactions);
+  const byArticle = new Map();
+  for (const tx of deduped.transactions) {
+    const article = tx.article;
+    if (!byArticle.has(article)) {
+      byArticle.set(article, {
+        name: article,
+        category: tx.category,
+        amount: 0,
+        transactions: []
+      });
+    }
+    const item = byArticle.get(article);
+    item.amount += tx.amount;
+    item.transactions.push({
+      date: tx.date,
+      counterparty: tx.counterparty,
+      document: tx.document,
+      purpose: tx.purpose,
+      amount: tx.amount
     });
   }
   const articles = Array.from(byArticle.values()).map((article) => {
@@ -360,7 +431,13 @@ async function getPaidFact(period) {
     available: true,
     total: Math.round(articles.reduce((sum, article) => sum + article.amount, 0) * 100) / 100,
     articles,
-    transactions: articles.reduce((sum, article) => sum + article.transactions.length, 0)
+    // «Движение» точнее слова «платёж»: здесь есть РКО, авансовые отчёты и сторно.
+    movements: deduped.transactions.length,
+    rawMovements: rawTransactions.length,
+    documents: new Set(deduped.transactions.map((tx) => tx.document).filter(Boolean)).size,
+    transactions: deduped.transactions.length,
+    deduplicatedAmount: deduped.deduplicatedAmount,
+    adjustments: deduped.adjustments
   };
 }
 
@@ -420,7 +497,7 @@ async function compute(period) {
   if (fact.available === undefined) fact.available = true;
   const paid = paidResult.status === 'fulfilled'
     ? paidResult.value
-    : { available: false, total: 0, articles: [], transactions: 0, error: paidResult.reason.message };
+    : { available: false, total: 0, articles: [], movements: 0, rawMovements: 0, documents: 0, transactions: 0, adjustments: [], deduplicatedAmount: 0, error: paidResult.reason.message };
 
   const committed = Math.round((fact.approved + fact.pending) * 100) / 100;
   const remainingApproved = Math.round((plan.total - fact.approved) * 100) / 100;
@@ -444,14 +521,14 @@ async function compute(period) {
       committedPct: plan.total > 0 ? Math.round(committed / plan.total * 1000) / 10 : null,
       paidPct: plan.total > 0 ? Math.round(paid.total / plan.total * 1000) / 10 : null
     },
-    note: 'План — сумма строк выбранного листа Google Sheets. «Утверждено» — последнее решение ФП по маркетинговым заказам. «Оплачено» — фактические расходы по всем маркетинговым статьям движения денег в 1С за выбранный месяц.',
+    note: 'План — сумма строк выбранного листа Google Sheets. «Утверждено» — последнее решение ФП по маркетинговым заказам. «Оплачено» — фактические расходы по всем маркетинговым статьям движения денег в 1С за выбранный месяц. Точные пары РКО и авансового отчёта учитываются один раз.',
     refreshedAt: new Date().toISOString()
   };
 }
 
 function getMarketingBudget(period) {
   const p = period || upp.nowYM();
-  return resultCache.wrap(`marketing-budget-v2:${p}`, () => compute(p));
+  return resultCache.wrap(`marketing-budget-v3:${p}`, () => compute(p));
 }
 
 module.exports = {
@@ -459,5 +536,6 @@ module.exports = {
   // Чистые функции оставлены доступными для регрессионных проверок парсинга.
   parseMoney,
   parseSheetRows,
-  classifyText
+  classifyText,
+  deduplicateCashTransactions
 };

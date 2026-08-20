@@ -5123,15 +5123,16 @@ function renderPaidCosts(pc){
   // реально крупнейший — SMS (тот же класс косяка, что тултип «SMS: X ₽» в mGroup).
   var topCh=ch.slice().sort(function(a,b){ return (b.cost||0)-(a.cost||0); })[0]||{};
   var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px">'+
-    kpi('<b>'+mNum(pc.totalMonthly)+' ₽</b>','Платный маркетинг / мес (итого)')+
+    kpi('<b>'+mNum(pc.totalMonthly)+' ₽</b>','Затраты выбранного месяца')+
     kpi(mNum(ch.length),'Каналов')+
     kpi(mNum(topCh.cost||0)+' ₽','Самый дорогой: '+(topCh.name||'—'))+
     '</div>'+
     '<div class="table-wrap"><table style="font-size:12px"><thead><tr><th>Канал</th><th class="num">Затраты/мес ₽</th><th class="num">Доля</th><th>Что даёт</th><th>Стоимость результата</th></tr></thead><tbody>'+
     ch.map(function(c){
-      var liveBadge = c.live ? '' : ' <span style="font-size:10px;color:var(--muted)">фикс</span>';
-      var res = c.live ? c.result : '<span style="color:var(--muted)">'+c.result+'</span>';
-      return '<tr><td><b>'+c.name+'</b>'+liveBadge+'<div style="font-size:10px;color:var(--muted)">'+(c.costNote||'')+'</div></td>'+
+      var sourceWord={mixed:'факт + норматив',estimated:'норматив',calculated:'расчёт',actual:'факт'};
+      var sourceBadge=' <span style="font-size:10px;color:var(--muted)">'+(sourceWord[c.costSource]||'')+'</span>';
+      var res = c.attribution==='missing' ? '<span style="color:var(--muted)">'+c.result+'</span>' : c.result;
+      return '<tr><td><b>'+c.name+'</b>'+sourceBadge+'<div style="font-size:10px;color:var(--muted)">'+(c.costNote||'')+'</div></td>'+
         '<td class="num">'+mNum(c.cost)+'</td>'+
         '<td class="num">'+share(c.cost)+' %</td>'+
         '<td style="font-size:11px">'+res+'</td>'+
@@ -5140,6 +5141,7 @@ function renderPaidCosts(pc){
     '<tr class="mkt-total"><td><b>Итого / мес</b></td><td class="num"><b>'+mNum(pc.totalMonthly)+'</b></td><td class="num">100 %</td><td colspan="2"></td></tr>'+
     '</tbody></table></div>';
   if(pc.note) html+='<div style="font-size:11px;color:var(--muted);margin-top:8px">'+pc.note+'</div>';
+  if(pc.dataQuality&&pc.dataQuality.issues&&pc.dataQuality.issues.length) html+='<div style="font-size:11px;color:var(--gold);margin-top:7px">⚠ '+pc.dataQuality.issues.map(escapeHtml).join('<br>⚠ ')+'</div>';
   el.innerHTML=html;
 }
 
@@ -5159,7 +5161,7 @@ function renderMarketingBudget(b){
   var html='<div class="mkt-yoy-grid">'+
     kpi(plan.available?rub(t.plan):'н/д','План на месяц',plan.available?(plan.items||[]).length+' строк из Google Sheets':'план не найден')+
     kpi(fact.available?rub(t.approved):'н/д','Утверждено на ФП',fact.available?pct(t.executionPct)+' плана':'1С недоступна')+
-    kpi(paid.available?rub(t.paid):'н/д','Фактически оплачено',paid.available?pct(t.paidPct)+' плана · '+(paid.transactions||0)+' платежей':'движения денег недоступны')+
+    kpi(paid.available?rub(t.paid):'н/д','Фактически оплачено',paid.available?pct(t.paidPct)+' плана · '+(paid.movements||paid.transactions||0)+' движений / '+(paid.documents||0)+' документов':'движения денег недоступны')+
     kpi(fact.available?rub(t.pending):'н/д','Ждёт рассмотрения',fact.available?((fact.counts&&fact.counts.pending)||0)+' заявок':'1С недоступна')+
     kpi(plan.available&&paid.available?'<span style="color:'+remainingColor+'">'+rub(remaining)+'</span>':'н/д',remaining<0?'Перерасход по оплатам':'Остаток после оплат','утверждено + ожидает: '+rub(t.committed))+
   '</div>';
@@ -5167,6 +5169,7 @@ function renderMarketingBudget(b){
   var warnings=(plan.warnings||[]).slice();
   if(fact.error) warnings.push('Данные 1С недоступны: '+fact.error);
   if(paid.error) warnings.push('Оплаты из 1С недоступны: '+paid.error);
+  if(paid.deduplicatedAmount>0) warnings.push('Точная пара РКО и авансового отчёта учтена один раз: убрано задвоение '+rub(paid.deduplicatedAmount)+'.');
   if(warnings.length){
     html+='<div style="margin-top:10px;padding:9px 11px;border:1px solid var(--gold);background:var(--warn-soft);border-radius:7px;font-size:12px;color:var(--gold)">⚠ '+warnings.map(escapeHtml).join('<br>⚠ ')+'</div>';
   }
@@ -5190,13 +5193,13 @@ function renderMarketingBudget(b){
       if(aRows.length){
         var tx=[];
         aRows.forEach(function(a){(a.transactions||[]).forEach(function(x){tx.push({article:a.name,date:x.date,counterparty:x.counterparty,document:x.document,purpose:x.purpose,amount:x.amount});});});
-        out+='<div><div class="mkt-budget-detail-title">Оплаченные статьи · '+mNum(aRows.length)+'</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Статья движения денег</th><th class="num">Оплачено, ₽</th><th class="num">Платежей</th></tr></thead><tbody>'+aRows.map(function(a){return '<tr><td><b>'+escapeHtml(a.name)+'</b></td><td class="num"><b>'+mNum(a.amount)+'</b></td><td class="num">'+mNum((a.transactions||[]).length)+'</td></tr>';}).join('')+'</tbody></table></div>'+
-          '<div class="mkt-budget-detail-title" style="margin-top:10px">Детализация платежей</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Дата</th><th>Статья</th><th>Контрагент</th><th>Назначение / документ</th><th class="num">Сумма, ₽</th></tr></thead><tbody>'+tx.map(function(x){return '<tr><td style="white-space:nowrap">'+escapeHtml(String(x.date||'').slice(0,10))+'</td><td><b>'+escapeHtml(x.article)+'</b></td><td>'+escapeHtml(x.counterparty||'—')+'</td><td style="color:var(--muted)">'+escapeHtml(x.purpose||x.document||'—')+'</td><td class="num">'+mNum(x.amount)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+        out+='<div><div class="mkt-budget-detail-title">Оплаченные статьи · '+mNum(aRows.length)+'</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Статья движения денег</th><th class="num">Оплачено, ₽</th><th class="num">Движений</th></tr></thead><tbody>'+aRows.map(function(a){return '<tr><td><b>'+escapeHtml(a.name)+'</b></td><td class="num"><b>'+mNum(a.amount)+'</b></td><td class="num">'+mNum((a.transactions||[]).length)+'</td></tr>';}).join('')+'</tbody></table></div>'+
+          '<div class="mkt-budget-detail-title" style="margin-top:10px">Детализация движений денег</div><div class="table-wrap"><table style="font-size:11px"><thead><tr><th>Дата</th><th>Статья</th><th>Контрагент</th><th>Назначение / документ</th><th class="num">Сумма, ₽</th></tr></thead><tbody>'+tx.map(function(x){return '<tr><td style="white-space:nowrap">'+escapeHtml(String(x.date||'').slice(0,10))+'</td><td><b>'+escapeHtml(x.article)+'</b></td><td>'+escapeHtml(x.counterparty||'—')+'</td><td style="color:var(--muted)">'+escapeHtml(x.purpose||x.document||'—')+'</td><td class="num">'+mNum(x.amount)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
       }
       if(!pRows.length&&!oRows.length&&!aRows.length) out+='<div style="color:var(--muted)">Нет детализации.</div>';
       return out+'</div>';
     };
-    html+='<div class="section-hint" style="margin-top:12px">Нажмите на категорию, чтобы раскрыть все плановые статьи, заявки ФП и фактические платежи.</div>'+
+    html+='<div class="section-hint" style="margin-top:12px">Нажмите на категорию, чтобы раскрыть все плановые статьи, заявки ФП и фактические движения денег.</div>'+
       '<div class="table-wrap" style="margin-top:6px"><table class="mkt-budget-table" style="font-size:12px"><thead><tr><th>Категория</th><th class="num">План</th><th class="num">Утверждено</th><th class="num">Оплачено</th><th class="num">Ожидает ФП</th><th class="num">Остаток после оплат</th><th class="num">Оплачено, %</th></tr></thead><tbody>'+
       cats.map(function(c){
         var remColor=c.remainingPaid<0?'var(--bad)':'';
@@ -5216,6 +5219,85 @@ function renderMarketingBudget(b){
       row.setAttribute('aria-expanded',open?'true':'false');
       var arrow=row.querySelector('.mkt-budget-arrow'); if(arrow) arrow.textContent=open?'▾':'▸';
     };
+    row.addEventListener('click',toggle);
+    row.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+  });
+}
+
+// Единый Campaign P&L: стоимость выбранного месяца, измеримые заказы, CAC и ROMI.
+function renderCampaignPerformance(d){
+  var el=document.getElementById('mktCampaignPnl'); if(!el) return;
+  if(!d || d.error || d.unavailable){
+    el.innerHTML='<div style="font-size:12px;color:var(--muted)">Отчёт недоступен: '+escapeHtml((d&&(d.error||d.reason))||'нет данных')+'</div>';
+    return;
+  }
+  var s=d.summary||{}, rows=d.rows||[];
+  var rub=function(v){return v==null?'—':mNum(v)+' ₽';};
+  var percent=function(v){return v==null?'—':(v>0?'+':'')+mNum1(v)+' %';};
+  var kpi=function(v,l,sub){return '<div class="mkt-kpi"><div class="mkt-v">'+v+'</div><div class="mkt-l">'+l+'</div>'+(sub?'<div class="mkt-yoy-p" style="margin-top:3px">'+sub+'</div>':'')+'</div>';};
+  var gap=s.cashGap;
+  var romiColor=s.romiPct==null?'var(--muted)':(s.romiPct>=0?'var(--good)':'var(--bad)');
+  var html='<div class="mkt-yoy-grid">'+
+    kpi(rub(s.actualCashPaid),'Оплачено по 1С','кассовые движения месяца')+
+    kpi(rub(s.periodCost),'Затраты периода','активности выбранного месяца')+
+    kpi(s.attributedCostPct==null?'—':mNum1(s.attributedCostPct)+' %','Покрыто покупками',rub(s.attributedCost)+' затрат с атрибуцией')+
+    kpi(rub(s.reportedRevenue),'Выручка каналов','без межканального дедупа')+
+    kpi(rub(s.estimatedGrossProfit),'Валовая прибыль каналов',s.grossMarginPct==null?'маржа месяца не закрыта':'оценка по марже '+mNum1(s.grossMarginPct)+' %')+
+    kpi('<span style="color:'+romiColor+'">'+percent(s.romiPct)+'</span>','ROMI отслеженных','по валовой прибыли, не по выручке')+
+  '</div>';
+  if(gap!=null && Math.abs(gap)>=1){
+    html+='<div class="mkt-campaign-reconcile"><b>Сверка баз:</b> кассовые оплаты '+rub(s.actualCashPaid)+' · затраты выбранного периода '+rub(s.periodCost)+' · разница '+rub(Math.abs(gap))+'. Разница не считается ошибкой автоматически: в оплатах могут быть авансы, договоры на несколько месяцев и услуги без привязки к кампании.</div>';
+  }
+
+  var attrLabel={
+    measured:['измерено','var(--good)'],
+    estimated:['оценка прироста','var(--accent)'],
+    weak:['слабая связь','var(--gold)'],
+    'traffic-only':['только действие','var(--gold)'],
+    missing:['нет атрибуции','var(--bad)']
+  };
+  var costLabel={actual:'оплата','mixed':'факт + норматив',estimated:'норматив','calculated':'расчёт'};
+  if(rows.length){
+    html+='<div class="section-hint" style="margin-top:12px">Нажмите на строку, чтобы увидеть базу стоимости и метод атрибуции. Выручка SMS с рассчитанным baseline показана только как прирост сверх обычного уровня.</div>'+
+      '<div class="table-wrap" style="margin-top:6px"><table class="mkt-budget-table mkt-campaign-table" style="font-size:12px"><thead><tr><th>Канал / кампания</th><th class="num">Затраты</th><th class="num">Заказы</th><th class="num">Выручка</th><th class="num">CAC</th><th class="num">Валовая прибыль</th><th class="num">ROMI</th><th>Атрибуция</th></tr></thead><tbody>'+
+      rows.map(function(r,i){
+        var al=attrLabel[r.attribution]||attrLabel.missing;
+        var rc=r.romiPct==null?'var(--muted)':(r.romiPct>=0?'var(--good)':'var(--bad)');
+        var id='mkt-campaign-detail-'+i;
+        var result=r.orders==null?'—':mNum(r.orders);
+        if(r.orders==null && r.actions!=null) result=mNum(r.actions)+' '+escapeHtml(r.actionLabel||'действий');
+        var detail='<b>Стоимость:</b> '+escapeHtml(r.costNote||'нет описания')+
+          '<br><b>Источник стоимости:</b> '+escapeHtml(costLabel[r.costSource]||r.costSource||'н/д')+
+          ' · <b>период:</b> '+escapeHtml(r.sourcePeriod||'не указан')+
+          '<br><b>Метод результата:</b> '+escapeHtml(r.method||'не указан')+
+          (r.metric?'<br><b>Метрика SMS:</b> '+escapeHtml(r.metric):'')+
+          (r.product?'<br><b>Оффер:</b> '+escapeHtml(r.product):'')+
+          (r.error?'<br><b style="color:var(--bad)">Ошибка:</b> '+escapeHtml(r.error):'');
+        return '<tr class="mkt-budget-cat-row" data-target="'+id+'" tabindex="0" role="button" aria-expanded="false" aria-controls="'+id+'">'+
+          '<td><span class="mkt-budget-arrow">▸</span><b>'+escapeHtml(r.channel||'—')+'</b><div style="font-size:10px;color:var(--muted);max-width:420px">'+escapeHtml(r.campaign||'—')+(r.date?' · '+escapeHtml(r.date):'')+'</div></td>'+
+          '<td class="num"><b>'+rub(r.cost)+'</b><div style="font-size:9px;color:var(--muted)">'+escapeHtml(costLabel[r.costSource]||r.costSource||'')+'</div></td>'+
+          '<td class="num">'+result+'</td><td class="num">'+rub(r.revenue)+'</td><td class="num">'+rub(r.cac)+'</td><td class="num">'+rub(r.estimatedGrossProfit)+'</td><td class="num" style="color:'+rc+'"><b>'+percent(r.romiPct)+'</b></td>'+
+          '<td><span style="color:'+al[1]+';font-weight:700">'+al[0]+'</span></td></tr>'+
+          '<tr id="'+id+'" class="mkt-budget-cat-detail" hidden><td colspan="8"><div class="section-hint">'+detail+'</div></td></tr>';
+      }).join('')+
+      '<tr class="mkt-total"><td><b>Итого по доступной атрибуции</b><div style="font-size:10px;color:var(--muted)">'+mNum(s.campaignsWithRevenue||0)+' из '+mNum(s.campaigns||0)+' строк с выручкой</div></td><td class="num"><b>'+rub(s.attributedCost)+'</b></td><td class="num">—</td><td class="num"><b>'+rub(s.reportedRevenue)+'</b></td><td class="num">—</td><td class="num"><b>'+rub(s.estimatedGrossProfit)+'</b></td><td class="num" style="color:'+romiColor+'"><b>'+percent(s.romiPct)+'</b></td><td>без дедупа заказов</td></tr>'+
+      '</tbody></table></div>';
+  }
+
+  var issues=d.issues||[];
+  if(issues.length){
+    var issueColor={error:'var(--bad)',warn:'var(--gold)',info:'var(--accent)'};
+    html+='<details class="mkt-details mkt-campaign-quality" open><summary>Контроль качества данных · '+mNum(issues.length)+'</summary><div class="mkt-campaign-issues">'+issues.map(function(x){return '<div style="border-left:3px solid '+(issueColor[x.level]||'var(--muted)')+'">'+escapeHtml(x.text)+'</div>';}).join('')+'</div></details>';
+  }
+  var tracking=d.tracking||[];
+  if(tracking.length){
+    html+='<details class="mkt-details"><summary>Что уже связано и чего ещё не хватает</summary><div class="mkt-tracking-grid">'+tracking.map(function(x){var ready=x.status==='ready';return '<div><span style="color:'+(ready?'var(--good)':'var(--bad)')+';font-weight:800">'+(ready?'✓':'○')+'</span> '+escapeHtml(x.name)+'</div>';}).join('')+'</div></details>';
+  }
+  var notes=d.notes||{};
+  html+='<div class="section-hint" style="margin-top:9px">'+escapeHtml(notes.grossProfit||'')+' '+escapeHtml(notes.romi||'')+' '+escapeHtml(notes.attribution||'')+'</div>';
+  el.innerHTML=html;
+  el.querySelectorAll('.mkt-budget-cat-row').forEach(function(row){
+    var toggle=function(){var detail=document.getElementById(row.dataset.target);if(!detail)return;var open=detail.hidden;detail.hidden=!open;row.setAttribute('aria-expanded',open?'true':'false');var arrow=row.querySelector('.mkt-budget-arrow');if(arrow)arrow.textContent=open?'▾':'▸';};
     row.addEventListener('click',toggle);
     row.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
   });
@@ -5482,6 +5564,29 @@ function mktExport(){
     push([mktCsvN(bt.plan),mktCsvN(bt.approved),mktCsvN(bt.paid),mktCsvN(bt.pending),mktCsvN(bt.remainingPaid),bt.paidPct==null?'':mktCsvN(bt.paidPct,1)]);
     push(['Категория','План руб','Утверждено руб','Оплачено руб','Ожидает ФП руб','Остаток после оплат руб','Оплачено %']);
     (_mktBudget.categories||[]).forEach(function(c){push([c.name,mktCsvN(c.plan),mktCsvN(c.approved),mktCsvN(c.paid),mktCsvN(c.pending),mktCsvN(c.remainingPaid),c.paidPct==null?'':mktCsvN(c.paidPct,1)]);});
+    L.push('');
+  }
+
+  // Campaign P&L: только строки выбранного месяца с явной пометкой качества атрибуции.
+  if(_mktCampaign && _mktCampaign.rows){
+    var cps=_mktCampaign.summary||{};
+    push(['Эффективность кампаний — CAC и ROMI']);
+    push(['Оплачено по 1С руб','Затраты периода руб','Затраты с атрибуцией руб','Выручка каналов руб (без межканального дедупа)','Оценочная валовая прибыль руб','ROMI отслеженных %']);
+    push([
+      cps.actualCashPaid==null?'':mktCsvN(cps.actualCashPaid),
+      cps.periodCost==null?'':mktCsvN(cps.periodCost),
+      cps.attributedCost==null?'':mktCsvN(cps.attributedCost),
+      cps.reportedRevenue==null?'':mktCsvN(cps.reportedRevenue),
+      cps.estimatedGrossProfit==null?'':mktCsvN(cps.estimatedGrossProfit),
+      cps.romiPct==null?'':mktCsvN(cps.romiPct,1)
+    ]);
+    push(['Канал','Кампания','Дата/период','Затраты руб','Источник стоимости','Заказы','Выручка руб','CAC руб','Оценочная валовая прибыль руб','ROMI %','Атрибуция','Метод']);
+    _mktCampaign.rows.forEach(function(r){push([
+      r.channel||'',r.campaign||'',r.date||'',mktCsvN(r.cost||0),r.costSource||'',
+      r.orders==null?'':r.orders,r.revenue==null?'':mktCsvN(r.revenue),r.cac==null?'':mktCsvN(r.cac),
+      r.estimatedGrossProfit==null?'':mktCsvN(r.estimatedGrossProfit),r.romiPct==null?'':mktCsvN(r.romiPct,1),
+      r.attribution||'',r.method||''
+    ]);});
     L.push('');
   }
 
@@ -6042,7 +6147,7 @@ var _mktInited=false;
 // Какой период реально загружен в маркетинг-блоки (для ресинка после metadata).
 var _mktLoadedPeriod=null;
 // Последние live-данные для CSV-экспорта.
-var _mktLive=null, _mktSms=null, _mktPaid=null, _mktBudget=null;
+var _mktLive=null, _mktSms=null, _mktPaid=null, _mktBudget=null, _mktCampaign=null;
 function mktInit(){
   // В обзоре сначала показываем решения и алерты, затем расчётные детали.
   var overview=document.getElementById('page-marketing'), alerts=document.getElementById('mkt-s-alerts'), gp=document.getElementById('mkt-s-grossprofit');
@@ -6113,6 +6218,7 @@ function mktLoadYoY(){
   var period=mktSelectedPeriod();
   _mktLoadedPeriod=period;
   _mktSms=null;
+  _mktCampaign=null;
   var echo=document.getElementById('mktPeriodEcho'); if(echo) echo.textContent=period;
   el.innerHTML='<div class="mkt-yoy-load">Загрузка из 1С…</div>';
   fetchJson('/api/marketing/channels?period='+period).then(function(d){
@@ -6175,6 +6281,15 @@ function mktLoadYoY(){
       budgetEl.innerHTML='<div class="mkt-yoy-load">Сверяю план, решения ФП и оплаты из 1С…</div>';
       fetchJson('/api/marketing/budget-plan-fact?period='+period).then(function(b){ _mktBudget=b; renderMarketingBudget(b); })
         .catch(function(e){ budgetEl.innerHTML='<div style="font-size:12px;color:var(--muted)">План-факт недоступен: '+escapeHtml(e.message)+'</div>'; });
+    }
+    // Campaign P&L — единая карточка затрат, заказов, выручки, CAC и ROMI.
+    var campaignEl=document.getElementById('mktCampaignPnl');
+    if(campaignEl){
+      campaignEl.innerHTML='<div class="mkt-yoy-load">Собираю затраты и атрибуцию кампаний…</div>';
+      fetchJson('/api/marketing/campaign-performance?period='+period).then(function(cp){
+        if(period!==_mktLoadedPeriod) return;
+        _mktCampaign=cp; renderCampaignPerformance(cp);
+      }).catch(function(e){ campaignEl.innerHTML='<div style="font-size:12px;color:var(--muted)">Campaign P&amp;L недоступен: '+escapeHtml(e.message)+'</div>'; });
     }
     // Свежесть внешних источников — служебный блок: ловит «тихую смерть» скрейпов.
     var srcEl=document.getElementById('mktSources');

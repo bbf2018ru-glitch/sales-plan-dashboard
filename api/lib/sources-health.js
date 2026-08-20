@@ -14,6 +14,8 @@ const DIR = process.env.MARKETING_DATA_DIR || '/opt/marketing-data';
 const EXPECTED = {
   'direct.json':            { h: 26,  name: 'Яндекс.Директ — расход за месяц' },
   'direct-history.json':    { h: 26,  name: 'Яндекс.Директ — история по месяцам' },
+  'direct-ecommerce.json':  { h: 26,  name: 'Ecommerce — покупки Директа и 2ГИС' },
+  'direct-ecommerce-history.json': { h: 26, name: 'Ecommerce — история покупок по каналам' },
   'metrika.json':           { h: 26,  name: 'Яндекс.Метрика — источники трафика' },
   'metrika-history.json':   { h: 26,  name: 'Яндекс.Метрика — помесячно' },
   '2gis.json':              { h: 26,  name: '2ГИС — карточка компании' },
