@@ -38,6 +38,10 @@ function normalize(value) {
   return String(value || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 }
 
+function partyKey(value) {
+  return normalize(value).replace(/[^a-zа-я0-9]/g, '');
+}
+
 function round(value) { return Math.round((value || 0) * 100) / 100; }
 
 function median(values) {
@@ -47,9 +51,16 @@ function median(values) {
   return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
 }
 
-function classifyCashExpense(article) {
+function classifyCashExpense(article, details = {}) {
   const s = normalize(article);
   if (!s) return 'excluded';
+  // Перевод, где организация и контрагент — одно и то же ИП, является выводом
+  // предпринимательского дохода/перемещением собственных денег, а не расходом
+  // бизнеса. В июле такие переводы были записаны под общей статьёй «Прочие
+  // расходы» и ошибочно уменьшали операционную прибыль на 4 005 000 ₽.
+  const organization = partyKey(details.organization);
+  const counterparty = partyKey(details.counterparty);
+  if (organization && counterparty && organization === counterparty) return 'excluded';
   if (MATERIAL_CASH_RE.test(s)) return 'materials';
   if (PAYROLL_CASH_RE.test(s)) return 'payroll';
   if (TAX_CASH_RE.test(s)) return 'taxes';
@@ -91,11 +102,13 @@ async function compute(period) {
     + ' Т.СчетДт, Т.СчетКт, Т.СубконтоДт1';
 
   const cashQ = 'ВЫБРАТЬ НАЧАЛОПЕРИОДА(Д.Период, МЕСЯЦ) КАК Мес,'
-    + ' Д.СтатьяДвиженияДенежныхСредств КАК Статья, СУММА(Д.СуммаУпр) КАК Сумма'
+    + ' Д.СтатьяДвиженияДенежныхСредств КАК Статья, Д.Организация КАК Организация,'
+    + ' Д.Контрагент КАК Контрагент, СУММА(Д.СуммаУпр) КАК Сумма'
     + ' ИЗ РегистрНакопления.ДвиженияДенежныхСредств КАК Д'
     + ` ГДЕ Д.Период >= ДАТАВРЕМЯ(${fr.y},${fr.m},1) И Д.Период < ДАТАВРЕМЯ(${b.ny},${b.nm},1)`
     + ' И Д.ПриходРасход = ЗНАЧЕНИЕ(Перечисление.ВидыДвиженийПриходРасход.Расход)'
-    + ' СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Д.Период, МЕСЯЦ), Д.СтатьяДвиженияДенежныхСредств';
+    + ' СГРУППИРОВАТЬ ПО НАЧАЛОПЕРИОДА(Д.Период, МЕСЯЦ), Д.СтатьяДвиженияДенежныхСредств,'
+    + ' Д.Организация, Д.Контрагент';
 
   const [materialsRes, payrollRes, cashRes] = await Promise.all([
     upp.callQuery(materialsQ, { timeoutMs: 60000 }),
@@ -153,11 +166,16 @@ async function compute(period) {
     const entry = cashByMonth[ym];
     const article = String(row.Статья || '').trim();
     const amount = upp.parseRu(row.Сумма);
-    const kind = classifyCashExpense(article);
+    const kind = classifyCashExpense(article, {
+      organization: row.Организация,
+      counterparty: row.Контрагент
+    });
     if (!(amount > 0)) { entry.excluded += amount; continue; }
     if (kind === 'operating') {
       entry.operating += amount;
-      entry.items.push({ name: article, amount: round(amount) });
+      const item = entry.items.find((x) => x.name === article);
+      if (item) item.amount = round(item.amount + amount);
+      else entry.items.push({ name: article, amount: round(amount) });
     } else if (kind === 'taxes') entry.taxes += amount;
     else if (kind === 'capex') entry.capex += amount;
     else if (kind === 'materials') entry.materialsPaid += amount;
@@ -183,8 +201,8 @@ async function compute(period) {
 
 function getGrossProfitCogs(period) {
   const p = period || upp.nowYM();
-  // v3 — добавлены полный ФОТ и прочие операционные расходы.
-  return cache.wrap('gpv3:' + p, () => compute(p));
+  // v4 — исключены переводы предпринимательского дохода самому ИП.
+  return cache.wrap('gpv4:' + p, () => compute(p));
 }
 
 module.exports = { getGrossProfitCogs, classifyCashExpense };
