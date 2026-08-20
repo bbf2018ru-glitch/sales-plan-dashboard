@@ -2196,6 +2196,36 @@ const server = http.createServer(async (req, res) => {
     // M2M-прокси для maria-crew (Hostinger вне whitelist 1С).
     // Auth — X-API-Key (INGEST_API_KEY), путь жёстко зафиксирован чтобы прокси
     // не стал universal-reflector.
+    if (pathname === '/api/upp/proxy/crew-sales-summary' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const period = monthKey(parsedUrl.searchParams.get('period'));
+      const db = await store.getDb();
+      const storesById = new Map((db.stores || []).map(s => [String(s.id), String(s.name || '')]));
+      const result = {
+        period,
+        gp: { salesCount: 0, quantity: 0, amount: 0 },
+        site: { salesCount: 0, quantity: 0, amount: 0 }
+      };
+      for (const sale of db.sales || []) {
+        if (sale.period !== period) continue;
+        const storeId = String(sale.storeId || sale.store_id || '');
+        const storeName = storesById.get(storeId) || '';
+        const bucket = /склад готовой продукции|склад гп/i.test(storeName)
+          ? result.gp
+          : (/сайт/i.test(storeName) ? result.site : null);
+        if (!bucket) continue;
+        bucket.salesCount += 1;
+        bucket.quantity += Number(sale.quantity || 0);
+        bucket.amount += Number(sale.amount || 0);
+      }
+      for (const bucket of [result.gp, result.site]) {
+        bucket.quantity = Number(bucket.quantity.toFixed(2));
+        bucket.amount = Number(bucket.amount.toFixed(2));
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+
     if (pathname === '/api/upp/proxy/products-detail' && req.method === 'GET') {
       if (!requireApiKey(req, res)) return;
       if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
