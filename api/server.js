@@ -2245,6 +2245,30 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Детальные строки чеков для игровых заданий maria-bot. Ограниченный
+    // M2M-прокси, а не универсальный рефлектор: наружу отдаём только
+    // sales-detail и только за указанный месяц.
+    if (pathname === '/api/upp/proxy/crew-sales-detail' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
+      try {
+        const { fetchUppPackage } = require('./lib/upp-pull');
+        const base = UPP_PULL_URL.replace(/\/pull(\?.*)?$/, '');
+        const period = monthKey(parsedUrl.searchParams.get('period'));
+        const limit = String(Math.min(Math.max(Number(parsedUrl.searchParams.get('limit') || 200000), 1), 200000));
+        const result = await fetchUppPackage({
+          url: `${base}/sales-detail?period=${encodeURIComponent(period)}&limit=${encodeURIComponent(limit)}`,
+          username: UPP_PULL_USER,
+          password: UPP_PULL_PASSWORD,
+          period
+        });
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 502, { error: e.message || 'upstream 1C error' });
+      }
+      return;
+    }
+
     if (pathname === '/api/upp/proxy/products-detail' && req.method === 'GET') {
       if (!requireApiKey(req, res)) return;
       if (!UPP_PULL_URL) { sendJson(res, 503, { error: 'UPP_PULL_URL не настроен' }); return; }
